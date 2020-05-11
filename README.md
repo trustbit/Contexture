@@ -1,6 +1,6 @@
 # Bounded Context Canvas Wizard
 
-The Bounded-Context-Canvas (BMC) was introduced by [Nick Tune](https://medium.com/nick-tune-tech-strategy-blog/bounded-context-canvas-v2-simplifications-and-additions-229ed35f825f) and it is a tool to document and visualize your contexts and their connections in a system.
+The Bounded-Context-Canvas (BMC) was introduced by [Nick Tune](https://medium.com/nick-tune-tech-strategy-blog/bounded-context-canvas-v2-simplifications-and-additions-229ed35f825f) as a tool to document and visualize contexts and their connections in a system.
 The canvas can be used to document business aspects, the most important behaviors and the interactions of a bounded context with other parts of the system.
 Reading and understanding an existing canvas is simple, even for people who are not familiar with concepts from Domain Driven Design.
 In order to create a new BMC, you need to understand a lot of concepts from DDD and filling in all the fields is not a simple task.
@@ -54,7 +54,7 @@ Version 3: "Empower users to input data"
 - No tests needed
 - No deployment needed (local/dev dependencies should be dockerized?)
 - No authentication/authorization
-- JSON persistence enough
+- File based persistence is good enough
 - No versioning needed
 
 Guessed effort for the main parts:
