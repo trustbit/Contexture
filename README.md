@@ -57,6 +57,8 @@ Version 3: "Empower users to input data"
 - JSON persistence enough
 - No versioning needed
 
+Guessed effort for the main parts:
+
 - "Mimicking the BMC with HTML forms"
   - can be run without any external dependencies
   - effort: 3 days
