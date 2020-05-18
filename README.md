@@ -1,37 +1,48 @@
 # Bounded Context Canvas Wizard
 
-The Bounded-Context-Canvas (BMC) was introduced by [Nick Tune](https://medium.com/nick-tune-tech-strategy-blog/bounded-context-canvas-v2-simplifications-and-additions-229ed35f825f) as a tool to document and visualize contexts and their connections in a system.
+The Bounded-Context-Canvas (BCC) was introduced by [Nick Tune](https://medium.com/nick-tune-tech-strategy-blog/bounded-context-canvas-v2-simplifications-and-additions-229ed35f825f) as a tool to document and visualize contexts and their connections in a system.
 The canvas can be used to document business aspects, the most important behaviors and the interactions of a bounded context with other parts of the system.
 Reading and understanding an existing canvas is simple, even for people who are not familiar with concepts from Domain Driven Design.
-In order to create a new BMC, you need to understand a lot of concepts from DDD and filling in all the fields is not a simple task.
+In order to create a new BCC, you need to understand a lot of concepts from DDD and filling in all the fields is not a simple task.
 
 ## Building an application
 
-Typically a BMC is created with the help of Post-ITs on physical paper, while digital versions are usually just a mirror of the physical representation, e.g. with the help of Miro.
+Typically a BCC is created with the help of Post-ITs on physical paper, while digital versions are usually just a mirror of the physical representation, e.g. with the help of Miro.
 Meaning that the captured information is represented as free text on virtual Post-ITs and is not stored in a structured way.
 This prohibits further data processing and visualization of the information.
 
 Therefor we propose to design a small application which:
 
-- stores information about a BMC in a structured way instead of just using free text on (virtual) Post-ITs,
+- stores information about a BCC in a structured way instead of just using free text on (virtual) Post-ITs,
 - allows explicit connections between different bounded contexts,
 - supports updating and versioning of the information over time,
 - allows to export and visualize the information from the application,
-- and helps people to input data for a BMC easier
+- and helps people to input data for a BCC easier
+
+While capturing the data manually via a form is great for learning, understanding and building up initial representations of BCC.
+The manual work can only be seen as a short to mid term goal, in the long run the data for the BCC should be gathered automatically from applications and should then be presented to the user.
+E.g. the data can be read from the source code during the build process:
+
+- capturing domain terminology by looking at frequently used words,
+- reading business rules & policies from e.g. attributed types,
+- discovering dependencies to other systems via e.g. OpenAPI documents or
+- describing model traits or classifications via attributes
+
+Additional ideas on how to gather or present information can be read in [Cyrille Martraire book on Living Documentation](https://leanpub.com/livingdocumentation).
 
 ### Features for a Prototype
 
-MVP: "Mimicking the BMC with HTML forms"
+MVP: "Mimicking the BCC with HTML forms"
 
-- Have a form mirroring the BMC with free text fields
+- Have a form mirroring the BCC with free text fields
 - Creating a new bounded context by submitting a new form
-- Loading existing BMC into a form and updating them by (re)submitting it
+- Loading existing BCC into a form and updating them by (re)submitting it
 
 Version 1: "Improving data quality"
 
 - Use dropdowns + (conditional) free text where appropriate (strategic classification, model traits, relationships)
 - Improve definition of ubiquitous language terms (allow Key-Value pairs)
-- Provide Auto-complete boxes (free text search) for dependencies (search in already existing BMC names)
+- Provide Auto-complete boxes (free text search) for dependencies (search in already existing BCC names)
 - Provide Auto-complete boxes (free text search) for consumed message contracts (search in produces message contracts)
 
 Note: can be run without any external dependencies
@@ -39,14 +50,14 @@ Note: can be run without any external dependencies
 Version 2: "Connecting Sructurizr for visualization"
 
 - connect Structurizr as (additional?) persistence layer
-- Visualize data from Structurizr as BMC
+- Visualize data from Structurizr as BCC
 
 Note: needs Structurizr on-premise (via a docker-container)
 
 Version 3: "Empower users to input data"
 
 - Provide help text/additional information for each field
-- Design a wizard for gradually/step-by-step creating a BMC
+- Design a wizard for gradually/step-by-step creating a BCC
 - Show proposed Bounded Context Canvases (from entered dependencies)
 
 ### Roadmap to a Prototype
@@ -59,7 +70,7 @@ Version 3: "Empower users to input data"
 
 Guessed effort for the main parts:
 
-- "Mimicking the BMC with HTML forms"
+- "Mimicking the BCC with HTML forms"
   - can be run without any external dependencies
   - effort: 3 days
 - "Improving data quality"
@@ -71,11 +82,11 @@ Guessed effort for the main parts:
 - "Empower users to input data"
   - effort 4 days
 
-## Connect the BMC with Structurizr
+## Connect the BCC with Structurizr
 
 For visualization and exploration purposes Structurizr can be used to display information and the connections of bounded contexts.
 
-Mapping BMC towards the Structurizr / C4 model:
+Mapping BCC towards the Structurizr / C4 model:
 
 DDD concepts:
 
@@ -84,7 +95,7 @@ DDD concepts:
 - BoundedContext -> C4/Container
 - Messages/Contracts -> C4/Component
 
-BMC concepts:
+BCC concepts:
 
 - Name -> C4/Container-name
 - Description -> C4/Container-Description
