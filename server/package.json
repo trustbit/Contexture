@@ -1,0 +1,17 @@
+{
+  "name": "bcc-wizard-server",
+  "version": "1.0.0",
+  "description": "Server for BCC-Wizard using json-server as storage backend and serving assets with express.js",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "cors": "^2.8.5",
+    "express": "^4.17.1",
+    "json-server": "^0.16.1"
+  }
+}

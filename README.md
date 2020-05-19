@@ -110,3 +110,38 @@ Visualizations:
 
 - Domain / global context map -> Structurizr/Workspace linking + SystemLandscapeDiagram
 - Context map within domain -> Structurizr/SystemLandscapeDiagram
+
+## BCC-Wizard server backend
+
+The BCC-Wizard server implements a simple storage backend that uses `json-server` to expose a file system backed REST API and serving static assets through express.
+
+### Installation
+
+```bash
+cd server
+npm i
+```
+
+### Usage
+
+```bash
+cd server
+npm start
+```
+
+BCC-Wizard server will listen on port 3000 per default. If you want to have the server listening on any other port set the environment variable `PORT` to the desired port.
+
+### Docker
+
+```bash
+cd server
+docker build -t bcc-wizard-server .
+docker run -p 8081:3000 bcc-wizard-server
+```
+
+Now head to your browser and access the BCC-Wizard server through http://localhost:8081
+
+### Caveats
+
+- `cors` is configured to allow all origins
+- no logging built in
