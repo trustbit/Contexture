@@ -21,8 +21,8 @@ jobs:
     # Checks-out your repository under $GITHUB_WORKSPACE, so your job can access it
     - uses: actions/checkout@v2
 
-    - working-directory: app
 
     - name: Setup Elm
       uses: justgook/setup-elm@v1
     - run: elm make src/Main.elm
+      working-directory: ./app
