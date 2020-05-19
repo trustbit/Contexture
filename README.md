@@ -145,3 +145,25 @@ Now head to your browser and access the BCC-Wizard server through http://localho
 
 - `cors` is configured to allow all origins
 - no logging built in
+
+## BCC-Wizard frontend application
+
+The application is developed with [Elm](https://elm-lang.org/) and connects to the backend via the API.
+
+Make sure [Elm](https://guide.elm-lang.org/install/elm.html) is installed and part of your path.
+
+### Usage
+
+During development:
+
+```bash
+cd app
+elm reactor
+```
+
+Building the app
+
+```bash
+cd app
+elm make src/Main.elm
+```
