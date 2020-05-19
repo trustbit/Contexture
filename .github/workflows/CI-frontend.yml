@@ -25,6 +25,4 @@ jobs:
 
     - name: Setup Elm
       uses: justgook/setup-elm@v1
-  
-    - name: Build app
     - run: elm make src/Main.elm
