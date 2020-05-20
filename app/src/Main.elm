@@ -1,11 +1,5 @@
 module Main exposing (..)
 
--- Press buttons to increment and decrement a counter.
---
--- Read how it works:
---   https://guide.elm-lang.org/architecture/buttons.html
---
-
 import Browser
 import Html exposing (Html, button, div, text)
 import Html.Attributes exposing (..)
@@ -23,7 +17,6 @@ import Json.Encode as Encode
 import Json.Decode exposing (Decoder, map2, field, string, int, at)
 
 
-
 -- MAIN
 
 
@@ -34,7 +27,6 @@ main =
     , view = view
     , subscriptions = subscriptions 
     }
-
 
 
 -- MODEL
@@ -64,14 +56,15 @@ init id _ =
   )
 
 
-
 -- UPDATE
 
+type FieldMsg
+  = SetName String
+  | SetDescription String
 
 type Msg
   = Loaded (Result Http.Error BoundedContextCanvas)
-  | SetName String
-  | SetDescription String
+  | Field FieldMsg
   | Save
   | Saved (Result Http.Error ())
 
@@ -79,20 +72,9 @@ type Msg
 update : Msg -> Model -> (Model, Cmd Msg)
 update msg model =
   case msg of
-    SetName name ->
-      let 
-        canvas = model.canvas
-        newCanvas = { canvas | name = name}
-      in
-        ({ model | canvas = newCanvas}, Cmd.none)
-
-    SetDescription description ->
-      let 
-        canvas = model.canvas
-        newCanvas = { canvas | description = description}
-      in
-        ({ model | canvas = newCanvas}, Cmd.none)
-    
+    Field fieldMsg ->
+      ({ model | canvas = updateFields fieldMsg model.canvas  }, Cmd.none)
+      
     Save -> 
       (model, saveBCC model)
     Saved result -> 
@@ -108,6 +90,15 @@ update msg model =
         Err _ ->
           (model, Cmd.none)
 
+updateFields: FieldMsg -> BoundedContextCanvas -> BoundedContextCanvas
+updateFields msg canvas =
+  case msg of
+    SetName name ->
+      { canvas | name = name}
+      
+    SetDescription description ->
+      { canvas | description = description}
+      
 -- SUBSCRIPTIONS
 
 
@@ -122,7 +113,7 @@ view : Model -> Html Msg
 view model =
   Grid.container [] 
     [ CDN.stylesheet
-    , viewCanvas model.canvas
+    , viewCanvas model.canvas |> Html.map Field
     , Grid.row []
       [ Grid.col [] 
         [ Form.label [] [ text <| "echo name: " ++ model.canvas.name ]
@@ -134,7 +125,7 @@ view model =
       ]
     ]
 
-viewCanvas: BoundedContextCanvas -> Html Msg
+viewCanvas: BoundedContextCanvas -> Html FieldMsg
 viewCanvas model =
   Grid.row []
     [ Grid.col []
@@ -156,6 +147,7 @@ loadBCC id =
     { url = "http://localhost:3000/api/bccs/" ++ id
     , expect = Http.expectJson Loaded modelDecoder
     }
+
 saveBCC: Model -> Cmd Msg
 saveBCC model =
   if model.exists then
