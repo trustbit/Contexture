@@ -19,6 +19,8 @@ Therefor we propose to design a small application which:
 - allows to export and visualize the information from the application,
 - and helps people to input data for a BCC easier
 
+![Mockup of the application](./Sketch.jpg)
+
 While capturing the data manually via a form is great for learning, understanding and building up initial representations of BCC.
 The manual work can only be seen as a short to mid term goal, in the long run the data for the BCC should be gathered automatically from applications and should then be presented to the user.
 E.g. the data can be read from the source code during the build process:
