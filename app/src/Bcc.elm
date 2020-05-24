@@ -10,13 +10,14 @@ import Bootstrap.Form as Form
 import Bootstrap.Form.Input as Input
 import Bootstrap.Button as Button
 
+import Url
 import Http
 import Json.Encode as Encode
 import Json.Decode exposing (Decoder, map2, field, string, int, at)
 
 -- MODEL
 
-type alias BoundedContextId = String
+type alias BoundedContextId = Int
 
 type alias BoundedContextCanvas = 
   { name: String
@@ -24,20 +25,18 @@ type alias BoundedContextCanvas =
   }
 
 type alias Model = 
-  { id: BoundedContextId
-  , exists: Bool
+  { url: Url.Url
   , canvas: BoundedContextCanvas
   }
 
 
-init : BoundedContextId -> (Model, Cmd Msg)
-init id =
+init : Url.Url -> (Model, Cmd Msg)
+init url =
   (
-    { id = id
-    , exists = False
+    { url = url
     , canvas = { name = "", description = ""}
     }
-  , loadBCC id
+  , loadBCC url
   )
 
 
@@ -71,7 +70,7 @@ update msg model =
     Loaded result ->
       case result of
         Ok m ->
-          ({ model | exists = True, canvas = m }, Cmd.none)
+          ({ model | canvas = m }, Cmd.none)
         Err _ ->
           (model, Cmd.none)
 
@@ -88,18 +87,19 @@ updateFields msg canvas =
 
 view : Model -> Html Msg
 view model =
-    Grid.container [] 
+    Html.div []
         [ viewCanvas model.canvas |> Html.map Field
         , Grid.row []
-        [ Grid.col [] 
-            [ Form.label [] [ text <| "echo name: " ++ model.canvas.name ]
-            , Html.br [] []
-            , Form.label [] [ text <| "echo description: " ++ model.canvas.description ]
-            , Html.br [] []
-            , Button.button [ Button.primary, Button.onClick Save ] [ text "Save"]
+            [ Grid.col [] 
+                [ Form.label [] [ text <| "echo name: " ++ model.canvas.name ]
+                , Html.br [] []
+                , Form.label [] [ text <| "echo description: " ++ model.canvas.description ]
+                , Html.br [] []
+                , Button.button [ Button.primary, Button.onClick Save ] [ text "Save"]
+                ]
             ]
         ]
-        ]
+
 
 viewCanvas: BoundedContextCanvas -> Html FieldMsg
 viewCanvas model =
@@ -117,37 +117,29 @@ viewCanvas model =
 
 -- HTTP
 
-loadBCC: BoundedContextId -> Cmd Msg
+loadBCC: Url.Url -> Cmd Msg
 loadBCC id =
   Http.get
-    { url = "http://localhost:3000/api/bccs/" ++ id
+    { url = Url.toString id
     , expect = Http.expectJson Loaded modelDecoder
     }
 
 saveBCC: Model -> Cmd Msg
 saveBCC model =
-  if model.exists then
     Http.request
       { method = "PUT"
       , headers = []
-      , url = "http://localhost:3000/api/bccs/" ++ model.id
+      , url = Url.toString model.url
       , body = Http.jsonBody <| modelEncoder model
       , expect = Http.expectWhatever Saved
       , timeout = Nothing
       , tracker = Nothing
       }
-  else
-    Http.post
-      { url = "http://localhost:3000/api/bccs"
-      , body = Http.jsonBody <| modelEncoder model
-      , expect = Http.expectWhatever Saved
-      }
 
 modelEncoder: Model -> Encode.Value
 modelEncoder model = 
   Encode.object
-    [ ("id", Encode.string model.id)
-    , ("name", Encode.string model.canvas.name)
+    [ ("name", Encode.string model.canvas.name)
     , ("description", Encode.string model.canvas.description)
     ]
 
