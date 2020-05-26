@@ -160,6 +160,8 @@ cd app
 elm make src/Main.elm
 ```
 
+Make sure the backend part is reachable with its default url <http://localhost:3000>
+
 ## Running with Docker
 
 ```bash
