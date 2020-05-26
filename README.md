@@ -133,16 +133,6 @@ npm start
 
 BCC-Wizard server will listen on port 3000 per default. If you want to have the server listening on any other port set the environment variable `PORT` to the desired port.
 
-### Docker
-
-```bash
-cd server
-docker build -t bcc-wizard-server .
-docker run -p 8081:3000 bcc-wizard-server
-```
-
-Now head to your browser and access the BCC-Wizard server through http://localhost:8081
-
 ### Caveats
 
 - `cors` is configured to allow all origins
@@ -169,3 +159,16 @@ Building the app
 cd app
 elm make src/Main.elm
 ```
+
+## Running with Docker
+
+```bash
+cd app
+elm make src/Main.elm --output=../server/public/index.html
+
+cd ../server
+docker build -t bcc-wizard .
+docker run -p 8081:3000 bcc-wizard
+```
+
+Now head to your browser and access the BCC-Wizard through http://localhost:8081
