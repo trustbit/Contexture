@@ -1,25 +1,3 @@
 {
-  "bccs": [
-    {
-      "name": "ask",
-      "id": 2
-    },
-    {
-      "name": "tell",
-      "id": 3
-    },
-    {
-      "name": "poll",
-      "id": 4
-    },
-    {
-      "name": "ask",
-      "description": "asdf",
-      "id": 5
-    },
-    {
-      "name": "ask",
-      "id": 6
-    }
-  ]
+  "bccs": []
 }

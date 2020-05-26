@@ -1,0 +1,122 @@
+module Overview exposing (Msg, Model, update, view, init)
+
+import Json.Encode as Encode
+import Json.Decode exposing (Decoder, map2, field, string, int, at, list)
+
+import Html exposing (Html, button, div, text)
+import Html.Attributes exposing (..)
+import Html.Events exposing (onClick)
+
+import Bootstrap.Grid as Grid
+import Bootstrap.Grid.Row as Row
+import Bootstrap.Grid.Col as Col
+import Bootstrap.Form as Form
+import Bootstrap.Form.Input as Input
+import Bootstrap.Button as Button
+
+import Url
+import Http
+
+import Bcc
+
+-- MODEL
+
+type alias BccItem = 
+  { id: Bcc.BoundedContextId
+  , name: String }
+
+type alias Model = 
+  { bccName : String
+  , bccs: List BccItem }
+
+init: () -> (Model, Cmd Msg)
+init _ =
+  ( { bccs = []
+    , bccName = "" }
+  , loadAll() )
+
+-- UPDATE
+
+type Msg
+  = Loaded (Result Http.Error (List BccItem))
+  | SetName String
+  | CreateBcc
+  | Created (Result Http.Error BccItem)
+
+update : Msg -> Model -> (Model, Cmd Msg)
+update msg model =
+  case msg of
+    Loaded (Ok items) ->
+      ({ model | bccs = items }, Cmd.none)
+    Loaded (Err e) ->
+      Debug.log (Debug.toString e)
+      (model, Cmd.none)
+    SetName name ->
+      ({ model | bccName = name}, Cmd.none)
+    CreateBcc ->
+      (model, createNewBcc model)
+    Created result ->
+      (model, Cmd.none)
+
+-- VIEW
+
+createWithName : String -> Grid.Column Msg
+createWithName name =
+  Grid.col []
+    [ Form.group []
+      [ Form.label [for "name"] [ text "Name"]
+      , Input.text [ Input.id "name", Input.value name, Input.onInput SetName ] ]
+    , Button.button [ Button.primary, Button.onClick CreateBcc ] [ text "Create new Bounded Context"]
+    ]
+
+viewExisting : List BccItem  -> Grid.Column Msg
+viewExisting items =
+   let
+      renderItem item =
+          Html.li [] 
+            [ Html.a [ href ("/bccs/" ++ Bcc.idToString item.id)] [text item.name] ]
+    in
+      Grid.col []
+        [ Form.label [] [ text "Existing BCs"]
+        , Html.ol [] (items |> List.map renderItem) ]
+
+view : Model -> Html Msg
+view model =
+  Grid.row []
+    [ viewExisting model.bccs
+    , createWithName model.bccName
+    ]
+
+-- helpers
+
+loadAll: () -> Cmd Msg
+loadAll _ =
+  Http.get
+    { url = "http://localhost:3000/api/bccs"
+    , expect = Http.expectJson Loaded bccItemsDecoder
+    }
+
+createNewBcc : Model -> Cmd Msg
+createNewBcc model = 
+    let 
+        body =
+            Encode.object
+            [ ("name", Encode.string model.bccName) ]
+    in 
+        Http.post
+        { url = "http://localhost:3000/api/bccs"
+        , body = Http.jsonBody body 
+        , expect = Http.expectJson Created bccItemDecoder
+        }
+
+bccItemsDecoder: Decoder (List BccItem)
+bccItemsDecoder =
+  Json.Decode.list bccItemDecoder
+
+
+bccItemDecoder: Decoder BccItem
+bccItemDecoder =
+  map2 BccItem
+    (at ["id"] Bcc.idDecoder)
+    (at ["name"] string)
+    
