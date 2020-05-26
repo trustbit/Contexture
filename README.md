@@ -146,11 +146,12 @@ Make sure [Elm](https://guide.elm-lang.org/install/elm.html) is installed and pa
 
 ### Usage
 
-During development:
+During development use `elm-live` for handling routes correctly.
 
 ```bash
+npm install elm-live -g
 cd app
-elm reactor
+elm-live src/Main.elm --pushstate
 ```
 
 Building the app

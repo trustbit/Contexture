@@ -81,7 +81,7 @@ initCurrentPage ( model, existingCmds ) =
             in
             ( Main pageModel, Cmd.map MainMsg pageCmds )
           Route.Bcc id ->
-            case "http://localhost:3000/api/bcc" ++ Bcc.idToString id |> Url.fromString of
+            case "http://localhost:3000/api/bccs/" ++ Bcc.idToString id |> Url.fromString of
               Just url ->
                 let
                   ( pageModel, pageCmds ) = Bcc.init url

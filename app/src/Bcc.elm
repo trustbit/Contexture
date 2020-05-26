@@ -15,7 +15,9 @@ import Url.Parser exposing (Parser, custom)
 
 import Http
 import Json.Encode as Encode
-import Json.Decode exposing (Decoder, map2, field, string, int, at)
+import Json.Decode exposing (Decoder, map2, field, string, int, at, nullable)
+import Json.Decode.Pipeline as JP
+
 
 -- MODEL
 
@@ -72,7 +74,6 @@ update msg model =
   case msg of
     Field fieldMsg ->
       ({ model | canvas = updateFields fieldMsg model.canvas  }, Cmd.none)
-      
     Save -> 
       (model, saveBCC model)
     Saved result -> 
@@ -84,8 +85,10 @@ update msg model =
     Loaded result ->
       case result of
         Ok m ->
+          Debug.log (Debug.toString m)
           ({ model | canvas = m }, Cmd.none)
-        Err _ ->
+        Err e ->
+          Debug.log (Debug.toString e)
           (model, Cmd.none)
 
 updateFields: FieldMsg -> BoundedContextCanvas -> BoundedContextCanvas
@@ -159,9 +162,10 @@ modelEncoder model =
 
 modelDecoder: Decoder BoundedContextCanvas
 modelDecoder =
-  map2 BoundedContextCanvas
-    (at ["name"] string)
-    (at ["description"] string)
+  Json.Decode.succeed BoundedContextCanvas
+    |> JP.required "name" string
+    |> JP.optional "description" string ""
+    
 
 idDecoder : Decoder BoundedContextId
 idDecoder =
