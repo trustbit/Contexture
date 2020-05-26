@@ -1,3 +1,24 @@
 {
-  "bccs": []
+  "bccs": [
+    {
+      "name": "ask",
+      "id": 2
+    },
+    {
+      "name": "tell",
+      "id": 3
+    },
+    {
+      "name": "poll",
+      "id": 4
+    },
+    {
+      "name": "ask",
+      "id": 5
+    },
+    {
+      "name": "ask",
+      "id": 6
+    }
+  ]
 }

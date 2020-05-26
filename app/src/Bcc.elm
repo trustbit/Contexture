@@ -1,4 +1,4 @@
-module Bcc exposing (Msg, Model, BoundedContextId, update, view, init)
+module Bcc exposing (Msg, Model, BoundedContextId, idToString, idDecoder, idParser, update, view, init)
 
 import Html exposing (Html, button, div, text)
 import Html.Attributes exposing (..)
@@ -11,13 +11,27 @@ import Bootstrap.Form.Input as Input
 import Bootstrap.Button as Button
 
 import Url
+import Url.Parser exposing (Parser, custom)
+
 import Http
 import Json.Encode as Encode
 import Json.Decode exposing (Decoder, map2, field, string, int, at)
 
 -- MODEL
 
-type alias BoundedContextId = Int
+type BoundedContextId 
+  = BoundedContextId Int
+
+idToString : BoundedContextId -> String
+idToString bccId =
+  case bccId of
+    BoundedContextId id -> String.fromInt id
+
+idParser : Parser (BoundedContextId -> a) a
+idParser =
+    custom "BCCID" <|
+        \bccId ->
+            Maybe.map BoundedContextId (String.toInt bccId)
 
 type alias BoundedContextCanvas = 
   { name: String
@@ -32,12 +46,12 @@ type alias Model =
 
 init : Url.Url -> (Model, Cmd Msg)
 init url =
-  (
-    { url = url
-    , canvas = { name = "", description = ""}
-    }
-  , loadBCC url
-  )
+    (
+      { url = url
+      , canvas = { name = "", description = ""}
+      }
+    , loadBCC url
+    )
 
 
 -- UPDATE
@@ -118,9 +132,9 @@ viewCanvas model =
 -- HTTP
 
 loadBCC: Url.Url -> Cmd Msg
-loadBCC id =
+loadBCC url =
   Http.get
-    { url = Url.toString id
+    { url = Url.toString url
     , expect = Http.expectJson Loaded modelDecoder
     }
 
@@ -148,3 +162,7 @@ modelDecoder =
   map2 BoundedContextCanvas
     (at ["name"] string)
     (at ["description"] string)
+
+idDecoder : Decoder BoundedContextId
+idDecoder =
+  Json.Decode.map BoundedContextId int

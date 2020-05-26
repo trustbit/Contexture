@@ -22,6 +22,7 @@ import Json.Encode as Encode
 import Json.Decode exposing (Decoder, map2, field, string, int, at, list)
 
 import Dict
+import Route exposing (Route)
 
 import Bcc
 
@@ -45,60 +46,89 @@ type alias BccItem =
   { id: Bcc.BoundedContextId
   , name: String }
 
+type alias Overview = 
+  { bccName : String
+  , bccs: List BccItem }
+
+type Page 
+  = NotFoundPage
+  | Main Overview
+  | Bcc Bcc.Model
+
 type alias Model = 
   { key : Nav.Key
-  , url : Url.Url
-  , bccName : String
-  , bccs: List BccItem
-  , model: Maybe Bcc.Model }
+  , route : Route
+  , model : Page }
 
+
+initOverview: () -> (Overview, Cmd MainMsg2)
+initOverview _ =
+  ( { bccs = []
+    , bccName = "" }
+  , loadAll() )
+
+initCurrentPage : ( Model, Cmd Msg ) -> ( Model, Cmd Msg )
+initCurrentPage ( model, existingCmds ) =
+    let
+      ( currentPage, mappedPageCmds ) =
+        case model.route of
+          Route.NotFound ->
+            ( NotFoundPage, Cmd.none )
+
+          Route.Main ->
+            let
+                ( pageModel, pageCmds ) = initOverview ()
+            in
+            ( Main pageModel, Cmd.map MainMsg pageCmds )
+          Route.Bcc id ->
+            case "http://localhost:3000/api/bcc" ++ Bcc.idToString id |> Url.fromString of
+              Just url ->
+                let
+                  ( pageModel, pageCmds ) = Bcc.init url
+                in
+                  ( Bcc pageModel, Cmd.map BccMsg pageCmds )
+              Nothing ->
+                ( NotFoundPage, Cmd.none )
+
+    in
+    ( { model | model = currentPage }
+    , Cmd.batch [ existingCmds, mappedPageCmds ]
+    )
 
 init : () -> Url.Url -> Nav.Key -> (Model, Cmd Msg)
 init _ url key =
-  ( 
-    { key = key
-    , url = url
-    , bccName = ""
-    , bccs = []
-    , model = Nothing }
-  , loadAll () 
-  )
-
-
+  let  
+    model =
+        { route = Route.parseUrl url
+        , model = NotFoundPage
+        , key = key
+        }
+  in
+    initCurrentPage ( model, Cmd.none )
+ 
 -- UPDATE
+
+type MainMsg2
+  = Loaded (Result Http.Error (List BccItem))
+  | SetName String
+  | CreateBcc
+  | Created (Result Http.Error BccItem)
 
 type Msg
   = LinkClicked Browser.UrlRequest
   | UrlChanged Url.Url
-  | Loaded (Result Http.Error (List BccItem))
-  | SetName String
-  | CreateBcc
-  | Created (Result String Url.Url)
+  | MainMsg MainMsg2
   | BccMsg Bcc.Msg
 
 
-update : Msg -> Model -> (Model, Cmd Msg)
-update msg model =
+updateMain : MainMsg2 -> Overview -> (Overview, Cmd MainMsg2)
+updateMain msg model =
   case msg of
-    LinkClicked urlRequest ->
-      case urlRequest of
-        Browser.Internal url ->
-          ( model, Nav.pushUrl model.key (Url.toString url) )
-
-        Browser.External href ->
-          ( model, Nav.load href )
-
-    UrlChanged url ->
-      ( { model | url = url }
-      , Cmd.none
-      )
-    Loaded result ->
-      case result of
-        Ok items ->
-          ({ model | bccs = items }, Cmd.none)
-        Err e ->
-          Debug.log (Debug.toString e)
-          (model, Cmd.none)
+    Loaded (Ok items) ->
+      ({ model | bccs = items }, Cmd.none)
+    Loaded (Err e) ->
+      Debug.log (Debug.toString e)
+      (model, Cmd.none)
     SetName name ->
       ({ model | bccName = name}, Cmd.none)
     CreateBcc ->
@@ -110,29 +140,67 @@ update msg model =
           Http.post
             { url = "http://localhost:3000/api/bccs"
             , body = Http.jsonBody body 
-            , expect = Http.expectStringResponse Created (extractHeader "location")
+            , expect = Http.expectJson Created bccItemDecoder
             }
       in
         (model, create)
+    -- _ -> (model, msg)
     Created result ->
-      case result of
-        Ok id ->
-          let
-            (bccModel, bccMsg) = Bcc.init id
-          in
-            ({ model | model = Just bccModel }, bccMsg |> Cmd.map BccMsg )
-        Err e ->
-          (model, Cmd.none)
-    BccMsg m ->
-      case model.model of
-        Just bccModel ->
-          let
-            (mo, msg2) = Bcc.update m bccModel
-          in
-            ({ model | model = Just mo}, Cmd.map BccMsg msg2)
-        Nothing ->
-          (model, Cmd.none)
-      
+      (model, Cmd.none)
+    --   case result of
+    --     Ok id ->
+    --       let
+    --         i = CreatedBcc id
+    --       in
+    --         (model, Cmd.Cmd i)
+    --     Err e ->
+    --       (model, Cmd.none)
+
+update : Msg -> Model -> (Model, Cmd Msg)
+update msg model =
+  case (msg, model.model) of
+    ( LinkClicked urlRequest, _ ) ->
+      case urlRequest of
+          Browser.Internal url ->
+              ( model
+              , Nav.pushUrl model.key (Url.toString url)
+              )
+
+          Browser.External url ->
+              ( model
+              , Nav.load url
+              )
+    ( UrlChanged url, _ ) ->
+      let
+        newRoute = Route.parseUrl url
+      in
+      ( { model | route = newRoute }, Cmd.none )
+          |> initCurrentPage
+    (MainMsg m, Main overview) ->
+      let
+        (updatedModel, updatedMsg) = updateMain m overview
+      in
+        ({ model | model = Main updatedModel}, updatedMsg |> Cmd.map MainMsg)
+            -- case updatedMsg of
+            --   Created result ->
+            --     case result of
+            --       Ok id ->
+            --         let
+            --           (bccModel, bccMsg) = Bcc.init id
+            --         in
+            --           ( { model | model = Bcc bccModel}, bccMsg |> Cmd.map BccMsg) 
+            --       Err e ->
+            --         (model, Cmd.none)
+    (BccMsg m, Bcc bccModel) ->
+      let
+        (mo, msg2) = Bcc.update m bccModel
+      in
+        ({ model | model = Bcc mo}, Cmd.map BccMsg msg2)
+    (_, _) ->
+      Debug.log (Debug.toString msg ++ Debug.toString model)
+      (model, Cmd.none)
+        
+        
 -- SUBSCRIPTIONS
 
 
@@ -143,47 +211,51 @@ subscriptions _ =
 -- VIEW
 
 
-createWithName : String -> Html Msg
+createWithName : String -> Grid.Column MainMsg2
 createWithName name =
-  Grid.row []
-    [ Grid.col []
-      [ Form.group []
-        [ Form.label [for "name"] [ text "Name"]
-        , Input.text [ Input.id "name", Input.value name, Input.onInput SetName ] ]
-      , Button.button [ Button.primary, Button.onClick CreateBcc ] [ text "Create new Bounded Context"]
-      ]
+  Grid.col []
+    [ Form.group []
+      [ Form.label [for "name"] [ text "Name"]
+      , Input.text [ Input.id "name", Input.value name, Input.onInput SetName ] ]
+    , Button.button [ Button.primary, Button.onClick CreateBcc ] [ text "Create new Bounded Context"]
     ]
-    
+  
 
-viewExisting : List BccItem  -> Html Msg
+viewExisting : List BccItem  -> Grid.Column MainMsg2
 viewExisting items =
    let
       renderItem item =
           Html.li [] 
-            [ Html.a [ href ("http://localhost:3000/api/bccs/" ++ String.fromInt item.id)] [text item.name] ]
+            [ Html.a [ href ("/bccs/" ++ Bcc.idToString item.id)] [text item.name] ]
     in
-      Grid.row []
-      [ Grid.col []
-        [ Form.label [] [ text "Existing BCs" ]
+      Grid.col []
+        [ Form.label [] [ text "Existing BCs"]
         , Html.ol [] (items |> List.map renderItem) ]
-      ]
+
+viewOverview : Overview -> Html MainMsg2
+viewOverview model =
+  Grid.row []
+    [ viewExisting model.bccs
+    , createWithName model.bccName
+    ]
 
 view : Model -> Browser.Document Msg
 view model =
   let 
     content = 
       case model.model of
-        Just m ->
+        Bcc m ->
           Bcc.view m |> Html.map BccMsg
-        Nothing ->
-          createWithName model.bccName
+        Main o ->
+          viewOverview o |> Html.map MainMsg
+        NotFoundPage ->
+          text "Not Found"
   in
     { title = "Bounded Context Wizard"
     , body = 
       [ CDN.stylesheet
       , Grid.container [] 
-        [ viewExisting model.bccs
-        , content ]
+        [ content ]
       ]
     }
 
@@ -202,7 +274,7 @@ extractHeader name resp =
 
 
 
-loadAll: () -> Cmd Msg
+loadAll: () -> Cmd MainMsg2
 loadAll _ =
   Http.get
     { url = "http://localhost:3000/api/bccs"
@@ -217,6 +289,6 @@ bccItemsDecoder =
 bccItemDecoder: Decoder BccItem
 bccItemDecoder =
   map2 BccItem
-    (at ["id"] int)
+    (at ["id"] Bcc.idDecoder)
     (at ["name"] string)
     
