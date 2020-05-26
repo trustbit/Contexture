@@ -50,7 +50,7 @@ initCurrentPage ( model, existingCmds ) =
 
           Route.Main ->
             let
-                ( pageModel, pageCmds ) = Overview.init ()
+                ( pageModel, pageCmds ) = Overview.init model.key
             in
             ( Overview pageModel, Cmd.map OverviewMsg pageCmds )
           Route.Bcc id ->

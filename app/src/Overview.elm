@@ -1,5 +1,7 @@
 module Overview exposing (Msg, Model, update, view, init)
 
+import Browser.Navigation as Nav
+
 import Json.Encode as Encode
 import Json.Decode exposing (Decoder, map2, field, string, int, at, list)
 
@@ -18,6 +20,7 @@ import Url
 import Http
 
 import Bcc
+import Route
 
 -- MODEL
 
@@ -26,12 +29,14 @@ type alias BccItem =
   , name: String }
 
 type alias Model = 
-  { bccName : String
+  { navKey : Nav.Key
+  , bccName : String
   , bccs: List BccItem }
 
-init: () -> (Model, Cmd Msg)
-init _ =
-  ( { bccs = []
+init: Nav.Key -> (Model, Cmd Msg)
+init key =
+  ( { navKey = key
+    , bccs = []
     , bccName = "" }
   , loadAll() )
 
@@ -55,7 +60,9 @@ update msg model =
       ({ model | bccName = name}, Cmd.none)
     CreateBcc ->
       (model, createNewBcc model)
-    Created result ->
+    Created (Ok item) ->
+        (model, Route.pushUrl (Route.Bcc item.id) model.navKey)
+    Created (Err _) ->
       (model, Cmd.none)
 
 -- VIEW
