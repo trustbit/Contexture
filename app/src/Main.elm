@@ -50,14 +50,14 @@ initCurrentPage ( model, existingCmds ) =
 
           Route.Main ->
             let
-                ( pageModel, pageCmds ) = Overview.init model.key
+              ( pageModel, pageCmds ) = Overview.init model.key
             in
-            ( Overview pageModel, Cmd.map OverviewMsg pageCmds )
+              ( Overview pageModel, Cmd.map OverviewMsg pageCmds )
           Route.Bcc id ->
             case "http://localhost:3000/api/bccs/" ++ Bcc.idToString id |> Url.fromString of
               Just url ->
                 let
-                  ( pageModel, pageCmds ) = Bcc.init url
+                  ( pageModel, pageCmds ) = Bcc.init model.key url
                 in
                   ( Bcc pageModel, Cmd.map BccMsg pageCmds )
               Nothing ->
@@ -119,7 +119,7 @@ update msg model =
       in
         ({ model | page = Bcc mo}, Cmd.map BccMsg msg2)
     (_, _) ->
-      Debug.log (Debug.toString msg ++ Debug.toString model)
+      Debug.log ("Main: " ++ Debug.toString msg ++ " " ++ Debug.toString model)
       (model, Cmd.none)
         
         

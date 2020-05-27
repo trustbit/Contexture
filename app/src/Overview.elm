@@ -13,6 +13,7 @@ import Bootstrap.Grid as Grid
 import Bootstrap.Grid.Row as Row
 import Bootstrap.Grid.Col as Col
 import Bootstrap.Form as Form
+import Bootstrap.Form.Fieldset as Fieldset
 import Bootstrap.Form.Input as Input
 import Bootstrap.Button as Button
 
@@ -53,45 +54,48 @@ update msg model =
   case msg of
     Loaded (Ok items) ->
       ({ model | bccs = items }, Cmd.none)
-    Loaded (Err e) ->
-      Debug.log (Debug.toString e)
-      (model, Cmd.none)
     SetName name ->
       ({ model | bccName = name}, Cmd.none)
     CreateBcc ->
       (model, createNewBcc model)
     Created (Ok item) ->
         (model, Route.pushUrl (Route.Bcc item.id) model.navKey)
-    Created (Err _) ->
-      (model, Cmd.none)
+    _ -> 
+        Debug.log ("Overview: " ++ Debug.toString msg ++ " " ++ Debug.toString model)
+        (model, Cmd.none)
 
 -- VIEW
 
-createWithName : String -> Grid.Column Msg
+createWithName : String -> Html Msg
 createWithName name =
-  Grid.col []
-    [ Form.group []
-      [ Form.label [for "name"] [ text "Name"]
-      , Input.text [ Input.id "name", Input.value name, Input.onInput SetName ] ]
-    , Button.button [ Button.primary, Button.onClick CreateBcc ] [ text "Create new Bounded Context"]
-    ]
+    Form.form [Html.Events.onSubmit CreateBcc]
+        [ Fieldset.config
+          |> Fieldset.legend [] [ text "Create a Bounded Context Canvas"]
+          |> Fieldset.children
+            [ Form.group []
+                [ Form.label [for "name"] [ text "Name"]
+                , Input.text [ Input.id "name", Input.value name, Input.onInput SetName ] ]
+            , Button.submitButton [ Button.primary] [ text "Fill out Details"] ]
+           |> Fieldset.view
+        ]
 
-viewExisting : List BccItem  -> Grid.Column Msg
+
+viewExisting : List BccItem  -> Html Msg
 viewExisting items =
    let
       renderItem item =
           Html.li [] 
             [ Html.a [ href ("/bccs/" ++ Bcc.idToString item.id)] [text item.name] ]
     in
-      Grid.col []
-        [ Form.label [] [ text "Existing BCs"]
+      div []
+        [ Html.h3 [] [ text "Existing BCs"]
         , Html.ol [] (items |> List.map renderItem) ]
 
 view : Model -> Html Msg
 view model =
   Grid.row []
-    [ viewExisting model.bccs
-    , createWithName model.bccName
+    [ Grid.col [] [viewExisting model.bccs]
+    , Grid.col [] [createWithName model.bccName]
     ]
 
 -- helpers
