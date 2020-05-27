@@ -13,6 +13,7 @@ import Bootstrap.Grid.Col as Col
 import Route exposing ( Route)
 
 import Bcc
+import Bcc.Edit as Bcc
 import Overview
 
 -- MAIN
