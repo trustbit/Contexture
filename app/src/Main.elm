@@ -1,106 +1,129 @@
 module Main exposing (..)
 
 import Browser
+import Browser.Navigation as Nav
+import Url
 import Html exposing (Html, button, div, text)
 import Html.Attributes exposing (..)
-import Html.Events exposing (onClick)
 import Bootstrap.CDN as CDN
 import Bootstrap.Grid as Grid
 import Bootstrap.Grid.Row as Row
 import Bootstrap.Grid.Col as Col
-import Bootstrap.Form as Form
-import Bootstrap.Form.Input as Input
-import Bootstrap.Button as Button
 
-import Http
-import Json.Encode as Encode
-import Json.Decode exposing (Decoder, map2, field, string, int, at)
+import Route exposing ( Route)
 
+import Bcc
+import Overview
 
 -- MAIN
 
-
 main =
-  Browser.element 
-    { init = init "1234"
+  Browser.application 
+    { init = init
     , update = update
     , view = view
-    , subscriptions = subscriptions 
+    , subscriptions = subscriptions
+    , onUrlChange = UrlChanged
+    , onUrlRequest = LinkClicked 
     }
 
 
 -- MODEL
 
-type alias BoundedContextId = String
-
-type alias BoundedContextCanvas = 
-  { name: String
-  , description: String
-  }
+type Page 
+  = NotFoundPage
+  | Overview Overview.Model
+  | Bcc Bcc.Model
 
 type alias Model = 
-  { id: BoundedContextId
-  , exists: Bool
-  , canvas: BoundedContextCanvas
-  }
+  { key : Nav.Key
+  , route : Route
+  , page : Page }
 
+initCurrentPage : ( Model, Cmd Msg ) -> ( Model, Cmd Msg )
+initCurrentPage ( model, existingCmds ) =
+    let
+      ( currentPage, mappedPageCmds ) =
+        case model.route of
+          Route.NotFound ->
+            ( NotFoundPage, Cmd.none )
 
-init : BoundedContextId -> () -> (Model, Cmd Msg)
-init id _ =
-  (
-    { id = id
-    , exists = False
-    , canvas = { name = "", description = ""}
-    }
-  , loadBCC id
-  )
+          Route.Main ->
+            let
+              ( pageModel, pageCmds ) = Overview.init model.key
+            in
+              ( Overview pageModel, Cmd.map OverviewMsg pageCmds )
+          Route.Bcc id ->
+            case "http://localhost:3000/api/bccs/" ++ Bcc.idToString id |> Url.fromString of
+              Just url ->
+                let
+                  ( pageModel, pageCmds ) = Bcc.init model.key url
+                in
+                  ( Bcc pageModel, Cmd.map BccMsg pageCmds )
+              Nothing ->
+                ( NotFoundPage, Cmd.none )
 
+    in
+    ( { model | page = currentPage }
+    , Cmd.batch [ existingCmds, mappedPageCmds ]
+    )
 
+init : () -> Url.Url -> Nav.Key -> (Model, Cmd Msg)
+init _ url key =
+  let  
+    model =
+        { route = Route.parseUrl url
+        , page = NotFoundPage
+        , key = key
+        }
+  in
+    initCurrentPage ( model, Cmd.none )
+ 
 -- UPDATE
 
-type FieldMsg
-  = SetName String
-  | SetDescription String
-
 type Msg
-  = Loaded (Result Http.Error BoundedContextCanvas)
-  | Field FieldMsg
-  | Save
-  | Saved (Result Http.Error ())
+  = LinkClicked Browser.UrlRequest
+  | UrlChanged Url.Url
+  | OverviewMsg Overview.Msg
+  | BccMsg Bcc.Msg
 
 
 update : Msg -> Model -> (Model, Cmd Msg)
 update msg model =
-  case msg of
-    Field fieldMsg ->
-      ({ model | canvas = updateFields fieldMsg model.canvas  }, Cmd.none)
-      
-    Save -> 
-      (model, saveBCC model)
-    Saved result -> 
-      case result of
-        Ok _ -> 
-          (model, Cmd.none)
-        Err _ ->
-          (model, Cmd.none)
-    Loaded result ->
-      case result of
-        Ok m ->
-          ({ model | exists = True, canvas = m }, Cmd.none)
-        Err _ ->
-          (model, Cmd.none)
+  case (msg, model.page) of
+    ( LinkClicked urlRequest, _ ) ->
+      case urlRequest of
+          Browser.Internal url ->
+              ( model
+              , Nav.pushUrl model.key (Url.toString url)
+              )
 
-updateFields: FieldMsg -> BoundedContextCanvas -> BoundedContextCanvas
-updateFields msg canvas =
-  case msg of
-    SetName name ->
-      { canvas | name = name}
-      
-    SetDescription description ->
-      { canvas | description = description}
-      
+          Browser.External url ->
+              ( model
+              , Nav.load url
+              )
+    ( UrlChanged url, _ ) ->
+      let
+        newRoute = Route.parseUrl url
+      in
+      ( { model | route = newRoute }, Cmd.none )
+          |> initCurrentPage
+    (OverviewMsg m, Overview overview) ->
+      let
+        (updatedModel, updatedMsg) = Overview.update m overview
+      in
+        ({ model | page = Overview updatedModel}, updatedMsg |> Cmd.map OverviewMsg)
+    (BccMsg m, Bcc bccModel) ->
+      let
+        (mo, msg2) = Bcc.update m bccModel
+      in
+        ({ model | page = Bcc mo}, Cmd.map BccMsg msg2)
+    (_, _) ->
+      Debug.log ("Main: " ++ Debug.toString msg ++ " " ++ Debug.toString model)
+      (model, Cmd.none)
+        
+        
 -- SUBSCRIPTIONS
-
 
 subscriptions : Model -> Sub Msg
 subscriptions _ =
@@ -108,75 +131,24 @@ subscriptions _ =
 
 -- VIEW
 
-
-view : Model -> Html Msg
+view : Model -> Browser.Document Msg
 view model =
-  Grid.container [] 
-    [ CDN.stylesheet
-    , viewCanvas model.canvas |> Html.map Field
-    , Grid.row []
-      [ Grid.col [] 
-        [ Form.label [] [ text <| "echo name: " ++ model.canvas.name ]
-        , Html.br [] []
-        , Form.label [] [ text <| "echo description: " ++ model.canvas.description ]
-        , Html.br [] []
-        , Button.button [ Button.primary, Button.onClick Save ] [ text "Save"]
-        ]
+  let 
+    content = 
+      case model.page of
+        Bcc m ->
+          Bcc.view m |> Html.map BccMsg
+        Overview o ->
+          Overview.view o |> Html.map OverviewMsg
+        NotFoundPage ->
+          text "Not Found"
+  in
+    { title = "Bounded Context Wizard"
+    , body = 
+      [ CDN.stylesheet
+      , Grid.container [] 
+        [ content ]
       ]
-    ]
-
-viewCanvas: BoundedContextCanvas -> Html FieldMsg
-viewCanvas model =
-  Grid.row []
-    [ Grid.col []
-      [ Form.group []
-        [ Form.label [for "name"] [ text "Name"]
-        , Input.text [ Input.id "name", Input.value model.name, Input.onInput SetName ] ]
-      , Form.group []
-        [ Form.label [for "description"] [ text "Description"]
-        , Input.text [ Input.id "description", Input.value model.description, Input.onInput SetDescription ] ]
-      ]
-    ]
-
-
--- HTTP
-
-loadBCC: BoundedContextId -> Cmd Msg
-loadBCC id =
-  Http.get
-    { url = "http://localhost:3000/api/bccs/" ++ id
-    , expect = Http.expectJson Loaded modelDecoder
     }
 
-saveBCC: Model -> Cmd Msg
-saveBCC model =
-  if model.exists then
-    Http.request
-      { method = "PUT"
-      , headers = []
-      , url = "http://localhost:3000/api/bccs/" ++ model.id
-      , body = Http.jsonBody <| modelEncoder model
-      , expect = Http.expectWhatever Saved
-      , timeout = Nothing
-      , tracker = Nothing
-      }
-  else
-    Http.post
-      { url = "http://localhost:3000/api/bccs"
-      , body = Http.jsonBody <| modelEncoder model
-      , expect = Http.expectWhatever Saved
-      }
 
-modelEncoder: Model -> Encode.Value
-modelEncoder model = 
-  Encode.object
-    [ ("id", Encode.string model.id)
-    , ("name", Encode.string model.canvas.name)
-    , ("description", Encode.string model.canvas.description)
-    ]
-
-modelDecoder: Decoder BoundedContextCanvas
-modelDecoder =
-  map2 BoundedContextCanvas
-    (at ["name"] string)
-    (at ["description"] string)
