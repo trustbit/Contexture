@@ -36,9 +36,9 @@ Additional ideas on how to gather or present information can be read in [Cyrille
 
 MVP: "Mimicking the BCC with HTML forms"
 
-- Have a form mirroring the BCC with free text fields
-- Creating a new bounded context by submitting a new form
-- Loading existing BCC into a form and updating them by (re)submitting it
+- [ ] Have a form mirroring the BCC with free text fields
+- [x] Creating a new bounded context by submitting a new form
+- [x] Loading existing BCC into a form and updating them by (re)submitting it
 
 Version 1: "Improving data quality"
 
