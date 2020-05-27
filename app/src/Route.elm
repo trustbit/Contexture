@@ -9,7 +9,7 @@ import Bcc exposing (BoundedContextId)
 
 type Route
     = NotFound
-    | Main
+    | Overview
     | Bcc BoundedContextId
 
 
@@ -28,7 +28,7 @@ parseUrl url =
 matchRoute : Parser (Route -> a) a
 matchRoute =
     oneOf
-        [ map Main top
+        [ map Overview top
         , map Bcc (s "bccs" </> Bcc.idParser)
 
         ]
@@ -48,7 +48,7 @@ routeToString route =
     case route of
         NotFound ->
             "/not-found"
-        Main ->
+        Overview ->
             "/"
         Bcc bccId ->
             "/bccs/" ++ Bcc.idToString bccId

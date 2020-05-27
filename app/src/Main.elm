@@ -13,7 +13,7 @@ import Bootstrap.Grid.Col as Col
 import Route exposing ( Route)
 
 import Bcc
-import Bcc.Edit as Bcc
+import Bcc.Edit
 import Overview
 
 -- MAIN
@@ -34,7 +34,7 @@ main =
 type Page 
   = NotFoundPage
   | Overview Overview.Model
-  | Bcc Bcc.Model
+  | Bcc Bcc.Edit.Model
 
 type alias Model = 
   { key : Nav.Key
@@ -49,7 +49,7 @@ initCurrentPage ( model, existingCmds ) =
           Route.NotFound ->
             ( NotFoundPage, Cmd.none )
 
-          Route.Main ->
+          Route.Overview ->
             let
               ( pageModel, pageCmds ) = Overview.init model.key
             in
@@ -58,7 +58,7 @@ initCurrentPage ( model, existingCmds ) =
             case "http://localhost:3000/api/bccs/" ++ Bcc.idToString id |> Url.fromString of
               Just url ->
                 let
-                  ( pageModel, pageCmds ) = Bcc.init model.key url
+                  ( pageModel, pageCmds ) = Bcc.Edit.init model.key url
                 in
                   ( Bcc pageModel, Cmd.map BccMsg pageCmds )
               Nothing ->
@@ -86,7 +86,7 @@ type Msg
   = LinkClicked Browser.UrlRequest
   | UrlChanged Url.Url
   | OverviewMsg Overview.Msg
-  | BccMsg Bcc.Msg
+  | BccMsg Bcc.Edit.Msg
 
 
 update : Msg -> Model -> (Model, Cmd Msg)
@@ -116,7 +116,7 @@ update msg model =
         ({ model | page = Overview updatedModel}, updatedMsg |> Cmd.map OverviewMsg)
     (BccMsg m, Bcc bccModel) ->
       let
-        (mo, msg2) = Bcc.update m bccModel
+        (mo, msg2) = Bcc.Edit.update m bccModel
       in
         ({ model | page = Bcc mo}, Cmd.map BccMsg msg2)
     (_, _) ->
@@ -138,7 +138,7 @@ view model =
     content = 
       case model.page of
         Bcc m ->
-          Bcc.view m |> Html.map BccMsg
+          Bcc.Edit.view m |> Html.map BccMsg
         Overview o ->
           Overview.view o |> Html.map OverviewMsg
         NotFoundPage ->

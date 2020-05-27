@@ -1,12 +1,9 @@
-module Bcc exposing (BoundedContextCanvas, BoundedContextId, idToString, idDecoder, idParser)
+module Bcc exposing (..)
 
-import Url
 import Url.Parser exposing (Parser, custom)
 
 import Http
-import Json.Encode as Encode
 import Json.Decode exposing (Decoder, map2, field, string, int, at, nullable)
-import Json.Decode.Pipeline as JP
 
 -- MODEL
 
@@ -20,12 +17,12 @@ type alias BoundedContextCanvas =
 
 -- UPDATE
 
-type FieldMsg
+type Msg
   = SetName String
   | SetDescription String
 
-updateFields: FieldMsg -> BoundedContextCanvas -> BoundedContextCanvas
-updateFields msg canvas =
+update: Msg -> BoundedContextCanvas -> BoundedContextCanvas
+update msg canvas =
   case msg of
     SetName name ->
       { canvas | name = name}

@@ -14,7 +14,6 @@ import Bootstrap.Button as Button
 import Bootstrap.ButtonGroup as ButtonGroup
 
 import Url
-import Url.Parser exposing (Parser, custom)
 
 import Http
 import Json.Encode as Encode
@@ -23,14 +22,14 @@ import Json.Decode.Pipeline as JP
 
 
 import Route
-import Bcc exposing(BoundedContextCanvas)
+import Bcc
 
 -- MODEL
 
 type alias Model = 
   { key: Nav.Key
   , self: Url.Url
-  , canvas: BoundedContextCanvas
+  , canvas: Bcc.BoundedContextCanvas
   }
 
 init : Nav.Key -> Url.Url -> (Model, Cmd Msg)
@@ -50,13 +49,9 @@ init key url =
 
 -- UPDATE
 
-type FieldMsg
-  = SetName String
-  | SetDescription String
-
 type Msg
-  = Loaded (Result Http.Error BoundedContextCanvas)
-  | Field FieldMsg
+  = Loaded (Result Http.Error Bcc.BoundedContextCanvas)
+  | Field Bcc.Msg
   | Save
   | Saved (Result Http.Error ())
   | Delete
@@ -68,7 +63,7 @@ update : Msg -> Model -> (Model, Cmd Msg)
 update msg model =
   case msg of
     Field fieldMsg ->
-      ({ model | canvas = updateFields fieldMsg model.canvas  }, Cmd.none)
+      ({ model | canvas = Bcc.update fieldMsg model.canvas  }, Cmd.none)
     Save -> 
       (model, saveBCC model)
     Saved (Ok _) -> 
@@ -76,7 +71,7 @@ update msg model =
     Delete ->
       (model, deleteBCC model)
     Deleted (Ok _) ->
-      (model, Route.pushUrl Route.Main model.key)
+      (model, Route.pushUrl Route.Overview model.key)
     Loaded (Ok m) ->
       ({ model | canvas = m }, Cmd.none)    
     Back -> 
@@ -85,15 +80,6 @@ update msg model =
       Debug.log ("BCC: " ++ Debug.toString msg ++ " " ++ Debug.toString model)
       (model, Cmd.none)
 
-updateFields: FieldMsg -> BoundedContextCanvas -> BoundedContextCanvas
-updateFields msg canvas =
-  case msg of
-    SetName name ->
-      { canvas | name = name}
-      
-    SetDescription description ->
-      { canvas | description = description}
-   
 -- VIEW
 
 view : Model -> Html Msg
@@ -122,16 +108,16 @@ view model =
         ]
 
 
-viewCanvas: BoundedContextCanvas -> Html FieldMsg
+viewCanvas: Bcc.BoundedContextCanvas -> Html Bcc.Msg
 viewCanvas model =
   Grid.row []
     [ Grid.col []
       [ Form.group []
         [ Form.label [for "name"] [ text "Name"]
-        , Input.text [ Input.id "name", Input.value model.name, Input.onInput SetName ] ]
+        , Input.text [ Input.id "name", Input.value model.name, Input.onInput Bcc.SetName ] ]
       , Form.group []
         [ Form.label [for "description"] [ text "Description"]
-        , Input.text [ Input.id "description", Input.value model.description, Input.onInput SetDescription ] ]
+        , Input.text [ Input.id "description", Input.value model.description, Input.onInput Bcc.SetDescription ] ]
       ]
     ]
 
@@ -178,9 +164,9 @@ modelEncoder model =
     , ("description", Encode.string model.canvas.description)
     ]
 
-modelDecoder: Decoder BoundedContextCanvas
+modelDecoder: Decoder Bcc.BoundedContextCanvas
 modelDecoder =
-  Json.Decode.succeed BoundedContextCanvas
+  Json.Decode.succeed Bcc.BoundedContextCanvas
     |> JP.required "name" string
     |> JP.optional "description" string ""
     
