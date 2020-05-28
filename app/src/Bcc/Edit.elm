@@ -10,6 +10,7 @@ import Bootstrap.Grid.Row as Row
 import Bootstrap.Grid.Col as Col
 import Bootstrap.Form as Form
 import Bootstrap.Form.Input as Input
+import Bootstrap.Form.Radio as Radio
 import Bootstrap.Button as Button
 import Bootstrap.ButtonGroup as ButtonGroup
 
@@ -38,7 +39,7 @@ init key url =
     model =
       { key = key
       , self = url
-      , canvas = { name = "", description = ""}
+      , canvas = { name = "", description = "", classification = Nothing}
       }
   in
     (
@@ -117,7 +118,19 @@ viewCanvas model =
         , Input.text [ Input.id "name", Input.value model.name, Input.onInput Bcc.SetName ] ]
       , Form.group []
         [ Form.label [for "description"] [ text "Description"]
-        , Input.text [ Input.id "description", Input.value model.description, Input.onInput Bcc.SetDescription ] ]
+        , Input.text [ Input.id "description", Input.value model.description, Input.onInput Bcc.SetDescription ]
+        , Form.help [] [ text "Summary of purpose and responsibilities"] ]
+      , Form.group []
+        [ Form.label [for "classification"] [ text "Classification"]
+        , div [] 
+            (Radio.radioList "classification" 
+            [ Radio.create [Radio.id "core", Radio.onClick (Bcc.SetClassification Bcc.Core), Radio.checked (model.classification == Just Bcc.Core)] "Core"
+            , Radio.create [Radio.id "supporting", Radio.onClick (Bcc.SetClassification Bcc.Supporting), Radio.checked (model.classification == Just Bcc.Supporting)] "Supporting"
+            , Radio.create [Radio.id "generic", Radio.onClick (Bcc.SetClassification Bcc.Generic), Radio.checked (model.classification == Just Bcc.Generic)] "Generic"
+            -- , Radio.create [Radio.id "other", Radio.onClick (Bcc.SetClassification Bcc.Other), Radio.checked (model.classification == Just Bcc.Generic)] "Generic"
+            ]
+            )
+        , Form.help [] [ text "Summary of purpose and responsibilities"] ]
       ]
     ]
 
@@ -137,7 +150,7 @@ saveBCC model =
       { method = "PUT"
       , headers = []
       , url = Url.toString model.self
-      , body = Http.jsonBody <| modelEncoder model
+      , body = Http.jsonBody <| modelEncoder model.canvas
       , expect = Http.expectWhatever Saved
       , timeout = Nothing
       , tracker = Nothing
@@ -156,17 +169,31 @@ deleteBCC model =
       }
 
 -- encoders
+        
 
-modelEncoder: Model -> Encode.Value
-modelEncoder model = 
+modelEncoder: Bcc.BoundedContextCanvas -> Encode.Value
+modelEncoder canvas = 
   Encode.object
-    [ ("name", Encode.string model.canvas.name)
-    , ("description", Encode.string model.canvas.description)
+    [ ("name", Encode.string canvas.name)
+    , ("description", Encode.string canvas.description)
+    , ("classification", classificationEncoder canvas.classification)
     ]
+
+classificationEncoder : Maybe Bcc.Classification -> Encode.Value
+classificationEncoder classification =
+  case classification of
+    Just c -> Encode.string (Bcc.classificationToString c)
+    Nothing -> Encode.null
+
+classificationDecoder: Decoder (Maybe Bcc.Classification)
+classificationDecoder =
+  Json.Decode.map Bcc.classificationParser string
 
 modelDecoder: Decoder Bcc.BoundedContextCanvas
 modelDecoder =
   Json.Decode.succeed Bcc.BoundedContextCanvas
     |> JP.required "name" string
     |> JP.optional "description" string ""
+    |> JP.optional "classification" classificationDecoder Nothing 
+
     

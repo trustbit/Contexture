@@ -10,9 +10,16 @@ import Json.Decode exposing (Decoder, map2, field, string, int, at, nullable)
 type BoundedContextId 
   = BoundedContextId Int
 
+type Classification
+  = Core
+  | Supporting
+  | Generic
+  | Other String
+
 type alias BoundedContextCanvas = 
   { name: String
   , description: String
+  , classification : Maybe Classification
   }
 
 -- UPDATE
@@ -20,6 +27,7 @@ type alias BoundedContextCanvas =
 type Msg
   = SetName String
   | SetDescription String
+  | SetClassification Classification
 
 update: Msg -> BoundedContextCanvas -> BoundedContextCanvas
 update msg canvas =
@@ -29,6 +37,9 @@ update msg canvas =
       
     SetDescription description ->
       { canvas | description = description}
+
+    SetClassification class ->
+      { canvas | classification = Just class}
    
 idToString : BoundedContextId -> String
 idToString bccId =
@@ -44,3 +55,20 @@ idParser =
 idDecoder : Decoder BoundedContextId
 idDecoder =
   Json.Decode.map BoundedContextId int
+
+classificationToString: Classification -> String
+classificationToString classification =
+    case classification of
+        Other value -> value
+        Generic -> "Generic"
+        Supporting -> "Supporting"
+        Core -> "Core"
+
+classificationParser: String -> Maybe Classification
+classificationParser classification =
+    case classification of
+        "Generic" -> Just Generic
+        "Supporting" -> Just Supporting
+        "Core" -> Just Core
+        "" -> Nothing
+        value -> Just (Other value)
