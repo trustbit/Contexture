@@ -2,7 +2,7 @@ module Bcc exposing (..)
 
 import Url.Parser exposing (Parser, custom)
 
-import Http
+import Set exposing(Set)
 import Json.Decode exposing (Decoder, map2, field, string, int, at, nullable)
 
 -- MODEL
@@ -29,15 +29,44 @@ type Evolution
   | Product
   | Commodity
 
+type alias BusinessDecisions = String
+type alias UbiquitousLanguage = String
+type alias ModelTraits = String
+
+type alias Message = String
+type alias Command = Message
+type alias Event = Message
+type alias Query = Message
+
+type alias Messages =
+    { commandsHandled : Set Command
+    , commandsSent : Set Command
+    , eventsHandled : Set Event
+    , eventsPublished : Set Event
+    , queriesHandled : Set Query
+    , queriesInvoked : Set Query
+    }
 type alias BoundedContextCanvas = 
   { name: String
   , description: String
   , classification : Maybe Classification
   , businessModel: Maybe BusinessModel
   , evolution: Maybe Evolution
-  , businessDecisions: String
-  , ubiquitousLanguage: String
-  , modelTraits: String
+  , businessDecisions: BusinessDecisions
+  , ubiquitousLanguage: UbiquitousLanguage
+  , modelTraits: ModelTraits
+  , messages: Messages
+  }
+
+
+initMessages : () -> Messages
+initMessages _ =
+  { commandsHandled = Set.empty
+  , commandsSent = Set.empty
+  , eventsHandled = Set.empty
+  , eventsPublished = Set.empty
+  , queriesHandled = Set.empty
+  , queriesInvoked = Set.empty
   }
 
 init: () -> BoundedContextCanvas
@@ -49,9 +78,15 @@ init _ =
   , evolution = Nothing
   , businessDecisions = ""
   , ubiquitousLanguage = ""
-  , modelTraits = "" }
+  , modelTraits = ""
+  , messages = initMessages ()
+     }
 
 -- UPDATE
+
+type MessageMsg
+  = AddCommandHandled Message
+  | RemoveCommandHandled Message
 
 type Msg
   = SetName String
@@ -59,9 +94,18 @@ type Msg
   | SetClassification Classification
   | SetBusinessModel BusinessModel
   | SetEvolution Evolution
-  | SetBusinessDecisions String
-  | SetUbiquitousLanguage String
-  | SetModelTraits String
+  | SetBusinessDecisions BusinessDecisions
+  | SetUbiquitousLanguage UbiquitousLanguage
+  | SetModelTraits ModelTraits
+  | ChangeMessages MessageMsg
+
+updateMessages : MessageMsg -> Messages -> Messages
+updateMessages msg model =
+  case msg of
+    AddCommandHandled cmd ->
+      { model | commandsHandled = Set.insert cmd model.commandsHandled}
+    RemoveCommandHandled cmd ->
+      { model | commandsHandled = Set.remove cmd model.commandsHandled}
 
 update: Msg -> BoundedContextCanvas -> BoundedContextCanvas
 update msg canvas =
@@ -86,6 +130,9 @@ update msg canvas =
 
     SetModelTraits traits ->
       { canvas | modelTraits = traits}
+
+    ChangeMessages m ->
+      { canvas | messages = updateMessages m canvas.messages }
    
 idToString : BoundedContextId -> String
 idToString bccId =
