@@ -14,13 +14,36 @@ type Classification
   = Core
   | Supporting
   | Generic
-  | Other String
+  | OtherClassification String
+
+type BusinessModel 
+  = Revenue
+  | Engagement
+  | Compliance
+  | CostReduction
+  | OtherBusinessModel String
+
+type Evolution
+  = Genesis
+  | CustomBuilt
+  | Product
+  | Commodity
 
 type alias BoundedContextCanvas = 
   { name: String
   , description: String
   , classification : Maybe Classification
+  , businessModel: Maybe BusinessModel
+  , evolution: Maybe Evolution
   }
+
+init: () -> BoundedContextCanvas
+init _ = 
+  { name = ""
+  , description = ""
+  , classification = Nothing
+  , businessModel = Nothing
+  , evolution = Nothing }
 
 -- UPDATE
 
@@ -28,6 +51,8 @@ type Msg
   = SetName String
   | SetDescription String
   | SetClassification Classification
+  | SetBusinessModel BusinessModel
+  | SetEvolution Evolution
 
 update: Msg -> BoundedContextCanvas -> BoundedContextCanvas
 update msg canvas =
@@ -40,6 +65,10 @@ update msg canvas =
 
     SetClassification class ->
       { canvas | classification = Just class}
+    SetBusinessModel business ->
+      { canvas | businessModel = Just business}
+    SetEvolution evo ->
+      { canvas | evolution = Just evo}
    
 idToString : BoundedContextId -> String
 idToString bccId =
@@ -58,17 +87,55 @@ idDecoder =
 
 classificationToString: Classification -> String
 classificationToString classification =
-    case classification of
-        Other value -> value
-        Generic -> "Generic"
-        Supporting -> "Supporting"
-        Core -> "Core"
+  case classification of
+      OtherClassification value -> value
+      Generic -> "Generic"
+      Supporting -> "Supporting"
+      Core -> "Core"
 
 classificationParser: String -> Maybe Classification
 classificationParser classification =
-    case classification of
-        "Generic" -> Just Generic
-        "Supporting" -> Just Supporting
-        "Core" -> Just Core
-        "" -> Nothing
-        value -> Just (Other value)
+  case classification of
+      "Generic" -> Just Generic
+      "Supporting" -> Just Supporting
+      "Core" -> Just Core
+      "" -> Nothing
+      value -> Just (OtherClassification value)
+
+
+businessModelToString: BusinessModel -> String
+businessModelToString businessModel =
+  case businessModel of
+      OtherBusinessModel value -> value
+      Revenue -> "Revenue"
+      Engagement -> "Engagement"
+      Compliance -> "Compliance"
+      CostReduction -> "CostReduction"
+
+businessModelParser: String -> Maybe BusinessModel
+businessModelParser businessModel =
+  case businessModel of
+      "Revenue" -> Just Revenue
+      "Engagement" -> Just Engagement
+      "Compliance" -> Just Compliance
+      "CostReduction" -> Just CostReduction
+      "" -> Nothing
+      value -> Just (OtherBusinessModel value)
+
+
+evolutionToString: Evolution -> String
+evolutionToString evolution =
+  case evolution of
+      Genesis -> "Genesis"
+      CustomBuilt -> "CustomBuilt"
+      Product -> "Product"
+      Commodity -> "Commodity"
+  
+evolutionParser: String -> Maybe Evolution
+evolutionParser evolution =
+  case evolution of
+      "Genesis" -> Just Genesis
+      "CustomBuilt" -> Just CustomBuilt
+      "Product" -> Just Product
+      "Commodity" -> Just Commodity
+      _ -> Nothing

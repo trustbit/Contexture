@@ -39,7 +39,7 @@ init key url =
     model =
       { key = key
       , self = url
-      , canvas = { name = "", description = "", classification = Nothing}
+      , canvas = Bcc.init ()
       }
   in
     (
@@ -108,6 +108,9 @@ view model =
             ]
         ]
 
+viewRadioButton : String -> String -> Bool -> Bcc.Msg -> Radio.Radio Bcc.Msg
+viewRadioButton id title checked msg =
+  Radio.create [Radio.id id, Radio.onClick msg, Radio.checked checked] title
 
 viewCanvas: Bcc.BoundedContextCanvas -> Html Bcc.Msg
 viewCanvas model =
@@ -120,17 +123,43 @@ viewCanvas model =
         [ Form.label [for "description"] [ text "Description"]
         , Input.text [ Input.id "description", Input.value model.description, Input.onInput Bcc.SetDescription ]
         , Form.help [] [ text "Summary of purpose and responsibilities"] ]
-      , Form.group []
-        [ Form.label [for "classification"] [ text "Classification"]
-        , div [] 
-            (Radio.radioList "classification" 
-            [ Radio.create [Radio.id "core", Radio.onClick (Bcc.SetClassification Bcc.Core), Radio.checked (model.classification == Just Bcc.Core)] "Core"
-            , Radio.create [Radio.id "supporting", Radio.onClick (Bcc.SetClassification Bcc.Supporting), Radio.checked (model.classification == Just Bcc.Supporting)] "Supporting"
-            , Radio.create [Radio.id "generic", Radio.onClick (Bcc.SetClassification Bcc.Generic), Radio.checked (model.classification == Just Bcc.Generic)] "Generic"
-            -- , Radio.create [Radio.id "other", Radio.onClick (Bcc.SetClassification Bcc.Other), Radio.checked (model.classification == Just Bcc.Generic)] "Generic"
-            ]
-            )
-        , Form.help [] [ text "Summary of purpose and responsibilities"] ]
+      , Grid.row []
+        [ Grid.col [] 
+          [ Form.label [for "classification"] [ text "Bounded Context classification"]
+          , div [] 
+              (Radio.radioList "classification" 
+              [ viewRadioButton "core" "Core" (model.classification == Just Bcc.Core) (Bcc.SetClassification Bcc.Core) 
+              , viewRadioButton "supporting" "Supporting" (model.classification == Just Bcc.Supporting) (Bcc.SetClassification Bcc.Supporting) 
+              , viewRadioButton "generic" "Generic" (model.classification == Just Bcc.Generic) (Bcc.SetClassification Bcc.Generic) 
+              -- TODO: Other
+              ]
+              )
+          , Form.help [] [ text "How can the Bounded Context be classified?"] ]
+          , Grid.col []
+            [ Form.label [for "businessModel"] [ text "Business Model"]
+            , div [] 
+                (Radio.radioList "businessModel" 
+                [ viewRadioButton "revenue" "Revenue" (model.businessModel == Just Bcc.Revenue) (Bcc.SetBusinessModel Bcc.Revenue) 
+                , viewRadioButton "engagement" "Engagement" (model.businessModel == Just Bcc.Engagement) (Bcc.SetBusinessModel Bcc.Engagement) 
+                , viewRadioButton "Compliance" "Compliance" (model.businessModel == Just Bcc.Compliance) (Bcc.SetBusinessModel Bcc.Compliance) 
+                , viewRadioButton "costReduction" "Cost reduction" (model.businessModel == Just Bcc.CostReduction) (Bcc.SetBusinessModel Bcc.CostReduction) 
+                -- TODO: Other
+                ]
+                )
+            , Form.help [] [ text "What's the underlying business model of the Bounded Context?"] ]
+          , Grid.col []
+            [ Form.label [for "evolution"] [ text "Evolution"]
+            , div [] 
+                (Radio.radioList "evolution" 
+                [ viewRadioButton "genesis" "Genesis" (model.evolution == Just Bcc.Genesis) (Bcc.SetEvolution Bcc.Genesis) 
+                , viewRadioButton "customBuilt" "Custom built" (model.evolution == Just Bcc.CustomBuilt) (Bcc.SetEvolution Bcc.CustomBuilt) 
+                , viewRadioButton "product" "Product" (model.evolution == Just Bcc.Product) (Bcc.SetEvolution Bcc.Product) 
+                , viewRadioButton "commodity" "Commodity" (model.evolution == Just Bcc.Commodity) (Bcc.SetEvolution Bcc.Commodity) 
+                -- TODO: Other
+                ]
+                )
+            , Form.help [] [ text "How does the context evolve? How novel is it?"] ]
+        ]
       ]
     ]
 
@@ -171,29 +200,33 @@ deleteBCC model =
 -- encoders
         
 
-modelEncoder: Bcc.BoundedContextCanvas -> Encode.Value
+modelEncoder : Bcc.BoundedContextCanvas -> Encode.Value
 modelEncoder canvas = 
   Encode.object
     [ ("name", Encode.string canvas.name)
     , ("description", Encode.string canvas.description)
-    , ("classification", classificationEncoder canvas.classification)
+    , ("classification", maybeStringEncoder Bcc.classificationToString canvas.classification)
+    , ("businessModel", maybeStringEncoder Bcc.businessModelToString canvas.businessModel)
+    , ("evolution", maybeStringEncoder Bcc.evolutionToString canvas.evolution)
     ]
 
-classificationEncoder : Maybe Bcc.Classification -> Encode.Value
-classificationEncoder classification =
-  case classification of
-    Just c -> Encode.string (Bcc.classificationToString c)
+maybeStringEncoder : (t -> String) -> Maybe t -> Encode.Value
+maybeStringEncoder encoder value =
+  case value of
+    Just v -> Encode.string (encoder v)
     Nothing -> Encode.null
 
-classificationDecoder: Decoder (Maybe Bcc.Classification)
-classificationDecoder =
-  Json.Decode.map Bcc.classificationParser string
+maybeStringDecoder : (String -> Maybe v) -> Decoder (Maybe v)
+maybeStringDecoder parser =
+  Json.Decode.map parser string
 
 modelDecoder: Decoder Bcc.BoundedContextCanvas
 modelDecoder =
   Json.Decode.succeed Bcc.BoundedContextCanvas
     |> JP.required "name" string
     |> JP.optional "description" string ""
-    |> JP.optional "classification" classificationDecoder Nothing 
+    |> JP.optional "classification" (maybeStringDecoder Bcc.classificationParser) Nothing 
+    |> JP.optional "businessModel" (maybeStringDecoder Bcc.businessModelParser) Nothing
+    |> JP.optional "evolution" (maybeStringDecoder Bcc.evolutionParser) Nothing 
 
     
