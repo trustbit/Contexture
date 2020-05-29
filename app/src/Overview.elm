@@ -75,7 +75,7 @@ createWithName name =
             [ Form.group []
                 [ Form.label [for "name"] [ text "Name"]
                 , Input.text [ Input.id "name", Input.value name, Input.onInput SetName ] ]
-            , Button.submitButton [ Button.primary] [ text "Fill out Details"] ]
+            , Button.submitButton [ Button.primary] [ text "Fill out the Rest!"] ]
            |> Fieldset.view
         ]
 

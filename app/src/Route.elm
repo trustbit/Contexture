@@ -1,4 +1,4 @@
-module Route exposing (Route(..), parseUrl,pushUrl)
+module Route exposing (Route(..), parseUrl,pushUrl,goBack)
 
 import Browser.Navigation as Nav
 import Url exposing (Url)
@@ -9,7 +9,7 @@ import Bcc exposing (BoundedContextId)
 
 type Route
     = NotFound
-    | Main
+    | Overview
     | Bcc BoundedContextId
 
 
@@ -28,7 +28,7 @@ parseUrl url =
 matchRoute : Parser (Route -> a) a
 matchRoute =
     oneOf
-        [ map Main top
+        [ map Overview top
         , map Bcc (s "bccs" </> Bcc.idParser)
 
         ]
@@ -38,13 +38,17 @@ pushUrl route navKey =
     routeToString route
         |> Nav.pushUrl navKey
 
+goBack : Nav.Key -> Cmd msg
+goBack navKey =
+    Nav.back navKey 1
+
 
 routeToString : Route -> String
 routeToString route =
     case route of
         NotFound ->
             "/not-found"
-        Main ->
+        Overview ->
             "/"
         Bcc bccId ->
             "/bccs/" ++ Bcc.idToString bccId
