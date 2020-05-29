@@ -167,7 +167,8 @@ viewRightside : Bcc.BoundedContextCanvas -> List (Html Bcc.Msg)
 viewRightside model =
   [ Form.group []
     [ Form.label [for "modelTraits"] [ text "Model traits"]
-    , Input.text [ Input.id "modelTraits", Input.value model.modelTraits, Input.onInput Bcc.SetModelTraits ] ]
+    , Input.text [ Input.id "modelTraits", Input.value model.modelTraits, Input.onInput Bcc.SetModelTraits ]
+    , Form.help [] [ text "draft, execute, audit, enforcer, interchange, gateway, etc."] ]
 
   ]
 

@@ -9,6 +9,8 @@ import Bootstrap.CDN as CDN
 import Bootstrap.Grid as Grid
 import Bootstrap.Grid.Row as Row
 import Bootstrap.Grid.Col as Col
+import Bootstrap.Navbar as Navbar
+
 
 import Route exposing ( Route)
 
@@ -39,6 +41,7 @@ type Page
 type alias Model = 
   { key : Nav.Key
   , route : Route
+  , navState: Navbar.State
   , page : Page }
 
 initCurrentPage : ( Model, Cmd Msg ) -> ( Model, Cmd Msg )
@@ -72,19 +75,22 @@ initCurrentPage ( model, existingCmds ) =
 init : () -> Url.Url -> Nav.Key -> (Model, Cmd Msg)
 init _ url key =
   let  
+    (navState, navCmd) = Navbar.initialState NavMsg
     model =
         { route = Route.parseUrl url
         , page = NotFoundPage
+        , navState = navState
         , key = key
         }
   in
-    initCurrentPage ( model, Cmd.none )
+    initCurrentPage ( model, navCmd )
  
 -- UPDATE
 
 type Msg
   = LinkClicked Browser.UrlRequest
   | UrlChanged Url.Url
+  | NavMsg Navbar.State
   | OverviewMsg Overview.Msg
   | BccMsg Bcc.Edit.Msg
 
@@ -109,6 +115,10 @@ update msg model =
       in
       ( { model | route = newRoute }, Cmd.none )
           |> initCurrentPage
+    (  NavMsg state, _) ->
+      ( { model | navState = state }
+      , Cmd.none
+      )
     (OverviewMsg m, Overview overview) ->
       let
         (updatedModel, updatedMsg) = Overview.update m overview
@@ -127,10 +137,20 @@ update msg model =
 -- SUBSCRIPTIONS
 
 subscriptions : Model -> Sub Msg
-subscriptions _ =
-  Sub.none
+subscriptions model =
+      Navbar.subscriptions model.navState NavMsg
+
 
 -- VIEW
+
+menu : Model -> Html Msg
+menu model =
+  Navbar.config NavMsg
+      |> Navbar.withAnimation
+      |> Navbar.primary
+      |> Navbar.brand [ href "/" ] [ text "Bounded Context Wizard" ]
+      |> Navbar.items []
+      |> Navbar.view model.navState
 
 view : Model -> Browser.Document Msg
 view model =
@@ -147,8 +167,11 @@ view model =
     { title = "Bounded Context Wizard"
     , body = 
       [ CDN.stylesheet
-      , Grid.container [] 
-        [ content ]
+      , div [] 
+        [ menu model
+        , Grid.containerFluid [] 
+          [ content ]
+        ]
       ]
     }
 
