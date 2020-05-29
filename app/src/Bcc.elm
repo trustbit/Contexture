@@ -37,6 +37,7 @@ type alias BoundedContextCanvas =
   , evolution: Maybe Evolution
   , businessDecisions: String
   , ubiquitousLanguage: String
+  , modelTraits: String
   }
 
 init: () -> BoundedContextCanvas
@@ -47,7 +48,8 @@ init _ =
   , businessModel = Nothing
   , evolution = Nothing
   , businessDecisions = ""
-  , ubiquitousLanguage = "" }
+  , ubiquitousLanguage = ""
+  , modelTraits = "" }
 
 -- UPDATE
 
@@ -59,6 +61,7 @@ type Msg
   | SetEvolution Evolution
   | SetBusinessDecisions String
   | SetUbiquitousLanguage String
+  | SetModelTraits String
 
 update: Msg -> BoundedContextCanvas -> BoundedContextCanvas
 update msg canvas =
@@ -80,6 +83,9 @@ update msg canvas =
       { canvas | businessDecisions = decisions}
     SetUbiquitousLanguage language ->
       { canvas | ubiquitousLanguage = language}
+
+    SetModelTraits traits ->
+      { canvas | modelTraits = traits}
    
 idToString : BoundedContextId -> String
 idToString bccId =

@@ -86,90 +86,96 @@ update msg model =
 
 view : Model -> Html Msg
 view model =
-    Form.form [Html.Events.onSubmit Save]
-        [ viewCanvas model.canvas |> Html.map Field
-        , Grid.row []
-            [ Grid.col [] 
-                [ Form.label [] [ text <| "echo name: " ++ model.canvas.name ]
-                , Html.br [] []
-                , Form.label [] [ text <| "echo description: " ++ model.canvas.description ]
-                , Html.br [] []
-                , div []
-                  [ Button.button [Button.secondary, Button.onClick Back] [text "Back"]
-                  , Button.submitButton [ Button.primary ] [ text "Save"]
-                  , Button.button 
-                    [ Button.danger
-                    , Button.small
-                    , Button.onClick Delete
-                    , Button.attrs [ title ("Delete " ++ model.canvas.name) ] 
-                    ]
-                    [ text "X" ]
-                  ]
-                ]
+  Form.form [Html.Events.onSubmit Save]
+      [ viewCanvas model.canvas |> Html.map Field
+      , Grid.row []
+        [ Grid.col [] 
+          [ Button.button [Button.secondary, Button.onClick Back] [text "Back"]
+          , Button.submitButton [ Button.primary ] [ text "Save"]
+          , Button.button 
+            [ Button.danger
+            , Button.small
+            , Button.onClick Delete
+            , Button.attrs [ title ("Delete " ++ model.canvas.name) ] 
             ]
+            [ text "X" ]
+          ]
         ]
+      ]
 
 viewRadioButton : String -> String -> Bool -> Bcc.Msg -> Radio.Radio Bcc.Msg
 viewRadioButton id title checked msg =
   Radio.create [Radio.id id, Radio.onClick msg, Radio.checked checked] title
 
-viewCanvas: Bcc.BoundedContextCanvas -> Html Bcc.Msg
+viewLeftside : Bcc.BoundedContextCanvas -> List (Html Bcc.Msg)
+viewLeftside model =
+  [ Form.group []
+    [ Form.label [for "name"] [ text "Name"]
+    , Input.text [ Input.id "name", Input.value model.name, Input.onInput Bcc.SetName ] ]
+  , Form.group []
+    [ Form.label [for "description"] [ text "Description"]
+    , Input.text [ Input.id "description", Input.value model.description, Input.onInput Bcc.SetDescription ]
+    , Form.help [] [ text "Summary of purpose and responsibilities"] ]
+  , Grid.row []
+    [ Grid.col [] 
+      [ Form.label [for "classification"] [ text "Bounded Context classification"]
+      , div [] 
+          (Radio.radioList "classification" 
+          [ viewRadioButton "core" "Core" (model.classification == Just Bcc.Core) (Bcc.SetClassification Bcc.Core) 
+          , viewRadioButton "supporting" "Supporting" (model.classification == Just Bcc.Supporting) (Bcc.SetClassification Bcc.Supporting) 
+          , viewRadioButton "generic" "Generic" (model.classification == Just Bcc.Generic) (Bcc.SetClassification Bcc.Generic) 
+          -- TODO: Other
+          ]
+          )
+      , Form.help [] [ text "How can the Bounded Context be classified?"] ]
+      , Grid.col []
+        [ Form.label [for "businessModel"] [ text "Business Model"]
+        , div [] 
+            (Radio.radioList "businessModel" 
+            [ viewRadioButton "revenue" "Revenue" (model.businessModel == Just Bcc.Revenue) (Bcc.SetBusinessModel Bcc.Revenue) 
+            , viewRadioButton "engagement" "Engagement" (model.businessModel == Just Bcc.Engagement) (Bcc.SetBusinessModel Bcc.Engagement) 
+            , viewRadioButton "Compliance" "Compliance" (model.businessModel == Just Bcc.Compliance) (Bcc.SetBusinessModel Bcc.Compliance) 
+            , viewRadioButton "costReduction" "Cost reduction" (model.businessModel == Just Bcc.CostReduction) (Bcc.SetBusinessModel Bcc.CostReduction) 
+            -- TODO: Other
+            ]
+            )
+        , Form.help [] [ text "What's the underlying business model of the Bounded Context?"] ]
+      , Grid.col []
+        [ Form.label [for "evolution"] [ text "Evolution"]
+        , div [] 
+            (Radio.radioList "evolution" 
+            [ viewRadioButton "genesis" "Genesis" (model.evolution == Just Bcc.Genesis) (Bcc.SetEvolution Bcc.Genesis) 
+            , viewRadioButton "customBuilt" "Custom built" (model.evolution == Just Bcc.CustomBuilt) (Bcc.SetEvolution Bcc.CustomBuilt) 
+            , viewRadioButton "product" "Product" (model.evolution == Just Bcc.Product) (Bcc.SetEvolution Bcc.Product) 
+            , viewRadioButton "commodity" "Commodity" (model.evolution == Just Bcc.Commodity) (Bcc.SetEvolution Bcc.Commodity) 
+            -- TODO: Other
+            ]
+            )
+        , Form.help [] [ text "How does the context evolve? How novel is it?"] ]
+    ]
+  , Form.group []
+    [ Form.label [for "businessDecisions"] [ text "Business Decisions"]
+      , Textarea.textarea [ Textarea.id "businessDecisions", Textarea.rows 4, Textarea.value model.businessDecisions, Textarea.onInput Bcc.SetBusinessDecisions ]
+      , Form.help [] [ text "Key business rules, policies and decisions"] ]
+  , Form.group []
+    [ Form.label [for "ubiquitousLanguage"] [ text "Ubiquitous Language"]
+      , Textarea.textarea [ Textarea.id "ubiquitousLanguage", Textarea.rows 4, Textarea.value model.ubiquitousLanguage, Textarea.onInput Bcc.SetUbiquitousLanguage ]
+      , Form.help [] [ text "Key domain terminology"] ]
+  ]
+
+viewRightside : Bcc.BoundedContextCanvas -> List (Html Bcc.Msg)
+viewRightside model =
+  [ Form.group []
+    [ Form.label [for "modelTraits"] [ text "Model traits"]
+    , Input.text [ Input.id "modelTraits", Input.value model.modelTraits, Input.onInput Bcc.SetModelTraits ] ]
+
+  ]
+
+viewCanvas : Bcc.BoundedContextCanvas -> Html Bcc.Msg
 viewCanvas model =
   Grid.row []
-    [ Grid.col []
-      [ Form.group []
-        [ Form.label [for "name"] [ text "Name"]
-        , Input.text [ Input.id "name", Input.value model.name, Input.onInput Bcc.SetName ] ]
-      , Form.group []
-        [ Form.label [for "description"] [ text "Description"]
-        , Input.text [ Input.id "description", Input.value model.description, Input.onInput Bcc.SetDescription ]
-        , Form.help [] [ text "Summary of purpose and responsibilities"] ]
-      , Grid.row []
-        [ Grid.col [] 
-          [ Form.label [for "classification"] [ text "Bounded Context classification"]
-          , div [] 
-              (Radio.radioList "classification" 
-              [ viewRadioButton "core" "Core" (model.classification == Just Bcc.Core) (Bcc.SetClassification Bcc.Core) 
-              , viewRadioButton "supporting" "Supporting" (model.classification == Just Bcc.Supporting) (Bcc.SetClassification Bcc.Supporting) 
-              , viewRadioButton "generic" "Generic" (model.classification == Just Bcc.Generic) (Bcc.SetClassification Bcc.Generic) 
-              -- TODO: Other
-              ]
-              )
-          , Form.help [] [ text "How can the Bounded Context be classified?"] ]
-          , Grid.col []
-            [ Form.label [for "businessModel"] [ text "Business Model"]
-            , div [] 
-                (Radio.radioList "businessModel" 
-                [ viewRadioButton "revenue" "Revenue" (model.businessModel == Just Bcc.Revenue) (Bcc.SetBusinessModel Bcc.Revenue) 
-                , viewRadioButton "engagement" "Engagement" (model.businessModel == Just Bcc.Engagement) (Bcc.SetBusinessModel Bcc.Engagement) 
-                , viewRadioButton "Compliance" "Compliance" (model.businessModel == Just Bcc.Compliance) (Bcc.SetBusinessModel Bcc.Compliance) 
-                , viewRadioButton "costReduction" "Cost reduction" (model.businessModel == Just Bcc.CostReduction) (Bcc.SetBusinessModel Bcc.CostReduction) 
-                -- TODO: Other
-                ]
-                )
-            , Form.help [] [ text "What's the underlying business model of the Bounded Context?"] ]
-          , Grid.col []
-            [ Form.label [for "evolution"] [ text "Evolution"]
-            , div [] 
-                (Radio.radioList "evolution" 
-                [ viewRadioButton "genesis" "Genesis" (model.evolution == Just Bcc.Genesis) (Bcc.SetEvolution Bcc.Genesis) 
-                , viewRadioButton "customBuilt" "Custom built" (model.evolution == Just Bcc.CustomBuilt) (Bcc.SetEvolution Bcc.CustomBuilt) 
-                , viewRadioButton "product" "Product" (model.evolution == Just Bcc.Product) (Bcc.SetEvolution Bcc.Product) 
-                , viewRadioButton "commodity" "Commodity" (model.evolution == Just Bcc.Commodity) (Bcc.SetEvolution Bcc.Commodity) 
-                -- TODO: Other
-                ]
-                )
-            , Form.help [] [ text "How does the context evolve? How novel is it?"] ]
-        ]
-      , Form.group []
-        [ Form.label [for "businessDecisions"] [ text "Business Decisions"]
-          , Textarea.textarea [ Textarea.id "businessDecisions", Textarea.rows 4, Textarea.value model.businessDecisions, Textarea.onInput Bcc.SetBusinessDecisions ]
-          , Form.help [] [ text "Key business rules, policies and decisions"] ]
-      , Form.group []
-        [ Form.label [for "ubiquitousLanguage"] [ text "Ubiquitous Language"]
-          , Textarea.textarea [ Textarea.id "ubiquitousLanguage", Textarea.rows 4, Textarea.value model.ubiquitousLanguage, Textarea.onInput Bcc.SetUbiquitousLanguage ]
-          , Form.help [] [ text "Key domain terminology"] ]
-      ]
+    [ Grid.col [] (viewLeftside model)
+    , Grid.col [] (viewRightside model)
     ]
 
 
@@ -219,6 +225,7 @@ modelEncoder canvas =
     , ("evolution", maybeStringEncoder Bcc.evolutionToString canvas.evolution)
     , ("businessDecisions", Encode.string canvas.businessDecisions)
     , ("ubiquitousLanguage", Encode.string canvas.ubiquitousLanguage)
+    , ("modelTraits", Encode.string canvas.modelTraits)
     ]
 
 maybeStringEncoder : (t -> String) -> Maybe t -> Encode.Value
@@ -241,5 +248,6 @@ modelDecoder =
     |> JP.optional "evolution" (maybeStringDecoder Bcc.evolutionParser) Nothing
     |> JP.optional "businessDecisions" string ""
     |> JP.optional "ubiquitousLanguage" string ""
+    |> JP.optional "modelTraits" string ""
 
     
