@@ -10,6 +10,7 @@ import Bootstrap.Grid.Row as Row
 import Bootstrap.Grid.Col as Col
 import Bootstrap.Form as Form
 import Bootstrap.Form.Input as Input
+import Bootstrap.Form.Textarea as Textarea
 import Bootstrap.Form.Radio as Radio
 import Bootstrap.Button as Button
 import Bootstrap.ButtonGroup as ButtonGroup
@@ -160,6 +161,14 @@ viewCanvas model =
                 )
             , Form.help [] [ text "How does the context evolve? How novel is it?"] ]
         ]
+      , Form.group []
+        [ Form.label [for "businessDecisions"] [ text "Business Decisions"]
+          , Textarea.textarea [ Textarea.id "businessDecisions", Textarea.rows 4, Textarea.value model.businessDecisions, Textarea.onInput Bcc.SetBusinessDecisions ]
+          , Form.help [] [ text "Key business rules, policies and decisions"] ]
+      , Form.group []
+        [ Form.label [for "ubiquitousLanguage"] [ text "Ubiquitous Language"]
+          , Textarea.textarea [ Textarea.id "ubiquitousLanguage", Textarea.rows 4, Textarea.value model.ubiquitousLanguage, Textarea.onInput Bcc.SetUbiquitousLanguage ]
+          , Form.help [] [ text "Key domain terminology"] ]
       ]
     ]
 
@@ -208,6 +217,8 @@ modelEncoder canvas =
     , ("classification", maybeStringEncoder Bcc.classificationToString canvas.classification)
     , ("businessModel", maybeStringEncoder Bcc.businessModelToString canvas.businessModel)
     , ("evolution", maybeStringEncoder Bcc.evolutionToString canvas.evolution)
+    , ("businessDecisions", Encode.string canvas.businessDecisions)
+    , ("ubiquitousLanguage", Encode.string canvas.ubiquitousLanguage)
     ]
 
 maybeStringEncoder : (t -> String) -> Maybe t -> Encode.Value
@@ -227,6 +238,8 @@ modelDecoder =
     |> JP.optional "description" string ""
     |> JP.optional "classification" (maybeStringDecoder Bcc.classificationParser) Nothing 
     |> JP.optional "businessModel" (maybeStringDecoder Bcc.businessModelParser) Nothing
-    |> JP.optional "evolution" (maybeStringDecoder Bcc.evolutionParser) Nothing 
+    |> JP.optional "evolution" (maybeStringDecoder Bcc.evolutionParser) Nothing
+    |> JP.optional "businessDecisions" string ""
+    |> JP.optional "ubiquitousLanguage" string ""
 
     
