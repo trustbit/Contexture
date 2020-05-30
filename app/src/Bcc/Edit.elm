@@ -109,7 +109,7 @@ updateEdit msg model =
         addingMessageModel = model.addingMessage
         addingMessage = 
           case change of
-            Bcc.AddCommandHandled _ ->
+            Bcc.CommandHandled _ ->
               { addingMessageModel | commandsHandled = "" }
             _ -> addingMessageModel
       in
@@ -225,12 +225,33 @@ viewLeftside model =
   ]
   |> List.map (Html.map Field)
 
-viewMessageOption : (Bcc.Message -> Bcc.MessageMsg) -> Bcc.Message -> ListGroup.Item Bcc.MessageMsg
+viewMessageOption : (Bcc.MessageAction   -> Bcc.MessageMsg) -> Bcc.Message -> ListGroup.Item Bcc.MessageMsg
 viewMessageOption remove model =
   ListGroup.li [] 
-    [ Button.button [Button.danger, Button.onClick (remove model)] [ text "x"]
+    [ Button.button [Button.danger, Button.onClick (remove (Bcc.Remove model))] [ text "x"]
     , text model
     ]
+
+-- vieMessage : String -> String -> Set Bcc.Message -> Message -> ReturnType
+-- vieMessage id title messages =
+  -- Form.group []
+  --   [ Form.label [for "commandsHandled"] [ text "Commands handled"]
+  --   , ListGroup.ul 
+  --     (
+  --       messages.commandsHandled
+  --       |> Set.toList
+  --       |> List.map (viewMessageOption Bcc.RemoveCommandHandled)
+  --     )
+  --     |> Html.map (Bcc.ChangeMessages >> Field)
+  --   , Form.form [Html.Events.onSubmit (editing.addingMessage.commandsHandled |> Bcc.AddCommandHandled |> Bcc.ChangeMessages |> Field)  ]
+  --     [ Input.text 
+  --       [ Input.id "commandsHandled"
+  --       , Input.value editing.addingMessage.commandsHandled
+  --       , Input.onInput CommandsHandled 
+  --       ] |> Html.map MessageField
+  --     , Button.submitButton [ Button.secondary] [ text "Add"]
+  --     ]
+  --   ] 
 
 viewMessages : EditingCanvas -> Html EditingMsg
 viewMessages editing =
@@ -243,23 +264,23 @@ viewMessages editing =
       [ Grid.col [] 
         [ Html.h6 [] [ text "Messages Consumed"]
         , Form.group []
-          [ Form.label [for "commandsHandled"] [ text "Commands handled"]
-          , ListGroup.ul 
-            (
-              messages.commandsHandled
-              |> Set.toList
-              |> List.map (viewMessageOption Bcc.RemoveCommandHandled)
-            )
-            |> Html.map (Bcc.ChangeMessages >> Field)
-          , Form.form [Html.Events.onSubmit (editing.addingMessage.commandsHandled |> Bcc.AddCommandHandled |> Bcc.ChangeMessages |> Field)  ]
-            [ Input.text 
-              [ Input.id "commandHandled"
-              , Input.value editing.addingMessage.commandsHandled
-              , Input.onInput CommandsHandled 
-              ] |> Html.map MessageField
-            , Button.submitButton [ Button.secondary] [ text "Add"]
-            ]
-          ] 
+        [ Form.label [for "commandsHandled"] [ text "Commands handled"]
+        , ListGroup.ul 
+          (
+            messages.commandsHandled
+            |> Set.toList
+            |> List.map (viewMessageOption Bcc.CommandHandled)
+          )
+          |> Html.map (Bcc.ChangeMessages >> Field)
+        , Form.form [Html.Events.onSubmit (editing.addingMessage.commandsHandled |> Bcc.Add |> Bcc.CommandHandled |> Bcc.ChangeMessages |> Field)  ]
+          [ Input.text 
+            [ Input.id "commandsHandled"
+            , Input.value editing.addingMessage.commandsHandled
+            , Input.onInput CommandsHandled 
+            ] |> Html.map MessageField
+          , Button.submitButton [ Button.secondary] [ text "Add"]
+          ]
+        ] 
         ]
       , Grid.col []
         [ Html.h6 [] [ text "Messages Consumed"]

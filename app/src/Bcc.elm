@@ -80,13 +80,17 @@ init _ =
   , ubiquitousLanguage = ""
   , modelTraits = ""
   , messages = initMessages ()
-     }
+  }
 
 -- UPDATE
 
+type MessageAction
+  = Add Message
+  | Remove Message
+
 type MessageMsg
-  = AddCommandHandled Message
-  | RemoveCommandHandled Message
+  = CommandHandled MessageAction
+  | CommandSent MessageAction
 
 type Msg
   = SetName String
@@ -99,14 +103,22 @@ type Msg
   | SetModelTraits ModelTraits
   | ChangeMessages MessageMsg
 
+updateMessageAction : MessageAction -> Set Message -> Set Message
+updateMessageAction action messages =
+  case action of
+    Add m ->
+      Set.insert m messages
+    Remove m ->
+      Set.remove m messages
+
 updateMessages : MessageMsg -> Messages -> Messages
 updateMessages msg model =
   case msg of
-    AddCommandHandled cmd ->
-      { model | commandsHandled = Set.insert cmd model.commandsHandled}
-    RemoveCommandHandled cmd ->
-      { model | commandsHandled = Set.remove cmd model.commandsHandled}
-
+    CommandHandled cmd ->
+      { model | commandsHandled = updateMessageAction cmd model.commandsHandled}
+    CommandSent cmd ->
+      { model | commandsHandled = updateMessageAction cmd model.commandsSent}
+    
 update: Msg -> BoundedContextCanvas -> BoundedContextCanvas
 update msg canvas =
   case msg of
