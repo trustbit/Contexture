@@ -3,7 +3,9 @@ module Bcc exposing (..)
 import Url.Parser exposing (Parser, custom)
 
 import Set exposing(Set)
-import Json.Decode exposing (Decoder, map2, field, string, int, at, nullable)
+import Json.Encode as Encode
+import Json.Decode exposing (Decoder, map2, field, string, int, at, nullable, list)
+import Json.Decode.Pipeline as JP
 
 -- MODEL
 
@@ -227,3 +229,67 @@ evolutionParser evolution =
       "Product" -> Just Product
       "Commodity" -> Just Commodity
       _ -> Nothing
+
+-- encoders
+        
+messagesEncoder : Messages -> Encode.Value
+messagesEncoder messages =
+  Encode.object
+    [ ("commandsHandled", Encode.set Encode.string messages.commandsHandled)
+    , ("commandsSent", Encode.set Encode.string messages.commandsSent)
+    , ("eventsHandled", Encode.set Encode.string messages.eventsHandled)
+    , ("eventsPublished", Encode.set Encode.string messages.eventsPublished)
+    , ("queriesHandled", Encode.set Encode.string messages.queriesHandled)
+    , ("queriesInvoked" , Encode.set Encode.string messages.queriesInvoked)
+    ]
+
+modelEncoder : BoundedContextCanvas -> Encode.Value
+modelEncoder canvas = 
+  Encode.object
+    [ ("name", Encode.string canvas.name)
+    , ("description", Encode.string canvas.description)
+    , ("classification", maybeStringEncoder classificationToString canvas.classification)
+    , ("businessModel", maybeStringEncoder businessModelToString canvas.businessModel)
+    , ("evolution", maybeStringEncoder evolutionToString canvas.evolution)
+    , ("businessDecisions", Encode.string canvas.businessDecisions)
+    , ("ubiquitousLanguage", Encode.string canvas.ubiquitousLanguage)
+    , ("modelTraits", Encode.string canvas.modelTraits)
+    , ("messages", messagesEncoder canvas.messages)
+    ]
+
+maybeStringEncoder : (t -> String) -> Maybe t -> Encode.Value
+maybeStringEncoder encoder value =
+  case value of
+    Just v -> Encode.string (encoder v)
+    Nothing -> Encode.null
+
+maybeStringDecoder : (String -> Maybe v) -> Decoder (Maybe v)
+maybeStringDecoder parser =
+  Json.Decode.map parser string
+
+setDecoder : Decoder (Set.Set String)
+setDecoder =
+  Json.Decode.map Set.fromList (Json.Decode.list string) 
+
+messagesDecoder : Decoder Messages
+messagesDecoder =
+  Json.Decode.succeed Messages
+    |> JP.required "commandsHandled" setDecoder
+    |> JP.required "commandsSent" setDecoder
+    |> JP.required "eventsHandled" setDecoder
+    |> JP.required "eventsPublished" setDecoder
+    |> JP.required "queriesHandled" setDecoder
+    |> JP.required "queriesInvoked" setDecoder
+
+modelDecoder : Decoder BoundedContextCanvas
+modelDecoder =
+  Json.Decode.succeed BoundedContextCanvas
+    |> JP.required "name" string
+    |> JP.optional "description" string ""
+    |> JP.optional "classification" (maybeStringDecoder classificationParser) Nothing
+    |> JP.optional "businessModel" (maybeStringDecoder businessModelParser) Nothing
+    |> JP.optional "evolution" (maybeStringDecoder evolutionParser) Nothing
+    |> JP.optional "businessDecisions" string ""
+    |> JP.optional "ubiquitousLanguage" string ""
+    |> JP.optional "modelTraits" string ""
+    |> JP.optional "messages" messagesDecoder (initMessages ())

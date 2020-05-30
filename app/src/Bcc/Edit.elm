@@ -22,10 +22,6 @@ import Url
 
 import Set
 import Http
-import Json.Encode as Encode
-import Json.Decode exposing (Decoder, map2, field, string, int, at, nullable, list)
-import Json.Decode.Pipeline as JP
-
 
 import Route
 import Bcc
@@ -367,7 +363,7 @@ loadBCC: Model -> Cmd Msg
 loadBCC model =
   Http.get
     { url = Url.toString model.self
-    , expect = Http.expectJson Loaded modelDecoder
+    , expect = Http.expectJson Loaded Bcc.modelDecoder
     }
 
 saveBCC: Model -> Cmd Msg
@@ -376,7 +372,7 @@ saveBCC model =
       { method = "PUT"
       , headers = []
       , url = Url.toString model.self
-      , body = Http.jsonBody <| modelEncoder model.edit.canvas
+      , body = Http.jsonBody <| Bcc.modelEncoder model.edit.canvas
       , expect = Http.expectWhatever Saved
       , timeout = Nothing
       , tracker = Nothing
@@ -394,68 +390,3 @@ deleteBCC model =
       , tracker = Nothing
       }
 
--- encoders
-        
-messagesEncoder : Bcc.Messages -> Encode.Value
-messagesEncoder messages =
-  Encode.object
-    [ ("commandsHandled", Encode.set Encode.string messages.commandsHandled)
-    , ("commandsSent", Encode.set Encode.string messages.commandsSent)
-    , ("eventsHandled", Encode.set Encode.string messages.eventsHandled)
-    , ("eventsPublished", Encode.set Encode.string messages.eventsPublished)
-    , ("queriesHandled", Encode.set Encode.string messages.queriesHandled)
-    , ("queriesInvoked" , Encode.set Encode.string messages.queriesInvoked)
-    ]
-
-modelEncoder : Bcc.BoundedContextCanvas -> Encode.Value
-modelEncoder canvas = 
-  Encode.object
-    [ ("name", Encode.string canvas.name)
-    , ("description", Encode.string canvas.description)
-    , ("classification", maybeStringEncoder Bcc.classificationToString canvas.classification)
-    , ("businessModel", maybeStringEncoder Bcc.businessModelToString canvas.businessModel)
-    , ("evolution", maybeStringEncoder Bcc.evolutionToString canvas.evolution)
-    , ("businessDecisions", Encode.string canvas.businessDecisions)
-    , ("ubiquitousLanguage", Encode.string canvas.ubiquitousLanguage)
-    , ("modelTraits", Encode.string canvas.modelTraits)
-    , ("messages", messagesEncoder canvas.messages)
-    ]
-
-maybeStringEncoder : (t -> String) -> Maybe t -> Encode.Value
-maybeStringEncoder encoder value =
-  case value of
-    Just v -> Encode.string (encoder v)
-    Nothing -> Encode.null
-
-maybeStringDecoder : (String -> Maybe v) -> Decoder (Maybe v)
-maybeStringDecoder parser =
-  Json.Decode.map parser string
-
-setDecoder : Decoder (Set.Set String)
-setDecoder =
-  Json.Decode.map Set.fromList (Json.Decode.list string) 
-
-messagesDecoder : Decoder Bcc.Messages
-messagesDecoder =
-  Json.Decode.succeed Bcc.Messages
-    |> JP.required "commandsHandled" setDecoder
-    |> JP.required "commandsSent" setDecoder
-    |> JP.required "eventsHandled" setDecoder
-    |> JP.required "eventsPublished" setDecoder
-    |> JP.required "queriesHandled" setDecoder
-    |> JP.required "queriesInvoked" setDecoder
-    
-modelDecoder : Decoder Bcc.BoundedContextCanvas
-modelDecoder =
-  Json.Decode.succeed Bcc.BoundedContextCanvas
-    |> JP.required "name" string
-    |> JP.optional "description" string ""
-    |> JP.optional "classification" (maybeStringDecoder Bcc.classificationParser) Nothing 
-    |> JP.optional "businessModel" (maybeStringDecoder Bcc.businessModelParser) Nothing
-    |> JP.optional "evolution" (maybeStringDecoder Bcc.evolutionParser) Nothing
-    |> JP.optional "businessDecisions" string ""
-    |> JP.optional "ubiquitousLanguage" string ""
-    |> JP.optional "modelTraits" string ""
-    |> JP.optional "messages" messagesDecoder (Bcc.initMessages ())
-
-    
