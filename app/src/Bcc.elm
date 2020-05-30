@@ -93,6 +93,8 @@ type MessageMsg
   | CommandSent MessageAction
   | EventsHandled MessageAction
   | EventsPublished MessageAction
+  | QueriesHandled MessageAction
+  | QueriesInvoked MessageAction
 
 type Msg
   = SetName String
@@ -124,6 +126,10 @@ updateMessages msg model =
       { model | eventsHandled = updateMessageAction event model.eventsHandled }
     EventsPublished event ->
       { model | eventsPublished = updateMessageAction event model.eventsPublished }
+    QueriesHandled event ->
+      { model | queriesHandled = updateMessageAction event model.queriesHandled }
+    QueriesInvoked event ->
+      { model | queriesInvoked = updateMessageAction event model.queriesInvoked }
     
 update: Msg -> BoundedContextCanvas -> BoundedContextCanvas
 update msg canvas =

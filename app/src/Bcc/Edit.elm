@@ -84,6 +84,8 @@ type MessageFieldMsg
   | CommandsSent String
   | EventsHandled String
   | EventsPublished String
+  | QueriesHandled String
+  | QueriesInvoked String
 
 type EditingMsg
   = Field Bcc.Msg
@@ -109,6 +111,10 @@ updateAddingMessage msg model =
       { model | eventsHandled = event }
     EventsPublished event ->
       { model | eventsPublished = event }
+    QueriesHandled query ->
+      { model | queriesHandled = query }
+    QueriesInvoked query ->
+      { model | queriesInvoked = query }
 
 updateEdit : EditingMsg -> EditingCanvas -> EditingCanvas
 updateEdit msg model =
@@ -126,6 +132,10 @@ updateEdit msg model =
               { addingMessageModel | eventsHandled = "" }
             Bcc.EventsPublished _ ->
               { addingMessageModel | eventsPublished = "" }
+            Bcc.QueriesHandled _ ->
+              { addingMessageModel | queriesHandled = "" }
+            Bcc.QueriesInvoked _ ->
+              { addingMessageModel | queriesInvoked = "" }
       in
         { model | canvas = Bcc.update (Bcc.ChangeMessages change) model.canvas, addingMessage = addingMessage }
     Field fieldMsg ->
@@ -286,6 +296,7 @@ viewMessages : EditingCanvas -> Html EditingMsg
 viewMessages editing =
   let
     messages = editing.canvas.messages
+    addingMessage = editing.addingMessage
   in
   div []
     [ Html.h5 [] [ text "Messages Consumed and Produced" ]
@@ -293,28 +304,38 @@ viewMessages editing =
       [ Grid.col [] 
         [ Html.h6 [] [ text "Messages Consumed"]
         , { messages = messages.commandsHandled
-          , message = editing.addingMessage.commandsHandled
+          , message = addingMessage.commandsHandled
           , modifyMessageCmd = Bcc.CommandHandled
           , updateNewMessageText = CommandsHandled
           } |> viewMessage "commandsHandled" "Commands handled"
         , { messages = messages.eventsHandled
-          , message = editing.addingMessage.eventsHandled
+          , message = addingMessage.eventsHandled
           , modifyMessageCmd = Bcc.EventsHandled
           , updateNewMessageText = EventsHandled
           } |> viewMessage "eventsHandled" "Events handled"
+        , { messages = messages.queriesHandled
+          , message = addingMessage.queriesHandled
+          , modifyMessageCmd = Bcc.QueriesHandled
+          , updateNewMessageText = QueriesHandled
+          } |> viewMessage "queriesHandled" "Queries handled"
         ]
       , Grid.col []
         [ Html.h6 [] [ text "Messages Consumed"]
         , { messages = messages.commandsSent
-          , message = editing.addingMessage.commandsSent
+          , message = addingMessage.commandsSent
           , modifyMessageCmd = Bcc.CommandSent
           , updateNewMessageText = CommandsSent
           } |> viewMessage "commandsSent" "Commands sent"
         , { messages = messages.eventsPublished
-          , message = editing.addingMessage.eventsPublished
+          , message = addingMessage.eventsPublished
           , modifyMessageCmd = Bcc.EventsPublished
           , updateNewMessageText = EventsPublished
           } |> viewMessage "eventsPublished" "Events published"
+        , { messages = messages.queriesInvoked
+          , message = addingMessage.queriesInvoked
+          , modifyMessageCmd = Bcc.QueriesInvoked
+          , updateNewMessageText = QueriesInvoked
+          } |> viewMessage "queriesInvoked" "Queries invoked"
         ]
       ]
     ]
