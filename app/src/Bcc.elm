@@ -91,6 +91,8 @@ type MessageAction
 type MessageMsg
   = CommandHandled MessageAction
   | CommandSent MessageAction
+  | EventsHandled MessageAction
+  | EventsPublished MessageAction
 
 type Msg
   = SetName String
@@ -115,9 +117,13 @@ updateMessages : MessageMsg -> Messages -> Messages
 updateMessages msg model =
   case msg of
     CommandHandled cmd ->
-      { model | commandsHandled = updateMessageAction cmd model.commandsHandled}
+      { model | commandsHandled = updateMessageAction cmd model.commandsHandled }
     CommandSent cmd ->
-      { model | commandsSent = updateMessageAction cmd model.commandsSent}
+      { model | commandsSent = updateMessageAction cmd model.commandsSent }
+    EventsHandled event ->
+      { model | eventsHandled = updateMessageAction event model.eventsHandled }
+    EventsPublished event ->
+      { model | eventsPublished = updateMessageAction event model.eventsPublished }
     
 update: Msg -> BoundedContextCanvas -> BoundedContextCanvas
 update msg canvas =

@@ -82,6 +82,8 @@ init key url =
 type MessageFieldMsg
   = CommandsHandled String
   | CommandsSent String
+  | EventsHandled String
+  | EventsPublished String
 
 type EditingMsg
   = Field Bcc.Msg
@@ -100,9 +102,13 @@ updateAddingMessage : MessageFieldMsg -> AddingMessage -> AddingMessage
 updateAddingMessage msg model =
   case msg of
     CommandsHandled cmd ->
-      { model | commandsHandled = cmd}
+      { model | commandsHandled = cmd }
     CommandsSent cmd ->
-      { model | commandsSent = cmd}
+      { model | commandsSent = cmd }
+    EventsHandled event ->
+      { model | eventsHandled = event }
+    EventsPublished event ->
+      { model | eventsPublished = event }
 
 updateEdit : EditingMsg -> EditingCanvas -> EditingCanvas
 updateEdit msg model =
@@ -114,7 +120,12 @@ updateEdit msg model =
           case change of
             Bcc.CommandHandled _ ->
               { addingMessageModel | commandsHandled = "" }
-            _ -> addingMessageModel
+            Bcc.CommandSent _ ->
+              { addingMessageModel | commandsSent = "" }
+            Bcc.EventsHandled _ ->
+              { addingMessageModel | eventsHandled = "" }
+            Bcc.EventsPublished _ ->
+              { addingMessageModel | eventsPublished = "" }
       in
         { model | canvas = Bcc.update (Bcc.ChangeMessages change) model.canvas, addingMessage = addingMessage }
     Field fieldMsg ->
@@ -286,7 +297,11 @@ viewMessages editing =
           , modifyMessageCmd = Bcc.CommandHandled
           , updateNewMessageText = CommandsHandled
           } |> viewMessage "commandsHandled" "Commands handled"
-        
+        , { messages = messages.eventsHandled
+          , message = editing.addingMessage.eventsHandled
+          , modifyMessageCmd = Bcc.EventsHandled
+          , updateNewMessageText = EventsHandled
+          } |> viewMessage "eventsHandled" "Events handled"
         ]
       , Grid.col []
         [ Html.h6 [] [ text "Messages Consumed"]
@@ -295,6 +310,11 @@ viewMessages editing =
           , modifyMessageCmd = Bcc.CommandSent
           , updateNewMessageText = CommandsSent
           } |> viewMessage "commandsSent" "Commands sent"
+        , { messages = messages.eventsPublished
+          , message = editing.addingMessage.eventsPublished
+          , modifyMessageCmd = Bcc.EventsPublished
+          , updateNewMessageText = EventsPublished
+          } |> viewMessage "eventsPublished" "Events published"
         ]
       ]
     ]
