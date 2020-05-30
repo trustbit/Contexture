@@ -14,6 +14,8 @@ import Bootstrap.Form.Textarea as Textarea
 import Bootstrap.Form.Radio as Radio
 import Bootstrap.Button as Button
 import Bootstrap.ListGroup as ListGroup
+import Bootstrap.Utilities.Flex as Flex
+import Bootstrap.Utilities.Spacing as Spacing
 
 
 import Url
@@ -251,9 +253,10 @@ viewLeftside model =
 
 viewMessageOption : (Bcc.MessageAction   -> Bcc.MessageMsg) -> Bcc.Message -> ListGroup.Item Bcc.MessageMsg
 viewMessageOption remove model =
-  ListGroup.li [] 
-    [ Button.button [Button.danger, Button.onClick (remove (Bcc.Remove model))] [ text "x"]
-    , text model
+  ListGroup.li 
+    [ ListGroup.attrs [ Flex.block, Flex.justifyBetween, Flex.alignItemsCenter, Spacing.p1 ] ] 
+    [ text model
+    , Button.button [Button.danger, Button.small, Button.onClick (remove (Bcc.Remove model))] [ text "x"]
     ]
 
 type alias MessageEdit =
@@ -265,7 +268,7 @@ type alias MessageEdit =
 
 viewMessage : String -> String -> MessageEdit -> Html EditingMsg
 viewMessage id title edit =
-  Form.group []
+  Form.group [Form.attrs [style "min-height" "250px"]]
     [ Form.label [for id] [ text title]
     , ListGroup.ul 
       (
@@ -276,12 +279,13 @@ viewMessage id title edit =
       |> Html.map (Bcc.ChangeMessages >> Field)
     , Form.form 
       [ Html.Events.onSubmit 
-        (edit.message
-          |> Bcc.Add
-          |> edit.modifyMessageCmd
-          |> Bcc.ChangeMessages
-          |> Field
-        )
+          (edit.message
+            |> Bcc.Add
+            |> edit.modifyMessageCmd
+            |> Bcc.ChangeMessages
+            |> Field
+          )
+      , Flex.block, Flex.justifyBetween, Flex.alignItemsCenter
       ]
       [ Input.text 
         [ Input.id id
