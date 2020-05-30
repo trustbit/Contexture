@@ -3,9 +3,13 @@ module Bcc exposing (..)
 import Url.Parser exposing (Parser, custom)
 
 import Set exposing(Set)
+import Dict exposing(Dict)
+
 import Json.Encode as Encode
 import Json.Decode exposing (Decoder, map2, field, string, int, at, nullable, list)
 import Json.Decode.Pipeline as JP
+
+
 
 -- MODEL
 
@@ -48,6 +52,27 @@ type alias Messages =
     , queriesHandled : Set Query
     , queriesInvoked : Set Query
     }
+
+type Relationship
+  = AntiCorruptionLayer
+  | OpenHostService
+  | PublishedLanguage
+  | SharedKernel
+  | UpstreamDownstream
+  | Conformist
+  | Octopus
+  | Partnership
+  | CustomerSupplier
+
+type alias System = String
+
+type alias Dependency = (System, Maybe Relationship)
+
+type alias Dependencies = 
+  { suppliers: Dict System (Maybe Relationship)
+  , consumers: Dict System (Maybe Relationship)
+  }
+
 type alias BoundedContextCanvas = 
   { name: String
   , description: String
@@ -58,6 +83,7 @@ type alias BoundedContextCanvas =
   , ubiquitousLanguage: UbiquitousLanguage
   , modelTraits: ModelTraits
   , messages: Messages
+  , dependencies: Dependencies
   }
 
 
@@ -71,6 +97,12 @@ initMessages _ =
   , queriesInvoked = Set.empty
   }
 
+initDependencies : () -> Dependencies
+initDependencies _ = 
+  { suppliers = Dict.empty
+  , consumers = Dict.empty
+  }
+
 init: () -> BoundedContextCanvas
 init _ = 
   { name = ""
@@ -82,13 +114,20 @@ init _ =
   , ubiquitousLanguage = ""
   , modelTraits = ""
   , messages = initMessages ()
+  , dependencies = initDependencies ()
   }
 
 -- UPDATE
 
-type MessageAction
-  = Add Message
-  | Remove Message
+type DependenciesMsg
+  = Supplier (Action Dependency)
+  | Consumer (Action Dependency)
+
+type Action t
+  = Add t
+  | Remove t
+
+type alias MessageAction = Action Message
 
 type MessageMsg
   = CommandHandled MessageAction
@@ -108,8 +147,9 @@ type Msg
   | SetUbiquitousLanguage UbiquitousLanguage
   | SetModelTraits ModelTraits
   | ChangeMessages MessageMsg
+  | ChangeDependencies DependenciesMsg
 
-updateMessageAction : MessageAction -> Set Message -> Set Message
+updateMessageAction : Action Message -> Set Message -> Set Message
 updateMessageAction action messages =
   case action of
     Add m ->
@@ -133,6 +173,22 @@ updateMessages msg model =
     QueriesInvoked event ->
       { model | queriesInvoked = updateMessageAction event model.queriesInvoked }
     
+updateDependencyAction : Action Dependency -> Dict System (Maybe Relationship) -> Dict System (Maybe Relationship)
+updateDependencyAction action dependencies =
+  case action of
+    Add (system, relationship) ->
+      Dict.insert system relationship dependencies
+    Remove (system, _) ->
+      Dict.remove system dependencies
+
+updateDependencies : DependenciesMsg -> Dependencies -> Dependencies
+updateDependencies msg model =
+  case msg of
+    Supplier dependency ->
+      { model | suppliers = updateDependencyAction dependency model.suppliers }
+    Consumer dependency ->
+      { model | consumers = updateDependencyAction dependency model.consumers }
+
 update: Msg -> BoundedContextCanvas -> BoundedContextCanvas
 update msg canvas =
   case msg of
@@ -159,6 +215,9 @@ update msg canvas =
 
     ChangeMessages m ->
       { canvas | messages = updateMessages m canvas.messages }
+
+    ChangeDependencies m ->
+      { canvas | dependencies = updateDependencies m canvas.dependencies }
    
 idToString : BoundedContextId -> String
 idToString bccId =
@@ -230,6 +289,34 @@ evolutionParser evolution =
       "Commodity" -> Just Commodity
       _ -> Nothing
 
+
+relationshipToString: Relationship -> String
+relationshipToString relationship =
+  case relationship of
+    AntiCorruptionLayer -> "AntiCorruptionLayer"
+    OpenHostService -> "OpenHostService"
+    PublishedLanguage -> "PublishedLanguage"
+    SharedKernel -> "SharedKernel"
+    UpstreamDownstream -> "UpstreamDownstream"
+    Conformist -> "Conformist"
+    Octopus -> "Octopus"
+    Partnership -> "Partnership"
+    CustomerSupplier -> "CustomerSupplier"
+  
+relationshipParser: String -> Maybe Relationship
+relationshipParser relationship =
+  case relationship of
+    "AntiCorruptionLayer" -> Just AntiCorruptionLayer
+    "OpenHostService" -> Just OpenHostService
+    "PublishedLanguage" -> Just PublishedLanguage
+    "SharedKernel" -> Just SharedKernel
+    "UpstreamDownstream" -> Just UpstreamDownstream
+    "Conformist" -> Just Conformist
+    "Octopus" -> Just Octopus
+    "Partnership" -> Just Partnership
+    "CustomerSupplier" -> Just CustomerSupplier
+    _ -> Nothing
+
 -- encoders
         
 messagesEncoder : Messages -> Encode.Value
@@ -241,6 +328,13 @@ messagesEncoder messages =
     , ("eventsPublished", Encode.set Encode.string messages.eventsPublished)
     , ("queriesHandled", Encode.set Encode.string messages.queriesHandled)
     , ("queriesInvoked" , Encode.set Encode.string messages.queriesInvoked)
+    ]
+
+dependenciesEncoder : Dependencies -> Encode.Value
+dependenciesEncoder dependencies =
+  Encode.object
+    [ ("suppliers", Encode.dict identity (maybeStringEncoder relationshipToString) dependencies.suppliers )
+    , ("consumers", Encode.dict identity (maybeStringEncoder relationshipToString) dependencies.consumers )
     ]
 
 modelEncoder : BoundedContextCanvas -> Encode.Value
@@ -255,6 +349,7 @@ modelEncoder canvas =
     , ("ubiquitousLanguage", Encode.string canvas.ubiquitousLanguage)
     , ("modelTraits", Encode.string canvas.modelTraits)
     , ("messages", messagesEncoder canvas.messages)
+    , ("dependencies", dependenciesEncoder canvas.dependencies)
     ]
 
 maybeStringEncoder : (t -> String) -> Maybe t -> Encode.Value
@@ -281,6 +376,12 @@ messagesDecoder =
     |> JP.required "queriesHandled" setDecoder
     |> JP.required "queriesInvoked" setDecoder
 
+dependenciesDecoder : Decoder Dependencies
+dependenciesDecoder =
+  Json.Decode.succeed Dependencies
+    |> JP.optional "suppliers" (Json.Decode.dict (maybeStringDecoder relationshipParser)) Dict.empty
+    |> JP.optional "consumers" (Json.Decode.dict (maybeStringDecoder relationshipParser)) Dict.empty
+
 modelDecoder : Decoder BoundedContextCanvas
 modelDecoder =
   Json.Decode.succeed BoundedContextCanvas
@@ -293,3 +394,4 @@ modelDecoder =
     |> JP.optional "ubiquitousLanguage" string ""
     |> JP.optional "modelTraits" string ""
     |> JP.optional "messages" messagesDecoder (initMessages ())
+    |> JP.optional "dependencies" dependenciesDecoder (initDependencies ())
