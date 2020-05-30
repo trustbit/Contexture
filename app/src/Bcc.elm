@@ -117,7 +117,7 @@ updateMessages msg model =
     CommandHandled cmd ->
       { model | commandsHandled = updateMessageAction cmd model.commandsHandled}
     CommandSent cmd ->
-      { model | commandsHandled = updateMessageAction cmd model.commandsSent}
+      { model | commandsSent = updateMessageAction cmd model.commandsSent}
     
 update: Msg -> BoundedContextCanvas -> BoundedContextCanvas
 update msg canvas =
