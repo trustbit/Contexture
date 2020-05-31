@@ -1,4 +1,4 @@
-module Bcc.Edit.Dependencies exposing (Msg(..), DependenciesFieldMsg(..), DependencyFieldMsg(..), Model, AddingDependency, update, init,initDependency, viewDepencency, viewAddDependency)
+module Bcc.Edit.Dependencies exposing (Msg(..), Model, update, init, view)
 
 import Html exposing (Html, button, div, text)
 import Html.Attributes exposing (..)
@@ -10,12 +10,9 @@ import Bootstrap.Grid.Col as Col
 import Bootstrap.Form as Form
 import Bootstrap.Form.Input as Input
 import Bootstrap.Form.Select as Select
-import Bootstrap.Form.Textarea as Textarea
-import Bootstrap.Form.Radio as Radio
-import Bootstrap.Form.InputGroup as InputGroup
 import Bootstrap.Button as Button
-import Bootstrap.ListGroup as ListGroup
 
+import Dict
 
 import Bcc
 
@@ -46,6 +43,8 @@ type DependenciesFieldMsg
   = Consumer DependencyFieldMsg
   | Supplier DependencyFieldMsg
 
+type alias DependencyType = DependencyFieldMsg -> DependenciesFieldMsg
+
 type Msg
   = FieldEdit DependenciesFieldMsg
   | DepdendencyChanged Bcc.DependenciesMsg
@@ -58,13 +57,30 @@ updateAddingDependency msg model =
     SetRelationship relationship ->
       { model | relationship = Bcc.relationshipParser relationship }
 
-update : DependenciesFieldMsg -> Model -> Model
-update msg model =
+updateField : DependenciesFieldMsg -> Model -> Model
+updateField msg model =
   case msg of
     Consumer conMsg ->
       { model | consumer = updateAddingDependency conMsg model.consumer }
     Supplier supMsg ->
       { model | supplier = updateAddingDependency supMsg model.supplier }
+
+update : Msg -> (Model, Bcc.BoundedContextCanvas) -> (Model, Bcc.BoundedContextCanvas)
+update msg (model, canvas) =
+  case msg of
+    DepdendencyChanged change ->
+      let 
+        addingDependencies =
+          case change of
+            Bcc.Supplier _ ->
+              { model | supplier = initDependency }
+            Bcc.Consumer _ ->
+              { model | consumer = initDependency }
+      in
+        (addingDependencies, Bcc.update (Bcc.ChangeDependencies change) canvas)
+    FieldEdit depMsg ->
+      ( updateField depMsg model, canvas)
+
 
 -- VIEW
 
@@ -81,8 +97,8 @@ translateRelationship relationship =
     Bcc.Partnership -> "Partnership"
     Bcc.CustomerSupplier -> "Customer/Supplier"
 
-viewDepencency : (Bcc.Action Bcc.Dependency -> Bcc.DependenciesMsg) -> Bcc.Dependency -> Html Bcc.Msg
-viewDepencency removeCmd (system, relationship) =
+viewAddedDepencency : (Bcc.Action Bcc.Dependency -> Bcc.DependenciesMsg) -> Bcc.Dependency -> Html Msg
+viewAddedDepencency removeCmd (system, relationship) =
   Grid.row []
     [ Grid.col [] [text system]
     , Grid.col [] [text (Maybe.withDefault "not specified" (relationship |> Maybe.map translateRelationship))]
@@ -91,7 +107,7 @@ viewDepencency removeCmd (system, relationship) =
         [ Button.danger
         , Button.onClick (
             (system, relationship)
-            |> Bcc.Remove |> removeCmd |> Bcc.ChangeDependencies
+            |> Bcc.Remove |> removeCmd |> DepdendencyChanged
           ) 
         ]
         [ text "x" ]
@@ -136,5 +152,32 @@ viewAddDependency editCmd addCmd model =
       , Grid.col [ Col.xs2 ]
         [ Button.submitButton [ Button.secondary ] [ text "+" ]
         ]
+      ]
+    ]
+
+viewDependency : String -> AddingDependency -> DependencyType -> Bcc.DependencyMap -> Bcc.DependencyType -> List (Html Msg)
+viewDependency title model updatedField addedDependencies updatedDependency =
+    [ Html.h6 [ class "text-center" ] [ text title ]
+    , Grid.row []
+      [ Grid.col [] [ Html.h6 [] [ text "Name"] ]
+      , Grid.col [] [ Html.h6 [] [ text "Relationship"] ]
+      , Grid.col [Col.xs2] []
+      ]
+    , div [] 
+      (addedDependencies
+      |> Dict.toList
+      |> List.map (viewAddedDepencency updatedDependency))
+    , viewAddDependency updatedField updatedDependency model
+    ]
+
+view : Model -> Bcc.Dependencies -> Html Msg
+view model dependencies =
+  div []
+    [ Html.h5 [ class "text-center" ] [ text "Dependencies and Relationships" ]
+    , Grid.row []
+      [ Grid.col []
+        (viewDependency "Message Suppliers" model.supplier Supplier dependencies.suppliers Bcc.Supplier)
+      , Grid.col []
+        (viewDependency "Message Consumers" model.consumer Consumer dependencies.consumers Bcc.Consumer)
       ]
     ]

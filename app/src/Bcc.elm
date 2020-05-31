@@ -119,13 +119,17 @@ init _ =
 
 -- UPDATE
 
-type DependenciesMsg
-  = Supplier (Action Dependency)
-  | Consumer (Action Dependency)
-
 type Action t
   = Add t
   | Remove t
+
+type alias DependencyAction = Action Dependency
+
+type DependenciesMsg
+  = Supplier DependencyAction
+  | Consumer DependencyAction
+
+type alias DependencyType = DependencyAction -> DependenciesMsg
 
 type alias MessageAction = Action Message
 

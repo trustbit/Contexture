@@ -146,19 +146,11 @@ updateEdit msg model =
         { model | canvas = Bcc.update (Bcc.ChangeMessages change) model.canvas, addingMessage = addingMessage }
     Field fieldMsg ->
       { model | canvas = Bcc.update fieldMsg model.canvas }
-    DependencyField (Dependencies.DepdendencyChanged change) ->
+    DependencyField dependency ->
       let 
-        addingDependenciesModel = model.addingDependencies
-        addingDependencies =
-          case change of
-            Bcc.Supplier _ ->
-              { addingDependenciesModel | supplier = Dependencies.initDependency }
-            Bcc.Consumer _ ->
-              { addingDependenciesModel | consumer = Dependencies.initDependency }
+        (addingDependencies, canvas) = Dependencies.update dependency (model.addingDependencies, model.canvas)
       in
-        { model | canvas = Bcc.update (Bcc.ChangeDependencies change) model.canvas, addingDependencies = addingDependencies }
-    DependencyField (Dependencies.FieldEdit depMsg) ->
-      { model | addingDependencies = Dependencies.update depMsg model.addingDependencies }
+        { model | canvas = canvas, addingDependencies = addingDependencies }
     MessageField fieldMsg ->
       { model | addingMessage = updateAddingMessage fieldMsg model.addingMessage }
 
@@ -369,42 +361,6 @@ viewMessages editing =
       ]
     ]
 
-viewDependencies : EditingCanvas -> Html EditingMsg
-viewDependencies model =
-  div []
-    [ Html.h5 [ class "text-center" ] [ text "Dependencies and Relationships" ]
-    , Grid.row []
-      [ Grid.col []
-        [ Html.h6 [ class "text-center" ] [ text "Message Suppliers" ]
-        , Grid.row []
-          [ Grid.col [] [ Html.h6 [] [ text "Name"] ]
-          , Grid.col [] [ Html.h6 [] [ text "Relationship"] ]
-          , Grid.col [Col.xs2] []
-          ]
-        , div [] 
-          (model.canvas.dependencies.suppliers
-          |> Dict.toList
-          |> List.map (Dependencies.viewDepencency Bcc.Supplier)
-          |> List.map (Html.map Field))
-        , Dependencies.viewAddDependency Dependencies.Supplier  Bcc.Supplier model.addingDependencies.supplier |> Html.map DependencyField
-        ]
-      , Grid.col []
-        [ Html.h6 [ class "text-center" ] [ text "Message Consumers" ]
-        , Grid.row []
-          [ Grid.col [] [ Html.h6 [] [ text "Name"] ]
-          , Grid.col [] [ Html.h6 [] [ text "Relationship"] ]
-          , Grid.col [Col.xs2] []
-          ]
-        , div [] 
-          (model.canvas.dependencies.consumers
-          |> Dict.toList
-          |> List.map  (Dependencies.viewDepencency Bcc.Consumer)
-          |> List.map (Html.map Field))
-        , Dependencies.viewAddDependency Dependencies.Consumer Bcc.Consumer model.addingDependencies.consumer |> Html.map DependencyField
-        ]
-      ]
-    ]
-
 viewRightside : EditingCanvas -> List (Html EditingMsg)
 viewRightside model =
   [ Form.group []
@@ -412,7 +368,7 @@ viewRightside model =
     , Input.text [ Input.id "modelTraits", Input.value model.canvas.modelTraits, Input.onInput Bcc.SetModelTraits ] |> Html.map Field
     , Form.help [] [ text "draft, execute, audit, enforcer, interchange, gateway, etc."] ]
     , viewMessages model
-    , viewDependencies model
+    , Dependencies.view model.addingDependencies model.canvas.dependencies |> Html.map DependencyField
   ]
 
 viewCanvas : EditingCanvas -> Html EditingMsg
@@ -455,4 +411,3 @@ deleteBCC model =
       , timeout = Nothing
       , tracker = Nothing
       }
-
