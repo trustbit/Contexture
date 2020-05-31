@@ -5,6 +5,7 @@ import Browser.Navigation as Nav
 import Html exposing (Html, button, div, text)
 import Html.Attributes exposing (..)
 import Html.Events exposing (onClick)
+
 import Bootstrap.Grid as Grid
 import Bootstrap.Grid.Row as Row
 import Bootstrap.Grid.Col as Col
@@ -13,38 +14,22 @@ import Bootstrap.Form.Input as Input
 import Bootstrap.Form.Select as Select
 import Bootstrap.Form.Textarea as Textarea
 import Bootstrap.Form.Radio as Radio
-import Bootstrap.Form.InputGroup as InputGroup
 import Bootstrap.Button as Button
-import Bootstrap.ListGroup as ListGroup
-import Bootstrap.Text as Text
-import Bootstrap.Utilities.Flex as Flex
-import Bootstrap.Utilities.Spacing as Spacing
-
 
 import Url
-
-import Set
-import Dict
 import Http
 
 import Route
 import Bcc
 import Bcc.Edit.Dependencies as Dependencies
+import Bcc.Edit.Messages as Messages
 
 -- MODEL
 
 type alias EditingCanvas = 
   { canvas : Bcc.BoundedContextCanvas
-  , addingMessage : AddingMessage
+  , addingMessage : Messages.AddingMessage
   , addingDependencies: Dependencies.DependenciesEdit
-  }
-type alias AddingMessage = 
-  { commandsHandled : Bcc.Command
-  , commandsSent : Bcc.Command
-  , eventsHandled : Bcc.Event
-  , eventsPublished : Bcc.Event
-  , queriesHandled : Bcc.Query
-  , queriesInvoked : Bcc.Query
   }
 
 type alias Model = 
@@ -52,15 +37,6 @@ type alias Model =
   , self: Url.Url
   -- TODO: discuss we want this in edit or BCC - it's not persisted after all!
   , edit: EditingCanvas
-  }
-
-initAddingMessage = 
-  { commandsHandled = ""
-  , commandsSent = ""
-  , eventsHandled = ""
-  , eventsPublished = ""
-  , queriesHandled = ""
-  , queriesInvoked = ""
   }
 
 init : Nav.Key -> Url.Url -> (Model, Cmd Msg)
@@ -71,7 +47,7 @@ init key url =
       { key = key
       , self = url
       , edit = 
-        { addingMessage = initAddingMessage
+        { addingMessage = Messages.initAddingMessage
         , addingDependencies = Dependencies.initDependencies
         , canvas = canvas
         }
@@ -82,20 +58,11 @@ init key url =
     , loadBCC model
     )
 
-
 -- UPDATE
-
-type MessageFieldMsg
-  = CommandsHandled Bcc.Message
-  | CommandsSent Bcc.Message
-  | EventsHandled Bcc.Message
-  | EventsPublished Bcc.Message
-  | QueriesHandled Bcc.Message
-  | QueriesInvoked Bcc.Message
 
 type EditingMsg
   = Field Bcc.Msg
-  | MessageField MessageFieldMsg
+  | MessageField Messages.Msg
   | DependencyField Dependencies.Msg
 
 type Msg
@@ -107,44 +74,16 @@ type Msg
   | Deleted (Result Http.Error ())
   | Back
 
-updateAddingMessage : MessageFieldMsg -> AddingMessage -> AddingMessage
-updateAddingMessage msg model =
-  case msg of
-    CommandsHandled cmd ->
-      { model | commandsHandled = cmd }
-    CommandsSent cmd ->
-      { model | commandsSent = cmd }
-    EventsHandled event ->
-      { model | eventsHandled = event }
-    EventsPublished event ->
-      { model | eventsPublished = event }
-    QueriesHandled query ->
-      { model | queriesHandled = query }
-    QueriesInvoked query ->
-      { model | queriesInvoked = query }
-
 updateEdit : EditingMsg -> EditingCanvas -> EditingCanvas
 updateEdit msg model =
   case msg of
-    Field (Bcc.ChangeMessages change) ->
+    MessageField messageMsg ->
       let
-        addingMessageModel = model.addingMessage
-        addingMessage = 
-          case change of
-            Bcc.CommandHandled _ ->
-              { addingMessageModel | commandsHandled = "" }
-            Bcc.CommandSent _ ->
-              { addingMessageModel | commandsSent = "" }
-            Bcc.EventsHandled _ ->
-              { addingMessageModel | eventsHandled = "" }
-            Bcc.EventsPublished _ ->
-              { addingMessageModel | eventsPublished = "" }
-            Bcc.QueriesHandled _ ->
-              { addingMessageModel | queriesHandled = "" }
-            Bcc.QueriesInvoked _ ->
-              { addingMessageModel | queriesInvoked = "" }
+        (addingMessage, messages) = Messages.update messageMsg (model.addingMessage, model.canvas.messages)
+        canvas = model.canvas
+        c = { canvas | messages = messages}
       in
-        { model | canvas = Bcc.update (Bcc.ChangeMessages change) model.canvas, addingMessage = addingMessage }
+        { model | addingMessage = addingMessage, canvas = c }
     Field fieldMsg ->
       { model | canvas = Bcc.update fieldMsg model.canvas }
     DependencyField dependency ->
@@ -154,8 +93,7 @@ updateEdit msg model =
         c = { canvas | dependencies = dependencies}
       in
         { model | canvas = c, addingDependencies = addingDependencies }
-    MessageField fieldMsg ->
-      { model | addingMessage = updateAddingMessage fieldMsg model.addingMessage }
+    
 
 update : Msg -> Model -> (Model, Cmd Msg)
 update msg model =
@@ -174,7 +112,7 @@ update msg model =
       let
         editing = 
           { canvas = m
-          , addingMessage = initAddingMessage
+          , addingMessage = Messages.initAddingMessage
           , addingDependencies = Dependencies.initDependencies
           }
       in
@@ -266,112 +204,14 @@ viewLeftside model =
   ]
   |> List.map (Html.map Field)
 
-viewMessageOption : (Bcc.MessageAction   -> Bcc.MessageMsg) -> Bcc.Message -> ListGroup.Item Bcc.MessageMsg
-viewMessageOption remove model =
-  ListGroup.li 
-    [ ListGroup.attrs [ Flex.block, Flex.justifyBetween, Flex.alignItemsCenter, Spacing.p1 ] ] 
-    [ text model
-    , Button.button [Button.danger, Button.small, Button.onClick (remove (Bcc.Remove model))] [ text "x"]
-    ]
-
-type alias MessageEdit =
-  { messages: Set.Set Bcc.Message
-  , message : Bcc.Message
-  , modifyMessageCmd : Bcc.MessageAction -> Bcc.MessageMsg
-  , updateNewMessageText : String -> MessageFieldMsg
-  }
-
-viewMessage : String -> String -> MessageEdit -> Html EditingMsg
-viewMessage id title edit =
-  Form.group [Form.attrs [style "min-height" "250px"]]
-    [ Form.label [for id] [ text title]
-    , ListGroup.ul 
-      (
-        edit.messages
-        |> Set.toList
-        |> List.map (viewMessageOption edit.modifyMessageCmd)
-      )
-      |> Html.map (Bcc.ChangeMessages >> Field)
-    , Form.form 
-      [ Html.Events.onSubmit 
-          (edit.message
-            |> Bcc.Add
-            |> edit.modifyMessageCmd
-            |> Bcc.ChangeMessages
-            |> Field
-          )
-      , Flex.block, Flex.justifyBetween, Flex.alignItemsCenter
-      ]
-      [ InputGroup.config 
-          ( InputGroup.text
-            [ Input.id id
-            , Input.value edit.message
-            , Input.onInput edit.updateNewMessageText 
-            ]
-          )
-          |> InputGroup.successors
-            [ InputGroup.button [ Button.attrs [ Html.Attributes.type_ "submit"],  Button.secondary] [ text "Add"] ]
-          |> InputGroup.view
-          |> Html.map MessageField
-      ]
-    ] 
-
-viewMessages : EditingCanvas -> Html EditingMsg
-viewMessages editing =
-  let
-    messages = editing.canvas.messages
-    addingMessage = editing.addingMessage
-  in
-  div []
-    [ Html.h5 [ class "text-center" ] [ text "Messages Consumed and Produced" ]
-    , Grid.row []
-      [ Grid.col [] 
-        [ Html.h6 [ class "text-center" ] [ text "Messages consumed"]
-        , { messages = messages.commandsHandled
-          , message = addingMessage.commandsHandled
-          , modifyMessageCmd = Bcc.CommandHandled
-          , updateNewMessageText = CommandsHandled
-          } |> viewMessage "commandsHandled" "Commands handled"
-        , { messages = messages.eventsHandled
-          , message = addingMessage.eventsHandled
-          , modifyMessageCmd = Bcc.EventsHandled
-          , updateNewMessageText = EventsHandled
-          } |> viewMessage "eventsHandled" "Events handled"
-        , { messages = messages.queriesHandled
-          , message = addingMessage.queriesHandled
-          , modifyMessageCmd = Bcc.QueriesHandled
-          , updateNewMessageText = QueriesHandled
-          } |> viewMessage "queriesHandled" "Queries handled"
-        ]
-      , Grid.col []
-        [ Html.h6 [ class "text-center" ] [ text "Messages produced"]
-        , { messages = messages.commandsSent
-          , message = addingMessage.commandsSent
-          , modifyMessageCmd = Bcc.CommandSent
-          , updateNewMessageText = CommandsSent
-          } |> viewMessage "commandsSent" "Commands sent"
-        , { messages = messages.eventsPublished
-          , message = addingMessage.eventsPublished
-          , modifyMessageCmd = Bcc.EventsPublished
-          , updateNewMessageText = EventsPublished
-          } |> viewMessage "eventsPublished" "Events published"
-        , { messages = messages.queriesInvoked
-          , message = addingMessage.queriesInvoked
-          , modifyMessageCmd = Bcc.QueriesInvoked
-          , updateNewMessageText = QueriesInvoked
-          } |> viewMessage "queriesInvoked" "Queries invoked"
-        ]
-      ]
-    ]
-
 viewRightside : EditingCanvas -> List (Html EditingMsg)
 viewRightside model =
   [ Form.group []
     [ Form.label [for "modelTraits"] [ text "Model traits"]
     , Input.text [ Input.id "modelTraits", Input.value model.canvas.modelTraits, Input.onInput Bcc.SetModelTraits ] |> Html.map Field
     , Form.help [] [ text "draft, execute, audit, enforcer, interchange, gateway, etc."] ]
-    , viewMessages model
-    , Dependencies.view (model.addingDependencies, model.canvas.dependencies) |> Html.map DependencyField
+    , (model.addingMessage, model.canvas.messages) |> Messages.view |> Html.map MessageField
+    , (model.addingDependencies, model.canvas.dependencies) |> Dependencies.view |> Html.map DependencyField
   ]
 
 viewCanvas : EditingCanvas -> Html EditingMsg
@@ -380,7 +220,6 @@ viewCanvas model =
     [ Grid.col [] (viewLeftside model.canvas)
     , Grid.col [] (viewRightside model)
     ]
-
 
 -- HTTP
 

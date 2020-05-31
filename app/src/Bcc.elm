@@ -43,6 +43,8 @@ type alias Command = Message
 type alias Event = Message
 type alias Query = Message
 
+type alias MessageCollection = Set Message
+
 type alias Messages =
   { commandsHandled : Set Command
   , commandsSent : Set Command
