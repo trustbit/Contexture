@@ -26,7 +26,8 @@ main =
     -- elm reactor with custom index.html works, but local routing+reloading is awkward
     -- use the following variant for local dev :-/
     -- initFunction = initLocal
-    initFunction = init
+    -- initFunction = init
+    initFunction = initServer
   in
     Browser.application
       { init = initFunction
@@ -85,6 +86,10 @@ initCurrentPage ( model, existingCmds ) =
 initLocal : () -> Url.Url -> Nav.Key -> (Model, Cmd Msg)
 initLocal _ url key =
   init { baseUrl = "http://localhost:3000" } url key
+
+initServer : () -> Url.Url -> Nav.Key -> (Model, Cmd Msg)
+initServer _ url key =
+  init { baseUrl = "" } url key
 
 init : Flags -> Url.Url -> Nav.Key -> (Model, Cmd Msg)
 init flag url key =

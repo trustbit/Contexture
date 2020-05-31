@@ -20,17 +20,14 @@ parseUrl url =
     in case parse matchRoute url of
         Just route ->
             route
-
         Nothing ->
             NotFound
-
 
 matchRoute : Parser (Route -> a) a
 matchRoute =
     oneOf
         [ map Overview top
         , map Bcc (s "bccs" </> Bcc.idParser)
-
         ]
 
 pushUrl : Route -> Nav.Key -> Cmd msg
