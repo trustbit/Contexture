@@ -29,13 +29,14 @@ import Http
 
 import Route
 import Bcc
+import Bcc.Edit.Dependencies as Dependencies
 
 -- MODEL
 
 type alias EditingCanvas = 
   { canvas : Bcc.BoundedContextCanvas
   , addingMessage : AddingMessage
-  , addingDependencies: AddingDependencies
+  , addingDependencies: Dependencies.Model
   }
 type alias AddingMessage = 
   { commandsHandled : Bcc.Command
@@ -44,15 +45,6 @@ type alias AddingMessage =
   , eventsPublished : Bcc.Event
   , queriesHandled : Bcc.Query
   , queriesInvoked : Bcc.Query
-  }
-
-type alias AddingDependency =
-  { system: Bcc.System
-  , relationship: Maybe Bcc.Relationship }
-
-type alias AddingDependencies =
-  { consumer: AddingDependency
-  , supplier: AddingDependency
   }
 
 type alias Model = 
@@ -71,14 +63,6 @@ initAddingMessage =
   , queriesInvoked = ""
   }
 
-initDependency = 
-  { system = "", relationship = Nothing } 
-
-initAddingDependencies = 
-  { consumer = initDependency
-  , supplier = initDependency
-  }
-
 init : Nav.Key -> Url.Url -> (Model, Cmd Msg)
 init key url =
   let
@@ -87,7 +71,7 @@ init key url =
       , self = url
       , edit = 
         { addingMessage = initAddingMessage
-        , addingDependencies = initAddingDependencies
+        , addingDependencies = Dependencies.init
         , canvas = Bcc.init ()
         }
       }
@@ -108,21 +92,10 @@ type MessageFieldMsg
   | QueriesHandled Bcc.Message
   | QueriesInvoked Bcc.Message
 
-
-type DependencyFieldMsg
-  = SetSystem Bcc.System
-  | SetRelationship String
-  -- | ChangeDependency (Bcc.Action Bcc.Dependency)
-
-type DependenciesFieldMsg
-  = Consumer DependencyFieldMsg
-  | Supplier DependencyFieldMsg
-
-
 type EditingMsg
   = Field Bcc.Msg
   | MessageField MessageFieldMsg
-  | DependencyField DependenciesFieldMsg
+  | DependencyField Dependencies.Msg
 
 type Msg
   = Loaded (Result Http.Error Bcc.BoundedContextCanvas)
@@ -148,23 +121,6 @@ updateAddingMessage msg model =
       { model | queriesHandled = query }
     QueriesInvoked query ->
       { model | queriesInvoked = query }
-
-updateAddingDependency : DependencyFieldMsg -> AddingDependency -> AddingDependency
-updateAddingDependency msg model =
-  case msg of
-    SetSystem system ->
-      { model | system = system }
-    SetRelationship relationship ->
-      { model | relationship = Bcc.relationshipParser relationship }
-
-updateAddingDependencies : DependenciesFieldMsg -> AddingDependencies -> AddingDependencies
-updateAddingDependencies msg model =
-  case msg of
-    Consumer conMsg ->
-      { model | consumer = updateAddingDependency conMsg model.consumer }
-    Supplier supMsg ->
-      { model | supplier = updateAddingDependency supMsg model.supplier }
-      
 
 updateEdit : EditingMsg -> EditingCanvas -> EditingCanvas
 updateEdit msg model =
@@ -194,15 +150,15 @@ updateEdit msg model =
         addingDependencies =
           case change of
             Bcc.Supplier _ ->
-              { addingDependenciesModel | supplier = initDependency }
+              { addingDependenciesModel | supplier = Dependencies.initDependency }
             Bcc.Consumer _ ->
-              { addingDependenciesModel | consumer = initDependency }
+              { addingDependenciesModel | consumer = Dependencies.initDependency }
       in
         { model | canvas = Bcc.update (Bcc.ChangeDependencies change) model.canvas, addingDependencies = addingDependencies }
     Field fieldMsg ->
       { model | canvas = Bcc.update fieldMsg model.canvas }
     DependencyField depMsg ->
-      { model | addingDependencies = updateAddingDependencies depMsg model.addingDependencies }
+      { model | addingDependencies = Dependencies.update depMsg model.addingDependencies }
     MessageField fieldMsg ->
       { model | addingMessage = updateAddingMessage fieldMsg model.addingMessage }
 
@@ -224,7 +180,7 @@ update msg model =
         editing = 
           { canvas = m
           , addingMessage = initAddingMessage
-          , addingDependencies = initAddingDependencies
+          , addingDependencies = Dependencies.init
           }
       in
         ({ model | edit = editing } , Cmd.none)    
@@ -443,7 +399,7 @@ viewDepencency removeCmd (system, relationship) =
       ]
     ]
 
-viewAddDependency : (DependencyFieldMsg -> DependenciesFieldMsg) -> (Bcc.Action Bcc.Dependency -> Bcc.DependenciesMsg) -> AddingDependency -> Html EditingMsg
+viewAddDependency : (Dependencies.DependencyFieldMsg -> Dependencies.Msg) -> (Bcc.Action Bcc.Dependency -> Bcc.DependenciesMsg) -> Dependencies.AddingDependency -> Html EditingMsg
 viewAddDependency editCmd addCmd model =
   let
     items =
@@ -471,11 +427,11 @@ viewAddDependency editCmd addCmd model =
       [ Grid.col [] 
         [ Input.text
           [ Input.value model.system
-          , Input.onInput (SetSystem >> editCmd >> DependencyField)
+          , Input.onInput (Dependencies.SetSystem >> editCmd >> DependencyField)
           ]
         ] 
       , Grid.col [] 
-        [ Select.select [ Select.onChange (SetRelationship >> editCmd >> DependencyField) ]
+        [ Select.select [ Select.onChange (Dependencies.SetRelationship >> editCmd >> DependencyField) ]
             (List.append [ Select.item [ selected (model.relationship == Nothing), value "" ] [text "unknown"] ] items)
         ]
       , Grid.col [ Col.xs2 ]
@@ -483,6 +439,7 @@ viewAddDependency editCmd addCmd model =
         ]
       ]
     ]
+
 viewDependencies : EditingCanvas -> Html EditingMsg
 viewDependencies model =
   div []
@@ -499,7 +456,7 @@ viewDependencies model =
           (model.canvas.dependencies.suppliers
           |> Dict.toList
           |> List.map (viewDepencency Bcc.Supplier))
-        , viewAddDependency Supplier  Bcc.Supplier model.addingDependencies.supplier
+        , viewAddDependency Dependencies.Supplier  Bcc.Supplier model.addingDependencies.supplier
         ]
       , Grid.col []
         [ Html.h6 [ class "text-center" ] [ text "Message Consumers" ]
@@ -512,7 +469,7 @@ viewDependencies model =
           (model.canvas.dependencies.consumers
           |> Dict.toList
           |> List.map (viewDepencency Bcc.Consumer))
-        , viewAddDependency Consumer Bcc.Consumer model.addingDependencies.consumer
+        , viewAddDependency Dependencies.Consumer Bcc.Consumer model.addingDependencies.consumer
         ]
       ]
     ]
