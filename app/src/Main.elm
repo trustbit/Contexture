@@ -3,14 +3,13 @@ module Main exposing (..)
 import Browser
 import Browser.Navigation as Nav
 import Url
-import Html exposing (Html, button, div, text)
+import Html exposing (Html, div, text)
 import Html.Attributes exposing (..)
 import Bootstrap.CDN as CDN
 import Bootstrap.Grid as Grid
 import Bootstrap.Grid.Row as Row
 import Bootstrap.Grid.Col as Col
 import Bootstrap.Navbar as Navbar
-
 
 import Route exposing ( Route)
 
@@ -21,17 +20,27 @@ import Overview
 -- MAIN
 
 main =
-  Browser.application 
-    { init = init
-    , update = update
-    , view = view
-    , subscriptions = subscriptions
-    , onUrlChange = UrlChanged
-    , onUrlRequest = LinkClicked 
-    }
-
+  let
+    -- TODO: how is the DEV story with elm-live / elm reactor with local flags - defaults are not possible?! 
+    -- elm-live with a custom index.html is not working?
+    -- elm reactor with custom index.html works, but local routing+reloading is awkward
+    -- use the following variant for local dev :-/
+    -- initFunction = initLocal
+    initFunction = init
+  in
+    Browser.application
+      { init = initFunction
+      , update = update
+      , view = view
+      , subscriptions = subscriptions
+      , onUrlChange = UrlChanged
+      , onUrlRequest = LinkClicked
+      }
 
 -- MODEL
+
+type alias Flags =
+    { baseUrl : String }
 
 type Page 
   = NotFoundPage
@@ -42,6 +51,7 @@ type alias Model =
   { key : Nav.Key
   , route : Route
   , navState: Navbar.State
+  , baseUrl : String
   , page : Page }
 
 initCurrentPage : ( Model, Cmd Msg ) -> ( Model, Cmd Msg )
@@ -54,11 +64,11 @@ initCurrentPage ( model, existingCmds ) =
 
           Route.Overview ->
             let
-              ( pageModel, pageCmds ) = Overview.init model.key
+              ( pageModel, pageCmds ) = Overview.init model.baseUrl model.key
             in
               ( Overview pageModel, Cmd.map OverviewMsg pageCmds )
           Route.Bcc id ->
-            case "http://localhost:3000/api/bccs/" ++ Bcc.idToString id |> Url.fromString of
+            case model.baseUrl ++ "/api/bccs/" ++ Bcc.idToString id |> Url.fromString of
               Just url ->
                 let
                   ( pageModel, pageCmds ) = Bcc.Edit.init model.key url
@@ -72,15 +82,20 @@ initCurrentPage ( model, existingCmds ) =
     , Cmd.batch [ existingCmds, mappedPageCmds ]
     )
 
-init : () -> Url.Url -> Nav.Key -> (Model, Cmd Msg)
-init _ url key =
-  let  
+initLocal : () -> Url.Url -> Nav.Key -> (Model, Cmd Msg)
+initLocal _ url key =
+  init { baseUrl = "http://localhost:3000" } url key
+
+init : Flags -> Url.Url -> Nav.Key -> (Model, Cmd Msg)
+init flag url key =
+  let
     (navState, navCmd) = Navbar.initialState NavMsg
     model =
         { route = Route.parseUrl url
         , page = NotFoundPage
         , navState = navState
         , key = key
+        , baseUrl = flag.baseUrl
         }
   in
     initCurrentPage ( model, navCmd )

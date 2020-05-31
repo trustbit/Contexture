@@ -189,7 +189,7 @@ updateEdit msg model =
       in
         { model | canvas = Bcc.update (Bcc.ChangeMessages change) model.canvas, addingMessage = addingMessage }
     Field (Bcc.ChangeDependencies change) ->
-      let
+      let 
         addingDependenciesModel = model.addingDependencies
         addingDependencies =
           case change of
