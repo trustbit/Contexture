@@ -87,7 +87,6 @@ type alias BoundedContextCanvas =
   , dependencies: Dependencies
   }
 
-
 initMessages : () -> Messages
 initMessages _ =
   { commandsHandled = Set.empty
