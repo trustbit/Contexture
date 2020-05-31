@@ -83,13 +83,13 @@ initCurrentPage ( model, existingCmds ) =
     , Cmd.batch [ existingCmds, mappedPageCmds ]
     )
 
+initServer : () -> Url.Url -> Nav.Key -> (Model, Cmd Msg)
+initServer _ url key =
+  init { baseUrl =  Url.toString { url | path = "",  query = Nothing, fragment = Nothing } } url key
+
 initLocal : () -> Url.Url -> Nav.Key -> (Model, Cmd Msg)
 initLocal _ url key =
   init { baseUrl = "http://localhost:3000" } url key
-
-initServer : () -> Url.Url -> Nav.Key -> (Model, Cmd Msg)
-initServer _ url key =
-  init { baseUrl = "" } url key
 
 init : Flags -> Url.Url -> Nav.Key -> (Model, Cmd Msg)
 init flag url key =
