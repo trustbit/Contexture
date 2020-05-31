@@ -6,10 +6,9 @@ import Set exposing(Set)
 import Dict exposing(Dict)
 
 import Json.Encode as Encode
-import Json.Decode exposing (Decoder, map2, field, string, int, at, nullable, list)
+import Json.Decode as Decode
+import Json.Decode exposing (Decoder)
 import Json.Decode.Pipeline as JP
-
-
 
 -- MODEL
 
@@ -45,13 +44,13 @@ type alias Event = Message
 type alias Query = Message
 
 type alias Messages =
-    { commandsHandled : Set Command
-    , commandsSent : Set Command
-    , eventsHandled : Set Event
-    , eventsPublished : Set Event
-    , queriesHandled : Set Query
-    , queriesInvoked : Set Query
-    }
+  { commandsHandled : Set Command
+  , commandsSent : Set Command
+  , eventsHandled : Set Event
+  , eventsPublished : Set Event
+  , queriesHandled : Set Query
+  , queriesInvoked : Set Query
+  }
 
 type Relationship
   = AntiCorruptionLayer
@@ -68,9 +67,11 @@ type alias System = String
 
 type alias Dependency = (System, Maybe Relationship)
 
+type alias DependencyMap = Dict System (Maybe Relationship)
+
 type alias Dependencies = 
-  { suppliers: Dict System (Maybe Relationship)
-  , consumers: Dict System (Maybe Relationship)
+  { suppliers: DependencyMap
+  , consumers: DependencyMap
   }
 
 type alias BoundedContextCanvas = 
@@ -173,7 +174,7 @@ updateMessages msg model =
     QueriesInvoked event ->
       { model | queriesInvoked = updateMessageAction event model.queriesInvoked }
     
-updateDependencyAction : Action Dependency -> Dict System (Maybe Relationship) -> Dict System (Maybe Relationship)
+updateDependencyAction : Action Dependency -> DependencyMap -> DependencyMap
 updateDependencyAction action dependencies =
   case action of
     Add (system, relationship) ->
@@ -219,6 +220,8 @@ update msg canvas =
     ChangeDependencies m ->
       { canvas | dependencies = updateDependencies m canvas.dependencies }
    
+-- conversions
+
 idToString : BoundedContextId -> String
 idToString bccId =
   case bccId of
@@ -229,10 +232,6 @@ idParser =
     custom "BCCID" <|
         \bccId ->
             Maybe.map BoundedContextId (String.toInt bccId)
-
-idDecoder : Decoder BoundedContextId
-idDecoder =
-  Json.Decode.map BoundedContextId int
 
 classificationToString: Classification -> String
 classificationToString classification =
@@ -250,7 +249,6 @@ classificationParser classification =
       "Core" -> Just Core
       "" -> Nothing
       value -> Just (OtherClassification value)
-
 
 businessModelToString: BusinessModel -> String
 businessModelToString businessModel =
@@ -271,7 +269,6 @@ businessModelParser businessModel =
       "" -> Nothing
       value -> Just (OtherBusinessModel value)
 
-
 evolutionToString: Evolution -> String
 evolutionToString evolution =
   case evolution of
@@ -288,7 +285,6 @@ evolutionParser evolution =
       "Product" -> Just Product
       "Commodity" -> Just Commodity
       _ -> Nothing
-
 
 relationshipToString: Relationship -> String
 relationshipToString relationship =
@@ -318,7 +314,11 @@ relationshipParser relationship =
     _ -> Nothing
 
 -- encoders
-        
+
+idDecoder : Decoder BoundedContextId
+idDecoder =
+  Decode.map BoundedContextId Decode.int
+
 messagesEncoder : Messages -> Encode.Value
 messagesEncoder messages =
   Encode.object
@@ -360,15 +360,15 @@ maybeStringEncoder encoder value =
 
 maybeStringDecoder : (String -> Maybe v) -> Decoder (Maybe v)
 maybeStringDecoder parser =
-  Json.Decode.map parser string
+  Decode.map parser Decode.string
 
 setDecoder : Decoder (Set.Set String)
 setDecoder =
-  Json.Decode.map Set.fromList (Json.Decode.list string) 
+  Decode.map Set.fromList (Decode.list Decode.string) 
 
 messagesDecoder : Decoder Messages
 messagesDecoder =
-  Json.Decode.succeed Messages
+  Decode.succeed Messages
     |> JP.required "commandsHandled" setDecoder
     |> JP.required "commandsSent" setDecoder
     |> JP.required "eventsHandled" setDecoder
@@ -378,20 +378,20 @@ messagesDecoder =
 
 dependenciesDecoder : Decoder Dependencies
 dependenciesDecoder =
-  Json.Decode.succeed Dependencies
-    |> JP.optional "suppliers" (Json.Decode.dict (maybeStringDecoder relationshipParser)) Dict.empty
-    |> JP.optional "consumers" (Json.Decode.dict (maybeStringDecoder relationshipParser)) Dict.empty
+  Decode.succeed Dependencies
+    |> JP.optional "suppliers" (Decode.dict (maybeStringDecoder relationshipParser)) Dict.empty
+    |> JP.optional "consumers" (Decode.dict (maybeStringDecoder relationshipParser)) Dict.empty
 
 modelDecoder : Decoder BoundedContextCanvas
 modelDecoder =
-  Json.Decode.succeed BoundedContextCanvas
-    |> JP.required "name" string
-    |> JP.optional "description" string ""
+  Decode.succeed BoundedContextCanvas
+    |> JP.required "name" Decode.string
+    |> JP.optional "description" Decode.string ""
     |> JP.optional "classification" (maybeStringDecoder classificationParser) Nothing
     |> JP.optional "businessModel" (maybeStringDecoder businessModelParser) Nothing
     |> JP.optional "evolution" (maybeStringDecoder evolutionParser) Nothing
-    |> JP.optional "businessDecisions" string ""
-    |> JP.optional "ubiquitousLanguage" string ""
-    |> JP.optional "modelTraits" string ""
+    |> JP.optional "businessDecisions" Decode.string ""
+    |> JP.optional "ubiquitousLanguage" Decode.string ""
+    |> JP.optional "modelTraits" Decode.string ""
     |> JP.optional "messages" messagesDecoder (initMessages ())
     |> JP.optional "dependencies" dependenciesDecoder (initDependencies ())
