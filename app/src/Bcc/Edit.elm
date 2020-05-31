@@ -36,7 +36,7 @@ import Bcc.Edit.Dependencies as Dependencies
 type alias EditingCanvas = 
   { canvas : Bcc.BoundedContextCanvas
   , addingMessage : AddingMessage
-  , addingDependencies: Dependencies.Model
+  , addingDependencies: Dependencies.DependenciesEdit
   }
 type alias AddingMessage = 
   { commandsHandled : Bcc.Command
@@ -66,13 +66,14 @@ initAddingMessage =
 init : Nav.Key -> Url.Url -> (Model, Cmd Msg)
 init key url =
   let
+    canvas = Bcc.init ()
     model =
       { key = key
       , self = url
       , edit = 
         { addingMessage = initAddingMessage
-        , addingDependencies = Dependencies.init
-        , canvas = Bcc.init ()
+        , addingDependencies = Dependencies.initDependencies
+        , canvas = canvas
         }
       }
   in
@@ -148,9 +149,11 @@ updateEdit msg model =
       { model | canvas = Bcc.update fieldMsg model.canvas }
     DependencyField dependency ->
       let 
-        (addingDependencies, canvas) = Dependencies.update dependency (model.addingDependencies, model.canvas)
+        (addingDependencies, dependencies) = Dependencies.update dependency (model.addingDependencies, model.canvas.dependencies)
+        canvas = model.canvas
+        c = { canvas | dependencies = dependencies}
       in
-        { model | canvas = canvas, addingDependencies = addingDependencies }
+        { model | canvas = c, addingDependencies = addingDependencies }
     MessageField fieldMsg ->
       { model | addingMessage = updateAddingMessage fieldMsg model.addingMessage }
 
@@ -172,7 +175,7 @@ update msg model =
         editing = 
           { canvas = m
           , addingMessage = initAddingMessage
-          , addingDependencies = Dependencies.init
+          , addingDependencies = Dependencies.initDependencies
           }
       in
         ({ model | edit = editing } , Cmd.none)    
@@ -368,7 +371,7 @@ viewRightside model =
     , Input.text [ Input.id "modelTraits", Input.value model.canvas.modelTraits, Input.onInput Bcc.SetModelTraits ] |> Html.map Field
     , Form.help [] [ text "draft, execute, audit, enforcer, interchange, gateway, etc."] ]
     , viewMessages model
-    , Dependencies.view model.addingDependencies model.canvas.dependencies |> Html.map DependencyField
+    , Dependencies.view (model.addingDependencies, model.canvas.dependencies) |> Html.map DependencyField
   ]
 
 viewCanvas : EditingCanvas -> Html EditingMsg
