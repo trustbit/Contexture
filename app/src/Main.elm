@@ -25,9 +25,8 @@ main =
     -- elm-live with a custom index.html is not working?
     -- elm reactor with custom index.html works, but local routing+reloading is awkward
     -- use the following variant for local dev :-/
-    -- initFunction = initLocal
+    initFunction = initWithDerivedUrl
     -- initFunction = init
-    initFunction = initServer
   in
     Browser.application
       { init = initFunction
@@ -83,13 +82,18 @@ initCurrentPage ( model, existingCmds ) =
     , Cmd.batch [ existingCmds, mappedPageCmds ]
     )
 
-initServer : () -> Url.Url -> Nav.Key -> (Model, Cmd Msg)
-initServer _ url key =
-  init { baseUrl =  Url.toString { url | path = "",  query = Nothing, fragment = Nothing } } url key
+deriveBaseUrl : Url.Url -> String
+deriveBaseUrl url =
+ case url.port_ of
+    -- local dev with elm-live
+    Just 8000 -> "http://localhost:3000"
+    -- local deployed version
+    Just 3000 -> "http://localhost:3000"
+    _ ->  Url.toString { url | path = "",  query = Nothing, fragment = Nothing } 
 
-initLocal : () -> Url.Url -> Nav.Key -> (Model, Cmd Msg)
-initLocal _ url key =
-  init { baseUrl = "http://localhost:3000" } url key
+initWithDerivedUrl : () -> Url.Url -> Nav.Key -> (Model, Cmd Msg)
+initWithDerivedUrl _ url key =
+  init { baseUrl = deriveBaseUrl url} url key
 
 init : Flags -> Url.Url -> Nav.Key -> (Model, Cmd Msg)
 init flag url key =
@@ -113,7 +117,6 @@ type Msg
   | NavMsg Navbar.State
   | OverviewMsg Overview.Msg
   | BccMsg Bcc.Edit.Msg
-
 
 update : Msg -> Model -> (Model, Cmd Msg)
 update msg model =
@@ -149,10 +152,10 @@ update msg model =
         (mo, msg2) = Bcc.Edit.update m bccModel
       in
         ({ model | page = Bcc mo}, Cmd.map BccMsg msg2)
+
     (_, _) ->
       Debug.log ("Main: " ++ Debug.toString msg ++ " " ++ Debug.toString model)
       (model, Cmd.none)
-        
         
 -- SUBSCRIPTIONS
 
