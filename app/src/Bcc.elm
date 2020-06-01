@@ -365,7 +365,10 @@ maybeStringEncoder encoder value =
 
 maybeStringDecoder : (String -> Maybe v) -> Decoder (Maybe v)
 maybeStringDecoder parser =
-  Decode.map parser Decode.string
+  Decode.oneOf
+    [ Decode.null Nothing
+    , Decode.map parser Decode.string
+    ]
 
 setDecoder : Decoder (Set.Set String)
 setDecoder =
