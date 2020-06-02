@@ -125,6 +125,10 @@ update msg model =
 
 -- VIEW
 
+viewLabel : String -> String -> Html msg
+viewLabel labelId caption = 
+  Form.label [ for labelId] [ Html.h6 [] [ text caption ] ]
+
 view : Model -> Html Msg
 view model =
   div []
@@ -138,7 +142,7 @@ view model =
             , Button.onClick Delete
             , Button.attrs [ title ("Delete " ++ model.edit.canvas.name) ] 
             ]
-            [ text "X" ]
+            [ text "Delete" ]
           ]
         ]
       ]
@@ -150,15 +154,17 @@ viewRadioButton id title checked msg =
 viewLeftside : Bcc.BoundedContextCanvas -> List (Html EditingMsg)
 viewLeftside model =
   [ Form.group []
-    [ Form.label [for "name"] [ text "Name"]
+    [ viewLabel "name" "Name"
     , Input.text [ Input.id "name", Input.value model.name, Input.onInput Bcc.SetName ] ]
+  , Html.hr [] []
   , Form.group []
-    [ Form.label [for "description"] [ text "Description"]
+    [ viewLabel "description" "Description"
     , Input.text [ Input.id "description", Input.value model.description, Input.onInput Bcc.SetDescription ]
     , Form.help [] [ text "Summary of purpose and responsibilities"] ]
+  , Html.hr [] []
   , Grid.row []
     [ Grid.col [] 
-      [ Form.label [for "classification"] [ text "Bounded Context classification"]
+      [ viewLabel "classification" "BC classification"
       , div [] 
           (Radio.radioList "classification" 
           [ viewRadioButton "core" "Core" (model.classification == Just Bcc.Core) (Bcc.SetClassification Bcc.Core) 
@@ -169,7 +175,7 @@ viewLeftside model =
           )
       , Form.help [] [ text "How can the Bounded Context be classified?"] ]
       , Grid.col []
-        [ Form.label [for "businessModel"] [ text "Business Model"]
+        [ viewLabel "businessModel" "Business Model"
         , div [] 
             (Radio.radioList "businessModel" 
             [ viewRadioButton "revenue" "Revenue" (model.businessModel == Just Bcc.Revenue) (Bcc.SetBusinessModel Bcc.Revenue) 
@@ -181,7 +187,7 @@ viewLeftside model =
             )
         , Form.help [] [ text "What's the underlying business model of the Bounded Context?"] ]
       , Grid.col []
-        [ Form.label [for "evolution"] [ text "Evolution"]
+        [ viewLabel "evolution" "Evolution"
         , div [] 
             (Radio.radioList "evolution" 
             [ viewRadioButton "genesis" "Genesis" (model.evolution == Just Bcc.Genesis) (Bcc.SetEvolution Bcc.Genesis) 
@@ -193,13 +199,15 @@ viewLeftside model =
             )
         , Form.help [] [ text "How does the context evolve? How novel is it?"] ]
     ]
+  , Html.hr [] []
   , Form.group []
-    [ Form.label [for "businessDecisions"] [ text "Business Decisions"]
-      , Textarea.textarea [ Textarea.id "businessDecisions", Textarea.rows 4, Textarea.value model.businessDecisions, Textarea.onInput Bcc.SetBusinessDecisions ]
+    [ viewLabel "businessDecisions" "Business Decisions"
+      , Textarea.textarea [ Textarea.id "businessDecisions", Textarea.rows 10, Textarea.value model.businessDecisions, Textarea.onInput Bcc.SetBusinessDecisions ]
       , Form.help [] [ text "Key business rules, policies and decisions"] ]
+  , Html.hr [] []
   , Form.group []
-    [ Form.label [for "ubiquitousLanguage"] [ text "Ubiquitous Language"]
-      , Textarea.textarea [ Textarea.id "ubiquitousLanguage", Textarea.rows 4, Textarea.value model.ubiquitousLanguage, Textarea.onInput Bcc.SetUbiquitousLanguage ]
+    [ viewLabel "ubiquitousLanguage" "Ubiquitous Language"
+      , Textarea.textarea [ Textarea.id "ubiquitousLanguage", Textarea.rows 10, Textarea.value model.ubiquitousLanguage, Textarea.onInput Bcc.SetUbiquitousLanguage ]
       , Form.help [] [ text "Key domain terminology"] ]
   ]
   |> List.map (Html.map Field)
@@ -207,10 +215,12 @@ viewLeftside model =
 viewRightside : EditingCanvas -> List (Html EditingMsg)
 viewRightside model =
   [ Form.group []
-    [ Form.label [for "modelTraits"] [ text "Model traits"]
+    [ viewLabel "modelTraits" "Model traits"
     , Input.text [ Input.id "modelTraits", Input.value model.canvas.modelTraits, Input.onInput Bcc.SetModelTraits ] |> Html.map Field
     , Form.help [] [ text "draft, execute, audit, enforcer, interchange, gateway, etc."] ]
+    , Html.hr [] []
     , (model.addingMessage, model.canvas.messages) |> Messages.view |> Html.map MessageField
+    , Html.hr [] []
     , (model.addingDependencies, model.canvas.dependencies) |> Dependencies.view |> Html.map DependencyField
   ]
 

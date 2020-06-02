@@ -10,6 +10,7 @@ import Bootstrap.Grid as Grid
 import Bootstrap.Grid.Row as Row
 import Bootstrap.Grid.Col as Col
 import Bootstrap.Navbar as Navbar
+import Bootstrap.Utilities.Spacing as Spacing
 
 import Route exposing ( Route)
 
@@ -192,7 +193,7 @@ view model =
       [ CDN.stylesheet
       , div [] 
         [ menu model
-        , Grid.containerFluid [] 
+        , Grid.containerFluid [ Spacing.pt3 ] 
           [ content ]
         ]
       ]

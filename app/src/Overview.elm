@@ -16,6 +16,7 @@ import Bootstrap.Form as Form
 import Bootstrap.Form.Fieldset as Fieldset
 import Bootstrap.Form.Input as Input
 import Bootstrap.Button as Button
+import Bootstrap.ListGroup as ListGroup
 
 import Url
 import Http
@@ -75,9 +76,9 @@ createWithName name =
           |> Fieldset.legend [] [ text "Create a Bounded Context Canvas"]
           |> Fieldset.children
             [ Form.group []
-                [ Form.label [for "name"] [ text "Name"]
+                [ Form.label [for "name"] [ text "Name of the new Bounded Context"]
                 , Input.text [ Input.id "name", Input.value name, Input.onInput SetName ] ]
-            , Button.submitButton [ Button.primary] [ text "Fill out the Rest!"] ]
+            , Button.submitButton [ Button.primary] [ text "Fill out the rest!"] ]
            |> Fieldset.view
         ]
 
@@ -86,12 +87,11 @@ viewExisting : List BccItem  -> Html Msg
 viewExisting items =
    let
       renderItem item =
-          Html.li [] 
-            [ Html.a [ href ("/bccs/" ++ Bcc.idToString item.id)] [text item.name] ]
+        ListGroup.anchor [ ListGroup.attrs [href (Route.routeToString (Route.Bcc item.id))]] [text item.name]
     in
       div []
         [ Html.h3 [] [ text "Existing BCs"]
-        , Html.ol [] (items |> List.map renderItem) ]
+        , ListGroup.custom (items |> List.map renderItem) ]
 
 view : Model -> Html Msg
 view model =

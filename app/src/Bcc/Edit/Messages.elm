@@ -110,7 +110,7 @@ viewMessageOption model =
 viewMessage : String -> String -> (Bcc.Message, Bcc.MessageCollection) -> Html ChangeTypeMsg
 viewMessage id title (message, messages) =
   Form.group [Form.attrs [style "min-height" "250px"]]
-    [ Form.label [for id] [ text title]
+    [ Form.label [for id] [ text title ]
     , ListGroup.ul 
       (
         messages
