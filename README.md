@@ -34,9 +34,9 @@ Additional ideas on how to gather or present information can be read in [Cyrille
 
 ### Features for a Prototype
 
-MVP: "Mimicking the BCC with HTML forms"
+:white_check_mark: MVP: "Mimicking the BCC with HTML forms"
 
-- [ ] Have a form mirroring the BCC with free text fields
+- [x] Have a form mirroring the BCC with free text fields
 - [x] Creating a new bounded context by submitting a new form
 - [x] Loading existing BCC into a form and updating them by (re)submitting it
 
@@ -47,14 +47,15 @@ Version 1: "Improving data quality"
 - Provide Auto-complete boxes (free text search) for dependencies (search in already existing BCC names)
 - Provide Auto-complete boxes (free text search) for consumed message contracts (search in produces message contracts)
 - Include more help text and [tips](https://github.com/ddd-crew/bounded-context-canvas/blob/master/resources/model-traits-worksheet.md) 
-- Include checkboxes and freetext fields for 'Business Model' and 'Classification'
+- Include checkboxes and free text fields for 'Business Model' and 'Classification'
 
 Note: can be run without any external dependencies
 
-Version 2: "Connecting Sructurizr for visualization"
+Version 2: "Connecting existing Tools for visualization"
 
 - connect Structurizr as (additional?) persistence layer
 - Visualize data from Structurizr as BCC
+- evaluate [Context Map](https://contextmapper.org/docs/context-map/) for exporting & visualizing contexts (see <https://github.com/ContextMapper/context-mapper-examples/tree/master/src/main/cml/ddd-sample>)
 
 Note: needs Structurizr on-premise (via a docker-container)
 
@@ -74,7 +75,7 @@ Version 3: "Empower users to input data"
 
 Guessed effort for the main parts:
 
-- "Mimicking the BCC with HTML forms"
+- :white_check_mark: "Mimicking the BCC with HTML forms"
   - can be run without any external dependencies
   - effort: 3 days
 - "Improving data quality"
