@@ -193,7 +193,7 @@ view model =
       [ CDN.stylesheet
       , div [] 
         [ menu model
-        , Grid.containerFluid [ Spacing.pt3 ] 
+        , div[ Spacing.pt3 ] 
           [ content ]
         ]
       ]

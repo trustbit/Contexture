@@ -15,8 +15,11 @@ import Bootstrap.Grid.Col as Col
 import Bootstrap.Form as Form
 import Bootstrap.Form.Fieldset as Fieldset
 import Bootstrap.Form.Input as Input
+import Bootstrap.Form.InputGroup as InputGroup
 import Bootstrap.Button as Button
 import Bootstrap.ListGroup as ListGroup
+import Bootstrap.Card as Card
+import Bootstrap.Utilities.Spacing as Spacing
 
 import Url
 import Http
@@ -75,10 +78,18 @@ createWithName name =
         [ Fieldset.config
           |> Fieldset.legend [] [ text "Create a Bounded Context Canvas"]
           |> Fieldset.children
-            [ Form.group []
-                [ Form.label [for "name"] [ text "Name of the new Bounded Context"]
-                , Input.text [ Input.id "name", Input.value name, Input.onInput SetName ] ]
-            , Button.submitButton [ Button.primary] [ text "Fill out the rest!"] ]
+            [ InputGroup.config (
+              InputGroup.text
+                [ Input.id name
+                , Input.value name
+                , Input.onInput SetName
+                , Input.placeholder "Name of the Bounded Context"
+                ]
+              )
+              |> InputGroup.successors
+                [ InputGroup.button [ Button.attrs [ Html.Attributes.type_ "submit"],  Button.primary] [ text "Fill out the rest!"] ]
+              |> InputGroup.view
+             ]
            |> Fieldset.view
         ]
 
@@ -89,15 +100,19 @@ viewExisting items =
       renderItem item =
         ListGroup.anchor [ ListGroup.attrs [href (Route.routeToString (Route.Bcc item.id))]] [text item.name]
     in
-      div []
-        [ Html.h3 [] [ text "Existing BCs"]
-        , ListGroup.custom (items |> List.map renderItem) ]
+      Card.config []
+      |> Card.header [] [ text "Existing Bounded Contexts" ]
+      |> Card.customListGroup
+          (items |> List.map renderItem)
+      |> Card.view
 
 view : Model -> Html Msg
 view model =
-  Grid.row []
-    [ Grid.col [] [viewExisting model.bccs]
-    , Grid.col [] [createWithName model.bccName]
+  Grid.container [] 
+    [ Grid.row []
+      [ Grid.col [] [createWithName model.bccName] ]
+    ,Grid.row [ Row.attrs [ Spacing.pt3 ] ]
+      [ Grid.col [] [viewExisting model.bccs] ]  
     ]
 
 -- helpers

@@ -131,7 +131,7 @@ viewLabel labelId caption =
 
 view : Model -> Html Msg
 view model =
-  div []
+  Grid.containerFluid []
       [ viewCanvas model.edit |> Html.map Editing
       , Grid.row []
         [ Grid.col [] 
