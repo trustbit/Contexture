@@ -29,11 +29,11 @@ import Route
 
 -- MODEL
 
-type alias BccItem = 
+type alias BccItem =
   { id: Bcc.BoundedContextId
   , name: String }
 
-type alias Model = 
+type alias Model =
   { navKey : Nav.Key
   , bccName : String
   , baseUrl : String
@@ -66,7 +66,7 @@ update msg model =
       (model, createNewBcc model)
     Created (Ok item) ->
         (model, Route.pushUrl (Route.Bcc item.id) model.navKey)
-    _ -> 
+    _ ->
         Debug.log ("Overview: " ++ Debug.toString msg ++ " " ++ Debug.toString model)
         (model, Cmd.none)
 
@@ -87,7 +87,14 @@ createWithName name =
                 ]
               )
               |> InputGroup.successors
-                [ InputGroup.button [ Button.attrs [ Html.Attributes.type_ "submit"],  Button.primary] [ text "Fill out the rest!"] ]
+                [ InputGroup.button
+                  [ Button.attrs
+                    [ Html.Attributes.type_ "submit"]
+                    , Button.primary
+                    , Button.disabled (name |> Bcc.ifNameValid (\_ -> True) (\_ -> False))
+                    ]
+                  [ text "Fill out the rest!"]
+                ]
               |> InputGroup.view
              ]
            |> Fieldset.view
@@ -108,11 +115,11 @@ viewExisting items =
 
 view : Model -> Html Msg
 view model =
-  Grid.container [] 
+  Grid.container []
     [ Grid.row []
       [ Grid.col [] [createWithName model.bccName] ]
     ,Grid.row [ Row.attrs [ Spacing.pt3 ] ]
-      [ Grid.col [] [viewExisting model.bccs] ]  
+      [ Grid.col [] [viewExisting model.bccs] ]
     ]
 
 -- helpers
@@ -125,15 +132,15 @@ loadAll baseUrl =
     }
 
 createNewBcc : Model -> Cmd Msg
-createNewBcc model = 
-    let 
+createNewBcc model =
+    let
         body =
             Encode.object
             [ ("name", Encode.string model.bccName) ]
-    in 
+    in
         Http.post
         { url = model.baseUrl ++ "/api/bccs"
-        , body = Http.jsonBody body 
+        , body = Http.jsonBody body
         , expect = Http.expectJson Created bccItemDecoder
         }
 
@@ -147,4 +154,3 @@ bccItemDecoder =
   map2 BccItem
     (at ["id"] Bcc.idDecoder)
     (at ["name"] string)
-    

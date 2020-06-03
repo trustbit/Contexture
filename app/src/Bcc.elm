@@ -224,6 +224,17 @@ update msg canvas =
 
     ChangeDependencies m ->
       { canvas | dependencies = updateDependencies m canvas.dependencies }
+
+
+ifValid : (model -> Bool) -> (model -> result) -> (model -> result) -> model -> result
+ifValid predicate trueRenderer falseRenderer model =
+  if predicate model then
+    trueRenderer model
+  else
+    falseRenderer model
+
+ifNameValid =
+  ifValid (\name -> String.length name <= 0)
    
 -- conversions
 

@@ -26,13 +26,13 @@ import Bcc.Edit.Messages as Messages
 
 -- MODEL
 
-type alias EditingCanvas = 
+type alias EditingCanvas =
   { canvas : Bcc.BoundedContextCanvas
   , addingMessage : Messages.AddingMessage
   , addingDependencies: Dependencies.DependenciesEdit
   }
 
-type alias Model = 
+type alias Model =
   { key: Nav.Key
   , self: Url.Url
   -- TODO: discuss we want this in edit or BCC - it's not persisted after all!
@@ -46,7 +46,7 @@ init key url =
     model =
       { key = key
       , self = url
-      , edit = 
+      , edit =
         { addingMessage = Messages.initAddingMessage
         , addingDependencies = Dependencies.initDependencies
         , canvas = canvas
@@ -87,22 +87,22 @@ updateEdit msg model =
     Field fieldMsg ->
       { model | canvas = Bcc.update fieldMsg model.canvas }
     DependencyField dependency ->
-      let 
+      let
         (addingDependencies, dependencies) = Dependencies.update dependency (model.addingDependencies, model.canvas.dependencies)
         canvas = model.canvas
         c = { canvas | dependencies = dependencies}
       in
         { model | canvas = c, addingDependencies = addingDependencies }
-    
+
 
 update : Msg -> Model -> (Model, Cmd Msg)
 update msg model =
   case msg of
     Editing editing ->
       ({ model | edit = updateEdit editing model.edit}, Cmd.none)
-    Save -> 
+    Save ->
       (model, saveBCC model)
-    Saved (Ok _) -> 
+    Saved (Ok _) ->
       (model, Cmd.none)
     Delete ->
       (model, deleteBCC model)
@@ -110,14 +110,14 @@ update msg model =
       (model, Route.pushUrl Route.Overview model.key)
     Loaded (Ok m) ->
       let
-        editing = 
+        editing =
           { canvas = m
           , addingMessage = Messages.initAddingMessage
           , addingDependencies = Dependencies.initDependencies
           }
       in
-        ({ model | edit = editing } , Cmd.none)    
-    Back -> 
+        ({ model | edit = editing } , Cmd.none)
+    Back ->
       (model, Route.goBack model.key)
     _ ->
       Debug.log ("BCC: " ++ Debug.toString msg ++ " " ++ Debug.toString model)
@@ -126,7 +126,7 @@ update msg model =
 -- VIEW
 
 viewLabel : String -> String -> Html msg
-viewLabel labelId caption = 
+viewLabel labelId caption =
   Form.label [ for labelId] [ Html.h6 [] [ text caption ] ]
 
 view : Model -> Html Msg
@@ -134,13 +134,18 @@ view model =
   Grid.containerFluid []
       [ viewCanvas model.edit |> Html.map Editing
       , Grid.row []
-        [ Grid.col [] 
+        [ Grid.col []
           [ Button.button [Button.secondary, Button.onClick Back] [text "Back"]
-          , Button.submitButton [ Button.primary, Button.onClick Save ] [ text "Save"]
-          , Button.button 
+          , Button.submitButton
+            [ Button.primary
+            , Button.onClick Save
+            , Button.disabled (model.edit.canvas.name |> Bcc.ifNameValid (\_ -> True) (\_ -> False))
+            ]
+            [ text "Save"]
+          , Button.button
             [ Button.danger
             , Button.onClick Delete
-            , Button.attrs [ title ("Delete " ++ model.edit.canvas.name) ] 
+            , Button.attrs [ title ("Delete " ++ model.edit.canvas.name) ]
             ]
             [ text "Delete" ]
           ]
@@ -155,7 +160,13 @@ viewLeftside : Bcc.BoundedContextCanvas -> List (Html EditingMsg)
 viewLeftside model =
   [ Form.group []
     [ viewLabel "name" "Name"
-    , Input.text [ Input.id "name", Input.value model.name, Input.onInput Bcc.SetName ] ]
+    , Input.text (
+        List.concat
+        [ [ Input.id "name", Input.value model.name, Input.onInput Bcc.SetName ]
+        , model.name |> Bcc.ifNameValid (\_ -> [ Input.danger ]) (\_ -> [])
+        ])
+    , Form.invalidFeedback [] [ text "A name for a Bounded Context is required!" ]
+    ]
   , Html.hr [] []
   , Form.group []
     [ viewLabel "description" "Description"
@@ -163,37 +174,37 @@ viewLeftside model =
     , Form.help [] [ text "Summary of purpose and responsibilities"] ]
   , Html.hr [] []
   , Grid.row []
-    [ Grid.col [] 
+    [ Grid.col []
       [ viewLabel "classification" "BC classification"
-      , div [] 
-          (Radio.radioList "classification" 
-          [ viewRadioButton "core" "Core" (model.classification == Just Bcc.Core) (Bcc.SetClassification Bcc.Core) 
-          , viewRadioButton "supporting" "Supporting" (model.classification == Just Bcc.Supporting) (Bcc.SetClassification Bcc.Supporting) 
-          , viewRadioButton "generic" "Generic" (model.classification == Just Bcc.Generic) (Bcc.SetClassification Bcc.Generic) 
+      , div []
+          (Radio.radioList "classification"
+          [ viewRadioButton "core" "Core" (model.classification == Just Bcc.Core) (Bcc.SetClassification Bcc.Core)
+          , viewRadioButton "supporting" "Supporting" (model.classification == Just Bcc.Supporting) (Bcc.SetClassification Bcc.Supporting)
+          , viewRadioButton "generic" "Generic" (model.classification == Just Bcc.Generic) (Bcc.SetClassification Bcc.Generic)
           -- TODO: Other
           ]
           )
       , Form.help [] [ text "How can the Bounded Context be classified?"] ]
       , Grid.col []
         [ viewLabel "businessModel" "Business Model"
-        , div [] 
-            (Radio.radioList "businessModel" 
-            [ viewRadioButton "revenue" "Revenue" (model.businessModel == Just Bcc.Revenue) (Bcc.SetBusinessModel Bcc.Revenue) 
-            , viewRadioButton "engagement" "Engagement" (model.businessModel == Just Bcc.Engagement) (Bcc.SetBusinessModel Bcc.Engagement) 
-            , viewRadioButton "Compliance" "Compliance" (model.businessModel == Just Bcc.Compliance) (Bcc.SetBusinessModel Bcc.Compliance) 
-            , viewRadioButton "costReduction" "Cost reduction" (model.businessModel == Just Bcc.CostReduction) (Bcc.SetBusinessModel Bcc.CostReduction) 
+        , div []
+            (Radio.radioList "businessModel"
+            [ viewRadioButton "revenue" "Revenue" (model.businessModel == Just Bcc.Revenue) (Bcc.SetBusinessModel Bcc.Revenue)
+            , viewRadioButton "engagement" "Engagement" (model.businessModel == Just Bcc.Engagement) (Bcc.SetBusinessModel Bcc.Engagement)
+            , viewRadioButton "Compliance" "Compliance" (model.businessModel == Just Bcc.Compliance) (Bcc.SetBusinessModel Bcc.Compliance)
+            , viewRadioButton "costReduction" "Cost reduction" (model.businessModel == Just Bcc.CostReduction) (Bcc.SetBusinessModel Bcc.CostReduction)
             -- TODO: Other
             ]
             )
         , Form.help [] [ text "What's the underlying business model of the Bounded Context?"] ]
       , Grid.col []
         [ viewLabel "evolution" "Evolution"
-        , div [] 
-            (Radio.radioList "evolution" 
-            [ viewRadioButton "genesis" "Genesis" (model.evolution == Just Bcc.Genesis) (Bcc.SetEvolution Bcc.Genesis) 
-            , viewRadioButton "customBuilt" "Custom built" (model.evolution == Just Bcc.CustomBuilt) (Bcc.SetEvolution Bcc.CustomBuilt) 
-            , viewRadioButton "product" "Product" (model.evolution == Just Bcc.Product) (Bcc.SetEvolution Bcc.Product) 
-            , viewRadioButton "commodity" "Commodity" (model.evolution == Just Bcc.Commodity) (Bcc.SetEvolution Bcc.Commodity) 
+        , div []
+            (Radio.radioList "evolution"
+            [ viewRadioButton "genesis" "Genesis" (model.evolution == Just Bcc.Genesis) (Bcc.SetEvolution Bcc.Genesis)
+            , viewRadioButton "customBuilt" "Custom built" (model.evolution == Just Bcc.CustomBuilt) (Bcc.SetEvolution Bcc.CustomBuilt)
+            , viewRadioButton "product" "Product" (model.evolution == Just Bcc.Product) (Bcc.SetEvolution Bcc.Product)
+            , viewRadioButton "commodity" "Commodity" (model.evolution == Just Bcc.Commodity) (Bcc.SetEvolution Bcc.Commodity)
             -- TODO: Other
             ]
             )

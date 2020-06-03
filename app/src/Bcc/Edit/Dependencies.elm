@@ -147,7 +147,11 @@ viewAddDependency model =
             (List.append [ Select.item [ selected (model.relationship == Nothing), value "" ] [text "unknown"] ] items)
         ]
       , Grid.col [ Col.xs2 ]
-        [ Button.submitButton [ Button.secondary ] [ text "+" ]
+        [ Button.submitButton 
+          [ Button.secondary
+          , Button.disabled (String.length model.system <= 0)
+          ]
+          [ text "+" ]
         ]
       ]
     ]

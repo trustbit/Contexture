@@ -133,7 +133,13 @@ viewMessage id title (message, messages) =
             ]
           )
           |> InputGroup.successors
-            [ InputGroup.button [ Button.attrs [ Html.Attributes.type_ "submit"],  Button.secondary] [ text "Add"] ]
+            [ InputGroup.button 
+              [ Button.attrs 
+                [ Html.Attributes.type_ "submit"]
+                ,  Button.secondary
+                , Button.disabled (String.length message <= 0)
+                ]
+              [ text "Add"] ]
           |> InputGroup.view
       ]
     ] 
