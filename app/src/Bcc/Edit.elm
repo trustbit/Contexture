@@ -11,13 +11,12 @@ import Bootstrap.Grid.Row as Row
 import Bootstrap.Grid.Col as Col
 import Bootstrap.Form as Form
 import Bootstrap.Form.Input as Input
-import Bootstrap.Form.Select as Select
 import Bootstrap.Form.Textarea as Textarea
 import Bootstrap.Form.Radio as Radio
 import Bootstrap.Button as Button
-
 import Url
 import Http
+import Dict
 
 import Route
 import Bcc
@@ -28,6 +27,7 @@ import Bcc.Edit.Messages as Messages
 
 type alias EditingCanvas =
   { canvas : Bcc.BoundedContextCanvas
+  , modelTraitPopover: Bool
   , addingMessage : Messages.AddingMessage
   , addingDependencies: Dependencies.DependenciesEdit
   }
@@ -47,7 +47,8 @@ init key url =
       { key = key
       , self = url
       , edit =
-        { addingMessage = Messages.initAddingMessage
+        { modelTraitPopover = False
+        , addingMessage = Messages.initAddingMessage
         , addingDependencies = Dependencies.initDependencies
         , canvas = canvas
         }
@@ -64,6 +65,7 @@ type EditingMsg
   = Field Bcc.Msg
   | MessageField Messages.Msg
   | DependencyField Dependencies.Msg
+  | ModelTraitMsg
 
 type Msg
   = Loaded (Result Http.Error Bcc.BoundedContextCanvas)
@@ -93,6 +95,8 @@ updateEdit msg model =
         c = { canvas | dependencies = dependencies}
       in
         { model | canvas = c, addingDependencies = addingDependencies }
+    ModelTraitMsg  ->
+      { model | modelTraitPopover = not model.modelTraitPopover }
 
 
 update : Msg -> Model -> (Model, Cmd Msg)
@@ -112,6 +116,7 @@ update msg model =
       let
         editing =
           { canvas = m
+          , modelTraitPopover = False
           , addingMessage = Messages.initAddingMessage
           , addingDependencies = Dependencies.initDependencies
           }
@@ -223,16 +228,64 @@ viewLeftside model =
   ]
   |> List.map (Html.map Field)
 
+viewModelTraits : EditingCanvas -> Html EditingMsg
+viewModelTraits model =
+  let
+    traits =
+      [ ("Specification Model", "Produces a document describing a job/request that needs to be performed. Example: Advertising Campaign Builder")
+      , ("Execution Model", "Performs or tracks a job. Example: Advertising Campaign Engine")
+      , ("Audit Model", "Monitors the execution. Example: Advertising Campaign Analyser")
+      , ("Approver", "Receives requests and determines if they should progress to the next step of the process. Example: Fraud Check")
+      , ("Enforcer", "Ensures that other contexts carry out certain operations. Example: GDPR Context (ensures other contexts delete all of a user’s data)")
+      , ("Octopus Enforcer", "Ensures that multiple/all contexts in the system all comply with a standard rule. Example: GDPR Context (as above)")
+      , ("Interchanger", "Translates between multiple ubiquitous languages.")
+      , ("Gateway", "Sits at the edge of a system and manages inbound and/or outbound communication. Example: IoT Message Gateway")
+      , ("Gateway Interchange", "The combination of a gateway and an interchange.")
+      , ("Dogfood Context", "Simulates the customer experience of using the core bounded contexts. Example: Whitelabel music store")
+      , ("Bubble Context", "Sits in-front of legacy contexts providing a new, cleaner model while legacy contexts are being replaced.")
+      , ("Autonomous Bubble", "Bubble context which has its own data store and synchronises data asynchronously with the legacy contexts.")
+      , ("Brain Context (likely anti-pattern)", "Contains a large number of important rules and many other contexts depend on it. Example: rules engine containing all the domain rules")
+      , ("Funnel Context", "Receives documents from multiple upstream contexts and passes them to a single downstream context in a standard format (after applying its own rules).")
+      , ("Engagement Context", "Provides key features which attract users to keep using the product. Example: Free Financial Advice Context")
+      ]
+      
+    descriptionList =
+      Html.dl [class "row"]
+        (traits
+            |> List.concatMap (
+              \(t, d) ->
+                [ Html.dt [ class "col-sm-3" ] [ text t ]
+                , Html.dd [ class "col-sm-9" ] [ text d ]
+                ]
+            )
+        )
+  in  
+    Form.group []
+      [ viewLabel "modelTraits" "Model traits"
+      , Input.text
+      [ Input.id "modelTraits", Input.value model.canvas.modelTraits, Input.onInput Bcc.SetModelTraits ]
+      |> Html.map Field
+      , Form.help [ style "cursor" "pointer", onClick ModelTraitMsg] [ text "Traits that describe the model." ]
+      , Form.help [ class ( if model.modelTraitPopover then "" else "collapse") ]
+        [ descriptionList 
+        , Html.footer 
+          [ class "blockquote-footer"]
+          [ Html.a
+            [target "_blank"
+            , href "https://github.com/ddd-crew/bounded-context-canvas/blob/master/resources/model-traits-worksheet.md"
+            ]
+            [ text "Source of the descriptions"]
+          ]
+        ]
+      ]
+
 viewRightside : EditingCanvas -> List (Html EditingMsg)
 viewRightside model =
-  [ Form.group []
-    [ viewLabel "modelTraits" "Model traits"
-    , Input.text [ Input.id "modelTraits", Input.value model.canvas.modelTraits, Input.onInput Bcc.SetModelTraits ] |> Html.map Field
-    , Form.help [] [ text "draft, execute, audit, enforcer, interchange, gateway, etc."] ]
-    , Html.hr [] []
-    , (model.addingMessage, model.canvas.messages) |> Messages.view |> Html.map MessageField
-    , Html.hr [] []
-    , (model.addingDependencies, model.canvas.dependencies) |> Dependencies.view |> Html.map DependencyField
+  [ viewModelTraits model
+  , Html.hr [] []
+  , (model.addingMessage, model.canvas.messages) |> Messages.view |> Html.map MessageField
+  , Html.hr [] []
+  , (model.addingDependencies, model.canvas.dependencies) |> Dependencies.view |> Html.map DependencyField
   ]
 
 viewCanvas : EditingCanvas -> Html EditingMsg
