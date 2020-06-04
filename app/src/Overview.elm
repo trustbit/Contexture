@@ -3,7 +3,9 @@ module Overview exposing (Msg, Model, update, view, init)
 import Browser.Navigation as Nav
 
 import Json.Encode as Encode
-import Json.Decode exposing (Decoder, map2, field, string, int, at, list)
+import Json.Decode.Pipeline as JP
+import Json.Decode as Decode
+import Json.Decode exposing (Decoder, map3, field, string, int, at, list, maybe)
 
 import Html exposing (Html, button, div, text)
 import Html.Attributes exposing (..)
@@ -31,7 +33,8 @@ import Route
 
 type alias BccItem =
   { id: Bcc.BoundedContextId
-  , name: String }
+  , name: String
+  , description: String }
 
 type alias Model =
   { navKey : Nav.Key
@@ -105,7 +108,18 @@ viewExisting : List BccItem  -> Html Msg
 viewExisting items =
    let
       renderItem item =
-        ListGroup.anchor [ ListGroup.attrs [href (Route.routeToString (Route.Bcc item.id))]] [text item.name]
+        ListGroup.anchor
+        [ ListGroup.attrs [href (Route.routeToString (Route.Bcc item.id))]]
+        [ div []
+            ( List.concat
+              [
+                [ Html.h6 [] [ text item.name ] ]
+                , if String.length item.description > 0
+                  then [ Html.small [] [ text item.description ] ]
+                  else []
+              ]
+            )
+        ]
     in
       Card.config []
       |> Card.header [] [ text "Existing Bounded Contexts" ]
@@ -151,6 +165,7 @@ bccItemsDecoder =
 
 bccItemDecoder: Decoder BccItem
 bccItemDecoder =
-  map2 BccItem
-    (at ["id"] Bcc.idDecoder)
-    (at ["name"] string)
+  Decode.succeed BccItem
+    |> JP.required "id" Bcc.idDecoder
+    |> JP.required "name" Decode.string
+    |> JP.optional "description" Decode.string ""
