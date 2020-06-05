@@ -22,7 +22,7 @@ import Overview
 
 main =
   let
-    -- TODO: how is the DEV story with elm-live / elm reactor with local flags - defaults are not possible?! 
+    -- TODO: how is the DEV story with elm-live / elm reactor with local flags - defaults are not possible?!
     -- elm-live with a custom index.html is not working?
     -- elm reactor with custom index.html works, but local routing+reloading is awkward
     -- use the following variant for local dev :-/
@@ -43,12 +43,12 @@ main =
 type alias Flags =
     { baseUrl : String }
 
-type Page 
+type Page
   = NotFoundPage
   | Overview Overview.Model
   | Bcc Bcc.Edit.Model
 
-type alias Model = 
+type alias Model =
   { key : Nav.Key
   , route : Route
   , navState: Navbar.State
@@ -90,7 +90,7 @@ deriveBaseUrl url =
     Just 8000 -> "http://localhost:3000"
     -- local deployed version
     Just 3000 -> "http://localhost:3000"
-    _ ->  Url.toString { url | path = "",  query = Nothing, fragment = Nothing } 
+    _ ->  Url.toString { url | path = "",  query = Nothing, fragment = Nothing }
 
 initWithDerivedUrl : () -> Url.Url -> Nav.Key -> (Model, Cmd Msg)
 initWithDerivedUrl _ url key =
@@ -109,7 +109,7 @@ init flag url key =
         }
   in
     initCurrentPage ( model, navCmd )
- 
+
 -- UPDATE
 
 type Msg
@@ -157,7 +157,7 @@ update msg model =
     (_, _) ->
       Debug.log ("Main: " ++ Debug.toString msg ++ " " ++ Debug.toString model)
       (model, Cmd.none)
-        
+
 -- SUBSCRIPTIONS
 
 subscriptions : Model -> Sub Msg
@@ -178,8 +178,8 @@ menu model =
 
 view : Model -> Browser.Document Msg
 view model =
-  let 
-    content = 
+  let
+    content =
       case model.page of
         Bcc m ->
           Bcc.Edit.view m |> Html.map BccMsg
@@ -189,11 +189,11 @@ view model =
           text "Not Found"
   in
     { title = "Bounded Context Wizard"
-    , body = 
+    , body =
       [ CDN.stylesheet
-      , div [] 
+      , div []
         [ menu model
-        , div[ Spacing.pt3 ] 
+        , div [ Spacing.pt3 ]
           [ content ]
         ]
       ]
