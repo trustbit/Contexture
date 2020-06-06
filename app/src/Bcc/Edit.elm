@@ -28,7 +28,7 @@ import Bcc.Edit.Messages as Messages
 type alias EditingCanvas =
   { canvas : Bcc.BoundedContextCanvas
   , modelTraitPopover: Bool
-  , addingMessage : Messages.AddingMessage
+  , addingMessage : Messages.Model
   , addingDependencies: Dependencies.DependenciesEdit
   }
 
@@ -48,7 +48,7 @@ init key url =
       , self = url
       , edit =
         { modelTraitPopover = False
-        , addingMessage = Messages.initAddingMessage
+        , addingMessage = Messages.init canvas.messages
         , addingDependencies = Dependencies.initDependencies
         , canvas = canvas
         }
@@ -81,11 +81,11 @@ updateEdit msg model =
   case msg of
     MessageField messageMsg ->
       let
-        (addingMessage, messages) = Messages.update messageMsg (model.addingMessage, model.canvas.messages)
+        updatedModel = Messages.update messageMsg model.addingMessage
         canvas = model.canvas
-        c = { canvas | messages = messages}
+        c = { canvas | messages = updatedModel.messages}
       in
-        { model | addingMessage = addingMessage, canvas = c }
+        { model | addingMessage = updatedModel, canvas = c }
     Field fieldMsg ->
       { model | canvas = Bcc.update fieldMsg model.canvas }
     DependencyField dependency ->
@@ -117,7 +117,7 @@ update msg model =
         editing =
           { canvas = m
           , modelTraitPopover = False
-          , addingMessage = Messages.initAddingMessage
+          , addingMessage = Messages.init m.messages
           , addingDependencies = Dependencies.initDependencies
           }
       in
@@ -283,7 +283,7 @@ viewRightside : EditingCanvas -> List (Html EditingMsg)
 viewRightside model =
   [ viewModelTraits model
   , Html.hr [] []
-  , (model.addingMessage, model.canvas.messages) |> Messages.view |> Html.map MessageField
+  , model.addingMessage |> Messages.view |> Html.map MessageField
   , Html.hr [] []
   , (model.addingDependencies, model.canvas.dependencies) |> Dependencies.view |> Html.map DependencyField
   ]

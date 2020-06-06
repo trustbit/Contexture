@@ -1,4 +1,4 @@
-module Bcc.Edit.Messages exposing (Msg(..), Model, AddingMessage, view, update, initAddingMessage)
+module Bcc.Edit.Messages exposing (Msg(..), Model, view, update, init)
 
 import Html exposing (Html, button, div, text)
 import Html.Attributes exposing (..)
@@ -30,7 +30,10 @@ type alias AddingMessage =
   , queriesInvoked : Bcc.Query
   }
 
-type alias Model = (AddingMessage, Bcc.Messages)
+type alias Model =
+  { adding: AddingMessage
+  , messages: Bcc.Messages
+  }
 
 initAddingMessage = 
   { commandsHandled = ""
@@ -40,6 +43,11 @@ initAddingMessage =
   , queriesHandled = ""
   , queriesInvoked = ""
   }
+
+init : Bcc.Messages -> Model
+init messages =
+  { adding = initAddingMessage
+  , messages = messages }
 
 -- UPDATE
 
@@ -55,7 +63,7 @@ type Msg
   | QueriesHandled ChangeTypeMsg
   | QueriesInvoked ChangeTypeMsg
 
-updateAction : ChangeTypeMsg -> Bcc.MessageCollection -> (Bcc.Message,Bcc.MessageCollection)
+updateAction : ChangeTypeMsg -> Bcc.MessageCollection -> (Bcc.Message, Bcc.MessageCollection)
 updateAction msg existingMessages =
     case msg of
         FieldEdit m ->
@@ -64,38 +72,38 @@ updateAction msg existingMessages =
             ("", Bcc.updateMessageAction changed existingMessages)
 
 update : Msg -> Model -> Model
-update msg (adding, messages) =
+update msg { adding,  messages} =
   case msg of
     CommandsHandled cmd ->
         let
-            (edit, editMessages) = updateAction cmd messages.commandsHandled
+          (edited, editMessages) = updateAction cmd messages.commandsHandled
         in
-            ({ adding | commandsHandled = edit }, { messages | commandsHandled = editMessages} )
+          { adding = { adding | commandsHandled = edited }, messages = { messages | commandsHandled = editMessages} }
     CommandsSent cmd ->
         let
-            (edit, editMessages) = updateAction cmd messages.commandsSent
+          (edited, editMessages) = updateAction cmd messages.commandsSent
         in
-            ({ adding | commandsSent = edit }, { messages | commandsSent = editMessages} )
+          { adding = { adding | commandsSent = edited }, messages = { messages | commandsSent = editMessages} }
     EventsHandled event ->
         let
-            (edit, editMessages) = updateAction event messages.eventsHandled
+          (edited, editMessages) = updateAction event messages.eventsHandled
         in
-            ({ adding | eventsHandled = edit }, { messages | eventsHandled = editMessages} )
+          { adding = { adding | eventsHandled = edited }, messages = { messages | eventsHandled = editMessages} }
     EventsPublished event ->
         let
-            (edit, editMessages) = updateAction event messages.eventsPublished
+          (edited, editMessages) = updateAction event messages.eventsPublished
         in
-            ({ adding | eventsPublished = edit }, { messages | eventsPublished = editMessages} )
+          { adding = { adding | eventsPublished = edited }, messages = { messages | eventsPublished = editMessages} }
     QueriesHandled query ->
         let
-            (edit, editMessages) = updateAction query messages.queriesHandled
+          (edited, editMessages) = updateAction query messages.queriesHandled
         in
-            ({ adding | queriesHandled = edit }, { messages | queriesHandled = editMessages} )
+          { adding = { adding | queriesHandled = edited }, messages = { messages | queriesHandled = editMessages} }
     QueriesInvoked query ->
         let
-            (edit, editMessages) = updateAction query messages.queriesInvoked
+          (edited, editMessages) = updateAction query messages.queriesInvoked
         in
-            ({ adding | queriesInvoked = edit }, { messages | queriesInvoked = editMessages} )
+          { adding = { adding | queriesInvoked = edited }, messages = { messages | queriesInvoked = editMessages} }
 
 -- VIEW
 
@@ -146,31 +154,31 @@ viewMessage id title (message, messages) =
 
 
 view : Model -> Html Msg
-view (addingMessage, messages) =
+view { adding, messages } =
   div []
     [ Html.h5 [ class "text-center" ] [ text "Messages Consumed and Produced" ]
     , Grid.row []
       [ Grid.col [] 
         [ Html.h6 [ class "text-center" ] [ text "Messages consumed"]
-        , (addingMessage.commandsHandled,  messages.commandsHandled)
+        , (adding.commandsHandled,  messages.commandsHandled)
             |> viewMessage "commandsHandled" "Commands handled"
             |> Html.map CommandsHandled
-        , (addingMessage.eventsHandled, messages.eventsHandled)
+        , (adding.eventsHandled, messages.eventsHandled)
             |> viewMessage "eventsHandled" "Events handled"
             |> Html.map EventsHandled
-        , (addingMessage.queriesHandled,messages.queriesHandled)
+        , (adding.queriesHandled,messages.queriesHandled)
             |> viewMessage "queriesHandled" "Queries handled"
             |> Html.map QueriesHandled
         ]
       , Grid.col []
         [ Html.h6 [ class "text-center" ] [ text "Messages produced"]
-        , (addingMessage.commandsSent, messages.commandsSent)
+        , (adding.commandsSent, messages.commandsSent)
             |> viewMessage "commandsSent" "Commands sent"
             |> Html.map CommandsSent
-        , (addingMessage.eventsPublished, messages.eventsPublished)
+        , (adding.eventsPublished, messages.eventsPublished)
             |> viewMessage "eventsPublished" "Events published"
             |> Html.map EventsPublished
-        , (addingMessage.queriesInvoked, messages.queriesInvoked)
+        , (adding.queriesInvoked, messages.queriesInvoked)
             |> viewMessage "queriesInvoked" "Queries invoked" 
             |> Html.map QueriesInvoked
         ]
