@@ -13,6 +13,7 @@ import Bootstrap.Form as Form
 import Bootstrap.Form.Input as Input
 import Bootstrap.Form.Textarea as Textarea
 import Bootstrap.Form.Radio as Radio
+import Bootstrap.Form.Checkbox as Checkbox
 import Bootstrap.Button as Button
 import Url
 import Http
@@ -154,6 +155,15 @@ viewRadioButton : String -> String -> Bool -> Bcc.Msg -> Radio.Radio Bcc.Msg
 viewRadioButton id title checked msg =
   Radio.create [Radio.id id, Radio.onClick msg, Radio.checked checked] title
 
+viewCheckbox : String -> String -> value -> List value -> Html (Bcc.Action value)
+viewCheckbox id title value currentValues =
+  Checkbox.checkbox
+    [Checkbox.id id
+    , Checkbox.onCheck(\isChecked -> if isChecked then Bcc.Add value else Bcc.Remove value )
+    , Checkbox.checked (List.member value currentValues)
+    ]
+    title
+
 viewLeftside : Bcc.BoundedContextCanvas -> List (Html EditingMsg)
 viewLeftside model =
   [ Form.group []
@@ -186,14 +196,15 @@ viewLeftside model =
       , Grid.col []
         [ viewLabel "businessModel" "Business Model"
         , div []
-            (Radio.radioList "businessModel"
-            [ viewRadioButton "revenue" "Revenue" (model.businessModel == Just Bcc.Revenue) (Bcc.SetBusinessModel Bcc.Revenue)
-            , viewRadioButton "engagement" "Engagement" (model.businessModel == Just Bcc.Engagement) (Bcc.SetBusinessModel Bcc.Engagement)
-            , viewRadioButton "Compliance" "Compliance" (model.businessModel == Just Bcc.Compliance) (Bcc.SetBusinessModel Bcc.Compliance)
-            , viewRadioButton "costReduction" "Cost reduction" (model.businessModel == Just Bcc.CostReduction) (Bcc.SetBusinessModel Bcc.CostReduction)
+          (
+            [viewCheckbox "revenue" "Revenue" Bcc.Revenue model.businessModel
+            , viewCheckbox "engagement" "Engagement" Bcc.Engagement model.businessModel
+            , viewCheckbox "Compliance" "Compliance" Bcc.Compliance model.businessModel
+            , viewCheckbox "costReduction" "Cost reduction" Bcc.CostReduction model.businessModel
             -- TODO: Other
             ]
-            )
+            |> List.map (Html.map Bcc.ChangeBusinessModel)
+          )
         , Form.help [] [ text "What's the underlying business model of the Bounded Context?"] ]
       , Grid.col []
         [ viewLabel "evolution" "Evolution"

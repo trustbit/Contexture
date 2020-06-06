@@ -3,6 +3,7 @@ module Bcc exposing (..)
 import Url.Parser exposing (Parser, custom)
 
 import Set exposing(Set)
+import Set as Set
 import Dict exposing(Dict)
 
 import Json.Encode as Encode
@@ -12,7 +13,7 @@ import Json.Decode.Pipeline as JP
 
 -- MODEL
 
-type BoundedContextId 
+type BoundedContextId
   = BoundedContextId Int
 
 type Classification
@@ -21,7 +22,7 @@ type Classification
   | Generic
   | OtherClassification String
 
-type BusinessModel 
+type BusinessModel
   = Revenue
   | Engagement
   | Compliance
@@ -71,16 +72,16 @@ type alias Dependency = (System, Maybe Relationship)
 
 type alias DependencyMap = Dict System (Maybe Relationship)
 
-type alias Dependencies = 
+type alias Dependencies =
   { suppliers: DependencyMap
   , consumers: DependencyMap
   }
 
-type alias BoundedContextCanvas = 
+type alias BoundedContextCanvas =
   { name: String
   , description: String
   , classification : Maybe Classification
-  , businessModel: Maybe BusinessModel
+  , businessModel: List BusinessModel
   , evolution: Maybe Evolution
   , businessDecisions: BusinessDecisions
   , ubiquitousLanguage: UbiquitousLanguage
@@ -100,17 +101,17 @@ initMessages _ =
   }
 
 initDependencies : () -> Dependencies
-initDependencies _ = 
+initDependencies _ =
   { suppliers = Dict.empty
   , consumers = Dict.empty
   }
 
 init: () -> BoundedContextCanvas
-init _ = 
+init _ =
   { name = ""
   , description = ""
   , classification = Nothing
-  , businessModel = Nothing
+  , businessModel = []
   , evolution = Nothing
   , businessDecisions = ""
   , ubiquitousLanguage = ""
@@ -147,7 +148,7 @@ type Msg
   = SetName String
   | SetDescription String
   | SetClassification Classification
-  | SetBusinessModel BusinessModel
+  | ChangeBusinessModel (Action BusinessModel)
   | SetEvolution Evolution
   | SetBusinessDecisions BusinessDecisions
   | SetUbiquitousLanguage UbiquitousLanguage
@@ -178,7 +179,7 @@ updateMessages msg model =
       { model | queriesHandled = updateMessageAction event model.queriesHandled }
     QueriesInvoked event ->
       { model | queriesInvoked = updateMessageAction event model.queriesInvoked }
-    
+
 updateDependencyAction : Action Dependency -> DependencyMap -> DependencyMap
 updateDependencyAction action dependencies =
   case action of
@@ -200,14 +201,16 @@ update msg canvas =
   case msg of
     SetName name ->
       { canvas | name = name}
-      
+
     SetDescription description ->
       { canvas | description = description}
 
     SetClassification class ->
       { canvas | classification = Just class}
-    SetBusinessModel business ->
-      { canvas | businessModel = Just business}
+    ChangeBusinessModel (Add business) ->
+      { canvas | businessModel = business :: canvas.businessModel}
+    ChangeBusinessModel (Remove business) ->
+      { canvas | businessModel = canvas.businessModel |> List.filter (\bm -> bm /= business )}
     SetEvolution evo ->
       { canvas | evolution = Just evo}
 
@@ -235,7 +238,7 @@ ifValid predicate trueRenderer falseRenderer model =
 
 ifNameValid =
   ifValid (\name -> String.length name <= 0)
-   
+
 -- conversions
 
 idToString : BoundedContextId -> String
@@ -292,7 +295,7 @@ evolutionToString evolution =
       CustomBuilt -> "CustomBuilt"
       Product -> "Product"
       Commodity -> "Commodity"
-  
+
 evolutionParser: String -> Maybe Evolution
 evolutionParser evolution =
   case evolution of
@@ -314,7 +317,7 @@ relationshipToString relationship =
     Octopus -> "Octopus"
     Partnership -> "Partnership"
     CustomerSupplier -> "CustomerSupplier"
-  
+
 relationshipParser: String -> Maybe Relationship
 relationshipParser relationship =
   case relationship of
@@ -354,12 +357,12 @@ dependenciesEncoder dependencies =
     ]
 
 modelEncoder : BoundedContextCanvas -> Encode.Value
-modelEncoder canvas = 
+modelEncoder canvas =
   Encode.object
     [ ("name", Encode.string canvas.name)
     , ("description", Encode.string canvas.description)
     , ("classification", maybeStringEncoder classificationToString canvas.classification)
-    , ("businessModel", maybeStringEncoder businessModelToString canvas.businessModel)
+    , ("businessModel", Encode.list (businessModelToString >> Encode.string)  canvas.businessModel)
     , ("evolution", maybeStringEncoder evolutionToString canvas.evolution)
     , ("businessDecisions", Encode.string canvas.businessDecisions)
     , ("ubiquitousLanguage", Encode.string canvas.ubiquitousLanguage)
@@ -383,7 +386,7 @@ maybeStringDecoder parser =
 
 setDecoder : Decoder (Set.Set String)
 setDecoder =
-  Decode.map Set.fromList (Decode.list Decode.string) 
+  Decode.map Set.fromList (Decode.list Decode.string)
 
 messagesDecoder : Decoder Messages
 messagesDecoder =
@@ -401,13 +404,28 @@ dependenciesDecoder =
     |> JP.optional "suppliers" (Decode.dict (maybeStringDecoder relationshipParser)) Dict.empty
     |> JP.optional "consumers" (Decode.dict (maybeStringDecoder relationshipParser)) Dict.empty
 
+businessModelDecoder : Decoder (List BusinessModel)
+businessModelDecoder =
+    let
+      maybeListDecoder = Decode.list (Decode.map businessModelParser Decode.string)
+      maybeAsList =
+        List.concatMap (\li ->
+          case li of
+            Just value -> [value]
+            Nothing -> []
+        )
+    in
+      maybeListDecoder |> Decode.map maybeAsList
+
+
+
 modelDecoder : Decoder BoundedContextCanvas
 modelDecoder =
   Decode.succeed BoundedContextCanvas
     |> JP.required "name" Decode.string
     |> JP.optional "description" Decode.string ""
     |> JP.optional "classification" (maybeStringDecoder classificationParser) Nothing
-    |> JP.optional "businessModel" (maybeStringDecoder businessModelParser) Nothing
+    |> JP.optional "businessModel" businessModelDecoder []
     |> JP.optional "evolution" (maybeStringDecoder evolutionParser) Nothing
     |> JP.optional "businessDecisions" Decode.string ""
     |> JP.optional "ubiquitousLanguage" Decode.string ""
