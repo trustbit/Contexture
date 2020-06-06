@@ -1,4 +1,4 @@
-module Bcc.Edit.Dependencies exposing (Msg(..), DependenciesEdit, update, initDependencies, view)
+module Bcc.Edit.Dependencies exposing (Msg(..), Model, update, init, view)
 
 import Html exposing (Html, button, div, text)
 import Html.Attributes exposing (..)
@@ -25,14 +25,22 @@ type alias DependenciesEdit =
   , supplier: DependencyEdit
   }
 
-type alias Model = (DependenciesEdit, Bcc.Dependencies)
+type alias Model =
+  { edit: DependenciesEdit
+  , dependencies: Bcc.Dependencies }
 
-initDependency = 
-  { system = "", relationship = Nothing } 
+initDependency =
+  { system = "", relationship = Nothing }
 
-initDependencies = 
+initDependencies =
   { consumer = initDependency
   , supplier = initDependency
+  }
+
+init : Bcc.Dependencies -> Model
+init dependencies =
+  { edit = initDependencies
+  , dependencies = dependencies
   }
 
 -- UPDATE
@@ -57,7 +65,7 @@ updateAddingDependency msg model =
     SetRelationship relationship ->
       { model | relationship = Bcc.relationshipParser relationship }
 
-updateDependency : ChangeTypeMsg -> (DependencyEdit, Bcc.DependencyMap) -> (DependencyEdit, Bcc.DependencyMap) 
+updateDependency : ChangeTypeMsg -> (DependencyEdit, Bcc.DependencyMap) -> (DependencyEdit, Bcc.DependencyMap)
 updateDependency msg (model,depdendencies) =
   case msg of
     DepdendencyChanged change ->
@@ -66,18 +74,18 @@ updateDependency msg (model,depdendencies) =
       ( updateAddingDependency depMsg model, depdendencies)
 
 update : Msg -> Model -> Model
-update msg (model, dependencies) =
+update msg { edit, dependencies } =
   case msg of
     Consumer conMsg ->
       let
-        (m, dependency) = updateDependency conMsg (model.consumer, dependencies.consumers)
+        (m, dependency) = updateDependency conMsg (edit.consumer, dependencies.consumers)
       in
-        ( { model | consumer = m }, { dependencies | consumers = dependency })
+        { edit = { edit | consumer = m }, dependencies = { dependencies | consumers = dependency } }
     Supplier supMsg ->
       let
-        (m, dependency) = updateDependency supMsg (model.supplier, dependencies.suppliers)
+        (m, dependency) = updateDependency supMsg (edit.supplier, dependencies.suppliers)
       in
-        ( { model | supplier = m }, { dependencies | suppliers = dependency })
+        { edit = { edit | supplier = m }, dependencies = { dependencies | suppliers = dependency } }
 
 -- VIEW
 
@@ -99,13 +107,13 @@ viewAddedDepencency (system, relationship) =
   Grid.row []
     [ Grid.col [] [text system]
     , Grid.col [] [text (Maybe.withDefault "not specified" (relationship |> Maybe.map translateRelationship))]
-    , Grid.col [ Col.xs2 ] 
-      [ Button.button 
+    , Grid.col [ Col.xs2 ]
+      [ Button.button
         [ Button.danger
         , Button.onClick (
             (system, relationship)
             |> Bcc.Remove |> DepdendencyChanged
-          ) 
+          )
         ]
         [ text "x" ]
       ]
@@ -128,26 +136,26 @@ viewAddDependency model =
         |> List.map (\r -> (r, translateRelationship r))
         |> List.map (\(v,t) -> Select.item [value (Bcc.relationshipToString v)] [ text t])
   in
-  Form.form 
+  Form.form
     [ Html.Events.onSubmit
       (
         (model.system, model.relationship)
         |> Bcc.Add >> DepdendencyChanged
-      ) 
-    ] 
+      )
+    ]
     [ Grid.row []
-      [ Grid.col [] 
+      [ Grid.col []
         [ Input.text
           [ Input.value model.system
           , Input.onInput (SetSystem >> FieldEdit)
           ]
-        ] 
-      , Grid.col [] 
+        ]
+      , Grid.col []
         [ Select.select [ Select.onChange (SetRelationship >> FieldEdit) ]
             (List.append [ Select.item [ selected (model.relationship == Nothing), value "" ] [text "unknown"] ] items)
         ]
       , Grid.col [ Col.xs2 ]
-        [ Button.submitButton 
+        [ Button.submitButton
           [ Button.secondary
           , Button.disabled (String.length model.system <= 0)
           ]
@@ -158,14 +166,14 @@ viewAddDependency model =
 
 viewDependency : String -> DependencyEdit -> Bcc.DependencyMap -> Html ChangeTypeMsg
 viewDependency title model addedDependencies =
-  div [] 
+  div []
     [ Html.h6 [ class "text-center" ] [ text title ]
     , Grid.row []
       [ Grid.col [] [ Html.h6 [] [ text "Name"] ]
       , Grid.col [] [ Html.h6 [] [ text "Relationship"] ]
       , Grid.col [Col.xs2] []
       ]
-    , div [] 
+    , div []
       (addedDependencies
       |> Dict.toList
       |> List.map viewAddedDepencency)
@@ -173,13 +181,13 @@ viewDependency title model addedDependencies =
     ]
 
 view : Model -> Html Msg
-view (model, dependencies) =
+view { edit, dependencies } =
   div []
     [ Html.h5 [ class "text-center" ] [ text "Dependencies and Relationships" ]
     , Grid.row []
       [ Grid.col []
-        [ viewDependency "Message Suppliers" model.supplier dependencies.suppliers |> Html.map Supplier ]
+        [ viewDependency "Message Suppliers" edit.supplier dependencies.suppliers |> Html.map Supplier ]
       , Grid.col []
-        [ viewDependency "Message Consumers" model.consumer dependencies.consumers |> Html.map Consumer ]
+        [ viewDependency "Message Consumers" edit.consumer dependencies.consumers |> Html.map Consumer ]
       ]
     ]

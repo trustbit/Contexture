@@ -29,7 +29,7 @@ type alias EditingCanvas =
   { canvas : Bcc.BoundedContextCanvas
   , modelTraitPopover: Bool
   , addingMessage : Messages.Model
-  , addingDependencies: Dependencies.DependenciesEdit
+  , addingDependencies: Dependencies.Model
   }
 
 type alias Model =
@@ -39,6 +39,12 @@ type alias Model =
   , edit: EditingCanvas
   }
 
+initWithCanvas canvas =
+  { modelTraitPopover = False
+  , addingMessage = Messages.init canvas.messages
+  , addingDependencies = Dependencies.init canvas.dependencies
+  , canvas = canvas
+  }
 init : Nav.Key -> Url.Url -> (Model, Cmd Msg)
 init key url =
   let
@@ -46,12 +52,7 @@ init key url =
     model =
       { key = key
       , self = url
-      , edit =
-        { modelTraitPopover = False
-        , addingMessage = Messages.init canvas.messages
-        , addingDependencies = Dependencies.initDependencies
-        , canvas = canvas
-        }
+      , edit = initWithCanvas canvas
       }
   in
     (
@@ -90,9 +91,9 @@ updateEdit msg model =
       { model | canvas = Bcc.update fieldMsg model.canvas }
     DependencyField dependency ->
       let
-        (addingDependencies, dependencies) = Dependencies.update dependency (model.addingDependencies, model.canvas.dependencies)
+        addingDependencies = Dependencies.update dependency model.addingDependencies
         canvas = model.canvas
-        c = { canvas | dependencies = dependencies}
+        c = { canvas | dependencies = addingDependencies.dependencies}
       in
         { model | canvas = c, addingDependencies = addingDependencies }
     ModelTraitMsg  ->
@@ -113,15 +114,7 @@ update msg model =
     Deleted (Ok _) ->
       (model, Route.pushUrl Route.Overview model.key)
     Loaded (Ok m) ->
-      let
-        editing =
-          { canvas = m
-          , modelTraitPopover = False
-          , addingMessage = Messages.init m.messages
-          , addingDependencies = Dependencies.initDependencies
-          }
-      in
-        ({ model | edit = editing } , Cmd.none)
+        ({ model | edit = initWithCanvas m } , Cmd.none)
     Back ->
       (model, Route.goBack model.key)
     _ ->
@@ -248,7 +241,7 @@ viewModelTraits model =
       , ("Funnel Context", "Receives documents from multiple upstream contexts and passes them to a single downstream context in a standard format (after applying its own rules).")
       , ("Engagement Context", "Provides key features which attract users to keep using the product. Example: Free Financial Advice Context")
       ]
-      
+
     descriptionList =
       Html.dl [class "row"]
         (traits
@@ -259,7 +252,7 @@ viewModelTraits model =
                 ]
             )
         )
-  in  
+  in
     Form.group []
       [ viewLabel "modelTraits" "Model traits"
       , Input.text
@@ -267,8 +260,8 @@ viewModelTraits model =
       |> Html.map Field
       , Form.help [ style "cursor" "pointer", onClick ModelTraitMsg] [ text "Traits that describe the model." ]
       , Form.help [ class ( if model.modelTraitPopover then "" else "collapse") ]
-        [ descriptionList 
-        , Html.footer 
+        [ descriptionList
+        , Html.footer
           [ class "blockquote-footer"]
           [ Html.a
             [target "_blank"
@@ -285,7 +278,7 @@ viewRightside model =
   , Html.hr [] []
   , model.addingMessage |> Messages.view |> Html.map MessageField
   , Html.hr [] []
-  , (model.addingDependencies, model.canvas.dependencies) |> Dependencies.view |> Html.map DependencyField
+  , model.addingDependencies |> Dependencies.view |> Html.map DependencyField
   ]
 
 viewCanvas : EditingCanvas -> Html EditingMsg
