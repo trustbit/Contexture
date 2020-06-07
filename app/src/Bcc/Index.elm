@@ -1,4 +1,4 @@
-module Overview exposing (Msg, Model, update, view, init)
+module Bcc.Index exposing (Msg, Model, update, view, init)
 
 import Browser.Navigation as Nav
 
@@ -141,7 +141,7 @@ view model =
 loadAll: String -> Cmd Msg
 loadAll baseUrl =
   Http.get
-    { url = baseUrl ++ "/api/bccs"
+    { url = baseUrl ++ "/bccs"
     , expect = Http.expectJson Loaded bccItemsDecoder
     }
 

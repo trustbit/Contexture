@@ -11,6 +11,8 @@ import Json.Decode as Decode
 import Json.Decode exposing (Decoder)
 import Json.Decode.Pipeline as JP
 
+import Domain
+
 -- MODEL
 
 type BoundedContextId
@@ -78,7 +80,8 @@ type alias Dependencies =
   }
 
 type alias BoundedContextCanvas =
-  { name: String
+  { domain: Domain.DomainId
+  , name: String
   , description: String
   , classification : Maybe Classification
   , businessModel: List BusinessModel
@@ -106,9 +109,10 @@ initDependencies _ =
   , consumers = Dict.empty
   }
 
-init: () -> BoundedContextCanvas
-init _ =
-  { name = ""
+init: Domain.DomainId -> BoundedContextCanvas
+init domain =
+  { domain = domain
+  , name = ""
   , description = ""
   , classification = Nothing
   , businessModel = []
@@ -359,7 +363,8 @@ dependenciesEncoder dependencies =
 modelEncoder : BoundedContextCanvas -> Encode.Value
 modelEncoder canvas =
   Encode.object
-    [ ("name", Encode.string canvas.name)
+    [ ("domain", Domain.idEncoder canvas.domain)
+    , ("name", Encode.string canvas.name)
     , ("description", Encode.string canvas.description)
     , ("classification", maybeStringEncoder classificationToString canvas.classification)
     , ("businessModel", Encode.list (businessModelToString >> Encode.string)  canvas.businessModel)
@@ -422,6 +427,7 @@ businessModelDecoder =
 modelDecoder : Decoder BoundedContextCanvas
 modelDecoder =
   Decode.succeed BoundedContextCanvas
+    |> JP.required "domain" Domain.idDecoder
     |> JP.required "name" Decode.string
     |> JP.optional "description" Decode.string ""
     |> JP.optional "classification" (maybeStringDecoder classificationParser) Nothing

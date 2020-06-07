@@ -14,9 +14,12 @@ import Bootstrap.Utilities.Spacing as Spacing
 
 import Route exposing ( Route)
 
+
+import Domain
+import Domain.Index
 import Bcc
 import Bcc.Edit
-import Overview
+import Bcc.Index
 
 -- MAIN
 
@@ -45,7 +48,7 @@ type alias Flags =
 
 type Page
   = NotFoundPage
-  | Overview Overview.Model
+  | Domains Domain.Index.Model
   | Bcc Bcc.Edit.Model
 
 type alias Model =
@@ -63,11 +66,13 @@ initCurrentPage ( model, existingCmds ) =
           Route.NotFound ->
             ( NotFoundPage, Cmd.none )
 
-          Route.Overview ->
+          Route.Home ->
             let
-              ( pageModel, pageCmds ) = Overview.init model.baseUrl model.key
+              ( pageModel, pageCmds ) = Domain.Index.init model.baseUrl model.key
             in
-              ( Overview pageModel, Cmd.map OverviewMsg pageCmds )
+              ( Domains pageModel, Cmd.map DomainMsg pageCmds )
+          Route.Domain _ ->
+            (NotFoundPage, Cmd.none)
           Route.Bcc id ->
             case model.baseUrl ++ "/api/bccs/" ++ Bcc.idToString id |> Url.fromString of
               Just url ->
@@ -116,7 +121,7 @@ type Msg
   = LinkClicked Browser.UrlRequest
   | UrlChanged Url.Url
   | NavMsg Navbar.State
-  | OverviewMsg Overview.Msg
+  | DomainMsg Domain.Index.Msg
   | BccMsg Bcc.Edit.Msg
 
 update : Msg -> Model -> (Model, Cmd Msg)
@@ -143,11 +148,11 @@ update msg model =
       ( { model | navState = state }
       , Cmd.none
       )
-    (OverviewMsg m, Overview overview) ->
+    (DomainMsg m, Domains overview) ->
       let
-        (updatedModel, updatedMsg) = Overview.update m overview
+        (updatedModel, updatedMsg) = Domain.Index.update m overview
       in
-        ({ model | page = Overview updatedModel}, updatedMsg |> Cmd.map OverviewMsg)
+        ({ model | page = Domains updatedModel}, updatedMsg |> Cmd.map DomainMsg)
     (BccMsg m, Bcc bccModel) ->
       let
         (mo, msg2) = Bcc.Edit.update m bccModel
@@ -183,8 +188,8 @@ view model =
       case model.page of
         Bcc m ->
           Bcc.Edit.view m |> Html.map BccMsg
-        Overview o ->
-          Overview.view o |> Html.map OverviewMsg
+        Domains o ->
+          Domain.Index.view o |> Html.map DomainMsg
         NotFoundPage ->
           text "Not Found"
   in

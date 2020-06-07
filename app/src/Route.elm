@@ -4,12 +4,14 @@ import Browser.Navigation as Nav
 import Url exposing (Url)
 import Url.Parser exposing (..)
 
+import Domain exposing(DomainId)
 import Bcc exposing (BoundedContextId)
 
 
 type Route
     = NotFound
-    | Overview
+    | Home
+    | Domain DomainId
     | Bcc BoundedContextId
 
 
@@ -26,7 +28,8 @@ parseUrl url =
 matchRoute : Parser (Route -> a) a
 matchRoute =
     oneOf
-        [ map Overview top
+        [ map Home top
+        , map Domain (s "domain" </> Domain.idParser)
         , map Bcc (s "bccs" </> Bcc.idParser)
         ]
 
@@ -45,7 +48,9 @@ routeToString route =
     case route of
         NotFound ->
             "/not-found"
-        Overview ->
+        Home ->
             "/"
+        Domain id ->
+            "/domain/" ++ Domain.idToString id
         Bcc bccId ->
             "/bccs/" ++ Bcc.idToString bccId

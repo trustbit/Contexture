@@ -20,6 +20,8 @@ import Http
 import Dict
 
 import Route
+
+import Domain
 import Bcc
 import Bcc.Edit.Dependencies as Dependencies
 import Bcc.Edit.Messages as Messages
@@ -40,6 +42,7 @@ type alias Model =
   , edit: EditingCanvas
   }
 
+initWithCanvas : Bcc.BoundedContextCanvas -> EditingCanvas
 initWithCanvas canvas =
   { modelTraitPopover = False
   , addingMessage = Messages.init canvas.messages
@@ -49,7 +52,7 @@ initWithCanvas canvas =
 init : Nav.Key -> Url.Url -> (Model, Cmd Msg)
 init key url =
   let
-    canvas = Bcc.init ()
+    canvas = Bcc.init (Domain.DomainId 0)
     model =
       { key = key
       , self = url
@@ -113,7 +116,7 @@ update msg model =
     Delete ->
       (model, deleteBCC model)
     Deleted (Ok _) ->
-      (model, Route.pushUrl Route.Overview model.key)
+      (model, Route.pushUrl (Route.Domain model.edit.canvas.domain) model.key)
     Loaded (Ok m) ->
         ({ model | edit = initWithCanvas m } , Cmd.none)
     Back ->
