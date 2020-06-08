@@ -1,5 +1,6 @@
 module Domain exposing (
-  DomainId(..),
+  DomainId(..), Domain, Model, init,
+  Msg(..),update,
   idToString, idParser, idEncoder, idDecoder
   )
 
@@ -13,18 +14,29 @@ type DomainId
   = DomainId Int
 
 type alias Domain =
-  { id: DomainId
-  , name: String
-  , description: String }
+  { name: String
+  , vision: String }
+
+type alias Model = Domain
 
 init : () -> Domain
 init _ =
-    { id = DomainId 0
-    , name = ""
-    , description = ""}
+    { name = ""
+    , vision = "" }
 
 -- UPDATE
 
+type Msg
+  = SetName String
+  | SetVision String
+
+update : Msg -> Model -> Model
+update msg model =
+  case msg of
+    SetName name ->
+      { model | name = name}
+    SetVision vision->
+      { model | vision = vision}
 
 -- VIEW
 

@@ -17,6 +17,7 @@ import Route exposing ( Route)
 
 import Domain
 import Domain.Index
+import Domain.Edit
 import Bcc
 import Bcc.Edit
 import Bcc.Index
@@ -49,6 +50,7 @@ type alias Flags =
 type Page
   = NotFoundPage
   | Domains Domain.Index.Model
+  | DomainsEdit Domain.Edit.Model
   | Bcc Bcc.Edit.Model
 
 type alias Model =
@@ -71,8 +73,15 @@ initCurrentPage ( model, existingCmds ) =
               ( pageModel, pageCmds ) = Domain.Index.init model.baseUrl model.key
             in
               ( Domains pageModel, Cmd.map DomainMsg pageCmds )
-          Route.Domain _ ->
-            (NotFoundPage, Cmd.none)
+          Route.Domain id ->
+            case model.baseUrl ++ "/api/domains/" ++ Domain.idToString id |> Url.fromString of
+              Just url ->
+                let
+                  ( pageModel, pageCmds ) = Domain.Edit.init model.key url
+                in
+                  ( DomainsEdit pageModel, Cmd.map DomainEditMsg pageCmds )
+              Nothing ->
+                ( NotFoundPage, Cmd.none )
           Route.Bcc id ->
             case model.baseUrl ++ "/api/bccs/" ++ Bcc.idToString id |> Url.fromString of
               Just url ->
@@ -122,6 +131,7 @@ type Msg
   | UrlChanged Url.Url
   | NavMsg Navbar.State
   | DomainMsg Domain.Index.Msg
+  | DomainEditMsg Domain.Edit.Msg
   | BccMsg Bcc.Edit.Msg
 
 update : Msg -> Model -> (Model, Cmd Msg)
@@ -153,6 +163,11 @@ update msg model =
         (updatedModel, updatedMsg) = Domain.Index.update m overview
       in
         ({ model | page = Domains updatedModel}, updatedMsg |> Cmd.map DomainMsg)
+    (DomainEditMsg m, DomainsEdit edit) ->
+      let
+        (updatedModel, updatedMsg) = Domain.Edit.update m edit
+      in
+        ({ model | page = DomainsEdit updatedModel}, updatedMsg |> Cmd.map DomainEditMsg)
     (BccMsg m, Bcc bccModel) ->
       let
         (mo, msg2) = Bcc.Edit.update m bccModel
@@ -190,6 +205,8 @@ view model =
           Bcc.Edit.view m |> Html.map BccMsg
         Domains o ->
           Domain.Index.view o |> Html.map DomainMsg
+        DomainsEdit o ->
+          Domain.Edit.view o |> Html.map DomainEditMsg
         NotFoundPage ->
           text "Not Found"
   in

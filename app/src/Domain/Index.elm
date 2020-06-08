@@ -36,7 +36,7 @@ import Route
 type alias Domain =
   { id: Domain.DomainId
   , name: String
-  , description: String }
+  , vision: String }
 
 type alias Model =
   { navKey : Nav.Key
@@ -118,8 +118,8 @@ viewExisting items =
             ( List.concat
               [
                 [ Html.h6 [] [ text item.name ] ]
-                , if String.length item.description > 0
-                  then [ Html.small [] [ text item.description ] ]
+                , if String.length item.vision > 0
+                  then [ Html.small [] [ text item.vision ] ]
                   else []
               ]
             )
@@ -174,4 +174,4 @@ domainDecoder =
   Decode.succeed Domain
     |> JP.required "id" Domain.idDecoder
     |> JP.required "name" Decode.string
-    |> JP.optional "description" Decode.string ""
+    |> JP.optional "vision" Decode.string ""

@@ -39,10 +39,10 @@ type alias BccItem =
 type alias Model =
   { navKey : Nav.Key
   , bccName : String
-  , baseUrl : String
+  , baseUrl : Url.Url
   , bccs: List BccItem }
 
-init: String -> Nav.Key -> (Model, Cmd Msg)
+init: Url.Url -> Nav.Key -> (Model, Cmd Msg)
 init baseUrl key =
   ( { navKey = key
     , bccs = []
@@ -132,16 +132,16 @@ view model =
   Grid.container []
     [ Grid.row []
       [ Grid.col [] [createWithName model.bccName] ]
-    ,Grid.row [ Row.attrs [ Spacing.pt3 ] ]
+    , Grid.row [ Row.attrs [ Spacing.pt3 ] ]
       [ Grid.col [] [viewExisting model.bccs] ]
     ]
 
 -- helpers
 
-loadAll: String -> Cmd Msg
+loadAll: Url.Url -> Cmd Msg
 loadAll baseUrl =
   Http.get
-    { url = baseUrl ++ "/bccs"
+    { url =  { baseUrl | path = baseUrl.path ++ "/bccs" } |> Url.toString
     , expect = Http.expectJson Loaded bccItemsDecoder
     }
 
@@ -151,9 +151,10 @@ createNewBcc model =
         body =
             Encode.object
             [ ("name", Encode.string model.bccName) ]
+        baseUrl = model.baseUrl
     in
         Http.post
-        { url = model.baseUrl ++ "/api/bccs"
+        { url = { baseUrl | path = baseUrl.path ++ "/bccs" } |> Url.toString
         , body = Http.jsonBody body
         , expect = Http.expectJson Created bccItemDecoder
         }
