@@ -53,6 +53,18 @@ idToString domainId =
   case domainId of
     DomainId id -> String.fromInt id
 
+idFromString : String -> Maybe DomainId
+idFromString value =
+  value
+  |> String.toInt
+  |> Maybe.map DomainId
+
+idFromStringSuccess : String -> Decode.Decoder DomainId
+idFromStringSuccess value =
+  case idFromString value of
+    Just id -> Decode.succeed id
+    Nothing -> Decode.fail ("Could not decode into DomainId " ++ value)
+
 idParser : Parser (DomainId -> a) a
 idParser =
     custom "DOMAINID" <|
@@ -61,7 +73,9 @@ idParser =
 
 idDecoder : Decode.Decoder DomainId
 idDecoder =
-  Decode.map DomainId Decode.int
+  Decode.oneOf
+    [ Decode.map DomainId Decode.int
+    , Decode.string |> Decode.andThen idFromStringSuccess]
 
 
 idEncoder : DomainId -> Encode.Value

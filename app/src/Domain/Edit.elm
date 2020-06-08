@@ -97,6 +97,11 @@ update msg model =
         ({ model | edit = { domain = m } } , Cmd.none)
     Back ->
       (model, Route.goBack model.key)
+    BccMsg m ->
+      let
+        (bccModels, bccCmd) = Bcc.Index.update m model.contexts
+      in
+        ({ model | contexts = bccModels}, bccCmd |> Cmd.map BccMsg)
     _ ->
       Debug.log ("BCC: " ++ Debug.toString msg ++ " " ++ Debug.toString model)
       (model, Cmd.none)
@@ -137,6 +142,10 @@ view model =
             ]
             [ text "Delete" ]
           ]
+        ]
+      , Grid.row []
+        [ Grid.col []
+          [ Bcc.Index.view model.contexts |> Html.map BccMsg]
         ]
       ]
 

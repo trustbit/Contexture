@@ -363,7 +363,7 @@ dependenciesEncoder dependencies =
 modelEncoder : BoundedContextCanvas -> Encode.Value
 modelEncoder canvas =
   Encode.object
-    [ ("domain", Domain.idEncoder canvas.domain)
+    [ ("domainId", Domain.idEncoder canvas.domain)
     , ("name", Encode.string canvas.name)
     , ("description", Encode.string canvas.description)
     , ("classification", maybeStringEncoder classificationToString canvas.classification)
@@ -427,7 +427,7 @@ businessModelDecoder =
 modelDecoder : Decoder BoundedContextCanvas
 modelDecoder =
   Decode.succeed BoundedContextCanvas
-    |> JP.required "domain" Domain.idDecoder
+    |> JP.required "domainId" Domain.idDecoder
     |> JP.required "name" Decode.string
     |> JP.optional "description" Decode.string ""
     |> JP.optional "classification" (maybeStringDecoder classificationParser) Nothing
