@@ -137,7 +137,11 @@ view model =
       [ viewCanvas model.edit |> Html.map Editing
       , Grid.row []
         [ Grid.col []
-          [ Button.button [Button.secondary, Button.onClick Back] [text "Back"]
+          [ Button.linkButton
+            [ Button.secondary
+            , Button.attrs [ href (Route.routeToString (Route.Domain model.edit.canvas.domain)) ]
+            ]
+            [ text "Back" ]
           , Button.submitButton
             [ Button.primary
             , Button.onClick Save

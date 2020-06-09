@@ -145,7 +145,11 @@ viewDomainCard model =
   |> Card.block []
     [ Block.custom <| (viewDomain model |> Html.map Editing) ]
   |> Card.footer []
-    [ Button.button [Button.secondary, Button.onClick Back] [text "Back"]
+    [ Button.linkButton
+      [ Button.secondary
+      , Button.attrs [ href (Route.routeToString Route.Home) ]
+      ]
+      [ text "Back" ]
     , Button.submitButton
       [ Button.primary
       , Button.onClick Save
