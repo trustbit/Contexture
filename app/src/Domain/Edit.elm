@@ -15,6 +15,8 @@ import Bootstrap.Form.Textarea as Textarea
 import Bootstrap.Form.Radio as Radio
 import Bootstrap.Form.Checkbox as Checkbox
 import Bootstrap.Button as Button
+import Bootstrap.Card as Card
+import Bootstrap.Card.Block as Block
 
 import Json.Encode as Encode
 import Json.Decode.Pipeline as JP
@@ -125,29 +127,55 @@ viewLabel labelId caption =
 view : Model -> Html Msg
 view model =
   Grid.containerFluid []
-      [ viewDomain model.edit |> Html.map Editing
-      , Grid.row []
-        [ Grid.col []
-          [ Button.button [Button.secondary, Button.onClick Back] [text "Back"]
-          , Button.submitButton
-            [ Button.primary
-            , Button.onClick Save
-            , Button.disabled (model.edit.domain.name |> ifNameValid (\_ -> True) (\_ -> False))
-            ]
-            [ text "Save"]
-          , Button.button
-            [ Button.danger
-            , Button.onClick Delete
-            , Button.attrs [ title ("Delete " ++ model.edit.domain.name) ]
-            ]
-            [ text "Delete" ]
-          ]
-        ]
-      , Grid.row []
-        [ Grid.col []
-          [ Bcc.Index.view model.contexts |> Html.map BccMsg]
+    [ Grid.row []
+      [ Grid.col []
+        [ Card.deck
+          [ viewDomainCard model.edit
+          , viewBccCard model.edit.domain.name model.contexts]
         ]
       ]
+    ]
+
+
+viewDomainCard : EditingDomain -> Card.Config Msg
+viewDomainCard model =
+  Card.config []
+  |> Card.header []
+    [ Html.h5 [] [ text "Manage Domain"] ]
+  |> Card.block []
+    [ Block.custom <| (viewDomain model |> Html.map Editing) ]
+  |> Card.footer []
+    [ Button.button [Button.secondary, Button.onClick Back] [text "Back"]
+    , Button.submitButton
+      [ Button.primary
+      , Button.onClick Save
+      , Button.disabled (model.domain.name |> ifNameValid (\_ -> True) (\_ -> False))
+      ]
+      [ text "Save"]
+    , Button.button
+      [ Button.danger
+      , Button.onClick Delete
+      , Button.attrs [ title ("Delete " ++ model.domain.name) ]
+      ]
+      [ text "Delete" ]
+    ]
+
+viewBccCard : String -> Bcc.Index.Model -> Card.Config Msg
+viewBccCard domainName model =
+  let
+    blocks =
+      Bcc.Index.view model
+      |> List.map (Html.map BccMsg)
+      |> List.map Block.custom
+      |> List.map (\block -> Card.block [] [ block ])
+    cardConfig =
+      Card.config []
+      |> Card.header []
+          [ Html.h5 [] [ text ("Manage Bounded Contexts for the '" ++ domainName ++ "' Domain") ] ]
+  in
+    blocks |> List.foldl (\block config -> config |> block) cardConfig
+
+
 
 viewDomain : EditingDomain -> Html EditingMsg
 viewDomain model =

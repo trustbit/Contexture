@@ -21,6 +21,7 @@ import Bootstrap.Form.InputGroup as InputGroup
 import Bootstrap.Button as Button
 import Bootstrap.ListGroup as ListGroup
 import Bootstrap.Card as Card
+import Bootstrap.Card.Block as Block
 import Bootstrap.Utilities.Spacing as Spacing
 
 import Url
@@ -79,29 +80,30 @@ createWithName : String -> Html Msg
 createWithName name =
     Form.form [Html.Events.onSubmit CreateBcc]
         [ Fieldset.config
-          |> Fieldset.legend [] [ text "Create a Bounded Context Canvas"]
-          |> Fieldset.children
+        |> Fieldset.legend [] [ text "Create a Bounded Context Canvas" ]
+        |> Fieldset.children
             [ InputGroup.config (
-              InputGroup.text
+            InputGroup.text
                 [ Input.id name
                 , Input.value name
                 , Input.onInput SetName
                 , Input.placeholder "Name of the Bounded Context"
                 ]
-              )
-              |> InputGroup.successors
+            )
+            |> InputGroup.successors
                 [ InputGroup.button
-                  [ Button.attrs
+                [ Button.attrs
                     [ Html.Attributes.type_ "submit"]
                     , Button.primary
                     , Button.disabled (name |> Bcc.ifNameValid (\_ -> True) (\_ -> False))
                     ]
-                  [ text "Fill out the rest!"]
+                [ text "Fill out the rest!"]
                 ]
-              |> InputGroup.view
-             ]
-           |> Fieldset.view
+            |> InputGroup.view
+            ]
+        |> Fieldset.view
         ]
+
 
 
 viewExisting : List BccItem  -> Html Msg
@@ -127,14 +129,10 @@ viewExisting items =
           (items |> List.map renderItem)
       |> Card.view
 
-view : Model -> Html Msg
+view : Model -> List (Html Msg)
 view model =
-  Grid.container []
-    [ Grid.row []
-      [ Grid.col [] [createWithName model.bccName] ]
-    , Grid.row [ Row.attrs [ Spacing.pt3 ] ]
-      [ Grid.col [] [viewExisting model.bccs] ]
-    ]
+    [ createWithName model.bccName
+    , viewExisting model.bccs ]
 
 -- helpers
 
