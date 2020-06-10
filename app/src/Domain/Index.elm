@@ -130,7 +130,6 @@ viewExisting items =
         in
         Card.deck (items |> List.map renderCard)
 
-
 view : Model -> Html Msg
 view model =
   Grid.container []

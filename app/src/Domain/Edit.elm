@@ -17,6 +17,8 @@ import Bootstrap.Form.Checkbox as Checkbox
 import Bootstrap.Button as Button
 import Bootstrap.Card as Card
 import Bootstrap.Card.Block as Block
+import Bootstrap.Text as Text
+import Bootstrap.Utilities.Spacing as Spacing
 
 import Json.Encode as Encode
 import Json.Decode.Pipeline as JP
@@ -126,59 +128,52 @@ viewLabel labelId caption =
 
 view : Model -> Html Msg
 view model =
-  Grid.containerFluid []
-    [ Grid.row []
-      [ Grid.col []
-        [ Card.deck
-          [ viewDomainCard model.edit
-          , viewBccCard model.edit.domain.name model.contexts]
+  Grid.container []
+    ( List.concat 
+        [ [ Grid.row []
+            [ Grid.col []
+                [ viewDomainCard model.edit  ]
+            ]
+          ]
+        , viewBccCard model.contexts
         ]
-      ]
-    ]
+    )
 
-
-viewDomainCard : EditingDomain -> Card.Config Msg
+viewDomainCard : EditingDomain -> Html Msg
 viewDomainCard model =
   Card.config []
   |> Card.header []
-    [ Html.h5 [] [ text "Manage Domain"] ]
+    [ Html.h5 [] [ text "Manage your domain"] ]
   |> Card.block []
     [ Block.custom <| (viewDomain model |> Html.map Editing) ]
   |> Card.footer []
-    [ Button.linkButton
-      [ Button.secondary
-      , Button.attrs [ href (Route.routeToString Route.Home) ]
+    [ Grid.row []
+      [ Grid.col []
+        [ Button.linkButton 
+          [ Button.attrs [ href (Route.routeToString Route.Home) ], Button.roleLink ]
+          [ text "Back" ] ]
+      , Grid.col [ Col.textAlign Text.alignLgRight ] 
+        [ Button.button
+          [ Button.secondary
+          , Button.onClick Delete
+          , Button.attrs [ title ("Delete " ++ model.domain.name) ]
+          ]
+          [ text "Delete" ]
+        , Button.submitButton
+          [ Button.primary
+          , Button.onClick Save
+          , Button.disabled (model.domain.name |> ifNameValid (\_ -> True) (\_ -> False))
+          ]
+          [ text "Save"]
+        ]
       ]
-      [ text "Back" ]
-    , Button.submitButton
-      [ Button.primary
-      , Button.onClick Save
-      , Button.disabled (model.domain.name |> ifNameValid (\_ -> True) (\_ -> False))
-      ]
-      [ text "Save"]
-    , Button.button
-      [ Button.danger
-      , Button.onClick Delete
-      , Button.attrs [ title ("Delete " ++ model.domain.name) ]
-      ]
-      [ text "Delete" ]
     ]
+  |> Card.view
 
-viewBccCard : String -> Bcc.Index.Model -> Card.Config Msg
-viewBccCard domainName model =
-  let
-    blocks =
-      Bcc.Index.view model
-      |> List.map (Html.map BccMsg)
-      |> List.map Block.custom
-      |> List.map (\block -> Card.block [] [ block ])
-    cardConfig =
-      Card.config []
-      |> Card.header []
-          [ Html.h5 [] [ text ("Manage Bounded Contexts for the '" ++ domainName ++ "' Domain") ] ]
-  in
-    blocks |> List.foldl (\block config -> config |> block) cardConfig
-
+viewBccCard : Bcc.Index.Model -> List(Html Msg)
+viewBccCard model =
+  Bcc.Index.view model
+  |> List.map (Html.map BccMsg)
 
 
 viewDomain : EditingDomain -> Html EditingMsg

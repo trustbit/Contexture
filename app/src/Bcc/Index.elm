@@ -79,60 +79,61 @@ update msg model =
 createWithName : String -> Html Msg
 createWithName name =
     Form.form [Html.Events.onSubmit CreateBcc]
-        [ Fieldset.config
-        |> Fieldset.legend [] [ text "Create a Bounded Context Canvas" ]
-        |> Fieldset.children
-            [ InputGroup.config (
-            InputGroup.text
-                [ Input.id name
-                , Input.value name
-                , Input.onInput SetName
-                , Input.placeholder "Name of the Bounded Context"
-                ]
-            )
-            |> InputGroup.successors
-                [ InputGroup.button
-                [ Button.attrs
-                    [ Html.Attributes.type_ "submit"]
-                    , Button.primary
-                    , Button.disabled (name |> Bcc.ifNameValid (\_ -> True) (\_ -> False))
-                    ]
-                [ text "Fill out the rest!"]
-                ]
-            |> InputGroup.view
+        [ InputGroup.config (
+        InputGroup.text
+            [ Input.id name
+            , Input.value name
+            , Input.onInput SetName
+            , Input.placeholder "Name of the new Bounded Context"
             ]
-        |> Fieldset.view
+        )
+        |> InputGroup.successors
+            [ InputGroup.button
+            [ Button.attrs
+                [ Html.Attributes.type_ "submit"]
+                , Button.primary
+                , Button.disabled (name |> Bcc.ifNameValid (\_ -> True) (\_ -> False))
+                ]
+            [ text "Create new Bounded Context"]
+            ]
+        |> InputGroup.view
         ]
-
-
 
 viewExisting : List BccItem  -> Html Msg
 viewExisting items =
-   let
-      renderItem item =
-        ListGroup.anchor
-        [ ListGroup.attrs [href (Route.routeToString (Route.Bcc item.id))]]
-        [ div []
-            ( List.concat
-              [
-                [ Html.h6 [] [ text item.name ] ]
-                , if String.length item.description > 0
-                  then [ Html.small [] [ text item.description ] ]
-                  else []
-              ]
-            )
-        ]
-    in
-      Card.config []
-      |> Card.header [] [ text "Existing Bounded Contexts" ]
-      |> Card.customListGroup
-          (items |> List.map renderItem)
-      |> Card.view
+    if List.isEmpty items then
+        Html.p
+            [ class "lead" ]
+            [ text "No exsisting Bounded Contexts found - do you want to create one?" ]
+    else
+        let
+            renderCard item =
+                Card.config []
+                    |> Card.block []
+                        ( List.concat
+                            [
+                                [ Block.titleH4 [] [ text item.name ]]
+                                , if String.length item.description > 0
+                                    then [ Block.text [] [ text item.description  ] ]
+                                    else []
+                            ]
+                        )
+                    |> Card.block []
+                        [ Block.link
+                            [ href (Route.routeToString (Route.Bcc item.id)), class "stretched-link" ]
+                            [text "View Bounded Context"]
+                        ]
+        in
+            Card.deck (items |> List.map renderCard)
 
 view : Model -> List (Html Msg)
 view model =
-    [ createWithName model.bccName
-    , viewExisting model.bccs ]
+    [ Grid.row [ Row.attrs [ Spacing.pt3 ] ]
+        [ Grid.col [] [viewExisting model.bccs] ]
+        , Grid.row [ Row.attrs [Spacing.mt3]]
+        [ Grid.col [] [ createWithName model.bccName ] ]
+    ]
+
 
 -- helpers
 
