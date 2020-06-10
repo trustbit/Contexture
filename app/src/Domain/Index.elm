@@ -21,6 +21,7 @@ import Bootstrap.Form.InputGroup as InputGroup
 import Bootstrap.Button as Button
 import Bootstrap.ListGroup as ListGroup
 import Bootstrap.Card as Card
+import Bootstrap.Card.Block as Block
 import Bootstrap.Utilities.Spacing as Spacing
 
 import Url
@@ -81,15 +82,12 @@ update msg model =
 createWithName : String -> Html Msg
 createWithName name =
     Form.form [Html.Events.onSubmit CreateDomain]
-        [ Fieldset.config
-          |> Fieldset.legend [] [ text "Create a new Domain"]
-          |> Fieldset.children
-            [ InputGroup.config (
+        [ InputGroup.config (
               InputGroup.text
                 [ Input.id name
                 , Input.value name
                 , Input.onInput SetDomainName
-                , Input.placeholder "Name of the new Domain"
+                , Input.placeholder "Name of the domain"
                 ]
               )
               |> InputGroup.successors
@@ -99,45 +97,47 @@ createWithName name =
                     , Button.primary
                     , Button.disabled (name |> Bcc.ifNameValid (\_ -> True) (\_ -> False))
                     ]
-                  [ text "Fill out the rest!"]
+                  [ text "Create new domain"]
                 ]
               |> InputGroup.view
              ]
-           |> Fieldset.view
-        ]
 
 
 
 viewExisting : List Domain  -> Html Msg
 viewExisting items =
-   let
-      renderItem item =
-        ListGroup.anchor
-        [ ListGroup.attrs [href (Route.routeToString (Route.Domain item.id))]]
-        [ div []
-            ( List.concat
-              [
-                [ Html.h6 [] [ text item.name ] ]
-                , if String.length item.vision > 0
-                  then [ Html.small [] [ text item.vision ] ]
-                  else []
-              ]
-            )
-        ]
-    in
-      Card.config []
-      |> Card.header [] [ text "Existing Domains" ]
-      |> Card.customListGroup
-          (items |> List.map renderItem)
-      |> Card.view
+    if List.isEmpty items then
+        Html.p
+            [ class "lead" ]
+            [ text "No existing domains found - do you want to create one?" ]
+    else
+        let
+            renderCard item =
+                Card.config []
+                    |> Card.block []
+                        ( List.concat
+                        [
+                            [ Block.titleH4 [] [ text item.name ]]
+                            , if String.length item.vision > 0
+                                then [ Block.text [] [ text item.vision  ] ]
+                                else []
+                        ] )
+                    |> Card.block []
+                        [ Block.link
+                            [ href (Route.routeToString (Route.Domain item.id)), class "stretched-link" ]
+                            [text "View Domain"]
+                        ]
+        in
+        Card.deck (items |> List.map renderCard)
+
 
 view : Model -> Html Msg
 view model =
   Grid.container []
-    [ Grid.row []
-      [ Grid.col [] [createWithName model.newDomainName] ]
-    , Grid.row [ Row.attrs [ Spacing.pt3 ] ]
+    [ Grid.row [ Row.attrs [ Spacing.pt3 ] ]
       [ Grid.col [] [viewExisting model.domains] ]
+    , Grid.row [ Row.attrs [Spacing.mt3]]
+      [ Grid.col [] [ createWithName model.newDomainName ] ]
     ]
 
 -- helpers
