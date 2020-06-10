@@ -15,6 +15,9 @@ import Bootstrap.Form.Textarea as Textarea
 import Bootstrap.Form.Radio as Radio
 import Bootstrap.Form.Checkbox as Checkbox
 import Bootstrap.Button as Button
+import Bootstrap.Text as Text
+import Bootstrap.Utilities.Spacing as Spacing
+
 import Url
 import Http
 import Dict
@@ -79,7 +82,6 @@ type Msg
   | Saved (Result Http.Error ())
   | Delete
   | Deleted (Result Http.Error ())
-  | Back
 
 updateEdit : EditingMsg -> EditingCanvas -> EditingCanvas
 updateEdit msg model =
@@ -119,8 +121,6 @@ update msg model =
       (model, Route.pushUrl (Route.Domain model.edit.canvas.domain) model.key)
     Loaded (Ok m) ->
         ({ model | edit = initWithCanvas m } , Cmd.none)
-    Back ->
-      (model, Route.goBack model.key)
     _ ->
       Debug.log ("BCC: " ++ Debug.toString msg ++ " " ++ Debug.toString model)
       (model, Cmd.none)
@@ -134,29 +134,35 @@ viewLabel labelId caption =
 view : Model -> Html Msg
 view model =
   Grid.containerFluid []
-      [ viewCanvas model.edit |> Html.map Editing
-      , Grid.row []
-        [ Grid.col []
-          [ Button.linkButton
+    [ viewCanvas model.edit |> Html.map Editing
+    , Grid.row [ Row.attrs [ Spacing.mt3, Spacing.mb3 ]]
+      [ Grid.col []
+        [ Button.linkButton
+          [ Button.roleLink
+          , Button.attrs [ href (Route.routeToString (Route.Domain model.edit.canvas.domain)) ]
+          ]
+          [ text "Back" ]
+        ]
+        , Grid.col [ Col.textAlign Text.alignLgRight]
+          [ Button.button
             [ Button.secondary
-            , Button.attrs [ href (Route.routeToString (Route.Domain model.edit.canvas.domain)) ]
+            , Button.onClick Delete
+            , Button.attrs
+              [ title ("Delete " ++ model.edit.canvas.name)
+              , Spacing.mr3
+              ]
             ]
-            [ text "Back" ]
+            [ text "Delete" ]
           , Button.submitButton
             [ Button.primary
             , Button.onClick Save
             , Button.disabled (model.edit.canvas.name |> Bcc.ifNameValid (\_ -> True) (\_ -> False))
             ]
             [ text "Save"]
-          , Button.button
-            [ Button.danger
-            , Button.onClick Delete
-            , Button.attrs [ title ("Delete " ++ model.edit.canvas.name) ]
-            ]
-            [ text "Delete" ]
           ]
         ]
       ]
+
 
 viewRadioButton : String -> String -> Bool -> Bcc.Msg -> Radio.Radio Bcc.Msg
 viewRadioButton id title checked msg =

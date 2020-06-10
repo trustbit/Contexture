@@ -156,7 +156,10 @@ viewDomainCard model =
         [ Button.button
           [ Button.secondary
           , Button.onClick Delete
-          , Button.attrs [ title ("Delete " ++ model.domain.name) ]
+          , Button.attrs
+            [ title ("Delete " ++ model.domain.name)
+            , Spacing.mr3
+            ]
           ]
           [ text "Delete" ]
         , Button.submitButton
