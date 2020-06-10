@@ -46,8 +46,8 @@ Version 1: "Improving data quality"
 - Improve definition of ubiquitous language terms (allow Key-Value pairs)
 - Provide Auto-complete boxes (free text search) for dependencies (search in already existing BCC names)
 - Provide Auto-complete boxes (free text search) for consumed message contracts (search in produces message contracts)
-[x] Include more help text and [tips](https://github.com/ddd-crew/bounded-context-canvas/blob/master/resources/model-traits-worksheet.md) 
-[] Include checkboxes and free text fields for 'Business Model' and 'Classification'
+- [x] Include more help text and [tips](https://github.com/ddd-crew/bounded-context-canvas/blob/master/resources/model-traits-worksheet.md) 
+- [] Include checkboxes and free text fields for 'Business Model' and 'Classification'
 
 Note: can be run without any external dependencies
 
