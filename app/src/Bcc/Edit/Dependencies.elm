@@ -11,6 +11,8 @@ import Bootstrap.Form as Form
 import Bootstrap.Form.Input as Input
 import Bootstrap.Form.Select as Select
 import Bootstrap.Button as Button
+import Bootstrap.Utilities.Spacing as Spacing
+import Bootstrap.Utilities.Display as Display
 
 import Dict
 
@@ -183,7 +185,13 @@ viewDependency title model addedDependencies =
 view : Model -> Html Msg
 view { edit, dependencies } =
   div []
-    [ Html.h5 [ class "text-center" ] [ text "Dependencies and Relationships" ]
+    [ Html.span
+      [ class "text-center"
+      , Display.block
+      , style "background-color" "lightGrey"
+      , Spacing.p2
+      ]
+      [ text "Dependencies and Relationships" ]
     , Grid.row []
       [ Grid.col []
         [ viewDependency "Message Suppliers" edit.supplier dependencies.suppliers |> Html.map Supplier ]

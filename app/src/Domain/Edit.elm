@@ -75,7 +75,6 @@ type Msg
   | Saved (Result Http.Error ())
   | Delete
   | Deleted (Result Http.Error ())
-  | Back
   | BccMsg Bcc.Index.Msg
 
 updateEdit : EditingMsg -> EditingDomain -> EditingDomain
@@ -99,8 +98,6 @@ update msg model =
       (model, Route.pushUrl Route.Home model.key)
     Loaded (Ok m) ->
         ({ model | edit = { domain = m } } , Cmd.none)
-    Back ->
-      (model, Route.goBack model.key)
     BccMsg m ->
       let
         (bccModels, bccCmd) = Bcc.Index.update m model.contexts
@@ -129,7 +126,7 @@ viewLabel labelId caption =
 view : Model -> Html Msg
 view model =
   Grid.container []
-    ( List.concat 
+    ( List.concat
         [ [ Grid.row []
             [ Grid.col []
                 [ viewDomainCard model.edit  ]
@@ -149,10 +146,10 @@ viewDomainCard model =
   |> Card.footer []
     [ Grid.row []
       [ Grid.col []
-        [ Button.linkButton 
+        [ Button.linkButton
           [ Button.attrs [ href (Route.routeToString Route.Home) ], Button.roleLink ]
           [ text "Back" ] ]
-      , Grid.col [ Col.textAlign Text.alignLgRight ] 
+      , Grid.col [ Col.textAlign Text.alignLgRight ]
         [ Button.button
           [ Button.secondary
           , Button.onClick Delete
@@ -195,7 +192,12 @@ viewDomain model =
     , Html.hr [] []
     , Form.group []
         [ viewLabel "vision" "Vision Statement"
-        , Input.text [ Input.id "vision", Input.value model.domain.vision, Input.onInput Domain.SetVision ]
+        , Textarea.textarea
+          [ Textarea.id "vision"
+          , Textarea.value model.domain.vision
+          , Textarea.onInput Domain.SetVision
+          , Textarea.rows 5
+          ]
         , Form.help [] [ text "Summary of purpose"] ]
     ]
     |> Html.map Field

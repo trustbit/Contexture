@@ -17,6 +17,7 @@ import Bootstrap.Form.Checkbox as Checkbox
 import Bootstrap.Button as Button
 import Bootstrap.Text as Text
 import Bootstrap.Utilities.Spacing as Spacing
+import Bootstrap.Utilities.Display as Display
 
 import Url
 import Http
@@ -129,13 +130,21 @@ update msg model =
 
 viewLabel : String -> String -> Html msg
 viewLabel labelId caption =
-  Form.label [ for labelId] [ Html.h6 [] [ text caption ] ]
+  Form.label
+    [ for labelId
+    , Display.block
+    , style "background-color" "lightGrey"
+    , Spacing.p2
+    ]
+    [ text caption ]
 
 view : Model -> Html Msg
 view model =
   Grid.containerFluid []
     [ viewCanvas model.edit |> Html.map Editing
-    , Grid.row [ Row.attrs [ Spacing.mt3, Spacing.mb3 ]]
+    , Grid.row [ Row.attrs [ Spacing.mt3, Spacing.mb3 ] ]
+      [ Grid.col [] [ Html.hr [] [] ] ]
+    , Grid.row []
       [ Grid.col []
         [ Button.linkButton
           [ Button.roleLink
@@ -143,26 +152,25 @@ view model =
           ]
           [ text "Back" ]
         ]
-        , Grid.col [ Col.textAlign Text.alignLgRight]
-          [ Button.button
-            [ Button.secondary
-            , Button.onClick Delete
-            , Button.attrs
-              [ title ("Delete " ++ model.edit.canvas.name)
-              , Spacing.mr3
-              ]
+      , Grid.col [ Col.textAlign Text.alignLgRight]
+        [ Button.button
+          [ Button.secondary
+          , Button.onClick Delete
+          , Button.attrs
+            [ title ("Delete " ++ model.edit.canvas.name)
+            , Spacing.mr3
             ]
-            [ text "Delete" ]
-          , Button.submitButton
-            [ Button.primary
-            , Button.onClick Save
-            , Button.disabled (model.edit.canvas.name |> Bcc.ifNameValid (\_ -> True) (\_ -> False))
-            ]
-            [ text "Save"]
           ]
+          [ text "Delete" ]
+        , Button.submitButton
+          [ Button.primary
+          , Button.onClick Save
+          , Button.disabled (model.edit.canvas.name |> Bcc.ifNameValid (\_ -> True) (\_ -> False))
+          ]
+          [ text "Save"]
         ]
       ]
-
+    ]
 
 viewRadioButton : String -> String -> Bool -> Bcc.Msg -> Radio.Radio Bcc.Msg
 viewRadioButton id title checked msg =
@@ -188,12 +196,14 @@ viewLeftside model =
         ])
     , Form.invalidFeedback [] [ text "A name for a Bounded Context is required!" ]
     ]
-  , Html.hr [] []
   , Form.group []
     [ viewLabel "description" "Description"
-    , Input.text [ Input.id "description", Input.value model.description, Input.onInput Bcc.SetDescription ]
+    , Textarea.textarea
+      [ Textarea.id "description"
+      , Textarea.value model.description
+      , Textarea.onInput Bcc.SetDescription
+      ]
     , Form.help [] [ text "Summary of purpose and responsibilities"] ]
-  , Html.hr [] []
   , Grid.row []
     [ Grid.col []
       [ viewLabel "classification" "BC classification"
@@ -232,12 +242,10 @@ viewLeftside model =
             )
         , Form.help [] [ text "How does the context evolve? How novel is it?"] ]
     ]
-  , Html.hr [] []
   , Form.group []
     [ viewLabel "businessDecisions" "Business Decisions"
       , Textarea.textarea [ Textarea.id "businessDecisions", Textarea.rows 10, Textarea.value model.businessDecisions, Textarea.onInput Bcc.SetBusinessDecisions ]
       , Form.help [] [ text "Key business rules, policies and decisions"] ]
-  , Html.hr [] []
   , Form.group []
     [ viewLabel "ubiquitousLanguage" "Ubiquitous Language"
       , Textarea.textarea [ Textarea.id "ubiquitousLanguage", Textarea.rows 10, Textarea.value model.ubiquitousLanguage, Textarea.onInput Bcc.SetUbiquitousLanguage ]
@@ -299,9 +307,7 @@ viewModelTraits model =
 viewRightside : EditingCanvas -> List (Html EditingMsg)
 viewRightside model =
   [ viewModelTraits model
-  , Html.hr [] []
   , model.addingMessage |> Messages.view |> Html.map MessageField
-  , Html.hr [] []
   , model.addingDependencies |> Dependencies.view |> Html.map DependencyField
   ]
 

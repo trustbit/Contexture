@@ -14,6 +14,7 @@ import Bootstrap.Button as Button
 import Bootstrap.ListGroup as ListGroup
 import Bootstrap.Utilities.Flex as Flex
 import Bootstrap.Utilities.Spacing as Spacing
+import Bootstrap.Utilities.Display as Display
 
 import Set
 
@@ -21,7 +22,7 @@ import Bcc
 
 -- MODEL
 
-type alias AddingMessage = 
+type alias AddingMessage =
   { commandsHandled : Bcc.Command
   , commandsSent : Bcc.Command
   , eventsHandled : Bcc.Event
@@ -35,7 +36,7 @@ type alias Model =
   , messages: Bcc.Messages
   }
 
-initAddingMessage = 
+initAddingMessage =
   { commandsHandled = ""
   , commandsSent = ""
   , eventsHandled = ""
@@ -109,8 +110,8 @@ update msg { adding,  messages} =
 
 viewMessageOption : Bcc.Message -> ListGroup.Item ChangeTypeMsg
 viewMessageOption model =
-  ListGroup.li 
-    [ ListGroup.attrs [ Flex.block, Flex.justifyBetween, Flex.alignItemsCenter, Spacing.p1 ] ] 
+  ListGroup.li
+    [ ListGroup.attrs [ Flex.block, Flex.justifyBetween, Flex.alignItemsCenter, Spacing.p1 ] ]
     [ text model
     , Button.button [Button.danger, Button.small, Button.onClick (MessageChanged (Bcc.Remove model))] [ text "x"]
     ]
@@ -119,21 +120,21 @@ viewMessage : String -> String -> (Bcc.Message, Bcc.MessageCollection) -> Html C
 viewMessage id title (message, messages) =
   Form.group [Form.attrs [style "min-height" "250px"]]
     [ Form.label [for id] [ text title ]
-    , ListGroup.ul 
+    , ListGroup.ul
       (
         messages
         |> Set.toList
         |> List.map viewMessageOption
       )
-    , Form.form 
-      [ Html.Events.onSubmit 
+    , Form.form
+      [ Html.Events.onSubmit
           (message
             |> Bcc.Add
             |> MessageChanged
           )
       , Flex.block, Flex.justifyBetween, Flex.alignItemsCenter
       ]
-      [ InputGroup.config 
+      [ InputGroup.config
           ( InputGroup.text
             [ Input.id id
             , Input.value message
@@ -141,8 +142,8 @@ viewMessage id title (message, messages) =
             ]
           )
           |> InputGroup.successors
-            [ InputGroup.button 
-              [ Button.attrs 
+            [ InputGroup.button
+              [ Button.attrs
                 [ Html.Attributes.type_ "submit"]
                 ,  Button.secondary
                 , Button.disabled (String.length message <= 0)
@@ -150,15 +151,21 @@ viewMessage id title (message, messages) =
               [ text "Add"] ]
           |> InputGroup.view
       ]
-    ] 
+    ]
 
 
 view : Model -> Html Msg
 view { adding, messages } =
   div []
-    [ Html.h5 [ class "text-center" ] [ text "Messages Consumed and Produced" ]
+    [ Html.span
+      [ class "text-center"
+      , Display.block
+      , style "background-color" "lightGrey"
+      , Spacing.p2
+      ]
+      [ text "Messages Consumed and Produced" ]
     , Grid.row []
-      [ Grid.col [] 
+      [ Grid.col []
         [ Html.h6 [ class "text-center" ] [ text "Messages consumed"]
         , (adding.commandsHandled,  messages.commandsHandled)
             |> viewMessage "commandsHandled" "Commands handled"
@@ -179,7 +186,7 @@ view { adding, messages } =
             |> viewMessage "eventsPublished" "Events published"
             |> Html.map EventsPublished
         , (adding.queriesInvoked, messages.queriesInvoked)
-            |> viewMessage "queriesInvoked" "Queries invoked" 
+            |> viewMessage "queriesInvoked" "Queries invoked"
             |> Html.map QueriesInvoked
         ]
       ]
