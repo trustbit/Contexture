@@ -1,7 +1,7 @@
 {
-  "name": "bcc-wizard-server",
+  "name": "contexture-server",
   "version": "1.0.0",
-  "description": "Server for BCC-Wizard using json-server as storage backend and serving assets with express.js",
+  "description": "Server for Contexture using json-server as storage backend and serving assets with express.js",
   "main": "server.js",
   "scripts": {
     "start": "node server.js"

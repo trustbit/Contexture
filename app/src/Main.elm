@@ -192,7 +192,7 @@ menu model =
   Navbar.config NavMsg
       |> Navbar.withAnimation
       |> Navbar.primary
-      |> Navbar.brand [ href "/" ] [ text "Bounded Context Wizard" ]
+      |> Navbar.brand [ href "/" ] [ text "Contexture" ]
       |> Navbar.items []
       |> Navbar.view model.navState
 
@@ -210,7 +210,7 @@ view model =
         NotFoundPage ->
           text "Not Found"
   in
-    { title = "Bounded Context Wizard"
+    { title = "Contexture - Managing your Domains & Contexts"
     , body =
       [ CDN.stylesheet
       , div []

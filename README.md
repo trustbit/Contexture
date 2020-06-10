@@ -1,4 +1,4 @@
-# Bounded Context Canvas Wizard
+# Contexture - the Bounded Context Canvas Wizard
 
 The Bounded-Context-Canvas (BCC) was introduced by [Nick Tune](https://medium.com/nick-tune-tech-strategy-blog/bounded-context-canvas-v2-simplifications-and-additions-229ed35f825f) as a tool to document and visualize contexts and their connections in a system.
 The canvas can be used to document business aspects, the most important behaviors and the interactions of a bounded context with other parts of the system.
@@ -46,8 +46,8 @@ Version 1: "Improving data quality"
 - Improve definition of ubiquitous language terms (allow Key-Value pairs)
 - Provide Auto-complete boxes (free text search) for dependencies (search in already existing BCC names)
 - Provide Auto-complete boxes (free text search) for consumed message contracts (search in produces message contracts)
-- Include more help text and [tips](https://github.com/ddd-crew/bounded-context-canvas/blob/master/resources/model-traits-worksheet.md) 
-- Include checkboxes and free text fields for 'Business Model' and 'Classification'
+[x] Include more help text and [tips](https://github.com/ddd-crew/bounded-context-canvas/blob/master/resources/model-traits-worksheet.md) 
+[] Include checkboxes and free text fields for 'Business Model' and 'Classification'
 
 Note: can be run without any external dependencies
 
@@ -116,9 +116,9 @@ Visualizations:
 - Domain / global context map -> Structurizr/Workspace linking + SystemLandscapeDiagram
 - Context map within domain -> Structurizr/SystemLandscapeDiagram
 
-## BCC-Wizard server backend
+## Contexture server backend
 
-The BCC-Wizard server implements a simple storage backend that uses `json-server` to expose a file system backed REST API and serving static assets through express.
+The Contexture server implements a simple storage backend that uses `json-server` to expose a file system backed REST API and serving static assets through express.
 
 ### Installation
 
@@ -134,14 +134,14 @@ cd server
 npm start
 ```
 
-BCC-Wizard server will listen on port 3000 per default. If you want to have the server listening on any other port set the environment variable `PORT` to the desired port.
+Contexture server will listen on port 3000 per default. If you want to have the server listening on any other port set the environment variable `PORT` to the desired port.
 
 ### Caveats
 
 - `cors` is configured to allow all origins
 - no logging built in
 
-## BCC-Wizard frontend application
+## Contexture frontend application
 
 The application is developed with [Elm](https://elm-lang.org/) and connects to the backend via the API.
 
@@ -173,8 +173,8 @@ cd app
 elm make src/Main.elm --output=../server/public/index.html
 
 cd ../server
-docker build -t bcc-wizard .
-docker run -p 8081:3000 bcc-wizard
+docker build -t contexture .
+docker run -p 8081:3000 contexture
 ```
 
-Now head to your browser and access the BCC-Wizard through http://localhost:8081
+Now head to your browser and access the Contexture through http://localhost:8081
