@@ -19,6 +19,7 @@ import Bootstrap.Text as Text
 import Bootstrap.Utilities.Spacing as Spacing
 import Bootstrap.Utilities.Display as Display
 
+import RemoteData
 import Url
 import Http
 import Dict
@@ -43,7 +44,7 @@ type alias Model =
   { key: Nav.Key
   , self: Url.Url
   -- TODO: discuss we want this in edit or BCC - it's not persisted after all!
-  , edit: EditingCanvas
+  , edit: RemoteData.WebData EditingCanvas
   }
 
 initWithCanvas : Bcc.BoundedContextCanvas -> EditingCanvas
@@ -60,7 +61,7 @@ init key url =
     model =
       { key = key
       , self = url
-      , edit = initWithCanvas canvas
+      , edit = RemoteData.Loading
       }
   in
     (
@@ -109,19 +110,21 @@ updateEdit msg model =
 
 update : Msg -> Model -> (Model, Cmd Msg)
 update msg model =
-  case msg of
-    Editing editing ->
-      ({ model | edit = updateEdit editing model.edit}, Cmd.none)
-    Save ->
-      (model, saveBCC model)
-    Saved (Ok _) ->
+  case (msg, model.edit) of
+    (Editing editing, RemoteData.Success editable) ->
+      ({ model | edit = RemoteData.Success <| updateEdit editing editable}, Cmd.none)
+    (Save, RemoteData.Success editable) ->
+      (model, saveBCC model.self editable)
+    (Saved (Ok _),_) ->
       (model, Cmd.none)
-    Delete ->
+    (Delete,_) ->
       (model, deleteBCC model)
-    Deleted (Ok _) ->
-      (model, Route.pushUrl (Route.Domain model.edit.canvas.domain) model.key)
-    Loaded (Ok m) ->
-        ({ model | edit = initWithCanvas m } , Cmd.none)
+    (Deleted (Ok _), RemoteData.Success editable) ->
+      (model, Route.pushUrl (Route.Domain editable.canvas.domain) model.key)
+    (Loaded (Ok m), _) ->
+      ({ model | edit = RemoteData.Success <| initWithCanvas m } , Cmd.none)
+    (Loaded (Err e),_) ->
+      ({ model | edit = RemoteData.Failure e } , Cmd.none)
     _ ->
       Debug.log ("BCC: " ++ Debug.toString msg ++ " " ++ Debug.toString model)
       (model, Cmd.none)
@@ -140,37 +143,48 @@ viewLabel labelId caption =
 
 view : Model -> Html Msg
 view model =
-  Grid.containerFluid []
-    [ viewCanvas model.edit |> Html.map Editing
-    , Grid.row [ Row.attrs [ Spacing.mt3, Spacing.mb3 ] ]
-      [ Grid.col [] [ Html.hr [] [] ] ]
-    , Grid.row []
-      [ Grid.col []
-        [ Button.linkButton
-          [ Button.roleLink
-          , Button.attrs [ href (Route.routeToString (Route.Domain model.edit.canvas.domain)) ]
-          ]
-          [ text "Back" ]
-        ]
-      , Grid.col [ Col.textAlign Text.alignLgRight]
-        [ Button.button
-          [ Button.secondary
-          , Button.onClick Delete
-          , Button.attrs
-            [ title ("Delete " ++ model.edit.canvas.name)
-            , Spacing.mr3
+  let
+    details =
+      case model.edit of
+        RemoteData.Success edit ->
+          [ viewCanvas edit |> Html.map Editing
+          , Grid.row [ Row.attrs [ Spacing.mt3, Spacing.mb3 ] ]
+            [ Grid.col [] [ Html.hr [] [] ] ]
+          , Grid.row []
+            [ Grid.col []
+              [ Button.linkButton
+                [ Button.roleLink
+                , Button.attrs [ href (Route.routeToString (Route.Domain edit.canvas.domain)) ]
+                ]
+                [ text "Back" ]
+              ]
+            , Grid.col [ Col.textAlign Text.alignLgRight]
+              [ Button.button
+                [ Button.secondary
+                , Button.onClick Delete
+                , Button.attrs
+                  [ title ("Delete " ++ edit.canvas.name)
+                  , Spacing.mr3
+                  ]
+                ]
+                [ text "Delete" ]
+              , Button.submitButton
+                [ Button.primary
+                , Button.onClick Save
+                , Button.disabled (edit.canvas.name |> Bcc.ifNameValid (\_ -> True) (\_ -> False))
+                ]
+                [ text "Save"]
+              ]
             ]
           ]
-          [ text "Delete" ]
-        , Button.submitButton
-          [ Button.primary
-          , Button.onClick Save
-          , Button.disabled (model.edit.canvas.name |> Bcc.ifNameValid (\_ -> True) (\_ -> False))
+
+        _ ->
+          [ Grid.row []
+            [ Grid.col [] [ text "Loading Bounded Context details..."]]
           ]
-          [ text "Save"]
-        ]
-      ]
-    ]
+  in
+    Grid.containerFluid [] details
+
 
 viewRadioButton : String -> String -> Bool -> Bcc.Msg -> Radio.Radio Bcc.Msg
 viewRadioButton id title checked msg =
@@ -327,13 +341,13 @@ loadBCC model =
     , expect = Http.expectJson Loaded Bcc.modelDecoder
     }
 
-saveBCC: Model -> Cmd Msg
-saveBCC model =
+saveBCC: Url.Url -> EditingCanvas -> Cmd Msg
+saveBCC url model =
     Http.request
       { method = "PUT"
       , headers = []
-      , url = Url.toString model.self
-      , body = Http.jsonBody <| Bcc.modelEncoder model.edit.canvas
+      , url = Url.toString url
+      , body = Http.jsonBody <| Bcc.modelEncoder model.canvas
       , expect = Http.expectWhatever Saved
       , timeout = Nothing
       , tracker = Nothing
