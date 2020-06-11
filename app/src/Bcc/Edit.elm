@@ -73,6 +73,7 @@ init key url =
 
 type EditingMsg
   = Field Bcc.Msg
+
   | MessageField Messages.Msg
   | DependencyField Dependencies.Msg
   | ModelTraitMsg
@@ -186,7 +187,7 @@ view model =
     Grid.containerFluid [] details
 
 
-viewRadioButton : String -> String -> Bool -> Bcc.Msg -> Radio.Radio Bcc.Msg
+viewRadioButton : String -> String -> Bool -> m -> Radio.Radio m
 viewRadioButton id title checked msg =
   Radio.create [Radio.id id, Radio.onClick msg, Radio.checked checked] title
 
@@ -198,6 +199,47 @@ viewCheckbox id title value currentValues =
     , Checkbox.checked (List.member value currentValues)
     ]
     title
+
+viewStrategicClassification : Bcc.StrategicClassification -> Html Bcc.StrategicClassificationMsg
+viewStrategicClassification model =
+  Grid.row []
+    [ Grid.col []
+      [ viewLabel "classification" "BC classification"
+      , div []
+          (Radio.radioList "classification"
+          [ viewRadioButton "core" "Core" (model.domain == Just Bcc.Core) (Bcc.SetDomainType Bcc.Core)
+          , viewRadioButton "supporting" "Supporting" (model.domain == Just Bcc.Supporting) (Bcc.SetDomainType Bcc.Supporting)
+          , viewRadioButton "generic" "Generic" (model.domain == Just Bcc.Generic) (Bcc.SetDomainType Bcc.Generic)
+          -- TODO: Other
+          ]
+          )
+      , Form.help [] [ text "How can the Bounded Context be classified?"] ]
+      , Grid.col []
+        [ viewLabel "businessModel" "Business Model"
+        , div []
+          (
+            [viewCheckbox "revenue" "Revenue" Bcc.Revenue model.business
+            , viewCheckbox "engagement" "Engagement" Bcc.Engagement model.business
+            , viewCheckbox "Compliance" "Compliance" Bcc.Compliance model.business
+            , viewCheckbox "costReduction" "Cost reduction" Bcc.CostReduction model.business
+            -- TODO: Other
+            ]
+            |> List.map (Html.map Bcc.ChangeBusinessModel)
+          )
+        , Form.help [] [ text "What's the underlying business model of the Bounded Context?"] ]
+      , Grid.col []
+        [ viewLabel "evolution" "Evolution"
+        , div []
+            (Radio.radioList "evolution"
+            [ viewRadioButton "genesis" "Genesis" (model.evolution == Just Bcc.Genesis) (Bcc.SetEvolution Bcc.Genesis)
+            , viewRadioButton "customBuilt" "Custom built" (model.evolution == Just Bcc.CustomBuilt) (Bcc.SetEvolution Bcc.CustomBuilt)
+            , viewRadioButton "product" "Product" (model.evolution == Just Bcc.Product) (Bcc.SetEvolution Bcc.Product)
+            , viewRadioButton "commodity" "Commodity" (model.evolution == Just Bcc.Commodity) (Bcc.SetEvolution Bcc.Commodity)
+            -- TODO: Other
+            ]
+            )
+        , Form.help [] [ text "How does the context evolve? How novel is it?"] ]
+    ]
 
 viewLeftside : Bcc.BoundedContextCanvas -> List (Html EditingMsg)
 viewLeftside model =
@@ -218,44 +260,7 @@ viewLeftside model =
       , Textarea.onInput Bcc.SetDescription
       ]
     , Form.help [] [ text "Summary of purpose and responsibilities"] ]
-  , Grid.row []
-    [ Grid.col []
-      [ viewLabel "classification" "BC classification"
-      , div []
-          (Radio.radioList "classification"
-          [ viewRadioButton "core" "Core" (model.classification == Just Bcc.Core) (Bcc.SetClassification Bcc.Core)
-          , viewRadioButton "supporting" "Supporting" (model.classification == Just Bcc.Supporting) (Bcc.SetClassification Bcc.Supporting)
-          , viewRadioButton "generic" "Generic" (model.classification == Just Bcc.Generic) (Bcc.SetClassification Bcc.Generic)
-          -- TODO: Other
-          ]
-          )
-      , Form.help [] [ text "How can the Bounded Context be classified?"] ]
-      , Grid.col []
-        [ viewLabel "businessModel" "Business Model"
-        , div []
-          (
-            [viewCheckbox "revenue" "Revenue" Bcc.Revenue model.businessModel
-            , viewCheckbox "engagement" "Engagement" Bcc.Engagement model.businessModel
-            , viewCheckbox "Compliance" "Compliance" Bcc.Compliance model.businessModel
-            , viewCheckbox "costReduction" "Cost reduction" Bcc.CostReduction model.businessModel
-            -- TODO: Other
-            ]
-            |> List.map (Html.map Bcc.ChangeBusinessModel)
-          )
-        , Form.help [] [ text "What's the underlying business model of the Bounded Context?"] ]
-      , Grid.col []
-        [ viewLabel "evolution" "Evolution"
-        , div []
-            (Radio.radioList "evolution"
-            [ viewRadioButton "genesis" "Genesis" (model.evolution == Just Bcc.Genesis) (Bcc.SetEvolution Bcc.Genesis)
-            , viewRadioButton "customBuilt" "Custom built" (model.evolution == Just Bcc.CustomBuilt) (Bcc.SetEvolution Bcc.CustomBuilt)
-            , viewRadioButton "product" "Product" (model.evolution == Just Bcc.Product) (Bcc.SetEvolution Bcc.Product)
-            , viewRadioButton "commodity" "Commodity" (model.evolution == Just Bcc.Commodity) (Bcc.SetEvolution Bcc.Commodity)
-            -- TODO: Other
-            ]
-            )
-        , Form.help [] [ text "How does the context evolve? How novel is it?"] ]
-    ]
+  , viewStrategicClassification model.classification |> Html.map Bcc.ChangeStrategicClassification
   , Form.group []
     [ viewLabel "businessDecisions" "Business Decisions"
       , Textarea.textarea [ Textarea.id "businessDecisions", Textarea.rows 10, Textarea.value model.businessDecisions, Textarea.onInput Bcc.SetBusinessDecisions ]

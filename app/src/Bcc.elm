@@ -18,11 +18,11 @@ import Domain
 type BoundedContextId
   = BoundedContextId Int
 
-type Classification
+type DomainType
   = Core
   | Supporting
   | Generic
-  | OtherClassification String
+  | OtherDomainType String
 
 type BusinessModel
   = Revenue
@@ -36,6 +36,12 @@ type Evolution
   | CustomBuilt
   | Product
   | Commodity
+
+type alias StrategicClassification =
+    { domain : Maybe DomainType
+    , business : List BusinessModel
+    , evolution : Maybe Evolution
+    }
 
 type alias BusinessDecisions = String
 type alias UbiquitousLanguage = String
@@ -75,22 +81,20 @@ type alias Dependency = (System, Maybe Relationship)
 type alias DependencyMap = Dict System (Maybe Relationship)
 
 type alias Dependencies =
-  { suppliers: DependencyMap
-  , consumers: DependencyMap
+  { suppliers : DependencyMap
+  , consumers : DependencyMap
   }
 
 type alias BoundedContextCanvas =
-  { domain: Domain.DomainId
-  , name: String
-  , description: String
-  , classification : Maybe Classification
-  , businessModel: List BusinessModel
-  , evolution: Maybe Evolution
-  , businessDecisions: BusinessDecisions
-  , ubiquitousLanguage: UbiquitousLanguage
-  , modelTraits: ModelTraits
-  , messages: Messages
-  , dependencies: Dependencies
+  { domain : Domain.DomainId
+  , name : String
+  , description : String
+  , classification : StrategicClassification
+  , businessDecisions : BusinessDecisions
+  , ubiquitousLanguage : UbiquitousLanguage
+  , modelTraits : ModelTraits
+  , messages : Messages
+  , dependencies : Dependencies
   }
 
 initMessages : () -> Messages
@@ -109,14 +113,18 @@ initDependencies _ =
   , consumers = Dict.empty
   }
 
+initStrategicClassification =
+  { domain = Nothing
+  , business = []
+  , evolution = Nothing
+  }
+
 init: Domain.DomainId -> BoundedContextCanvas
 init domain =
   { domain = domain
   , name = ""
   , description = ""
-  , classification = Nothing
-  , businessModel = []
-  , evolution = Nothing
+  , classification = initStrategicClassification
   , businessDecisions = ""
   , ubiquitousLanguage = ""
   , modelTraits = ""
@@ -148,12 +156,15 @@ type MessageMsg
   | QueriesHandled MessageAction
   | QueriesInvoked MessageAction
 
+type StrategicClassificationMsg
+  = SetDomainType DomainType
+  | ChangeBusinessModel (Action BusinessModel)
+  | SetEvolution Evolution
+
 type Msg
   = SetName String
   | SetDescription String
-  | SetClassification Classification
-  | ChangeBusinessModel (Action BusinessModel)
-  | SetEvolution Evolution
+  | ChangeStrategicClassification StrategicClassificationMsg
   | SetBusinessDecisions BusinessDecisions
   | SetUbiquitousLanguage UbiquitousLanguage
   | SetModelTraits ModelTraits
@@ -200,6 +211,18 @@ updateDependencies msg model =
     Consumer dependency ->
       { model | consumers = updateDependencyAction dependency model.consumers }
 
+updateClassification : StrategicClassificationMsg -> StrategicClassification -> StrategicClassification
+updateClassification msg canvas =
+  case msg of
+    SetDomainType class ->
+      { canvas | domain = Just class}
+    ChangeBusinessModel (Add business) ->
+      { canvas | business = business :: canvas.business}
+    ChangeBusinessModel (Remove business) ->
+      { canvas | business = canvas.business |> List.filter (\bm -> bm /= business )}
+    SetEvolution evo ->
+      { canvas | evolution = Just evo}
+
 update: Msg -> BoundedContextCanvas -> BoundedContextCanvas
 update msg canvas =
   case msg of
@@ -209,14 +232,8 @@ update msg canvas =
     SetDescription description ->
       { canvas | description = description}
 
-    SetClassification class ->
-      { canvas | classification = Just class}
-    ChangeBusinessModel (Add business) ->
-      { canvas | businessModel = business :: canvas.businessModel}
-    ChangeBusinessModel (Remove business) ->
-      { canvas | businessModel = canvas.businessModel |> List.filter (\bm -> bm /= business )}
-    SetEvolution evo ->
-      { canvas | evolution = Just evo}
+    ChangeStrategicClassification m ->
+      { canvas | classification = updateClassification m canvas.classification }
 
     SetBusinessDecisions decisions ->
       { canvas | businessDecisions = decisions}
@@ -256,22 +273,22 @@ idParser =
         \bccId ->
             Maybe.map BoundedContextId (String.toInt bccId)
 
-classificationToString: Classification -> String
-classificationToString classification =
+domainTypeToString: DomainType -> String
+domainTypeToString classification =
   case classification of
-      OtherClassification value -> value
+      OtherDomainType value -> value
       Generic -> "Generic"
       Supporting -> "Supporting"
       Core -> "Core"
 
-classificationParser: String -> Maybe Classification
-classificationParser classification =
+domainTypeParser: String -> Maybe DomainType
+domainTypeParser classification =
   case classification of
       "Generic" -> Just Generic
       "Supporting" -> Just Supporting
       "Core" -> Just Core
       "" -> Nothing
-      value -> Just (OtherClassification value)
+      value -> Just (OtherDomainType value)
 
 businessModelToString: BusinessModel -> String
 businessModelToString businessModel =
@@ -360,15 +377,21 @@ dependenciesEncoder dependencies =
     , ("consumers", Encode.dict identity (maybeStringEncoder relationshipToString) dependencies.consumers )
     ]
 
+strategicClassificationEncoder : StrategicClassification -> Encode.Value
+strategicClassificationEncoder classification =
+  Encode.object
+    [ ("domainType", maybeStringEncoder domainTypeToString classification.domain)
+    , ("businessModel", Encode.list (businessModelToString >> Encode.string)  classification.business)
+    , ("evolution", maybeStringEncoder evolutionToString classification.evolution)
+    ]
+
 modelEncoder : BoundedContextCanvas -> Encode.Value
 modelEncoder canvas =
   Encode.object
     [ ("domainId", Domain.idEncoder canvas.domain)
     , ("name", Encode.string canvas.name)
     , ("description", Encode.string canvas.description)
-    , ("classification", maybeStringEncoder classificationToString canvas.classification)
-    , ("businessModel", Encode.list (businessModelToString >> Encode.string)  canvas.businessModel)
-    , ("evolution", maybeStringEncoder evolutionToString canvas.evolution)
+    , ("classification", strategicClassificationEncoder canvas.classification)
     , ("businessDecisions", Encode.string canvas.businessDecisions)
     , ("ubiquitousLanguage", Encode.string canvas.ubiquitousLanguage)
     , ("modelTraits", Encode.string canvas.modelTraits)
@@ -376,11 +399,14 @@ modelEncoder canvas =
     , ("dependencies", dependenciesEncoder canvas.dependencies)
     ]
 
-maybeStringEncoder : (t -> String) -> Maybe t -> Encode.Value
-maybeStringEncoder encoder value =
+maybeEncoder : (t -> Encode.Value) -> Maybe t -> Encode.Value
+maybeEncoder encoder value =
   case value of
-    Just v -> Encode.string (encoder v)
+    Just v -> encoder v
     Nothing -> Encode.null
+
+maybeStringEncoder encoder value =
+  maybeEncoder (encoder >> Encode.string) value
 
 maybeStringDecoder : (String -> Maybe v) -> Decoder (Maybe v)
 maybeStringDecoder parser =
@@ -422,6 +448,12 @@ businessModelDecoder =
     in
       maybeListDecoder |> Decode.map maybeAsList
 
+strategicClassificationDecoder : Decoder StrategicClassification
+strategicClassificationDecoder =
+  Decode.succeed StrategicClassification
+    |> JP.optional "domainType" (maybeStringDecoder domainTypeParser) Nothing
+    |> JP.optional "businessModel" businessModelDecoder []
+    |> JP.optional "evolution" (maybeStringDecoder evolutionParser) Nothing
 
 
 modelDecoder : Decoder BoundedContextCanvas
@@ -430,9 +462,7 @@ modelDecoder =
     |> JP.required "domainId" Domain.idDecoder
     |> JP.required "name" Decode.string
     |> JP.optional "description" Decode.string ""
-    |> JP.optional "classification" (maybeStringDecoder classificationParser) Nothing
-    |> JP.optional "businessModel" businessModelDecoder []
-    |> JP.optional "evolution" (maybeStringDecoder evolutionParser) Nothing
+    |> JP.optional "classification" strategicClassificationDecoder initStrategicClassification
     |> JP.optional "businessDecisions" Decode.string ""
     |> JP.optional "ubiquitousLanguage" Decode.string ""
     |> JP.optional "modelTraits" Decode.string ""
