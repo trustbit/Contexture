@@ -24,6 +24,7 @@ import Json.Encode as Encode
 import Json.Decode.Pipeline as JP
 import Json.Decode as Decode
 
+import RemoteData
 
 import Url
 import Http
@@ -36,25 +37,23 @@ import Bcc.Index
 
 -- MODEL
 
-type alias EditingDomain =
-  { domain : Domain.Domain }
+type alias EditableDomain = Domain.Domain
 
 type alias Model =
   { key: Nav.Key
   , self: Url.Url
-  , edit: EditingDomain
+  , edit: RemoteData.WebData EditableDomain
   , contexts : Bcc.Index.Model
   }
 
 init : Nav.Key -> Url.Url -> (Model, Cmd Msg)
 init key url =
   let
-    domain = Domain.init ()
     (contexts, contextCmd) = Bcc.Index.init url key
     model =
       { key = key
       , self = url
-      , edit = { domain = domain }
+      , edit = RemoteData.Loading
       , contexts = contexts
       }
   in
@@ -77,11 +76,12 @@ type Msg
   | Deleted (Result Http.Error ())
   | BccMsg Bcc.Index.Msg
 
-updateEdit : EditingMsg -> EditingDomain -> EditingDomain
+updateEdit : EditingMsg -> RemoteData.WebData EditableDomain -> RemoteData.WebData EditableDomain
 updateEdit msg model =
-  case msg of
-    Field fieldMsg ->
-      { model | domain = Domain.update fieldMsg model.domain }
+  case (msg, model) of
+    (Field fieldMsg, RemoteData.Success domain) ->
+      RemoteData.Success <| Domain.update fieldMsg domain
+    _ -> model
 
 update : Msg -> Model -> (Model, Cmd Msg)
 update msg model =
@@ -89,7 +89,12 @@ update msg model =
     Editing editing ->
       ({ model | edit = updateEdit editing model.edit}, Cmd.none)
     Save ->
-      (model, saveBCC model)
+      case model.edit of
+        RemoteData.Success domain ->
+          (model, saveBCC model.self domain)
+        _ ->
+          Debug.log ("Cannot save unloaded model: " ++ Debug.toString msg ++ " " ++ Debug.toString model)
+          (model, Cmd.none)
     Saved (Ok _) ->
       (model, Cmd.none)
     Delete ->
@@ -97,7 +102,10 @@ update msg model =
     Deleted (Ok _) ->
       (model, Route.pushUrl Route.Home model.key)
     Loaded (Ok m) ->
-        ({ model | edit = { domain = m } } , Cmd.none)
+      Debug.log ("Loaded domain")
+      ({ model | edit = RemoteData.Success m } , Cmd.none)
+    Loaded (Err e) ->
+      ({ model | edit = RemoteData.Failure e } , Cmd.none)
     BccMsg m ->
       let
         (bccModels, bccCmd) = Bcc.Index.update m model.contexts
@@ -125,18 +133,31 @@ viewLabel labelId caption =
 
 view : Model -> Html Msg
 view model =
-  Grid.container []
-    ( List.concat
-        [ [ Grid.row []
+  let
+    detail =
+      case model.edit of
+        RemoteData.Success domain ->
+          ( List.concat
+            [ [ Grid.row []
+                [ Grid.col []
+                    [ viewDomainCard domain ]
+                ]
+              ]
+            , viewBccCard model.contexts
+            ]
+          )
+        -- RemoteData.Failtre
+        _ ->
+          [ Grid.row [] 
             [ Grid.col []
-                [ viewDomainCard model.edit  ]
+              [ Html.p [] [ text "Loading details..." ] ]
             ]
           ]
-        , viewBccCard model.contexts
-        ]
-    )
+  in
+    Grid.container [] detail
 
-viewDomainCard : EditingDomain -> Html Msg
+
+viewDomainCard : EditableDomain -> Html Msg
 viewDomainCard model =
   Card.config []
   |> Card.header []
@@ -154,7 +175,7 @@ viewDomainCard model =
           [ Button.secondary
           , Button.onClick Delete
           , Button.attrs
-            [ title ("Delete " ++ model.domain.name)
+            [ title ("Delete " ++ model.name)
             , Spacing.mr3
             ]
           ]
@@ -162,7 +183,7 @@ viewDomainCard model =
         , Button.submitButton
           [ Button.primary
           , Button.onClick Save
-          , Button.disabled (model.domain.name |> ifNameValid (\_ -> True) (\_ -> False))
+          , Button.disabled (model.name |> ifNameValid (\_ -> True) (\_ -> False))
           ]
           [ text "Save"]
         ]
@@ -176,15 +197,15 @@ viewBccCard model =
   |> List.map (Html.map BccMsg)
 
 
-viewDomain : EditingDomain -> Html EditingMsg
+viewDomain : EditableDomain -> Html EditingMsg
 viewDomain model =
   div []
     [ Form.group []
       [ viewLabel "name" "Name"
       , Input.text (
         List.concat
-        [ [ Input.id "name", Input.value model.domain.name, Input.onInput Domain.SetName ]
-        , model.domain.name |> ifNameValid (\_ -> [ Input.danger ]) (\_ -> [])
+        [ [ Input.id "name", Input.value model.name, Input.onInput Domain.SetName ]
+        , model.name |> ifNameValid (\_ -> [ Input.danger ]) (\_ -> [])
         ]
       )
       , Form.invalidFeedback [] [ text "A name for the Domain is required!" ]
@@ -194,7 +215,7 @@ viewDomain model =
         [ viewLabel "vision" "Vision Statement"
         , Textarea.textarea
           [ Textarea.id "vision"
-          , Textarea.value model.domain.vision
+          , Textarea.value model.vision
           , Textarea.onInput Domain.SetVision
           , Textarea.rows 5
           ]
@@ -211,13 +232,13 @@ loadDomain model =
     , expect = Http.expectJson Loaded modelDecoder
     }
 
-saveBCC: Model -> Cmd Msg
-saveBCC model =
+saveBCC: Url.Url -> EditableDomain -> Cmd Msg
+saveBCC url model =
     Http.request
       { method = "PUT"
       , headers = []
-      , url = Url.toString model.self
-      , body = Http.jsonBody <| modelEncoder model.edit.domain
+      , url = Url.toString url
+      , body = Http.jsonBody <| modelEncoder model
       , expect = Http.expectWhatever Saved
       , timeout = Nothing
       , tracker = Nothing

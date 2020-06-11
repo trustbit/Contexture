@@ -24,6 +24,7 @@ import Bootstrap.Card as Card
 import Bootstrap.Card.Block as Block
 import Bootstrap.Utilities.Spacing as Spacing
 
+import RemoteData
 import Url
 import Http
 
@@ -43,7 +44,7 @@ type alias Model =
   { navKey : Nav.Key
   , baseUrl : String
   , newDomainName: String
-  , domains: List Domain
+  , domains: RemoteData.WebData (List Domain)
    }
 
 init: String -> Nav.Key -> (Model, Cmd Msg)
@@ -51,7 +52,7 @@ init baseUrl key =
   ( { navKey = key
     , baseUrl = baseUrl
     , newDomainName = ""
-    , domains = [] }
+    , domains = RemoteData.Loading }
   , loadAll baseUrl )
 
 -- UPDATE
@@ -66,7 +67,9 @@ update : Msg -> Model -> (Model, Cmd Msg)
 update msg model =
   case msg of
     Loaded (Ok items) ->
-      ({ model | domains = items }, Cmd.none)
+      ({ model | domains = RemoteData.Success items }, Cmd.none)
+    Loaded (Err e) ->
+        ({ model | domains = RemoteData.Failure e }, Cmd.none)
     SetDomainName name ->
       ({ model | newDomainName = name}, Cmd.none)
     CreateDomain ->
@@ -132,12 +135,22 @@ viewExisting items =
 
 view : Model -> Html Msg
 view model =
-  Grid.container []
-    [ Grid.row [ Row.attrs [ Spacing.pt3 ] ]
-      [ Grid.col [] [viewExisting model.domains] ]
-    , Grid.row [ Row.attrs [Spacing.mt3]]
-      [ Grid.col [] [ createWithName model.newDomainName ] ]
-    ]
+  let 
+    details =
+        case model.domains of
+            RemoteData.Success items ->
+                [ Grid.row [ Row.attrs [ Spacing.pt3 ] ]
+                    [ Grid.col [] [viewExisting items ] ]
+                , Grid.row [ Row.attrs [Spacing.mt3]]
+                    [ Grid.col [] [ createWithName model.newDomainName ] ]
+                ]
+            _ ->
+                [ Grid.row []
+                    [ Grid.col [] [ text "Loading your domains"] ]
+                ] 
+  in
+    Grid.container [] details
+    
 
 -- helpers
 
