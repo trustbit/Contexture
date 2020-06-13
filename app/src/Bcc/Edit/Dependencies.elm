@@ -169,7 +169,9 @@ viewAddDependency model =
 viewDependency : String -> DependencyEdit -> Bcc.DependencyMap -> Html ChangeTypeMsg
 viewDependency title model addedDependencies =
   div []
-    [ Html.h6 [ class "text-center" ] [ text title ]
+    [ Html.h6
+      [ class "text-center", Spacing.p2 ]
+      [ Html.strong [] [ text title ] ]
     , Grid.row []
       [ Grid.col [] [ Html.h6 [] [ text "Name"] ]
       , Grid.col [] [ Html.h6 [] [ text "Relationship"] ]

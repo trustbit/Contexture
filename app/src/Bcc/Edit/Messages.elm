@@ -166,7 +166,9 @@ view { adding, messages } =
       [ text "Messages Consumed and Produced" ]
     , Grid.row []
       [ Grid.col []
-        [ Html.h6 [ class "text-center" ] [ text "Messages consumed"]
+        [ Html.h6
+          [ class "text-center", Spacing.p2 ]
+          [ Html.strong [] [ text "Messages consumed" ] ]
         , (adding.commandsHandled,  messages.commandsHandled)
             |> viewMessage "commandsHandled" "Commands handled"
             |> Html.map CommandsHandled
@@ -178,7 +180,9 @@ view { adding, messages } =
             |> Html.map QueriesHandled
         ]
       , Grid.col []
-        [ Html.h6 [ class "text-center" ] [ text "Messages produced"]
+        [ Html.h6
+          [ class "text-center", Spacing.p2 ]
+          [ Html.strong [] [ text "Messages produced" ] ]
         , (adding.commandsSent, messages.commandsSent)
             |> viewMessage "commandsSent" "Commands sent"
             |> Html.map CommandsSent

@@ -132,8 +132,8 @@ update msg model =
 
 -- VIEW
 
-viewLabel : String -> String -> Html msg
-viewLabel labelId caption =
+viewCaption : String -> String -> Html msg
+viewCaption labelId caption =
   Form.label
     [ for labelId
     , Display.block
@@ -141,6 +141,12 @@ viewLabel labelId caption =
     , Spacing.p2
     ]
     [ text caption ]
+
+viewLabel : String -> String -> Html msg
+viewLabel labelId caption =
+  Form.label
+    [ for labelId ]
+    [ Html.b [] [ text caption ] ]
 
 view : Model -> Html Msg
 view model =
@@ -200,76 +206,85 @@ viewCheckbox id title value currentValues =
     ]
     title
 
-viewStrategicClassification : Bcc.StrategicClassification -> Html Bcc.StrategicClassificationMsg
+viewStrategicClassification : Bcc.StrategicClassification -> List (Html Bcc.StrategicClassificationMsg)
 viewStrategicClassification model =
-  Grid.row []
-    [ Grid.col []
-      [ viewLabel "classification" "BC classification"
-      , div []
-          (Radio.radioList "classification"
-          [ viewRadioButton "core" "Core" (model.domain == Just Bcc.Core) (Bcc.SetDomainType Bcc.Core)
-          , viewRadioButton "supporting" "Supporting" (model.domain == Just Bcc.Supporting) (Bcc.SetDomainType Bcc.Supporting)
-          , viewRadioButton "generic" "Generic" (model.domain == Just Bcc.Generic) (Bcc.SetDomainType Bcc.Generic)
-          -- TODO: Other
-          ]
-          )
-      , Form.help [] [ text "How can the Bounded Context be classified?"] ]
-      , Grid.col []
-        [ viewLabel "businessModel" "Business Model"
+  [ Grid.row []
+      [ Grid.col [] [ viewCaption "" "Strategic Classification"]]
+  , Grid.row []
+      [ Grid.col []
+        [ viewLabel "classification" "Domain"
         , div []
-          (
-            [viewCheckbox "revenue" "Revenue" Bcc.Revenue model.business
-            , viewCheckbox "engagement" "Engagement" Bcc.Engagement model.business
-            , viewCheckbox "Compliance" "Compliance" Bcc.Compliance model.business
-            , viewCheckbox "costReduction" "Cost reduction" Bcc.CostReduction model.business
-            -- TODO: Other
-            ]
-            |> List.map (Html.map Bcc.ChangeBusinessModel)
-          )
-        , Form.help [] [ text "What's the underlying business model of the Bounded Context?"] ]
-      , Grid.col []
-        [ viewLabel "evolution" "Evolution"
-        , div []
-            (Radio.radioList "evolution"
-            [ viewRadioButton "genesis" "Genesis" (model.evolution == Just Bcc.Genesis) (Bcc.SetEvolution Bcc.Genesis)
-            , viewRadioButton "customBuilt" "Custom built" (model.evolution == Just Bcc.CustomBuilt) (Bcc.SetEvolution Bcc.CustomBuilt)
-            , viewRadioButton "product" "Product" (model.evolution == Just Bcc.Product) (Bcc.SetEvolution Bcc.Product)
-            , viewRadioButton "commodity" "Commodity" (model.evolution == Just Bcc.Commodity) (Bcc.SetEvolution Bcc.Commodity)
+            (Radio.radioList "classification"
+            [ viewRadioButton "core" "Core" (model.domain == Just Bcc.Core) (Bcc.SetDomainType Bcc.Core)
+            , viewRadioButton "supporting" "Supporting" (model.domain == Just Bcc.Supporting) (Bcc.SetDomainType Bcc.Supporting)
+            , viewRadioButton "generic" "Generic" (model.domain == Just Bcc.Generic) (Bcc.SetDomainType Bcc.Generic)
             -- TODO: Other
             ]
             )
-        , Form.help [] [ text "How does the context evolve? How novel is it?"] ]
-    ]
+        , Form.help [] [ text "How can the Bounded Context be classified?"] ]
+        , Grid.col []
+          [ viewLabel "businessModel" "Business Model"
+          , div []
+            (
+              [viewCheckbox "revenue" "Revenue" Bcc.Revenue model.business
+              , viewCheckbox "engagement" "Engagement" Bcc.Engagement model.business
+              , viewCheckbox "Compliance" "Compliance" Bcc.Compliance model.business
+              , viewCheckbox "costReduction" "Cost reduction" Bcc.CostReduction model.business
+              -- TODO: Other
+              ]
+              |> List.map (Html.map Bcc.ChangeBusinessModel)
+            )
+          , Form.help [] [ text "What's the underlying business model of the Bounded Context?"] ]
+        , Grid.col []
+          [ viewLabel "evolution" "Evolution"
+          , div []
+              (Radio.radioList "evolution"
+              [ viewRadioButton "genesis" "Genesis" (model.evolution == Just Bcc.Genesis) (Bcc.SetEvolution Bcc.Genesis)
+              , viewRadioButton "customBuilt" "Custom built" (model.evolution == Just Bcc.CustomBuilt) (Bcc.SetEvolution Bcc.CustomBuilt)
+              , viewRadioButton "product" "Product" (model.evolution == Just Bcc.Product) (Bcc.SetEvolution Bcc.Product)
+              , viewRadioButton "commodity" "Commodity" (model.evolution == Just Bcc.Commodity) (Bcc.SetEvolution Bcc.Commodity)
+              -- TODO: Other
+              ]
+              )
+          , Form.help [] [ text "How does the context evolve? How novel is it?"] ]
+      ]
+  ]
 
 viewLeftside : Bcc.BoundedContextCanvas -> List (Html EditingMsg)
 viewLeftside model =
-  [ Form.group []
-    [ viewLabel "name" "Name"
-    , Input.text (
-        List.concat
-        [ [ Input.id "name", Input.value model.name, Input.onInput Bcc.SetName ]
-        , model.name |> Bcc.ifNameValid (\_ -> [ Input.danger ]) (\_ -> [])
-        ])
-    , Form.invalidFeedback [] [ text "A name for a Bounded Context is required!" ]
-    ]
-  , Form.group []
-    [ viewLabel "description" "Description"
-    , Textarea.textarea
-      [ Textarea.id "description"
-      , Textarea.value model.description
-      , Textarea.onInput Bcc.SetDescription
+  List.concat
+    [ [ Form.group []
+        [ viewCaption "name" "Name"
+        , Input.text (
+            List.concat
+            [ [ Input.id "name", Input.value model.name, Input.onInput Bcc.SetName ]
+            , model.name |> Bcc.ifNameValid (\_ -> [ Input.danger ]) (\_ -> [])
+            ])
+        , Form.invalidFeedback [] [ text "A name for a Bounded Context is required!" ]
+        ]
+      , Form.group []
+        [ viewCaption "description" "Description"
+        , Textarea.textarea
+          [ Textarea.id "description"
+          , Textarea.value model.description
+          , Textarea.onInput Bcc.SetDescription
+          ]
+        , Form.help [] [ text "Summary of purpose and responsibilities"] ]
       ]
-    , Form.help [] [ text "Summary of purpose and responsibilities"] ]
-  , viewStrategicClassification model.classification |> Html.map Bcc.ChangeStrategicClassification
-  , Form.group []
-    [ viewLabel "businessDecisions" "Business Decisions"
-      , Textarea.textarea [ Textarea.id "businessDecisions", Textarea.rows 10, Textarea.value model.businessDecisions, Textarea.onInput Bcc.SetBusinessDecisions ]
-      , Form.help [] [ text "Key business rules, policies and decisions"] ]
-  , Form.group []
-    [ viewLabel "ubiquitousLanguage" "Ubiquitous Language"
-      , Textarea.textarea [ Textarea.id "ubiquitousLanguage", Textarea.rows 10, Textarea.value model.ubiquitousLanguage, Textarea.onInput Bcc.SetUbiquitousLanguage ]
-      , Form.help [] [ text "Key domain terminology"] ]
-  ]
+    , viewStrategicClassification model.classification
+      |> List.map (Html.map Bcc.ChangeStrategicClassification)
+    , [ Form.group []
+        [ viewCaption "businessDecisions" "Business Decisions"
+          , Textarea.textarea [ Textarea.id "businessDecisions", Textarea.rows 10, Textarea.value model.businessDecisions, Textarea.onInput Bcc.SetBusinessDecisions ]
+          , Form.help [] [ text "Key business rules, policies and decisions"]
+        ]
+      , Form.group []
+          [ viewCaption "ubiquitousLanguage" "Ubiquitous Language"
+            , Textarea.textarea [ Textarea.id "ubiquitousLanguage", Textarea.rows 10, Textarea.value model.ubiquitousLanguage, Textarea.onInput Bcc.SetUbiquitousLanguage ]
+            , Form.help [] [ text "Key domain terminology"]
+          ]
+      ]
+    ]
   |> List.map (Html.map Field)
 
 viewModelTraits : EditingCanvas -> Html EditingMsg
@@ -305,7 +320,7 @@ viewModelTraits model =
         )
   in
     Form.group []
-      [ viewLabel "modelTraits" "Model traits"
+      [ viewCaption "modelTraits" "Model traits"
       , Input.text
       [ Input.id "modelTraits", Input.value model.canvas.modelTraits, Input.onInput Bcc.SetModelTraits ]
       |> Html.map Field
