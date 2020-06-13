@@ -35,9 +35,9 @@ import Bcc.Edit.Messages as Messages
 
 type alias EditingCanvas =
   { canvas : Bcc.BoundedContextCanvas
-  , modelTraitPopover: Bool
+  , tooltips : Dict.Dict String Bool
   , addingMessage : Messages.Model
-  , addingDependencies: Dependencies.Model
+  , addingDependencies : Dependencies.Model
   }
 
 type alias Model =
@@ -49,11 +49,12 @@ type alias Model =
 
 initWithCanvas : Bcc.BoundedContextCanvas -> EditingCanvas
 initWithCanvas canvas =
-  { modelTraitPopover = False
+  { tooltips = Dict.empty
   , addingMessage = Messages.init canvas.messages
   , addingDependencies = Dependencies.init canvas.dependencies
   , canvas = canvas
   }
+
 init : Nav.Key -> Url.Url -> (Model, Cmd Msg)
 init key url =
   let
@@ -73,10 +74,9 @@ init key url =
 
 type EditingMsg
   = Field Bcc.Msg
-
   | MessageField Messages.Msg
   | DependencyField Dependencies.Msg
-  | ModelTraitMsg
+  | TooltipMsg String
 
 type Msg
   = Loaded (Result Http.Error Bcc.BoundedContextCanvas)
@@ -105,8 +105,17 @@ updateEdit msg model =
         c = { canvas | dependencies = addingDependencies.dependencies}
       in
         { model | canvas = c, addingDependencies = addingDependencies }
-    ModelTraitMsg  ->
-      { model | modelTraitPopover = not model.modelTraitPopover }
+    TooltipMsg key ->
+      let
+        updatedTooltip =
+          model.tooltips
+          |> Dict.update key (\b ->
+              case b of
+                Just v -> not v |> Just
+                Nothing -> True |> Just
+            )
+      in
+        { model | tooltips = updatedTooltip }
 
 
 update : Msg -> Model -> (Model, Cmd Msg)
@@ -192,10 +201,59 @@ view model =
   in
     Grid.containerFluid [] details
 
+viewInfoTooltip : EditingCanvas -> String -> String -> Html EditingMsg -> List (Html EditingMsg)
+viewInfoTooltip model id title description =
+  let
+    state =
+      model.tooltips
+      |> Dict.get id
+      |> Maybe.withDefault False
+  in
+    [ Form.help
+        [ style "cursor" "pointer", onClick (TooltipMsg id) ]
+        [ text title ]
+    , Form.help [ class ( if state then "" else "collapse") ] [ description ]
+    ]
 
-viewRadioButton : String -> String -> Bool -> m -> Radio.Radio m
-viewRadioButton id title checked msg =
-  Radio.create [Radio.id id, Radio.onClick msg, Radio.checked checked] title
+
+viewDescriptionList : List (String, String) -> Maybe String -> Html EditingMsg
+viewDescriptionList model sourceReference =
+  let
+    footer =
+      case sourceReference of
+        Just reference ->
+          [ Html.footer
+            [ class "blockquote-footer"]
+            [ Html.a
+              [target "_blank"
+              , href reference
+              ]
+              [ text "Source of the descriptions"]
+            ]
+          ]
+        Nothing -> []
+  in
+  List.concat
+    [ [ Html.dl [class "row"]
+        (model
+          |> List.concatMap (
+            \(t, d) ->
+              [ Html.dt [ class "col-sm-3" ] [ text t ]
+              , Html.dd [ class "col-sm-9" ] [ text d ]
+              ]
+          )
+        )
+      ]
+    , footer
+    ]
+  |> div []
+
+
+viewRadioButton : String  -> Bool -> m -> Html m -> Radio.Radio m
+viewRadioButton id checked msg title =
+  Radio.createAdvanced
+    [ Radio.id id, Radio.onClick msg, Radio.checked checked ]
+    (Radio.label [] [ title ])
 
 viewCheckbox : String -> String -> value -> List value -> Html (Bcc.Action value)
 viewCheckbox id title value currentValues =
@@ -206,8 +264,11 @@ viewCheckbox id title value currentValues =
     ]
     title
 
-viewStrategicClassification : Bcc.StrategicClassification -> List (Html Bcc.StrategicClassificationMsg)
-viewStrategicClassification model =
+viewStrategicClassification : EditingCanvas -> List (Html EditingMsg)
+viewStrategicClassification canvas =
+  let
+    model = canvas.canvas.classification
+  in
   [ Grid.row []
       [ Grid.col [] [ viewCaption "" "Strategic Classification"]]
   , Grid.row []
@@ -215,13 +276,13 @@ viewStrategicClassification model =
         [ viewLabel "classification" "Domain"
         , div []
             (Radio.radioList "classification"
-            [ viewRadioButton "core" "Core" (model.domain == Just Bcc.Core) (Bcc.SetDomainType Bcc.Core)
-            , viewRadioButton "supporting" "Supporting" (model.domain == Just Bcc.Supporting) (Bcc.SetDomainType Bcc.Supporting)
-            , viewRadioButton "generic" "Generic" (model.domain == Just Bcc.Generic) (Bcc.SetDomainType Bcc.Generic)
+            [ viewRadioButton "core" (model.domain == Just Bcc.Core) (Bcc.SetDomainType Bcc.Core) (text "Core")
+            , viewRadioButton "supporting" (model.domain == Just Bcc.Supporting) (Bcc.SetDomainType Bcc.Supporting)  (text "Supporting")
+            , viewRadioButton "generic" (model.domain == Just Bcc.Generic) (Bcc.SetDomainType Bcc.Generic)  (text "Generic")
             -- TODO: Other
             ]
             )
-        , Form.help [] [ text "How can the Bounded Context be classified?"] ]
+        , Form.help [] [ text "How important is this context to the success of your organisation?"] ]
         , Grid.col []
           [ viewLabel "businessModel" "Business Model"
           , div []
@@ -239,19 +300,23 @@ viewStrategicClassification model =
           [ viewLabel "evolution" "Evolution"
           , div []
               (Radio.radioList "evolution"
-              [ viewRadioButton "genesis" "Genesis" (model.evolution == Just Bcc.Genesis) (Bcc.SetEvolution Bcc.Genesis)
-              , viewRadioButton "customBuilt" "Custom built" (model.evolution == Just Bcc.CustomBuilt) (Bcc.SetEvolution Bcc.CustomBuilt)
-              , viewRadioButton "product" "Product" (model.evolution == Just Bcc.Product) (Bcc.SetEvolution Bcc.Product)
-              , viewRadioButton "commodity" "Commodity" (model.evolution == Just Bcc.Commodity) (Bcc.SetEvolution Bcc.Commodity)
+              [ viewRadioButton "genesis" (model.evolution == Just Bcc.Genesis) (Bcc.SetEvolution Bcc.Genesis) (text "Genesis")
+              , viewRadioButton "customBuilt" (model.evolution == Just Bcc.CustomBuilt) (Bcc.SetEvolution Bcc.CustomBuilt) (text "Custom built")
+              , viewRadioButton "product" (model.evolution == Just Bcc.Product) (Bcc.SetEvolution Bcc.Product) (text "Product")
+              , viewRadioButton "commodity" (model.evolution == Just Bcc.Commodity) (Bcc.SetEvolution Bcc.Commodity) (text "Commodity")
               -- TODO: Other
               ]
               )
           , Form.help [] [ text "How does the context evolve? How novel is it?"] ]
       ]
   ]
+  |> List.map (Html.map (Bcc.ChangeStrategicClassification >> Field))
 
-viewLeftside : Bcc.BoundedContextCanvas -> List (Html EditingMsg)
-viewLeftside model =
+viewLeftside : EditingCanvas -> List (Html EditingMsg)
+viewLeftside canvas =
+  let
+    model = canvas.canvas
+  in
   List.concat
     [ [ Form.group []
         [ viewCaption "name" "Name"
@@ -271,8 +336,8 @@ viewLeftside model =
           ]
         , Form.help [] [ text "Summary of purpose and responsibilities"] ]
       ]
-    , viewStrategicClassification model.classification
-      |> List.map (Html.map Bcc.ChangeStrategicClassification)
+      |> List.map (Html.map Field)
+    , viewStrategicClassification canvas
     , [ Form.group []
         [ viewCaption "businessDecisions" "Business Decisions"
           , Textarea.textarea [ Textarea.id "businessDecisions", Textarea.rows 10, Textarea.value model.businessDecisions, Textarea.onInput Bcc.SetBusinessDecisions ]
@@ -284,8 +349,9 @@ viewLeftside model =
             , Form.help [] [ text "Key domain terminology"]
           ]
       ]
+      |> List.map (Html.map Field)
     ]
-  |> List.map (Html.map Field)
+
 
 viewModelTraits : EditingCanvas -> Html EditingMsg
 viewModelTraits model =
@@ -307,36 +373,17 @@ viewModelTraits model =
       , ("Funnel Context", "Receives documents from multiple upstream contexts and passes them to a single downstream context in a standard format (after applying its own rules).")
       , ("Engagement Context", "Provides key features which attract users to keep using the product. Example: Free Financial Advice Context")
       ]
-
-    descriptionList =
-      Html.dl [class "row"]
-        (traits
-            |> List.concatMap (
-              \(t, d) ->
-                [ Html.dt [ class "col-sm-3" ] [ text t ]
-                , Html.dd [ class "col-sm-9" ] [ text d ]
-                ]
-            )
-        )
   in
     Form.group []
-      [ viewCaption "modelTraits" "Model traits"
-      , Input.text
-      [ Input.id "modelTraits", Input.value model.canvas.modelTraits, Input.onInput Bcc.SetModelTraits ]
-      |> Html.map Field
-      , Form.help [ style "cursor" "pointer", onClick ModelTraitMsg] [ text "Traits that describe the model." ]
-      , Form.help [ class ( if model.modelTraitPopover then "" else "collapse") ]
-        [ descriptionList
-        , Html.footer
-          [ class "blockquote-footer"]
-          [ Html.a
-            [target "_blank"
-            , href "https://github.com/ddd-crew/bounded-context-canvas/blob/master/resources/model-traits-worksheet.md"
-            ]
-            [ text "Source of the descriptions"]
-          ]
+      (List.concat
+      [
+        [ viewCaption "modelTraits" "Model traits"
+        , Input.text
+        [ Input.id "modelTraits", Input.value model.canvas.modelTraits, Input.onInput Bcc.SetModelTraits ]
+        |> Html.map Field
         ]
-      ]
+      , viewInfoTooltip model "modelTraits" "Traits that describe the model." (viewDescriptionList traits (Just "https://github.com/ddd-crew/bounded-context-canvas/blob/master/resources/model-traits-worksheet.md"))
+      ])
 
 viewRightside : EditingCanvas -> List (Html EditingMsg)
 viewRightside model =
@@ -348,7 +395,7 @@ viewRightside model =
 viewCanvas : EditingCanvas -> Html EditingMsg
 viewCanvas model =
   Grid.row []
-    [ Grid.col [] (viewLeftside model.canvas)
+    [ Grid.col [] (viewLeftside model)
     , Grid.col [] (viewRightside model)
     ]
 
