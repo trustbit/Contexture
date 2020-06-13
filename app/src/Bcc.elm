@@ -7,8 +7,7 @@ import Set as Set
 import Dict exposing(Dict)
 
 import Json.Encode as Encode
-import Json.Decode as Decode
-import Json.Decode exposing (Decoder)
+import Json.Decode as Decode exposing (Decoder)
 import Json.Decode.Pipeline as JP
 
 import Domain

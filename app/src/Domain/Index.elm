@@ -4,12 +4,11 @@ import Browser.Navigation as Nav
 
 import Json.Encode as Encode
 import Json.Decode.Pipeline as JP
-import Json.Decode as Decode
-import Json.Decode exposing (Decoder, map3, field, string, int, at, list, maybe)
+import Json.Decode as Decode exposing(Decoder)
 
 import Html exposing (Html, button, div, text)
 import Html.Attributes exposing (..)
-import Html.Events exposing (onClick)
+import Html.Events
 
 import Bootstrap.Grid as Grid
 import Bootstrap.Grid.Row as Row
@@ -29,7 +28,6 @@ import Url
 import Http
 
 import Bcc
-import Bcc.Index
 import Domain
 import Route
 
@@ -106,7 +104,6 @@ createWithName name =
              ]
 
 
-
 viewExisting : List Domain  -> Html Msg
 viewExisting items =
     if List.isEmpty items then
@@ -178,7 +175,7 @@ createNewDomain model =
 
 domainsDecoder: Decoder (List Domain)
 domainsDecoder =
-  Json.Decode.list domainDecoder
+  Decode.list domainDecoder
 
 
 domainDecoder: Decoder Domain

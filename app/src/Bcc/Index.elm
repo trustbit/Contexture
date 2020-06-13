@@ -4,8 +4,7 @@ import Browser.Navigation as Nav
 
 import Json.Encode as Encode
 import Json.Decode.Pipeline as JP
-import Json.Decode as Decode
-import Json.Decode exposing (Decoder, map3, field, string, int, at, list, maybe)
+import Json.Decode as Decode exposing (Decoder)
 
 import Html exposing (Html, button, div, text)
 import Html.Attributes exposing (..)
@@ -64,7 +63,6 @@ update : Msg -> Model -> (Model, Cmd Msg)
 update msg model =
   case msg of
     Loaded (Ok items) ->
-      Debug.log ("Loaded context")
       ({ model | bccs = RemoteData.Success items }, Cmd.none)
     Loaded (Err e) ->
       ({ model | bccs = RemoteData.Failure e }, Cmd.none)
@@ -167,7 +165,7 @@ createNewBcc model =
 
 bccItemsDecoder: Decoder (List BccItem)
 bccItemsDecoder =
-  Json.Decode.list bccItemDecoder
+  Decode.list bccItemDecoder
 
 
 bccItemDecoder: Decoder BccItem

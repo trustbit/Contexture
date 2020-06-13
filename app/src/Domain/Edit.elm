@@ -28,7 +28,6 @@ import RemoteData
 
 import Url
 import Http
-import Dict
 
 import Route
 
@@ -102,15 +101,14 @@ update msg model =
     Deleted (Ok _) ->
       (model, Route.pushUrl Route.Home model.key)
     Loaded (Ok m) ->
-      Debug.log ("Loaded domain")
       ({ model | edit = RemoteData.Success m } , Cmd.none)
     Loaded (Err e) ->
       ({ model | edit = RemoteData.Failure e } , Cmd.none)
     BccMsg m ->
       let
-        (bccModels, bccCmd) = Bcc.Index.update m model.contexts
+        (bccModel, bccCmd) = Bcc.Index.update m model.contexts
       in
-        ({ model | contexts = bccModels}, bccCmd |> Cmd.map BccMsg)
+        ({ model | contexts = bccModel}, bccCmd |> Cmd.map BccMsg)
     _ ->
       Debug.log ("BCC: " ++ Debug.toString msg ++ " " ++ Debug.toString model)
       (model, Cmd.none)
@@ -146,7 +144,6 @@ view model =
             , viewBccCard model.contexts
             ]
           )
-        -- RemoteData.Failtre
         _ ->
           [ Grid.row [] 
             [ Grid.col []
