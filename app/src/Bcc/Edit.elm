@@ -269,6 +269,23 @@ viewCheckbox id title value currentValues =
 viewStrategicClassification : EditingCanvas -> List (Html EditingMsg)
 viewStrategicClassification canvas =
   let
+    domainDescriptions =
+      [ ("Core domain", "A key strategic initiative")
+      , ("Supporting domain", "Necessary but not a differentiator")
+      , ("Generic","a common capability found in many domains")
+      ]
+    businessDescriptions =
+      [ ("Revenue", "People pay directly for this")
+      , ("Engagement","Users like it but they don't pay for it")
+      , ("Compliance", "Protects your business reputation and existence")
+      , ("Cost reduction", "Helps your business to reduce cost or effort")
+      ]
+    evolutionDescriptions =
+      [ ("Genesis", "New unexplored domain")
+      , ("Custom built", "Companies are building their own versions")
+      , ("Product", "Off-the-shelf versions exist with differentiation")
+      , ("Commodity", "Highly-standardised versions exist")
+      ]
     model = canvas.canvas.classification
   in
   [ Grid.row []
@@ -278,18 +295,21 @@ viewStrategicClassification canvas =
         [ viewLabel "classification" "Domain"
         , div []
             (Radio.radioList "classification"
-            [ viewRadioButton "core" (model.domain == Just Bcc.Core) (Bcc.SetDomainType Bcc.Core) (text "Core")
-            , viewRadioButton "supporting" (model.domain == Just Bcc.Supporting) (Bcc.SetDomainType Bcc.Supporting)  (text "Supporting")
-            , viewRadioButton "generic" (model.domain == Just Bcc.Generic) (Bcc.SetDomainType Bcc.Generic)  (text "Generic")
-            -- TODO: Other
-            ]
+              [ viewRadioButton "core" (model.domain == Just Bcc.Core) (Bcc.SetDomainType Bcc.Core) (text "Core")
+              , viewRadioButton "supporting" (model.domain == Just Bcc.Supporting) (Bcc.SetDomainType Bcc.Supporting)  (text "Supporting")
+              , viewRadioButton "generic" (model.domain == Just Bcc.Generic) (Bcc.SetDomainType Bcc.Generic)  (text "Generic")
+              -- TODO: Other
+              ]
             )
-        , Form.help [] [ text "How important is this context to the success of your organisation?"] ]
+            |> Html.map (Bcc.ChangeStrategicClassification >> Field)
+          , viewDescriptionList domainDescriptions (Just "https://github.com/ddd-crew/bounded-context-canvas#strategic-classification")
+            |> viewInfoTooltip canvas "classification" "How important is this context to the success of your organisation?"
+          ]
         , Grid.col []
           [ viewLabel "businessModel" "Business Model"
           , div []
             (
-              [viewCheckbox "revenue" "Revenue" Bcc.Revenue model.business
+              [ viewCheckbox "revenue" "Revenue" Bcc.Revenue model.business
               , viewCheckbox "engagement" "Engagement" Bcc.Engagement model.business
               , viewCheckbox "Compliance" "Compliance" Bcc.Compliance model.business
               , viewCheckbox "costReduction" "Cost reduction" Bcc.CostReduction model.business
@@ -297,7 +317,10 @@ viewStrategicClassification canvas =
               ]
               |> List.map (Html.map Bcc.ChangeBusinessModel)
             )
-          , Form.help [] [ text "What's the underlying business model of the Bounded Context?"] ]
+            |> Html.map (Bcc.ChangeStrategicClassification >> Field)
+          , viewDescriptionList businessDescriptions (Just "https://github.com/ddd-crew/bounded-context-canvas#strategic-classification")
+            |> viewInfoTooltip canvas "businessModel" "What role does the context play in your business model?"
+          ]
         , Grid.col []
           [ viewLabel "evolution" "Evolution"
           , div []
@@ -309,10 +332,13 @@ viewStrategicClassification canvas =
               -- TODO: Other
               ]
               )
-          , Form.help [] [ text "How does the context evolve? How novel is it?"] ]
+              |> Html.map (Bcc.ChangeStrategicClassification >> Field)
+            , viewDescriptionList evolutionDescriptions (Just "https://github.com/ddd-crew/bounded-context-canvas#strategic-classification")
+            |> viewInfoTooltip canvas "evolution" "How evolved is the concept (see Wardley Maps)"
+          ]
       ]
   ]
-  |> List.map (Html.map (Bcc.ChangeStrategicClassification >> Field))
+
 
 viewLeftside : EditingCanvas -> List (Html EditingMsg)
 viewLeftside canvas =
