@@ -3,7 +3,6 @@ module Bcc.Index exposing (Msg, Model, update, view, init)
 import Browser.Navigation as Nav
 
 import Json.Encode as Encode
-import Json.Decode.Pipeline as JP
 import Json.Decode as Decode exposing (Decoder)
 
 import Html exposing (Html, button, div, text)
@@ -21,6 +20,7 @@ import Bootstrap.Button as Button
 import Bootstrap.ListGroup as ListGroup
 import Bootstrap.Card as Card
 import Bootstrap.Card.Block as Block
+import Bootstrap.Badge as Badge
 import Bootstrap.Utilities.Spacing as Spacing
 
 import Url
@@ -32,10 +32,7 @@ import Route
 
 -- MODEL
 
-type alias BccItem =
-  { id: Bcc.BoundedContextId
-  , name: String
-  , description: String }
+type alias BccItem = Bcc.BoundedContextCanvas
 
 type alias Model =
   { navKey : Nav.Key
@@ -101,6 +98,45 @@ createWithName name =
       |> InputGroup.view
     ]
 
+viewItem : BccItem -> Card.Config Msg
+viewItem item =
+  let
+    domainBadge =
+      case item.classification.domain of
+        Just domain -> [ Badge.badgePrimary [] [ text <| Bcc.domainTypeToString domain ] ]
+        Nothing -> []
+    businessBadges =
+      item.classification.business
+      |> List.map Bcc.businessModelToString
+      |> List.map (\b -> Badge.badgeSecondary [] [ text b ])
+    evolutionBadge =
+      case item.classification.evolution of
+        Just evolution -> [ Badge.badgeInfo [] [ text <| Bcc.evolutionToString evolution ] ]
+        Nothing -> []
+    badges = 
+      List.concat
+        [ domainBadge
+        , businessBadges
+        , evolutionBadge
+        ]
+  in
+  Card.config []
+    |> Card.block []
+      ( List.concat
+          [
+            [ Block.titleH4 [] [ text item.name ]]
+            , if String.length item.description > 0
+                then [ Block.text [] [ text item.description  ] ]
+                else []
+            , [ Block.custom (div [] badges) ]
+          ]
+      )
+    |> Card.block []
+      [ Block.link
+          [ href (Route.routeToString (Route.Bcc item.id)), class "stretched-link" ]
+          [text "View Bounded Context"]
+      ]
+
 viewExisting : List BccItem  -> Html Msg
 viewExisting items =
   if List.isEmpty items then
@@ -108,25 +144,7 @@ viewExisting items =
       [ class "lead" ]
       [ text "No exsisting Bounded Contexts found - do you want to create one?" ]
   else
-    let
-      renderCard item =
-        Card.config []
-          |> Card.block []
-            ( List.concat
-                [
-                  [ Block.titleH4 [] [ text item.name ]]
-                  , if String.length item.description > 0
-                      then [ Block.text [] [ text item.description  ] ]
-                      else []
-                ]
-            )
-          |> Card.block []
-            [ Block.link
-                [ href (Route.routeToString (Route.Bcc item.id)), class "stretched-link" ]
-                [text "View Bounded Context"]
-            ]
-    in
-        Card.deck (items |> List.map renderCard)
+    Card.deck (items |> List.map viewItem)
 
 view : Model -> List (Html Msg)
 view model =
@@ -160,17 +178,9 @@ createNewBcc model =
       Http.post
       { url = { baseUrl | path = baseUrl.path ++ "/bccs" } |> Url.toString
       , body = Http.jsonBody body
-      , expect = Http.expectJson Created bccItemDecoder
+      , expect = Http.expectJson Created Bcc.modelDecoder
       }
 
 bccItemsDecoder: Decoder (List BccItem)
 bccItemsDecoder =
-  Decode.list bccItemDecoder
-
-
-bccItemDecoder: Decoder BccItem
-bccItemDecoder =
-  Decode.succeed BccItem
-    |> JP.required "id" Bcc.idDecoder
-    |> JP.required "name" Decode.string
-    |> JP.optional "description" Decode.string ""
+  Decode.list Bcc.modelDecoder

@@ -85,7 +85,8 @@ type alias Dependencies =
   }
 
 type alias BoundedContextCanvas =
-  { domain : Domain.DomainId
+  { id : BoundedContextId
+  , domain : Domain.DomainId
   , name : String
   , description : String
   , classification : StrategicClassification
@@ -120,7 +121,8 @@ initStrategicClassification =
 
 init: Domain.DomainId -> BoundedContextCanvas
 init domain =
-  { domain = domain
+  { id = BoundedContextId(-1)
+  , domain = domain
   , name = ""
   , description = ""
   , classification = initStrategicClassification
@@ -454,10 +456,10 @@ strategicClassificationDecoder =
     |> JP.optional "businessModel" businessModelDecoder []
     |> JP.optional "evolution" (maybeStringDecoder evolutionParser) Nothing
 
-
 modelDecoder : Decoder BoundedContextCanvas
 modelDecoder =
   Decode.succeed BoundedContextCanvas
+    |> JP.required "id" idDecoder
     |> JP.required "domainId" Domain.idDecoder
     |> JP.required "name" Decode.string
     |> JP.optional "description" Decode.string ""
