@@ -201,7 +201,7 @@ view model =
   in
     Grid.containerFluid [] details
 
-viewInfoTooltip : EditingCanvas -> String -> String -> Html EditingMsg -> List (Html EditingMsg)
+viewInfoTooltip : EditingCanvas -> String -> String -> Html EditingMsg -> Html EditingMsg
 viewInfoTooltip model id title description =
   let
     state =
@@ -209,11 +209,13 @@ viewInfoTooltip model id title description =
       |> Dict.get id
       |> Maybe.withDefault False
   in
-    [ Form.help
-        [ style "cursor" "pointer", onClick (TooltipMsg id) ]
-        [ text title ]
-    , Form.help [ class ( if state then "" else "collapse") ] [ description ]
-    ]
+    div
+      []
+      [ Form.help
+          [ style "cursor" "pointer", onClick (TooltipMsg id) ]
+          [ text title ]
+      , Form.help [ class ( if state then "" else "collapse") ] [ description ]
+      ]
 
 
 viewDescriptionList : List (String, String) -> Maybe String -> Html EditingMsg
@@ -340,12 +342,22 @@ viewLeftside canvas =
     , viewStrategicClassification canvas
     , [ Form.group []
         [ viewCaption "businessDecisions" "Business Decisions"
-          , Textarea.textarea [ Textarea.id "businessDecisions", Textarea.rows 10, Textarea.value model.businessDecisions, Textarea.onInput Bcc.SetBusinessDecisions ]
+          , Textarea.textarea
+            [ Textarea.id "businessDecisions"
+            , Textarea.rows 10
+            , Textarea.value model.businessDecisions
+            , Textarea.onInput Bcc.SetBusinessDecisions
+            ]
           , Form.help [] [ text "Key business rules, policies and decisions"]
         ]
       , Form.group []
           [ viewCaption "ubiquitousLanguage" "Ubiquitous Language"
-            , Textarea.textarea [ Textarea.id "ubiquitousLanguage", Textarea.rows 10, Textarea.value model.ubiquitousLanguage, Textarea.onInput Bcc.SetUbiquitousLanguage ]
+            , Textarea.textarea
+              [ Textarea.id "ubiquitousLanguage"
+              , Textarea.rows 10
+              , Textarea.value model.ubiquitousLanguage
+              , Textarea.onInput Bcc.SetUbiquitousLanguage
+              ]
             , Form.help [] [ text "Key domain terminology"]
           ]
       ]
@@ -375,15 +387,17 @@ viewModelTraits model =
       ]
   in
     Form.group []
-      (List.concat
-      [
-        [ viewCaption "modelTraits" "Model traits"
-        , Input.text
-        [ Input.id "modelTraits", Input.value model.canvas.modelTraits, Input.onInput Bcc.SetModelTraits ]
-        |> Html.map Field
+      [ viewCaption "modelTraits" "Model traits"
+      , Input.text
+        [ Input.id "modelTraits"
+        , Input.value model.canvas.modelTraits
+        , Input.onInput Bcc.SetModelTraits
         ]
-      , viewInfoTooltip model "modelTraits" "Traits that describe the model." (viewDescriptionList traits (Just "https://github.com/ddd-crew/bounded-context-canvas/blob/master/resources/model-traits-worksheet.md"))
-      ])
+        |> Html.map Field
+    , viewDescriptionList traits (Just "https://github.com/ddd-crew/bounded-context-canvas/blob/master/resources/model-traits-worksheet.md")
+      |> viewInfoTooltip model "modelTraits" "Traits that describe the model."
+    ]
+
 
 viewRightside : EditingCanvas -> List (Html EditingMsg)
 viewRightside model =
