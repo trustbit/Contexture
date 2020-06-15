@@ -174,6 +174,17 @@ view model =
                 ]
                 [ text "Back" ]
               ]
+            , Grid.col []
+              [ Button.linkButton
+                [ Button.roleLink
+                , Button.attrs
+                  [ target "_blank"
+                  , href "https://github.com/ddd-crew/bounded-context-canvas"
+                  , class "text-muted"
+                  ]
+                ]
+                [ text "Source of the descriptions & help text"]
+              ]
             , Grid.col [ Col.textAlign Text.alignLgRight]
               [ Button.button
                 [ Button.secondary
@@ -236,12 +247,12 @@ viewDescriptionList model sourceReference =
         Nothing -> []
   in
   List.concat
-    [ [ Html.dl [class "row"]
+    [ [ Html.dl []
         (model
           |> List.concatMap (
             \(t, d) ->
-              [ Html.dt [ class "col-sm-3" ] [ text t ]
-              , Html.dd [ class "col-sm-9" ] [ text d ]
+              [ Html.dt [] [ text t ]
+              , Html.dd [] [ text d ]
               ]
           )
         )
@@ -302,7 +313,7 @@ viewStrategicClassification canvas =
               ]
             )
             |> Html.map (Bcc.ChangeStrategicClassification >> Field)
-          , viewDescriptionList domainDescriptions (Just "https://github.com/ddd-crew/bounded-context-canvas#strategic-classification")
+          , viewDescriptionList domainDescriptions Nothing
             |> viewInfoTooltip canvas "classification" "How important is this context to the success of your organisation?"
           ]
         , Grid.col []
@@ -318,7 +329,7 @@ viewStrategicClassification canvas =
               |> List.map (Html.map Bcc.ChangeBusinessModel)
             )
             |> Html.map (Bcc.ChangeStrategicClassification >> Field)
-          , viewDescriptionList businessDescriptions (Just "https://github.com/ddd-crew/bounded-context-canvas#strategic-classification")
+          , viewDescriptionList businessDescriptions Nothing
             |> viewInfoTooltip canvas "businessModel" "What role does the context play in your business model?"
           ]
         , Grid.col []
@@ -333,7 +344,7 @@ viewStrategicClassification canvas =
               ]
               )
               |> Html.map (Bcc.ChangeStrategicClassification >> Field)
-            , viewDescriptionList evolutionDescriptions (Just "https://github.com/ddd-crew/bounded-context-canvas#strategic-classification")
+            , viewDescriptionList evolutionDescriptions Nothing
             |> viewInfoTooltip canvas "evolution" "How evolved is the concept (see Wardley Maps)"
           ]
       ]
@@ -354,6 +365,7 @@ viewLeftside canvas =
             , model.name |> Bcc.ifNameValid (\_ -> [ Input.danger ]) (\_ -> [])
             ])
         , Form.invalidFeedback [] [ text "A name for a Bounded Context is required!" ]
+        , Form.help [] [ text "Naming is hard. Writing down the name of your context and gaining agreement as a team will frame how you design the context." ]
         ]
       , Form.group []
         [ viewCaption "description" "Description"
@@ -362,10 +374,10 @@ viewLeftside canvas =
           , Textarea.value model.description
           , Textarea.onInput Bcc.SetDescription
           ]
-        , Form.help [] [ text "Summary of purpose and responsibilities"] ]
+        , Form.help [] [ text "A few sentences describing the why and what of the context in business language. No technical details here."] ]
       ]
       |> List.map (Html.map Field)
-    , viewStrategicClassification canvas
+    , [ Form.group [] (viewStrategicClassification canvas) ]
     , [ Form.group []
         [ viewCaption "businessDecisions" "Business Decisions"
           , Textarea.textarea
@@ -374,7 +386,7 @@ viewLeftside canvas =
             , Textarea.value model.businessDecisions
             , Textarea.onInput Bcc.SetBusinessDecisions
             ]
-          , Form.help [] [ text "Key business rules, policies and decisions"]
+          , Form.help [] [ text "What are the key business rules and policies within this context?"]
         ]
       , Form.group []
           [ viewCaption "ubiquitousLanguage" "Ubiquitous Language"
@@ -384,7 +396,7 @@ viewLeftside canvas =
               , Textarea.value model.ubiquitousLanguage
               , Textarea.onInput Bcc.SetUbiquitousLanguage
               ]
-            , Form.help [] [ text "Key domain terminology"]
+            , Form.help [] [ text "What are the key domain terms that exist within this context, and what do they mean?"]
           ]
       ]
       |> List.map (Html.map Field)
@@ -421,7 +433,7 @@ viewModelTraits model =
         ]
         |> Html.map Field
     , viewDescriptionList traits (Just "https://github.com/ddd-crew/bounded-context-canvas/blob/master/resources/model-traits-worksheet.md")
-      |> viewInfoTooltip model "modelTraits" "Traits that describe the model."
+      |> viewInfoTooltip model "modelTraits" "How can you characterise the behaviour of this bounded context?"
     ]
 
 

@@ -194,6 +194,7 @@ view { edit, dependencies } =
       , Spacing.p2
       ]
       [ text "Dependencies and Relationships" ]
+    , Form.help [] [ text "To create loosely coupled systems it's essential to be wary of dependencies. In this section you should write the name of each dependency and a short explanation of why the dependency exists." ]
     , Grid.row []
       [ Grid.col []
         [ viewDependency "Message Suppliers" edit.supplier dependencies.suppliers |> Html.map Supplier ]

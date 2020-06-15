@@ -164,6 +164,7 @@ view { adding, messages } =
       , Spacing.p2
       ]
       [ text "Messages Consumed and Produced" ]
+    , Form.help [] [ text "What is the public interface or the contract of your bounded context? Which messages come in and which does it send out?" ]
     , Grid.row []
       [ Grid.col []
         [ Html.h6
