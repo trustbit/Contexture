@@ -47,7 +47,7 @@ Version 1: "Improving data quality"
 - Provide Auto-complete boxes (free text search) for dependencies (search in already existing BCC names)
 - Provide Auto-complete boxes (free text search) for consumed message contracts (search in produces message contracts)
 - [x] Include more help text and [tips](https://github.com/ddd-crew/bounded-context-canvas/blob/master/resources/model-traits-worksheet.md) 
-- [] Include checkboxes and free text fields for 'Business Model' and 'Classification'
+- [ ] Include checkboxes and free text fields for 'Business Model' and 'Classification'
 
 Note: can be run without any external dependencies
 
@@ -61,7 +61,7 @@ Note: needs Structurizr on-premise (via a docker-container)
 
 Version 3: "Empower users to input data"
 
-- Provide help text/additional information for each field
+- [x] Provide help text/additional information for each field
 - Design a wizard for gradually/step-by-step creating a BCC
 - Show proposed Bounded Context Canvases (from entered dependencies)
 
