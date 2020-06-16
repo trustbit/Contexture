@@ -28,6 +28,7 @@ import Url
 import Http
 import RemoteData
 import Dict
+import Set
 
 import Bcc
 import Route
@@ -100,6 +101,17 @@ createWithName name =
       |> InputGroup.view
     ]
 
+viewPillMessage : String -> Int -> List (Html msg)
+viewPillMessage caption value =
+  if value > 0 then
+  [ Grid.simpleRow
+    [ Grid.col [] [text caption]
+    , Grid.col []
+      [ Badge.pillWarning [] [ text (value |> String.fromInt)] ]
+    ]
+  ]
+  else []
+
 viewItem : BccItem -> Card.Config Msg
 viewItem item =
   let
@@ -122,32 +134,29 @@ viewItem item =
         , evolutionBadge
         ]
 
-    consumers = item.dependencies.consumers |> Dict.size
-    suppliers = item.dependencies.suppliers |> Dict.size
-    dependencies =
-      ( if consumers > 0 then
-        [ Grid.simpleRow
-          [ Grid.col [] [text "Consumers"]
-          , Grid.col []
-            [ Badge.pillDanger [class "text-right"] [ text (consumers |> String.fromInt)] ]
-          ]
-        ]
-        else []
-      )
+    messages =
+      [ item.messages.commandsHandled, item.messages.eventsHandled, item.messages.queriesHandled ]
+      |> List.map Set.size
+      |> List.sum
+      |> viewPillMessage "Handled Messages"
       |> List.append
-        ( if suppliers > 0 then
-          [ Grid.simpleRow
-            [ Grid.col [] [text "Suppliers"]
-            , Grid.col []
-              [ Badge.pillDanger [class "text-right"] [ text (suppliers |> String.fromInt)]]
-            ]
-          ]
-          else []
+        ( [ item.messages.commandsSent, item.messages.eventsPublished, item.messages.queriesInvoked]
+          |> List.map Set.size
+          |> List.sum
+          |> viewPillMessage "Published Messages"
         )
 
-
+    dependencies =
+      item.dependencies.consumers
+      |> Dict.size
+      |> viewPillMessage "Consumers"
+      |> List.append
+        ( item.dependencies.suppliers
+          |> Dict.size
+          |> viewPillMessage "Suppliers"
+        )
   in
-  Card.config [ Card.attrs [class "mb-3", class "col-lg-3"]]
+  Card.config [ Card.attrs [class "mb-3", class "col-lg-6"]]
     |> Card.block []
       ( List.concat
           [
@@ -156,9 +165,12 @@ viewItem item =
                 then [ Block.text [] [ text item.description  ] ]
                 else []
             , [ Block.custom (div [] badges) ]
-            , [ Block.custom (div [] dependencies)]
           ]
       )
+    |> Card.block []
+      [ Block.custom (div [] dependencies)
+      , Block.custom (div [] messages)
+      ]
     |> Card.block []
       [ Block.link
           [ href (Route.routeToString (Route.Bcc item.id)), class "stretched-link" ]
@@ -175,7 +187,7 @@ viewExisting items =
     items
     |> List.sortBy (\i -> i.name)
     |> List.map viewItem
-    |> chunksOfLeft 3
+    |> chunksOfLeft 2
     |> List.map Card.deck
     |> div []
 
