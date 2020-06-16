@@ -156,12 +156,11 @@ viewItem item =
           |> viewPillMessage "Suppliers"
         )
   in
-  Card.config [ Card.attrs [class "mb-3", class "col-lg-6"]]
+  Card.config [ Card.attrs [class "mb-3", class ""]]
+    |> Card.headerH4 [] [ text item.name ]
     |> Card.block []
       ( List.concat
-          [
-            [ Block.titleH4 [] [ text item.name ]]
-            , if String.length item.description > 0
+          [ if String.length item.description > 0
                 then [ Block.text [] [ text item.description  ] ]
                 else []
             , [ Block.custom (div [] badges) ]
@@ -171,10 +170,10 @@ viewItem item =
       [ Block.custom (div [] dependencies)
       , Block.custom (div [] messages)
       ]
-    |> Card.block []
-      [ Block.link
+    |> Card.footer []
+      [ Html.a
           [ href (Route.routeToString (Route.Bcc item.id)), class "stretched-link" ]
-          [text "View Bounded Context"]
+          [ text "Edit Bounded Context" ]
       ]
 
 viewExisting : List BccItem  -> Html Msg
