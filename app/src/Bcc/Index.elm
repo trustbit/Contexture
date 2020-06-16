@@ -23,6 +23,7 @@ import Bootstrap.Card.Block as Block
 import Bootstrap.Badge as Badge
 import Bootstrap.Utilities.Spacing as Spacing
 
+import List.Split exposing (chunksOfLeft)
 import Url
 import Http
 import RemoteData
@@ -120,7 +121,7 @@ viewItem item =
         , evolutionBadge
         ]
   in
-  Card.config []
+  Card.config [ Card.attrs [class "mb-3", class "col-lg-3"]]
     |> Card.block []
       ( List.concat
           [
@@ -144,7 +145,12 @@ viewExisting items =
       [ class "lead" ]
       [ text "No exsisting Bounded Contexts found - do you want to create one?" ]
   else
-    Card.deck (items |> List.map viewItem)
+    items
+    |> List.sortBy (\i -> i.name)
+    |> List.map viewItem
+    |> chunksOfLeft 3
+    |> List.map Card.deck
+    |> div []
 
 view : Model -> List (Html Msg)
 view model =
