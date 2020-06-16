@@ -27,6 +27,7 @@ import List.Split exposing (chunksOfLeft)
 import Url
 import Http
 import RemoteData
+import Dict
 
 import Bcc
 import Route
@@ -114,12 +115,37 @@ viewItem item =
       case item.classification.evolution of
         Just evolution -> [ Badge.badgeInfo [] [ text <| Bcc.evolutionToString evolution ] ]
         Nothing -> []
-    badges = 
+    badges =
       List.concat
         [ domainBadge
         , businessBadges
         , evolutionBadge
         ]
+
+    consumers = item.dependencies.consumers |> Dict.size
+    suppliers = item.dependencies.suppliers |> Dict.size
+    dependencies =
+      ( if consumers > 0 then
+        [ Grid.simpleRow
+          [ Grid.col [] [text "Consumers"]
+          , Grid.col []
+            [ Badge.pillDanger [class "text-right"] [ text (consumers |> String.fromInt)] ]
+          ]
+        ]
+        else []
+      )
+      |> List.append
+        ( if suppliers > 0 then
+          [ Grid.simpleRow
+            [ Grid.col [] [text "Suppliers"]
+            , Grid.col []
+              [ Badge.pillDanger [class "text-right"] [ text (suppliers |> String.fromInt)]]
+            ]
+          ]
+          else []
+        )
+
+
   in
   Card.config [ Card.attrs [class "mb-3", class "col-lg-3"]]
     |> Card.block []
@@ -130,6 +156,7 @@ viewItem item =
                 then [ Block.text [] [ text item.description  ] ]
                 else []
             , [ Block.custom (div [] badges) ]
+            , [ Block.custom (div [] dependencies)]
           ]
       )
     |> Card.block []
@@ -162,7 +189,7 @@ view model =
         [ Grid.col [] [ createWithName model.bccName ] ]
       ]
     _ -> [ text "Loading your contexts"]
-          
+
 
 -- helpers
 
