@@ -103,6 +103,22 @@ createWithName name =
               |> InputGroup.view
              ]
 
+viewDomain : Domain -> Card.Config Msg
+viewDomain item =
+  Card.config []
+    |> Card.headerH4 [] [ text item.name ]
+    |> Card.block []
+        ( List.concat
+        [ if String.length item.vision > 0
+                then [ Block.text [] [ text item.vision  ] ]
+                else []
+        ] )
+
+    |> Card.footer []
+        [ Html.a
+            [ href (Route.routeToString (Route.Domain item.id)), class "stretched-link" ]
+            [ text "View Domain" ]
+        ]
 
 viewExisting : List Domain  -> Html Msg
 viewExisting items =
@@ -111,28 +127,11 @@ viewExisting items =
             [ class "lead" ]
             [ text "No existing domains found - do you want to create one?" ]
     else
-        let
-            renderCard item =
-                Card.config []
-                    |> Card.block []
-                        ( List.concat
-                        [
-                            [ Block.titleH4 [] [ text item.name ]]
-                            , if String.length item.vision > 0
-                                then [ Block.text [] [ text item.vision  ] ]
-                                else []
-                        ] )
-                    |> Card.block []
-                        [ Block.link
-                            [ href (Route.routeToString (Route.Domain item.id)), class "stretched-link" ]
-                            [text "View Domain"]
-                        ]
-        in
-        Card.deck (items |> List.map renderCard)
+        Card.deck (items |> List.map viewDomain)
 
 view : Model -> Html Msg
 view model =
-  let 
+  let
     details =
         case model.domains of
             RemoteData.Success items ->
@@ -144,10 +143,10 @@ view model =
             _ ->
                 [ Grid.row []
                     [ Grid.col [] [ text "Loading your domains"] ]
-                ] 
+                ]
   in
     Grid.container [] details
-    
+
 
 -- helpers
 
