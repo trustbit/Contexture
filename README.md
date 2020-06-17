@@ -34,24 +34,27 @@ Additional ideas on how to gather or present information can be read in [Cyrille
 
 ### Features for a Prototype
 
-:white_check_mark: MVP: "Mimicking the BCC with HTML forms"
+:white_check_mark: Goal: "Mimicking the BCC with HTML forms"
 
 - [x] Have a form mirroring the BCC with free text fields
 - [x] Creating a new bounded context by submitting a new form
 - [x] Loading existing BCC into a form and updating them by (re)submitting it
 
-Version 1: "Improving data quality"
+Goal: "Improving data quality"
 
-- Use dropdowns + (conditional) free text where appropriate (strategic classification, model traits, relationships)
-- Improve definition of ubiquitous language terms (allow Key-Value pairs)
-- Provide Auto-complete boxes (free text search) for dependencies (search in already existing BCC names)
+- Use dropdowns/autocomplete free text where appropriate (model traits, relationships, messages)
+- Support editing of messages & relationships
+- Improve definition of ubiquitous language terms (allow Key-Value pairs for defining a glossary)
+- Provide Auto-complete boxes (with free text search) for dependencies (search in already existing BCC/Domain names) and allow only references to existing items (with the possibility to create some in the fly)
 - Provide Auto-complete boxes (free text search) for consumed message contracts (search in produces message contracts)
 - [x] Include more help text and [tips](https://github.com/ddd-crew/bounded-context-canvas/blob/master/resources/model-traits-worksheet.md) 
 - [ ] Include checkboxes and free text fields for 'Business Model' and 'Classification'
+- Allow Sub-Domains / Domain hierarchies (all levels can contain a Bounded Context)
+- Rename Messages to contracts and add UI-fragments as a new type of contract
 
 Note: can be run without any external dependencies
 
-Version 2: "Connecting existing Tools for visualization"
+Goal: "Connecting existing Tools for visualization"
 
 - connect Structurizr as (additional?) persistence layer
 - Visualize data from Structurizr as BCC
@@ -59,11 +62,14 @@ Version 2: "Connecting existing Tools for visualization"
 
 Note: needs Structurizr on-premise (via a docker-container)
 
-Version 3: "Empower users to input data"
+Goal: "Empower users to input data and document their landscape"
 
 - [x] Provide help text/additional information for each field
 - Design a wizard for gradually/step-by-step creating a BCC
 - Show proposed Bounded Context Canvases (from entered dependencies)
+- Assign a 'responsible Team' on both Domain & BC level
+- Document technical information for dependencies and messages (e.g. technical message names, protocol, underlying technology) in a seperate view
+- Support additional technical information (e.g. health checks, helm-charts, artifacts, ...)
 
 ### Roadmap to a Prototype
 
