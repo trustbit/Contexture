@@ -6,7 +6,7 @@ Reading and understanding an existing canvas is simple, even for people who are 
 In order to create a new BCC, you need to understand a lot of concepts from DDD and filling in all the fields is not a simple task.
 
 While other ways to build a [BCC exist](https://github.com/ddd-crew/bounded-context-canvas), we are building an application to support this modeling process with a dedicated tool from an DDD perspective.
-You can read about the ideas of Contexture in the [concept](./concept.md) and you can view the current status of the application here <https://contexture.azurewebsites.net/> (be careful: don't store any sensitive data there; everything you store will be deleted upon the next deployment.)
+You can read about the ideas of Contexture in the [concept](./concept.md) and you can view the current status of the application at <https://contexture.azurewebsites.net/> (be careful: don't store any sensitive data there; everything you store will be deleted upon the next deployment.)
 
 ## Contexture server backend
 
