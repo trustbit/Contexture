@@ -5,122 +5,8 @@ The canvas can be used to document business aspects, the most important behavior
 Reading and understanding an existing canvas is simple, even for people who are not familiar with concepts from Domain Driven Design.
 In order to create a new BCC, you need to understand a lot of concepts from DDD and filling in all the fields is not a simple task.
 
-## Building an application
-
-Typically a BCC is created with the help of Post-ITs on physical paper, while digital versions are usually just a mirror of the physical representation, e.g. with the help of Miro.
-Meaning that the captured information is represented as free text on virtual Post-ITs and is not stored in a structured way.
-This prohibits further data processing and visualization of the information.
-
-Therefor we propose to design a small application which:
-
-- stores information about a BCC in a structured way instead of just using free text on (virtual) Post-ITs,
-- allows explicit connections between different bounded contexts,
-- supports updating and versioning of the information over time,
-- allows to export and visualize the information from the application,
-- and helps people to input data for a BCC easier
-
-![Mockup of the application](./Sketch.jpg)
-
-While capturing the data manually via a form is great for learning, understanding and building up initial representations of BCC.
-The manual work can only be seen as a short to mid term goal, in the long run the data for the BCC should be gathered automatically from applications and should then be presented to the user.
-E.g. the data can be read from the source code during the build process:
-
-- capturing domain terminology by looking at frequently used words,
-- reading business rules & policies from e.g. attributed types,
-- discovering dependencies to other systems via e.g. OpenAPI documents or
-- describing model traits or classifications via attributes
-
-Additional ideas on how to gather or present information can be read in [Cyrille Martraire book on Living Documentation](https://leanpub.com/livingdocumentation).
-
-### Features for a Prototype
-
-:white_check_mark: Goal: "Mimicking the BCC with HTML forms"
-
-- [x] Have a form mirroring the BCC with free text fields
-- [x] Creating a new bounded context by submitting a new form
-- [x] Loading existing BCC into a form and updating them by (re)submitting it
-
-Goal: "Improving data quality"
-
-- Use dropdowns/autocomplete free text where appropriate (model traits, relationships, messages)
-- Support editing of messages & relationships
-- Improve definition of ubiquitous language terms (allow Key-Value pairs for defining a glossary)
-- Provide Auto-complete boxes (with free text search) for dependencies (search in already existing BCC/Domain names) and allow only references to existing items (with the possibility to create some in the fly)
-- Provide Auto-complete boxes (free text search) for consumed message contracts (search in produces message contracts)
-- [x] Include more help text and [tips](https://github.com/ddd-crew/bounded-context-canvas/blob/master/resources/model-traits-worksheet.md) 
-- [ ] Include checkboxes and free text fields for 'Business Model' and 'Classification'
-- Allow Sub-Domains / Domain hierarchies (all levels can contain a Bounded Context)
-- Rename Messages to contracts and add UI-fragments as a new type of contract
-
-Note: can be run without any external dependencies
-
-Goal: "Connecting existing Tools for visualization"
-
-- connect Structurizr as (additional?) persistence layer
-- Visualize data from Structurizr as BCC
-- evaluate [Context Map](https://contextmapper.org/docs/context-map/) for exporting & visualizing contexts (see <https://github.com/ContextMapper/context-mapper-examples/tree/master/src/main/cml/ddd-sample>)
-
-Note: needs Structurizr on-premise (via a docker-container)
-
-Goal: "Empower users to input data and document their landscape"
-
-- [x] Provide help text/additional information for each field
-- Design a wizard for gradually/step-by-step creating a BCC
-- Show proposed Bounded Context Canvases (from entered dependencies)
-- Assign a 'responsible Team' on both Domain & BC level
-- Document technical information for dependencies and messages (e.g. technical message names, protocol, underlying technology) in a seperate view
-- Support additional technical information (e.g. health checks, helm-charts, artifacts, ...)
-
-### Roadmap to a Prototype
-
-- No tests needed
-- No deployment needed (local/dev dependencies should be dockerized?)
-- No authentication/authorization
-- File based persistence is good enough
-- No versioning needed
-
-Guessed effort for the main parts:
-
-- :white_check_mark: "Mimicking the BCC with HTML forms"
-  - can be run without any external dependencies
-  - effort: 3 days
-- "Improving data quality"
-  - can be run without any external dependencies
-  - effort: 4 days
-- "Connecting Sructurizr for visualization"
-  - needs Structurizr on-premise version (via a docker-container)
-  - effort: 4 days
-- "Empower users to input data"
-  - effort 4 days
-
-## Connect the BCC with Structurizr
-
-For visualization and exploration purposes Structurizr can be used to display information and the connections of bounded contexts.
-
-Mapping BCC towards the Structurizr / C4 model:
-
-DDD concepts:
-
-- Domain -> Structurizr/Workspace
-- Subdomain -> C4/SoftwareSystem
-- BoundedContext -> C4/Container
-- Messages/Contracts -> C4/Component
-
-BCC concepts:
-
-- Name -> C4/Container-name
-- Description -> C4/Container-Description
-- Strategic Classification -> C4/Container-TAGs / Container-Properties
-- Business Decisions -> Markdown documentation
-- Ubiquitous Language -> Markdown documentation
-- Model Traits -> C4/Container-TAGs
-- Messages Consumed & Produced ~> Component references (TODO: message level?)
-- Dependencies/Relationships -> Structurizr/"uses" + tags for releationships
-
-Visualizations:
-
-- Domain / global context map -> Structurizr/Workspace linking + SystemLandscapeDiagram
-- Context map within domain -> Structurizr/SystemLandscapeDiagram
+While other ways to build a [BCC exist](https://github.com/ddd-crew/bounded-context-canvas), we are building an application to support this modeling process with a dedicated tool from an DDD perspective.
+You can read about the ideas of Contexture in the [concept](./concept.md) and you can view the current status of the application here <https://contexture.azurewebsites.net/> (be careful: don't store any sensitive data there; everything you store will be deleted upon the next deployment.)
 
 ## Contexture server backend
 
@@ -133,7 +19,7 @@ cd server
 npm i
 ```
 
-### Usage
+### Run the backend
 
 ```bash
 cd server
@@ -153,7 +39,7 @@ The application is developed with [Elm](https://elm-lang.org/) and connects to t
 
 Make sure [Elm](https://guide.elm-lang.org/install/elm.html) is installed and part of your path.
 
-### Usage
+### Run the frontend
 
 During development use `elm-live` for handling routes correctly.
 
