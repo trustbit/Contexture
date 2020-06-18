@@ -83,44 +83,42 @@ viewDomain item =
   Card.config []
     |> Card.headerH4 [] [ text item.name ]
     |> Card.block []
-        ( List.concat
-        [ if String.length item.vision > 0
-                then [ Block.text [] [ text item.vision  ] ]
-                else []
-        ] )
-
+      ( if String.length item.vision > 0
+        then [ Block.text [] [ text item.vision  ] ]
+        else []
+      )
     |> Card.footer []
-        [ Html.a
-            [ href (Route.routeToString (Route.Domain item.id)), class "stretched-link" ]
-            [ text "View Domain" ]
-        ]
+      [ Html.a
+        [ href (Route.routeToString (Route.Domain item.id)), class "stretched-link" ]
+        [ text "View Domain" ]
+      ]
 
 viewExisting : List Domain  -> Html Msg
 viewExisting items =
-    if List.isEmpty items then
-        Html.p
-            [ class "lead" ]
-            [ text "No existing domains found - do you want to create one?" ]
-    else
-        Card.deck (items |> List.map viewDomain)
+  if List.isEmpty items then
+    Html.p
+        [ class "lead" ]
+        [ text "No existing domains found - do you want to create one?" ]
+  else
+    Card.deck (items |> List.map viewDomain)
 
 view : Model -> Html Msg
 view model =
   let
     details =
-        case model.domains of
-            RemoteData.Success items ->
-                [ Grid.row [ Row.attrs [ Spacing.pt3 ] ]
-                    [ Grid.col [] [viewExisting items ] ]
-                , Grid.row [ Row.attrs [ Spacing.mt3 ] ]
-                    [ Grid.col []
-                      [ model.createDomain |> Domain.Create.view |> Html.map CreateMsg ]
-                    ]
-                ]
-            _ ->
-                [ Grid.row []
-                    [ Grid.col [] [ text "Loading your domains"] ]
-                ]
+      case model.domains of
+        RemoteData.Success items ->
+          [ Grid.row [ Row.attrs [ Spacing.pt3 ] ]
+              [ Grid.col [] [viewExisting items ] ]
+          , Grid.row [ Row.attrs [ Spacing.mt3 ] ]
+              [ Grid.col []
+                [ model.createDomain |> Domain.Create.view |> Html.map CreateMsg ]
+              ]
+          ]
+        _ ->
+          [ Grid.row []
+              [ Grid.col [] [ text "Loading your domains"] ]
+          ]
   in
     Grid.container [] details
 

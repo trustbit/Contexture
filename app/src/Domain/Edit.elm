@@ -115,16 +115,6 @@ update msg model =
 
 -- VIEW
 
-ifValid : (model -> Bool) -> (model -> result) -> (model -> result) -> model -> result
-ifValid predicate trueRenderer falseRenderer model =
-  if predicate model then
-    trueRenderer model
-  else
-    falseRenderer model
-
-ifNameValid =
-  ifValid (\name -> String.length name <= 0)
-
 viewLabel : String -> String -> Html msg
 viewLabel labelId caption =
   Form.label [ for labelId] [ Html.h6 [] [ text caption ] ]
@@ -180,7 +170,7 @@ viewDomainCard model =
         , Button.submitButton
           [ Button.primary
           , Button.onClick Save
-          , Button.disabled (model.name |> ifNameValid (\_ -> True) (\_ -> False))
+          , Button.disabled (model.name |> Domain.ifNameValid (\_ -> True) (\_ -> False))
           ]
           [ text "Save"]
         ]
@@ -202,7 +192,7 @@ viewDomain model =
       , Input.text (
         List.concat
         [ [ Input.id "name", Input.value model.name, Input.onInput Domain.SetName ]
-        , model.name |> ifNameValid (\_ -> [ Input.danger ]) (\_ -> [])
+        , model.name |> Domain.ifNameValid (\_ -> [ Input.danger ]) (\_ -> [])
         ]
       )
       , Form.invalidFeedback [] [ text "A name for the Domain is required!" ]
@@ -231,24 +221,24 @@ loadDomain model =
 
 saveBCC: Url.Url -> EditableDomain -> Cmd Msg
 saveBCC url model =
-    Http.request
-      { method = "PUT"
-      , headers = []
-      , url = Url.toString url
-      , body = Http.jsonBody <| Domain.modelEncoder model
-      , expect = Http.expectWhatever Saved
-      , timeout = Nothing
-      , tracker = Nothing
-      }
+  Http.request
+    { method = "PUT"
+    , headers = []
+    , url = Url.toString url
+    , body = Http.jsonBody <| Domain.modelEncoder model
+    , expect = Http.expectWhatever Saved
+    , timeout = Nothing
+    , tracker = Nothing
+    }
 
 deleteBCC: Model -> Cmd Msg
 deleteBCC model =
-    Http.request
-      { method = "DELETE"
-      , headers = []
-      , url = Url.toString model.self
-      , body = Http.emptyBody
-      , expect = Http.expectWhatever Deleted
-      , timeout = Nothing
-      , tracker = Nothing
-      }
+  Http.request
+    { method = "DELETE"
+    , headers = []
+    , url = Url.toString model.self
+    , body = Http.emptyBody
+    , expect = Http.expectWhatever Deleted
+    , timeout = Nothing
+    , tracker = Nothing
+    }

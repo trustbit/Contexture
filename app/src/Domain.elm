@@ -1,6 +1,6 @@
 module Domain exposing (
   DomainId(..), Domain, Model, init,
-  Msg(..),update,
+  Msg(..),update,ifNameValid,
   idToString, idParser, idEncoder, idDecoder,
   domainDecoder, domainsDecoder, modelEncoder
   )
@@ -43,6 +43,16 @@ update msg model =
       { model | vision = vision}
 
 -- VIEW
+
+ifValid : (model -> Bool) -> (model -> result) -> (model -> result) -> model -> result
+ifValid predicate trueRenderer falseRenderer model =
+  if predicate model then
+    trueRenderer model
+  else
+    falseRenderer model
+
+ifNameValid =
+  ifValid (\name -> String.length name <= 0)
 
 
 -- CONVERSIONS
