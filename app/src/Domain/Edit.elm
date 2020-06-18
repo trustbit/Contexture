@@ -226,7 +226,7 @@ loadDomain: Model -> Cmd Msg
 loadDomain model =
   Http.get
     { url = Url.toString model.self
-    , expect = Http.expectJson Loaded modelDecoder
+    , expect = Http.expectJson Loaded Domain.domainDecoder
     }
 
 saveBCC: Url.Url -> EditableDomain -> Cmd Msg
@@ -235,7 +235,7 @@ saveBCC url model =
       { method = "PUT"
       , headers = []
       , url = Url.toString url
-      , body = Http.jsonBody <| modelEncoder model
+      , body = Http.jsonBody <| Domain.modelEncoder model
       , expect = Http.expectWhatever Saved
       , timeout = Nothing
       , tracker = Nothing
@@ -252,16 +252,3 @@ deleteBCC model =
       , timeout = Nothing
       , tracker = Nothing
       }
-
-modelDecoder : Decode.Decoder Domain.Domain
-modelDecoder =
-  Decode.succeed Domain.Domain
-    |> JP.required "name" Decode.string
-    |> JP.optional "vision" Decode.string ""
-
-modelEncoder : Domain.Domain -> Encode.Value
-modelEncoder model =
-    Encode.object
-        [ ("name", Encode.string model.name)
-        , ("vision", Encode.string model.vision)
-        ]

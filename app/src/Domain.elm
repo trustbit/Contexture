@@ -1,10 +1,12 @@
 module Domain exposing (
   DomainId(..), Domain, Model, init,
   Msg(..),update,
-  idToString, idParser, idEncoder, idDecoder
+  idToString, idParser, idEncoder, idDecoder,
+  domainDecoder, domainsDecoder, modelEncoder
   )
 
 import Json.Decode as Decode
+import Json.Decode.Pipeline as JP
 import Json.Encode as Encode
 import Url.Parser exposing (Parser, custom)
 
@@ -14,14 +16,16 @@ type DomainId
   = DomainId Int
 
 type alias Domain =
-  { name: String
+  { id : DomainId
+  , name: String
   , vision: String }
 
 type alias Model = Domain
 
 init : () -> Domain
 init _ =
-    { name = ""
+    { id = DomainId(-1)
+    , name = ""
     , vision = "" }
 
 -- UPDATE
@@ -81,3 +85,23 @@ idDecoder =
 idEncoder : DomainId -> Encode.Value
 idEncoder value =
   Encode.int (extractInt value)
+
+domainDecoder: Decode.Decoder Domain
+domainDecoder =
+  Decode.succeed Domain
+    |> JP.required "id" idDecoder
+    |> JP.required "name" Decode.string
+    |> JP.optional "vision" Decode.string ""
+
+
+domainsDecoder: Decode.Decoder (List Domain)
+domainsDecoder =
+  Decode.list domainDecoder
+
+
+modelEncoder : Domain -> Encode.Value
+modelEncoder model =
+    Encode.object
+        [ ("name", Encode.string model.name)
+        , ("vision", Encode.string model.vision)
+        ]

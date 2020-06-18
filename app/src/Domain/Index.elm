@@ -29,6 +29,7 @@ import Http
 
 import Bcc
 import Domain
+import Domain.Create
 import Route
 
 -- MODEL
@@ -41,25 +42,26 @@ type alias Domain =
 type alias Model =
   { navKey : Nav.Key
   , baseUrl : String
-  , newDomainName: String
+  , createDomain: Domain.Create.Model
   , domains: RemoteData.WebData (List Domain)
    }
 
 init: String -> Nav.Key -> (Model, Cmd Msg)
 init baseUrl key =
+  let
+    (createModel, createCmd) = Domain.Create.init (baseUrl ++ "/api") key
+  in
   ( { navKey = key
     , baseUrl = baseUrl
-    , newDomainName = ""
+    , createDomain = createModel
     , domains = RemoteData.Loading }
-  , loadAll baseUrl )
+  , Cmd.batch [loadAll baseUrl, createCmd |> Cmd.map CreateMsg] )
 
 -- UPDATE
 
 type Msg
   = Loaded (Result Http.Error (List Domain))
-  | SetDomainName String
-  | CreateDomain
-  | DomainCreated (Result Http.Error Domain)
+  | CreateMsg Domain.Create.Msg
 
 update : Msg -> Model -> (Model, Cmd Msg)
 update msg model =
@@ -68,40 +70,13 @@ update msg model =
       ({ model | domains = RemoteData.Success items }, Cmd.none)
     Loaded (Err e) ->
         ({ model | domains = RemoteData.Failure e }, Cmd.none)
-    SetDomainName name ->
-      ({ model | newDomainName = name}, Cmd.none)
-    CreateDomain ->
-      (model, createNewDomain model)
-    DomainCreated (Ok item) ->
-        (model, Route.pushUrl (Route.Domain item.id) model.navKey)
-    _ ->
-        Debug.log ("Domain.Index: " ++ Debug.toString msg ++ " " ++ Debug.toString model)
-        (model, Cmd.none)
+    CreateMsg create ->
+      let
+        (createModel, createCmd) = Domain.Create.update create model.createDomain
+      in
+        ({ model | createDomain = createModel }, createCmd |> Cmd.map CreateMsg)
 
 -- VIEW
-
-createWithName : String -> Html Msg
-createWithName name =
-    Form.form [Html.Events.onSubmit CreateDomain]
-        [ InputGroup.config (
-              InputGroup.text
-                [ Input.id name
-                , Input.value name
-                , Input.onInput SetDomainName
-                , Input.placeholder "Name of the domain"
-                ]
-              )
-              |> InputGroup.successors
-                [ InputGroup.button
-                  [ Button.attrs
-                    [ Html.Attributes.type_ "submit"]
-                    , Button.primary
-                    , Button.disabled (name |> Bcc.ifNameValid (\_ -> True) (\_ -> False))
-                    ]
-                  [ text "Create new domain"]
-                ]
-              |> InputGroup.view
-             ]
 
 viewDomain : Domain -> Card.Config Msg
 viewDomain item =
@@ -137,8 +112,10 @@ view model =
             RemoteData.Success items ->
                 [ Grid.row [ Row.attrs [ Spacing.pt3 ] ]
                     [ Grid.col [] [viewExisting items ] ]
-                , Grid.row [ Row.attrs [Spacing.mt3]]
-                    [ Grid.col [] [ createWithName model.newDomainName ] ]
+                , Grid.row [ Row.attrs [ Spacing.mt3 ] ]
+                    [ Grid.col []
+                      [ model.createDomain |> Domain.Create.view |> Html.map CreateMsg ]
+                    ]
                 ]
             _ ->
                 [ Grid.row []
@@ -154,32 +131,7 @@ loadAll: String -> Cmd Msg
 loadAll baseUrl =
   Http.get
     { url = baseUrl ++ "/api/domains"
-    , expect = Http.expectJson Loaded domainsDecoder
+    , expect = Http.expectJson Loaded Domain.domainsDecoder
     }
 
 
-createNewDomain : Model -> Cmd Msg
-createNewDomain model =
-    let
-        body =
-            Encode.object
-            [ ("name", Encode.string model.newDomainName) ]
-    in
-        Http.post
-        { url = model.baseUrl ++ "/api/domains"
-        , body = Http.jsonBody body
-        , expect = Http.expectJson DomainCreated domainDecoder
-        }
-
-
-domainsDecoder: Decoder (List Domain)
-domainsDecoder =
-  Decode.list domainDecoder
-
-
-domainDecoder: Decoder Domain
-domainDecoder =
-  Decode.succeed Domain
-    |> JP.required "id" Domain.idDecoder
-    |> JP.required "name" Decode.string
-    |> JP.optional "vision" Decode.string ""
