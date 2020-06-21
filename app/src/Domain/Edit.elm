@@ -32,6 +32,7 @@ import Http
 import Route
 
 import Domain
+import Domain.Create
 import Bcc.Index
 
 -- MODEL
@@ -42,6 +43,7 @@ type alias Model =
   { key: Nav.Key
   , self: Url.Url
   , edit: RemoteData.WebData EditableDomain
+  , createSubDomain: Domain.Create.Model
   , contexts : Bcc.Index.Model
   }
 
@@ -49,16 +51,22 @@ init : Nav.Key -> Url.Url -> (Model, Cmd Msg)
 init key url =
   let
     (contexts, contextCmd) = Bcc.Index.init url key
+    (createSubModel, createSubCmd) = Domain.Create.init (Url.toString url) key
     model =
       { key = key
       , self = url
       , edit = RemoteData.Loading
       , contexts = contexts
+      , createSubDomain = createSubModel
       }
   in
     (
       model
-    , Cmd.batch [loadDomain model, contextCmd |> Cmd.map BccMsg ]
+    , Cmd.batch 
+      [ loadDomain model
+      , contextCmd |> Cmd.map BccMsg
+      , createSubCmd |> Cmd.map CreateMsg
+      ]
     )
 
 -- UPDATE
@@ -69,6 +77,7 @@ type EditingMsg
 type Msg
   = Loaded (Result Http.Error Domain.Domain)
   | Editing EditingMsg
+  | CreateMsg Domain.Create.Msg
   | Save
   | Saved (Result Http.Error ())
   | Delete
@@ -109,6 +118,11 @@ update msg model =
         (bccModel, bccCmd) = Bcc.Index.update m model.contexts
       in
         ({ model | contexts = bccModel}, bccCmd |> Cmd.map BccMsg)
+    CreateMsg createMsg ->
+      let
+        (createModel, createCmd) = Domain.Create.update createMsg model.createSubDomain
+      in
+        ({ model | createSubDomain = createModel }, createCmd |> Cmd.map CreateMsg)
     _ ->
       Debug.log ("BCC: " ++ Debug.toString msg ++ " " ++ Debug.toString model)
       (model, Cmd.none)
@@ -126,9 +140,13 @@ view model =
       case model.edit of
         RemoteData.Success domain ->
           ( List.concat
-            [ [ Grid.row []
+            [ [ Grid.simpleRow
                 [ Grid.col []
                     [ viewDomainCard domain ]
+                ]
+              , Grid.simpleRow
+                [ Grid.col []
+                  [ Domain.Create.view model.createSubDomain |> Html.map CreateMsg ]
                 ]
               ]
             , viewBccCard model.contexts

@@ -8,9 +8,6 @@ import Html exposing (Html, button, div, text)
 import Html.Attributes exposing (..)
 import Html.Events
 
-import Bootstrap.Grid as Grid
-import Bootstrap.Grid.Row as Row
-import Bootstrap.Grid.Col as Col
 import Bootstrap.Form as Form
 import Bootstrap.Form.Input as Input
 import Bootstrap.Form.InputGroup as InputGroup
@@ -18,7 +15,6 @@ import Bootstrap.Button as Button
 import Url
 import Http
 
-import Bcc
 import Domain
 import Route
 
