@@ -41,15 +41,15 @@ type alias Domain =
 
 type alias Model =
   { navKey : Nav.Key
-  , baseUrl : String
+  , baseUrl : Url.Url
   , createDomain: Domain.Create.Model
   , domains: RemoteData.WebData (List Domain)
    }
 
-init: String -> Nav.Key -> (Model, Cmd Msg)
+init: Url.Url -> Nav.Key -> (Model, Cmd Msg)
 init baseUrl key =
   let
-    (createModel, createCmd) = Domain.Create.init (baseUrl ++ "/api") key
+    (createModel, createCmd) = Domain.Create.init baseUrl key
   in
   ( { navKey = key
     , baseUrl = baseUrl
@@ -125,10 +125,10 @@ view model =
 
 -- helpers
 
-loadAll: String -> Cmd Msg
+loadAll: Url.Url -> Cmd Msg
 loadAll baseUrl =
   Http.get
-    { url = baseUrl ++ "/api/domains"
+    { url = Url.toString { baseUrl | path = baseUrl.path ++ "/domains" }
     , expect = Http.expectJson Loaded Domain.domainsDecoder
     }
 

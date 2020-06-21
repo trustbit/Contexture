@@ -51,7 +51,7 @@ init : Nav.Key -> Url.Url -> (Model, Cmd Msg)
 init key url =
   let
     (contexts, contextCmd) = Bcc.Index.init url key
-    (createSubModel, createSubCmd) = Domain.Create.init (Url.toString url) key
+    (createSubModel, createSubCmd) = Domain.Create.init url key
     model =
       { key = key
       , self = url

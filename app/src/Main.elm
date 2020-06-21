@@ -21,6 +21,7 @@ import Domain.Edit
 import Bcc
 import Bcc.Edit
 import Bcc.Index
+import Url exposing (Protocol)
 
 -- MAIN
 
@@ -45,7 +46,7 @@ main =
 -- MODEL
 
 type alias Flags =
-    { baseUrl : String }
+    { baseUrl : Url.Url }
 
 type Page
   = NotFoundPage
@@ -57,7 +58,7 @@ type alias Model =
   { key : Nav.Key
   , route : Route
   , navState: Navbar.State
-  , baseUrl : String
+  , baseUrl : Url.Url
   , page : Page }
 
 initCurrentPage : ( Model, Cmd Msg ) -> ( Model, Cmd Msg )
@@ -74,37 +75,38 @@ initCurrentPage ( model, existingCmds ) =
             in
               ( Domains pageModel, Cmd.map DomainMsg pageCmds )
           Route.Domain id ->
-            case model.baseUrl ++ "/api/domains/" ++ Domain.idToString id |> Url.fromString of
-              Just url ->
-                let
-                  ( pageModel, pageCmds ) = Domain.Edit.init model.key url
-                in
-                  ( DomainsEdit pageModel, Cmd.map DomainEditMsg pageCmds )
-              Nothing ->
-                ( NotFoundPage, Cmd.none )
+            let
+              url = model.baseUrl
+              domainUrl = { url | path = url.path ++ "/domains/" ++ Domain.idToString id }
+              ( pageModel, pageCmds ) = Domain.Edit.init model.key domainUrl
+            in
+              ( DomainsEdit pageModel, Cmd.map DomainEditMsg pageCmds )
           Route.Bcc id ->
-            case model.baseUrl ++ "/api/bccs/" ++ Bcc.idToString id |> Url.fromString of
-              Just url ->
-                let
-                  ( pageModel, pageCmds ) = Bcc.Edit.init model.key url
-                in
-                  ( Bcc pageModel, Cmd.map BccMsg pageCmds )
-              Nothing ->
-                ( NotFoundPage, Cmd.none )
+            let
+              url = model.baseUrl
+              bccUrl = { url | path = url.path ++ "/bccs/" ++ Bcc.idToString id}
+            
+              ( pageModel, pageCmds ) = Bcc.Edit.init model.key bccUrl
+            in
+              ( Bcc pageModel, Cmd.map BccMsg pageCmds )
 
     in
     ( { model | page = currentPage }
     , Cmd.batch [ existingCmds, mappedPageCmds ]
     )
 
-deriveBaseUrl : Url.Url -> String
-deriveBaseUrl url =
- case url.port_ of
+deriveBaseUrl : Url.Url -> Url.Url
+deriveBaseUrl appUrl =
+  let
+    localDev = { protocol = Url.Http, host ="localhost", port_ = Just 3000, path = "/api", query = Nothing, fragment = Nothing}
+  in
+  case appUrl.port_ of
     -- local dev with elm-live
-    Just 8000 -> "http://localhost:3000"
+    Just 8000 -> localDev
     -- local deployed version
-    Just 3000 -> "http://localhost:3000"
-    _ ->  Url.toString { url | path = "",  query = Nothing, fragment = Nothing }
+    Just 3000 -> localDev
+    -- default: assume it's running on the same server with the same port in the root
+    _ -> { appUrl | path = "/api",  query = Nothing, fragment = Nothing }
 
 initWithDerivedUrl : () -> Url.Url -> Nav.Key -> (Model, Cmd Msg)
 initWithDerivedUrl _ url key =

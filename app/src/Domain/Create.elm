@@ -26,7 +26,7 @@ type alias Domain =
 
 type alias Model =
   { navKey : Nav.Key
-  , baseUrl : String
+  , baseUrl : Url.Url
   , newDomainName: String
   }
 
@@ -35,7 +35,7 @@ type Msg
   | CreateDomain
   | DomainCreated (Result Http.Error Domain)
 
-init: String -> Nav.Key -> (Model, Cmd Msg)
+init: Url.Url -> Nav.Key -> (Model, Cmd Msg)
 init baseUrl key =
   ( { navKey = key
     , baseUrl = baseUrl
@@ -89,9 +89,10 @@ createNewDomain model =
     body =
       Encode.object
       [ ("name", Encode.string model.newDomainName) ]
+    url = model.baseUrl
   in
     Http.post
-      { url = model.baseUrl ++ "/domains"
+      { url = {url | path = url.path ++ "/domains" } |> Url.toString
       , body = Http.jsonBody body
       , expect = Http.expectJson DomainCreated Domain.domainDecoder
       }
