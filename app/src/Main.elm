@@ -71,7 +71,7 @@ initCurrentPage ( model, existingCmds ) =
 
           Route.Home ->
             let
-              ( pageModel, pageCmds ) = Domain.Index.init model.baseUrl model.key
+              ( pageModel, pageCmds ) = Domain.Index.initWithoutSubdomains model.baseUrl model.key
             in
               ( Domains pageModel, Cmd.map DomainMsg pageCmds )
           Route.Domain id ->

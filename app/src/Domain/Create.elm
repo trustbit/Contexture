@@ -18,11 +18,7 @@ import Http
 import Domain
 import Route
 
-type alias Domain =
-  { id: Domain.DomainId
-  , name: String
-  , vision: String
-  }
+type alias Domain = Domain.Domain
 
 type alias Model =
   { navKey : Nav.Key

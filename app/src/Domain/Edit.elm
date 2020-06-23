@@ -33,6 +33,7 @@ import Route
 
 import Domain
 import Domain.Create
+import Domain.Index
 import Bcc.Index
 
 -- MODEL
@@ -43,7 +44,7 @@ type alias Model =
   { key: Nav.Key
   , self: Url.Url
   , edit: RemoteData.WebData EditableDomain
-  , createSubDomain: Domain.Create.Model
+  , subDomains : Domain.Index.Model
   , contexts : Bcc.Index.Model
   }
 
@@ -51,21 +52,21 @@ init : Nav.Key -> Url.Url -> (Model, Cmd Msg)
 init key url =
   let
     (contexts, contextCmd) = Bcc.Index.init url key
-    (createSubModel, createSubCmd) = Domain.Create.init url key
+    (subDomainsModel, subDomainsCmd) = Domain.Index.initWithSubdomains url key
     model =
       { key = key
       , self = url
       , edit = RemoteData.Loading
       , contexts = contexts
-      , createSubDomain = createSubModel
+      , subDomains = subDomainsModel
       }
   in
     (
       model
-    , Cmd.batch 
+    , Cmd.batch
       [ loadDomain model
       , contextCmd |> Cmd.map BccMsg
-      , createSubCmd |> Cmd.map CreateMsg
+      , subDomainsCmd |> Cmd.map SubDomainMsg
       ]
     )
 
@@ -77,7 +78,7 @@ type EditingMsg
 type Msg
   = Loaded (Result Http.Error Domain.Domain)
   | Editing EditingMsg
-  | CreateMsg Domain.Create.Msg
+  | SubDomainMsg Domain.Index.Msg
   | Save
   | Saved (Result Http.Error ())
   | Delete
@@ -118,11 +119,11 @@ update msg model =
         (bccModel, bccCmd) = Bcc.Index.update m model.contexts
       in
         ({ model | contexts = bccModel}, bccCmd |> Cmd.map BccMsg)
-    CreateMsg createMsg ->
+    SubDomainMsg subMsg ->
       let
-        (createModel, createCmd) = Domain.Create.update createMsg model.createSubDomain
+        (subModel, subCmd) = Domain.Index.update subMsg model.subDomains
       in
-        ({ model | createSubDomain = createModel }, createCmd |> Cmd.map CreateMsg)
+        ({ model | subDomains = subModel }, subCmd |> Cmd.map SubDomainMsg)
     _ ->
       Debug.log ("BCC: " ++ Debug.toString msg ++ " " ++ Debug.toString model)
       (model, Cmd.none)
@@ -146,14 +147,19 @@ view model =
                 ]
               , Grid.simpleRow
                 [ Grid.col []
-                  [ Domain.Create.view model.createSubDomain |> Html.map CreateMsg ]
+                  [ Html.h5 [ Spacing.mt3 ] [ text "Subdomains" ]
+                  , Domain.Index.view model.subDomains |> Html.map SubDomainMsg ]
+                ]
+              , Grid.simpleRow
+                [ Grid.col []
+                  [ Html.h5 [ Spacing.mt3 ] [ text "Bounded Context of the domain" ] ]
                 ]
               ]
             , viewBccCard model.contexts
             ]
           )
         _ ->
-          [ Grid.row [] 
+          [ Grid.row []
             [ Grid.col []
               [ Html.p [] [ text "Loading details..." ] ]
             ]
@@ -164,6 +170,14 @@ view model =
 
 viewDomainCard : EditableDomain -> Html Msg
 viewDomainCard model =
+  let
+    backLink =
+      case model.parentDomain of
+        Just id ->
+          Route.Domain id
+        Nothing ->
+          Route.Home
+  in
   Card.config []
   |> Card.header []
     [ Html.h5 [] [ text "Manage your domain"] ]
@@ -173,7 +187,7 @@ viewDomainCard model =
     [ Grid.row []
       [ Grid.col []
         [ Button.linkButton
-          [ Button.attrs [ href (Route.routeToString Route.Home) ], Button.roleLink ]
+          [ Button.attrs [ href (Route.routeToString backLink) ], Button.roleLink ]
           [ text "Back" ] ]
       , Grid.col [ Col.textAlign Text.alignLgRight ]
         [ Button.button

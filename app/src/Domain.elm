@@ -18,7 +18,9 @@ type DomainId
 type alias Domain =
   { id : DomainId
   , name: String
-  , vision: String }
+  , vision: String
+  , parentDomain: Maybe DomainId
+  }
 
 type alias Model = Domain
 
@@ -26,7 +28,8 @@ init : () -> Domain
 init _ =
     { id = DomainId(-1)
     , name = ""
-    , vision = "" }
+    , vision = "" 
+    , parentDomain = Nothing}
 
 -- UPDATE
 
@@ -102,6 +105,7 @@ domainDecoder =
     |> JP.required "id" idDecoder
     |> JP.required "name" Decode.string
     |> JP.optional "vision" Decode.string ""
+    |> JP.optional "domainId" (Decode.maybe idDecoder) Nothing
 
 
 domainsDecoder: Decode.Decoder (List Domain)

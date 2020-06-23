@@ -1,4 +1,4 @@
-module Domain.Index exposing (Msg, Model, update, view, init)
+module Domain.Index exposing (Msg, Model, update, view, initWithSubdomains, initWithoutSubdomains)
 
 import Browser.Navigation as Nav
 
@@ -34,28 +34,36 @@ import Route
 
 -- MODEL
 
-type alias Domain =
-  { id: Domain.DomainId
-  , name: String
-  , vision: String }
+type alias Domain = Domain.Domain
 
 type alias Model =
   { navKey : Nav.Key
   , baseUrl : Url.Url
+  , showSubdomains : Bool
   , createDomain: Domain.Create.Model
   , domains: RemoteData.WebData (List Domain)
    }
 
-init: Url.Url -> Nav.Key -> (Model, Cmd Msg)
-init baseUrl key =
+init: Bool -> Url.Url -> Nav.Key -> (Model, Cmd Msg)
+init subDomains baseUrl key =
   let
     (createModel, createCmd) = Domain.Create.init baseUrl key
   in
   ( { navKey = key
     , baseUrl = baseUrl
+    , showSubdomains = subDomains
     , createDomain = createModel
     , domains = RemoteData.Loading }
   , Cmd.batch [loadAll baseUrl, createCmd |> Cmd.map CreateMsg] )
+
+initWithSubdomains : Url.Url -> Nav.Key -> (Model, Cmd Msg)
+initWithSubdomains baseUrl key =
+  init True baseUrl key
+
+initWithoutSubdomains : Url.Url -> Nav.Key -> (Model, Cmd Msg)
+initWithoutSubdomains baseUrl key =
+  init False baseUrl key
+
 
 -- UPDATE
 
@@ -67,7 +75,15 @@ update : Msg -> Model -> (Model, Cmd Msg)
 update msg model =
   case msg of
     Loaded (Ok items) ->
-      ({ model | domains = RemoteData.Success items }, Cmd.none)
+      let
+        filtered =
+          items
+          |> List.filter (\i ->
+            case i.parentDomain of 
+              Just _ -> model.showSubdomains
+              Nothing -> not model.showSubdomains
+            )
+      in ({ model | domains = RemoteData.Success filtered }, Cmd.none)
     Loaded (Err e) ->
         ({ model | domains = RemoteData.Failure e }, Cmd.none)
     CreateMsg create ->
@@ -120,7 +136,9 @@ view model =
               [ Grid.col [] [ text "Loading your domains"] ]
           ]
   in
-    Grid.container [] details
+    if model.showSubdomains
+    then div [] details
+    else Grid.container [] details
 
 
 -- helpers
