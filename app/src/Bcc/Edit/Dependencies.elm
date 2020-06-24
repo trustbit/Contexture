@@ -174,7 +174,6 @@ update msg model =
         (model, Cmd.none)
 
 
-
 -- VIEW
 
 filter : Int -> String -> List Dependency_ -> Maybe (List Dependency_)
@@ -183,12 +182,17 @@ filter minChars query items =
       Nothing
   else
     let
-      searchable i=
+      lowerQuery = query |> String.toLower
+      containsLowerString text =
+        text
+        |> String.toLower
+        |> String.contains lowerQuery 
+      searchable i =
         case i of
           BoundedContext bc ->
-            String.contains query bc.name || String.contains query bc.domain.name
+            containsLowerString bc.name || containsLowerString bc.domain.name
           Domain d ->
-            String.contains query d.name
+            containsLowerString d.name
       in
         items
         |> List.filter searchable
@@ -204,11 +208,12 @@ renderItem item =
     content =
       case item of
       BoundedContext bc ->
-        [ text bc.name, text bc.domain.name ]
+        [ Html.h5 [ class "text-muted" ] [ text bc.domain.name ]
+        , Html.h6 [] [ text bc.name ] ]
       Domain d ->
-        [ text d.name ]
+        [ Html.h5 [] [ text d.name ] ]
   in
-    Html.li [] content      
+    Html.span [] content      
 
 selectConfig : Autocomplete.Config FieldMsg Dependency_
 selectConfig =
@@ -218,22 +223,18 @@ selectConfig =
         , filter = filter 2
         }
         |> Autocomplete.withCutoff 12
-        -- |> Select.withInputWrapperClass "border border-gray-600"
-        -- |> Select.withInputWrapperStyles
+        |> Autocomplete.withInputClass "text-control border rounded form-control-lg"
+        |> Autocomplete.withInputWrapperClass "text-control mt-2"
+        -- |> Autocomplete.withInputWrapperStyles
         --     [ ( "padding", "0.4rem" ) ]
-        -- |> Select.withInputId "input-id"
-        -- |> Select.withItemClass " p-2 border-b border-gray-500 text-gray-800"
-        -- |> Select.withItemStyles [ ( "font-size", "1rem" ) ]
-        -- |> Select.withMenuClass "border border-gray-800"
-        -- |> Select.withMenuStyles [ ( "background", "white" ) ]
+        |> Autocomplete.withItemClass " border p-2 "
+        |> Autocomplete.withMenuClass "bg-light"
         |> Autocomplete.withNotFound "No matches"
-        |> Autocomplete.withNotFoundClass "text-red"
-        -- |> Select.withNotFoundStyles [ ( "padding", "0 2rem" ) ]
-        -- |> Select.withHighlightedItemClass "bg-gray-300"
-        -- |> Select.withHighlightedItemStyles [ ( "color", "black" ) ]
+        |> Autocomplete.withNotFoundClass "text-danger"
+        |> Autocomplete.withHighlightedItemClass "bg-white"
         |> Autocomplete.withPrompt "Select a Dependency"
-        -- |> Select.withPromptClass "text-gray-800"
-        -- |> Select.withUnderlineClass "underline"
+        -- |> Autocomplete.withPromptClass "text-gray-800"
+        -- |> Autocomplete.withUnderlineClass "underline"
         |> Autocomplete.withItemHtml renderItem
 
 translateRelationship : Bcc.Relationship -> String
