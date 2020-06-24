@@ -14,6 +14,8 @@ import Bootstrap.Button as Button
 import Bootstrap.Utilities.Spacing as Spacing
 import Bootstrap.Utilities.Display as Display
 
+import Select as Autocomplete
+
 import Json.Decode as Decode exposing (Decoder)
 import Json.Decode.Pipeline as JP
 
@@ -39,6 +41,8 @@ type Dependency_
 
 type alias DependencyEdit =
   { system: Bcc.System
+  , selectedSystem : Maybe Dependency_
+  , dependencySelectState: Autocomplete.State
   , relationship: Maybe Bcc.Relationship }
 
 type alias DependenciesEdit =
@@ -55,12 +59,15 @@ type alias Model =
   { edit: EditModel
   , availableDependencies : List Dependency_ }
 
-initDependency =
-  { system = "", relationship = Nothing }
+initDependency id =
+  { system = ""
+  , selectedSystem = Nothing
+  , dependencySelectState = Autocomplete.newState id
+  , relationship = Nothing }
 
 initDependencies =
-  { consumer = initDependency
-  , supplier = initDependency
+  { consumer = initDependency "consumer-select"
+  , supplier = initDependency "supplier-select"
   }
 
 init : Url.Url -> Bcc.Dependencies -> (Model, Cmd Msg)
@@ -78,6 +85,8 @@ init baseUrl dependencies =
 
 type FieldMsg
   = SetSystem Bcc.System
+  | SelectMsg (Autocomplete.Msg Dependency_)
+  | OnSelect (Maybe Dependency_)
   | SetRelationship String
 
 type ChangeTypeMsg
@@ -93,57 +102,139 @@ type Msg
   | BoundedContextsLoaded (Result Http.Error (List BoundedContextDependency))
   | DomainsLoaded (Result Http.Error (List DomainDependency))
 
-updateAddingDependency : FieldMsg -> DependencyEdit -> DependencyEdit
+updateAddingDependency : FieldMsg -> DependencyEdit -> (DependencyEdit, Cmd FieldMsg)
 updateAddingDependency msg model =
   case msg of
     SetSystem system ->
-      { model | system = system }
+      ({ model | system = system }, Cmd.none)
     SetRelationship relationship ->
-      { model | relationship = Bcc.relationshipParser relationship }
+      ({ model | relationship = Bcc.relationshipParser relationship }, Cmd.none)
+    SelectMsg selMsg ->
+      let
+        ( updated, cmd ) =
+          Autocomplete.update selectConfig selMsg model.dependencySelectState
+      in
+        ( { model | dependencySelectState = updated }, cmd )
+    OnSelect item ->
+      ({ model | selectedSystem = item }, Cmd.none)
 
-updateDependency : ChangeTypeMsg -> (DependencyEdit, Bcc.DependencyMap) -> (DependencyEdit, Bcc.DependencyMap)
-updateDependency msg (model,depdendencies) =
+updateDependency : ChangeTypeMsg -> (DependencyEdit, Bcc.DependencyMap) -> ((DependencyEdit, Bcc.DependencyMap), Cmd ChangeTypeMsg)
+updateDependency msg (model, depdendencies) =
   case msg of
     DepdendencyChanged change ->
-        (initDependency , Bcc.updateDependencyAction change depdendencies)
+      ( ({model | system = "", relationship = Nothing }, Bcc.updateDependencyAction change depdendencies)
+      , Cmd.none
+      )
     FieldEdit depMsg ->
-      ( updateAddingDependency depMsg model, depdendencies)
+      let 
+        (fieldModel, fieldCmd) = updateAddingDependency depMsg model
+      in
+        ( (fieldModel, depdendencies)
+        , fieldCmd |> Cmd.map FieldEdit
+        )
 
-updateEdit : EditMsg -> EditModel -> EditModel
+updateEdit : EditMsg -> EditModel -> (EditModel, Cmd EditMsg)
 updateEdit msg { edit, dependencies } =
   case msg of
     Consumer conMsg ->
       let
-        (m, dependency) = updateDependency conMsg (edit.consumer, dependencies.consumers)
+        ((m, dependency), dependencyCmd) = updateDependency conMsg (edit.consumer, dependencies.consumers)
       in
-        { edit = { edit | consumer = m }, dependencies = { dependencies | consumers = dependency } }
+        ( { edit = { edit | consumer = m }, dependencies = { dependencies | consumers = dependency } }
+        , dependencyCmd |> Cmd.map Consumer
+        )
     Supplier supMsg ->
       let
-        (m, dependency) = updateDependency supMsg (edit.supplier, dependencies.suppliers)
+        ((m, dependency),dependencyCmd) = updateDependency supMsg (edit.supplier, dependencies.suppliers)
       in
-        { edit = { edit | supplier = m }, dependencies = { dependencies | suppliers = dependency } }
+        ( { edit = { edit | supplier = m }, dependencies = { dependencies | suppliers = dependency } }
+        , dependencyCmd |> Cmd.map Consumer
+        )
 
-update : Msg -> Model -> Model
+update : Msg -> Model -> (Model, Cmd Msg)
 update msg model =
   case msg of
     Edit edit ->
       let
-        editModel = updateEdit edit model.edit
+        (editModel, editCmd) = updateEdit edit model.edit
       in
-        { model | edit = editModel }
+        ({ model | edit = editModel }, editCmd |> Cmd.map Edit)
     BoundedContextsLoaded (Ok contexts) ->
-      { model | availableDependencies = List.append model.availableDependencies (contexts |> List.map BoundedContext) }
+      ( { model | availableDependencies = List.append model.availableDependencies (contexts |> List.map BoundedContext) }
+      , Cmd.none
+      )
     DomainsLoaded (Ok domains) ->
-      { model | availableDependencies = List.append model.availableDependencies (domains |> List.map Domain) }
+      ( { model | availableDependencies = List.append model.availableDependencies (domains |> List.map Domain) }
+      , Cmd.none
+      )
     _ ->
       let
         _ = Debug.log ("Dependencies: " ++ (Debug.toString msg) ++ (Debug.toString model))
       in
-        model
+        (model, Cmd.none)
 
 
 
 -- VIEW
+
+filter : Int -> String -> List Dependency_ -> Maybe (List Dependency_)
+filter minChars query items =
+  if String.length query < minChars then
+      Nothing
+  else
+    let
+      searchable i=
+        case i of
+          BoundedContext bc ->
+            String.contains query bc.name || String.contains query bc.domain.name
+          Domain d ->
+            String.contains query d.name
+      in
+        items
+        |> List.filter searchable
+        |> Just
+
+noOpLabel : Dependency_ -> String
+noOpLabel _ =
+  ""
+
+renderItem : Dependency_ -> Html Never
+renderItem item =
+  let 
+    content =
+      case item of
+      BoundedContext bc ->
+        [ text bc.name, text bc.domain.name ]
+      Domain d ->
+        [ text d.name ]
+  in
+    Html.li [] content      
+
+selectConfig : Autocomplete.Config FieldMsg Dependency_
+selectConfig =
+    Autocomplete.newConfig
+        { onSelect = OnSelect
+        , toLabel = noOpLabel
+        , filter = filter 2
+        }
+        |> Autocomplete.withCutoff 12
+        -- |> Select.withInputWrapperClass "border border-gray-600"
+        -- |> Select.withInputWrapperStyles
+        --     [ ( "padding", "0.4rem" ) ]
+        -- |> Select.withInputId "input-id"
+        -- |> Select.withItemClass " p-2 border-b border-gray-500 text-gray-800"
+        -- |> Select.withItemStyles [ ( "font-size", "1rem" ) ]
+        -- |> Select.withMenuClass "border border-gray-800"
+        -- |> Select.withMenuStyles [ ( "background", "white" ) ]
+        |> Autocomplete.withNotFound "No matches"
+        |> Autocomplete.withNotFoundClass "text-red"
+        -- |> Select.withNotFoundStyles [ ( "padding", "0 2rem" ) ]
+        -- |> Select.withHighlightedItemClass "bg-gray-300"
+        -- |> Select.withHighlightedItemStyles [ ( "color", "black" ) ]
+        |> Autocomplete.withPrompt "Select a Dependency"
+        -- |> Select.withPromptClass "text-gray-800"
+        -- |> Select.withUnderlineClass "underline"
+        |> Autocomplete.withItemHtml renderItem
 
 translateRelationship : Bcc.Relationship -> String
 translateRelationship relationship =
@@ -175,8 +266,8 @@ viewAddedDepencency (system, relationship) =
       ]
     ]
 
-viewAddDependency : DependencyEdit -> Html ChangeTypeMsg
-viewAddDependency model =
+viewAddDependency : List Dependency_ -> DependencyEdit -> Html ChangeTypeMsg
+viewAddDependency dependencies model =
   let
     items =
       [ Bcc.AntiCorruptionLayer
@@ -191,6 +282,18 @@ viewAddDependency model =
       ]
         |> List.map (\r -> (r, translateRelationship r))
         |> List.map (\(v,t) -> Select.item [value (Bcc.relationshipToString v)] [ text t])
+
+    selectedItem = 
+      case model.selectedSystem of
+        Just s -> [ s ]
+        Nothing -> []
+
+    autocompleteSelect =
+      Autocomplete.view
+        selectConfig
+        model.dependencySelectState
+        dependencies
+        selectedItem
   in
   Form.form
     [ Html.Events.onSubmit
@@ -205,6 +308,7 @@ viewAddDependency model =
           [ Input.value model.system
           , Input.onInput (SetSystem >> FieldEdit)
           ]
+        , autocompleteSelect |> Html.map (SelectMsg >> FieldEdit)
         ]
       , Grid.col []
         [ Select.select [ Select.onChange (SetRelationship >> FieldEdit) ]
@@ -220,8 +324,8 @@ viewAddDependency model =
       ]
     ]
 
-viewDependency : String -> DependencyEdit -> Bcc.DependencyMap -> Html ChangeTypeMsg
-viewDependency title model addedDependencies =
+viewDependency : List Dependency_ -> String -> DependencyEdit -> Bcc.DependencyMap -> Html ChangeTypeMsg
+viewDependency items title model addedDependencies =
   div []
     [ Html.h6
       [ class "text-center", Spacing.p2 ]
@@ -235,11 +339,11 @@ viewDependency title model addedDependencies =
       (addedDependencies
       |> Dict.toList
       |> List.map viewAddedDepencency)
-    , viewAddDependency model
+    , viewAddDependency items model
     ]
 
-viewEdit : EditModel -> Html EditMsg
-viewEdit { edit, dependencies } =
+viewEdit : List Dependency_ -> EditModel -> Html EditMsg
+viewEdit items { edit, dependencies } =
   div []
     [ Html.span
       [ class "text-center"
@@ -251,15 +355,15 @@ viewEdit { edit, dependencies } =
     , Form.help [] [ text "To create loosely coupled systems it's essential to be wary of dependencies. In this section you should write the name of each dependency and a short explanation of why the dependency exists." ]
     , Grid.row []
       [ Grid.col []
-        [ viewDependency "Message Suppliers" edit.supplier dependencies.suppliers |> Html.map Supplier ]
+        [ viewDependency items "Message Suppliers" edit.supplier dependencies.suppliers |> Html.map Supplier ]
       , Grid.col []
-        [ viewDependency "Message Consumers" edit.consumer dependencies.consumers |> Html.map Consumer ]
+        [ viewDependency items "Message Consumers" edit.consumer dependencies.consumers |> Html.map Consumer ]
       ]
     ]
 
 view : Model -> Html Msg
 view model =
-  viewEdit model.edit |> Html.map Edit
+  viewEdit model.availableDependencies model.edit |> Html.map Edit
 
 domainDecoder : Decoder DomainDependency
 domainDecoder =

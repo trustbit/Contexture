@@ -15,12 +15,14 @@
             "elm/url": "1.0.0",
             "elm-community/list-split": "1.0.3",
             "krisajenkins/remotedata": "6.0.1",
-            "rundis/elm-bootstrap": "5.2.0"
+            "rundis/elm-bootstrap": "5.2.0",
+            "sporto/elm-select": "3.2.0"
         },
         "indirect": {
             "avh4/elm-color": "1.0.0",
             "elm/bytes": "1.0.8",
             "elm/file": "1.0.5",
+            "elm/svg": "1.0.1",
             "elm/time": "1.0.0",
             "elm/virtual-dom": "1.0.2"
         }

@@ -90,7 +90,7 @@ type Msg
   | Delete
   | Deleted (Result Http.Error ())
 
-updateEdit : EditingMsg -> EditingCanvas -> EditingCanvas
+updateEdit : EditingMsg -> EditingCanvas -> (EditingCanvas, Cmd EditingMsg)
 updateEdit msg model =
   case msg of
     MessageField messageMsg ->
@@ -99,16 +99,16 @@ updateEdit msg model =
         canvas = model.canvas
         c = { canvas | messages = updatedModel.messages}
       in
-        { model | addingMessage = updatedModel, canvas = c }
+        ({ model | addingMessage = updatedModel, canvas = c }, Cmd.none)
     Field fieldMsg ->
-      { model | canvas = Bcc.update fieldMsg model.canvas }
+      ({ model | canvas = Bcc.update fieldMsg model.canvas }, Cmd.none)
     DependencyField dependency ->
       let
-        addingDependencies = Dependencies.update dependency model.addingDependencies
+        (addingDependencies, addingCmd) = Dependencies.update dependency model.addingDependencies
         canvas = model.canvas
-        c = { canvas | dependencies = addingDependencies.edit.dependencies}
+        c= { canvas | dependencies = addingDependencies.edit.dependencies}
       in
-        { model | canvas = c, addingDependencies = addingDependencies }
+        ({ model | canvas = c, addingDependencies = addingDependencies }, addingCmd |> Cmd.map DependencyField)
     TooltipMsg key ->
       let
         updatedTooltip =
@@ -119,14 +119,17 @@ updateEdit msg model =
                 Nothing -> True |> Just
             )
       in
-        { model | tooltips = updatedTooltip }
+        ({ model | tooltips = updatedTooltip }, Cmd.none)
 
 
 update : Msg -> Model -> (Model, Cmd Msg)
 update msg model =
   case (msg, model.edit) of
     (Editing editing, RemoteData.Success editable) ->
-      ({ model | edit = RemoteData.Success <| updateEdit editing editable}, Cmd.none)
+      let
+        (editModel, editCmd) = updateEdit editing editable
+      in
+        ({ model | edit = RemoteData.Success <| editModel }, editCmd |> Cmd.map Editing)
     (Save, RemoteData.Success editable) ->
       (model, saveBCC model.self editable)
     (Saved (Ok _),_) ->
