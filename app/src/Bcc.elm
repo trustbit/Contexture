@@ -73,6 +73,11 @@ type Relationship
   | Partnership
   | CustomerSupplier
 
+
+type System_
+  = BoundedContext BoundedContextId
+  | Domain Domain.DomainId
+
 type alias System = String
 
 type alias Dependency = (System, Maybe Relationship)
@@ -456,12 +461,24 @@ strategicClassificationDecoder =
     |> JP.optional "businessModel" businessModelDecoder []
     |> JP.optional "evolution" (maybeStringDecoder evolutionParser) Nothing
 
+nameFieldDecoder : Decoder String
+nameFieldDecoder =
+  Decode.field "name" Decode.string
+
+idFieldDecoder : Decoder BoundedContextId
+idFieldDecoder =
+  Decode.field "id" idDecoder
+
+domainIdFieldDecoder : Decoder Domain.DomainId
+domainIdFieldDecoder =
+  Decode.field "domainId" Domain.idDecoder
+
 modelDecoder : Decoder BoundedContextCanvas
 modelDecoder =
   Decode.succeed BoundedContextCanvas
-    |> JP.required "id" idDecoder
-    |> JP.required "domainId" Domain.idDecoder
-    |> JP.required "name" Decode.string
+    |> JP.custom idFieldDecoder
+    |> JP.custom domainIdFieldDecoder
+    |> JP.custom nameFieldDecoder
     |> JP.optional "description" Decode.string ""
     |> JP.optional "classification" strategicClassificationDecoder initStrategicClassification
     |> JP.optional "businessDecisions" Decode.string ""

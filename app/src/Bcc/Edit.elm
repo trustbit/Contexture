@@ -47,18 +47,22 @@ type alias Model =
   , edit: RemoteData.WebData EditingCanvas
   }
 
-initWithCanvas : Bcc.BoundedContextCanvas -> EditingCanvas
-initWithCanvas canvas =
-  { tooltips = Dict.empty
-  , addingMessage = Messages.init canvas.messages
-  , addingDependencies = Dependencies.init canvas.dependencies
-  , canvas = canvas
-  }
+initWithCanvas : Url.Url -> Bcc.BoundedContextCanvas -> (EditingCanvas, Cmd EditingMsg)
+initWithCanvas url canvas =
+  let
+    (addingDependency, addingDependencyCmd) = Dependencies.init url canvas.dependencies
+  in
+    ( { tooltips = Dict.empty
+      , addingMessage = Messages.init canvas.messages
+      , addingDependencies = addingDependency
+      , canvas = canvas
+      }
+    , addingDependencyCmd |> Cmd.map DependencyField
+    )
 
 init : Nav.Key -> Url.Url -> (Model, Cmd Msg)
 init key url =
   let
-    canvas = Bcc.init (Domain.DomainId 0)
     model =
       { key = key
       , self = url
@@ -102,7 +106,7 @@ updateEdit msg model =
       let
         addingDependencies = Dependencies.update dependency model.addingDependencies
         canvas = model.canvas
-        c = { canvas | dependencies = addingDependencies.dependencies}
+        c = { canvas | dependencies = addingDependencies.edit.dependencies}
       in
         { model | canvas = c, addingDependencies = addingDependencies }
     TooltipMsg key ->
@@ -132,7 +136,10 @@ update msg model =
     (Deleted (Ok _), RemoteData.Success editable) ->
       (model, Route.pushUrl (Route.Domain editable.canvas.domain) model.key)
     (Loaded (Ok m), _) ->
-      ({ model | edit = RemoteData.Success <| initWithCanvas m } , Cmd.none)
+      let
+        (canvasModel, canvasCmd) = initWithCanvas model.self m
+      in
+        ({ model | edit = RemoteData.Success <| canvasModel }, canvasCmd |> Cmd.map Editing)
     (Loaded (Err e),_) ->
       ({ model | edit = RemoteData.Failure e } , Cmd.none)
     _ ->

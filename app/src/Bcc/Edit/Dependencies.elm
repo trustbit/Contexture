@@ -14,9 +14,28 @@ import Bootstrap.Button as Button
 import Bootstrap.Utilities.Spacing as Spacing
 import Bootstrap.Utilities.Display as Display
 
+import Json.Decode as Decode exposing (Decoder)
+import Json.Decode.Pipeline as JP
+
 import Dict
+import Url
+import Http
 
 import Bcc
+import Domain
+
+type alias DomainDependency =
+  { id : Domain.DomainId
+  , name : String }
+
+type alias BoundedContextDependency =
+  { id : Bcc.BoundedContextId
+  , name: String
+  , domain: DomainDependency }
+
+type Dependency_
+  = BoundedContext BoundedContextDependency
+  | Domain DomainDependency
 
 type alias DependencyEdit =
   { system: Bcc.System
@@ -27,9 +46,14 @@ type alias DependenciesEdit =
   , supplier: DependencyEdit
   }
 
-type alias Model =
+type alias EditModel =
   { edit: DependenciesEdit
-  , dependencies: Bcc.Dependencies }
+  , dependencies: Bcc.Dependencies
+  }
+
+type alias Model =
+  { edit: EditModel
+  , availableDependencies : List Dependency_ }
 
 initDependency =
   { system = "", relationship = Nothing }
@@ -39,11 +63,16 @@ initDependencies =
   , supplier = initDependency
   }
 
-init : Bcc.Dependencies -> Model
-init dependencies =
-  { edit = initDependencies
-  , dependencies = dependencies
-  }
+init : Url.Url -> Bcc.Dependencies -> (Model, Cmd Msg)
+init baseUrl dependencies =
+  (
+    { edit =
+      { edit = initDependencies
+      , dependencies = dependencies
+      }
+    , availableDependencies = []
+    }
+  , Cmd.batch [ loadBoundedContexts baseUrl, loadDomains baseUrl])
 
 -- UPDATE
 
@@ -55,9 +84,14 @@ type ChangeTypeMsg
   = FieldEdit FieldMsg
   | DepdendencyChanged Bcc.DependencyAction
 
-type Msg
+type EditMsg
   = Consumer ChangeTypeMsg
   | Supplier ChangeTypeMsg
+
+type Msg
+  = Edit EditMsg
+  | BoundedContextsLoaded (Result Http.Error (List BoundedContextDependency))
+  | DomainsLoaded (Result Http.Error (List DomainDependency))
 
 updateAddingDependency : FieldMsg -> DependencyEdit -> DependencyEdit
 updateAddingDependency msg model =
@@ -75,8 +109,8 @@ updateDependency msg (model,depdendencies) =
     FieldEdit depMsg ->
       ( updateAddingDependency depMsg model, depdendencies)
 
-update : Msg -> Model -> Model
-update msg { edit, dependencies } =
+updateEdit : EditMsg -> EditModel -> EditModel
+updateEdit msg { edit, dependencies } =
   case msg of
     Consumer conMsg ->
       let
@@ -88,6 +122,26 @@ update msg { edit, dependencies } =
         (m, dependency) = updateDependency supMsg (edit.supplier, dependencies.suppliers)
       in
         { edit = { edit | supplier = m }, dependencies = { dependencies | suppliers = dependency } }
+
+update : Msg -> Model -> Model
+update msg model =
+  case msg of
+    Edit edit ->
+      let
+        editModel = updateEdit edit model.edit
+      in
+        { model | edit = editModel }
+    BoundedContextsLoaded (Ok contexts) ->
+      { model | availableDependencies = List.append model.availableDependencies (contexts |> List.map BoundedContext) }
+    DomainsLoaded (Ok domains) ->
+      { model | availableDependencies = List.append model.availableDependencies (domains |> List.map Domain) }
+    _ ->
+      let
+        _ = Debug.log ("Dependencies: " ++ (Debug.toString msg) ++ (Debug.toString model))
+      in
+        model
+
+
 
 -- VIEW
 
@@ -184,8 +238,8 @@ viewDependency title model addedDependencies =
     , viewAddDependency model
     ]
 
-view : Model -> Html Msg
-view { edit, dependencies } =
+viewEdit : EditModel -> Html EditMsg
+viewEdit { edit, dependencies } =
   div []
     [ Html.span
       [ class "text-center"
@@ -202,3 +256,36 @@ view { edit, dependencies } =
         [ viewDependency "Message Consumers" edit.consumer dependencies.consumers |> Html.map Consumer ]
       ]
     ]
+
+view : Model -> Html Msg
+view model =
+  viewEdit model.edit |> Html.map Edit
+
+domainDecoder : Decoder DomainDependency
+domainDecoder =
+  Decode.succeed DomainDependency
+    |> JP.custom Domain.idFieldDecoder
+    |> JP.custom Domain.nameFieldDecoder
+
+boundedContextDecoder : Decoder BoundedContextDependency
+boundedContextDecoder =
+  Decode.succeed BoundedContextDependency
+    |> JP.custom Bcc.idFieldDecoder
+    |> JP.custom Bcc.nameFieldDecoder
+    |> JP.required "domain" domainDecoder
+
+loadBoundedContexts: Url.Url -> Cmd Msg
+loadBoundedContexts url =
+  Http.get
+  -- todo this is wrong
+    { url = Url.toString { url | path = "/api/bccs?_expand=domain"}
+    , expect = Http.expectJson BoundedContextsLoaded (Decode.list boundedContextDecoder)
+    }
+
+loadDomains: Url.Url -> Cmd Msg
+loadDomains url =
+  Http.get
+  -- todo this is wrong
+    { url = Url.toString { url | path = "/api/domains"}
+    , expect = Http.expectJson DomainsLoaded (Decode.list domainDecoder)
+    }

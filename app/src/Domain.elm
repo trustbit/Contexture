@@ -2,10 +2,10 @@ module Domain exposing (
   DomainId(..), Domain, Model, init,
   Msg(..),update,ifNameValid,
   idToString, idParser, idEncoder, idDecoder,
-  domainDecoder, domainsDecoder, modelEncoder
+  domainDecoder, domainsDecoder, modelEncoder, idFieldDecoder, nameFieldDecoder
   )
 
-import Json.Decode as Decode
+import Json.Decode as Decode exposing(Decoder)
 import Json.Decode.Pipeline as JP
 import Json.Encode as Encode
 import Url.Parser exposing (Parser, custom)
@@ -99,19 +99,25 @@ idEncoder : DomainId -> Encode.Value
 idEncoder value =
   Encode.int (extractInt value)
 
-domainDecoder: Decode.Decoder Domain
+nameFieldDecoder : Decoder String
+nameFieldDecoder =
+  Decode.field "name" Decode.string
+
+idFieldDecoder : Decoder DomainId
+idFieldDecoder =
+  Decode.field "id" idDecoder
+
+domainDecoder: Decoder Domain
 domainDecoder =
   Decode.succeed Domain
-    |> JP.required "id" idDecoder
-    |> JP.required "name" Decode.string
+    |> JP.custom idFieldDecoder
+    |> JP.custom nameFieldDecoder
     |> JP.optional "vision" Decode.string ""
     |> JP.optional "domainId" (Decode.maybe idDecoder) Nothing
-
 
 domainsDecoder: Decode.Decoder (List Domain)
 domainsDecoder =
   Decode.list domainDecoder
-
 
 modelEncoder : Domain -> Encode.Value
 modelEncoder model =
