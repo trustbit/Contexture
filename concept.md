@@ -25,44 +25,16 @@ E.g. the data can be read from the source code during the build process:
 
 Additional ideas on how to gather or present information can be read in [Cyrille Martraire book on Living Documentation](https://leanpub.com/livingdocumentation).
 
-## Features for a Prototype
+## Goals for a Prototype
 
-:white_check_mark: Goal: "Mimicking the BCC with HTML forms"
+At the moment we have the following goals we like to reach with Contexture:
 
-- [x] Have a form mirroring the BCC with free text fields
-- [x] Creating a new bounded context by submitting a new form
-- [x] Loading existing BCC into a form and updating them by (re)submitting it
-
-Goal: "Improving data quality"
-
-- Use dropdowns/autocomplete free text where appropriate (model traits, relationships, messages)
-- Support editing of messages & relationships
-- Improve definition of ubiquitous language terms (allow Key-Value pairs for defining a glossary)
-- Provide Auto-complete boxes (with free text search) for dependencies (search in already existing BCC/Domain names) and allow only references to existing items (with the possibility to create some in the fly)
-- Provide Auto-complete boxes (free text search) for consumed message contracts (search in produces message contracts)
-- [x] Include more help text and [tips](https://github.com/ddd-crew/bounded-context-canvas/blob/master/resources/model-traits-worksheet.md)
-- [ ] Include checkboxes and free text fields for 'Business Model' and 'Classification'
-- Allow Sub-Domains / Domain hierarchies (all levels can contain a Bounded Context)
-- Rename Messages to contracts and add UI-fragments as a new type of contract
-
-Note: can be run without any external dependencies
-
-Goal: "Connecting existing Tools for visualization"
-
-- connect Structurizr as (additional?) persistence layer
-- Visualize data from Structurizr as BCC
-- evaluate [Context Map](https://contextmapper.org/docs/context-map/) for exporting & visualizing contexts (see <https://github.com/ContextMapper/context-mapper-examples/tree/master/src/main/cml/ddd-sample>)
-
-Note: needs Structurizr on-premise (via a docker-container)
-
-Goal: "Empower users to input data and document their landscape"
-
-- [x] Provide help text/additional information for each field
-- Design a wizard for gradually/step-by-step creating a BCC
-- Show proposed Bounded Context Canvases (from entered dependencies)
-- Assign a 'responsible Team' on both Domain & BC level
-- Document technical information for dependencies and messages (e.g. technical message names, protocol, underlying technology) in a seperate view
-- Support additional technical information (e.g. health checks, helm-charts, artifacts, ...)
+- [Mimicking the BCC with HTML forms](https://github.com/Softwarepark/Contexture/milestone/1)
+- [Improving data quality](https://github.com/Softwarepark/Contexture/milestone/2)
+- [Connecting existing Tools for visualization](https://github.com/Softwarepark/Contexture/milestone/3)
+- [Empower users to input data and document their landscape](https://github.com/Softwarepark/Contexture/milestone/4)
+- [Provide documentation and samples](https://github.com/Softwarepark/Contexture/milestone/5)
+- [Provide a technical perspective](https://github.com/Softwarepark/Contexture/milestone/6)
 
 ## Roadmap to a Prototype
 
@@ -71,46 +43,3 @@ Goal: "Empower users to input data and document their landscape"
 - No authentication/authorization
 - File based persistence is good enough
 - No versioning needed
-
-Guessed effort for the main parts:
-
-- :white_check_mark: "Mimicking the BCC with HTML forms"
-  - can be run without any external dependencies
-  - effort: 3 days
-- "Improving data quality"
-  - can be run without any external dependencies
-  - effort: 4 days
-- "Connecting Sructurizr for visualization"
-  - needs Structurizr on-premise version (via a docker-container)
-  - effort: 4 days
-- "Empower users to input data"
-  - effort 4 days
-
-## Connect the BCC with Structurizr
-
-For visualization and exploration purposes Structurizr can be used to display information and the connections of bounded contexts.
-
-Mapping BCC towards the Structurizr / C4 model:
-
-DDD concepts:
-
-- Domain -> Structurizr/Workspace
-- Subdomain -> C4/SoftwareSystem
-- BoundedContext -> C4/Container
-- Messages/Contracts -> C4/Component
-
-BCC concepts:
-
-- Name -> C4/Container-name
-- Description -> C4/Container-Description
-- Strategic Classification -> C4/Container-TAGs / Container-Properties
-- Business Decisions -> Markdown documentation
-- Ubiquitous Language -> Markdown documentation
-- Model Traits -> C4/Container-TAGs
-- Messages Consumed & Produced ~> Component references (TODO: message level?)
-- Dependencies/Relationships -> Structurizr/"uses" + tags for releationships
-
-Visualizations:
-
-- Domain / global context map -> Structurizr/Workspace linking + SystemLandscapeDiagram
-- Context map within domain -> Structurizr/SystemLandscapeDiagram
