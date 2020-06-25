@@ -106,7 +106,13 @@ updateEdit msg model =
       let
         (addingDependencies, addingCmd) = Dependencies.update dependency model.addingDependencies
         canvas = model.canvas
-        c= { canvas | dependencies = addingDependencies.edit.dependencies}
+        c =
+          { canvas |
+            dependencies =
+              { consumers = addingDependencies.consumer.existingDependencies
+              , suppliers = addingDependencies.supplier.existingDependencies
+              }
+          }
       in
         ({ model | canvas = c, addingDependencies = addingDependencies }, addingCmd |> Cmd.map DependencyField)
     TooltipMsg key ->

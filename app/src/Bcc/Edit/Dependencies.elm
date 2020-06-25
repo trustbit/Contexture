@@ -35,75 +35,60 @@ type alias BoundedContextDependency =
   , name: String
   , domain: DomainDependency }
 
-type Dependency_
+type DependencyReference
   = BoundedContext BoundedContextDependency
   | Domain DomainDependency
 
 type alias DependencyEdit =
   { system: Bcc.System
-  , selectedSystem : Maybe Dependency_
+  , selectedSystem : Maybe DependencyReference
   , dependencySelectState: Autocomplete.State
-  , relationship: Maybe Bcc.Relationship }
-
-type alias DependenciesEdit =
-  { consumer: DependencyEdit
-  , supplier: DependencyEdit
-  }
-
-type alias EditModel =
-  { edit: DependenciesEdit
-  , dependencies: Bcc.Dependencies
-  }
+  , relationship: Maybe Bcc.Relationship
+  , existingDependencies: Bcc.DependencyMap }
 
 type alias Model =
-  { edit: EditModel
-  , availableDependencies : List Dependency_ }
+  { consumer: DependencyEdit
+  , supplier: DependencyEdit
+  , availableDependencies : List DependencyReference
+  }
 
-initDependency id =
+initDependency existing id =
   { system = ""
   , selectedSystem = Nothing
   , dependencySelectState = Autocomplete.newState id
-  , relationship = Nothing }
+  , relationship = Nothing
+  , existingDependencies = existing }
 
-initDependencies =
-  { consumer = initDependency "consumer-select"
-  , supplier = initDependency "supplier-select"
+initDependencies dependencies =
+  { consumer = initDependency dependencies.consumers "consumer-select"
+  , supplier = initDependency dependencies.suppliers "supplier-select"
+  , availableDependencies = []
   }
 
 init : Url.Url -> Bcc.Dependencies -> (Model, Cmd Msg)
 init baseUrl dependencies =
   (
-    { edit =
-      { edit = initDependencies
-      , dependencies = dependencies
-      }
-    , availableDependencies = []
-    }
+    initDependencies dependencies
   , Cmd.batch [ loadBoundedContexts baseUrl, loadDomains baseUrl])
 
 -- UPDATE
 
-type FieldMsg
-  = SetSystem Bcc.System
-  | SelectMsg (Autocomplete.Msg Dependency_)
-  | OnSelect (Maybe Dependency_)
-  | SetRelationship String
-
 type ChangeTypeMsg
-  = FieldEdit FieldMsg
+  = SetSystem Bcc.System
+  | SelectMsg (Autocomplete.Msg DependencyReference)
+  | OnSelect (Maybe DependencyReference)
+  | SetRelationship String
   | DepdendencyChanged Bcc.DependencyAction
 
-type EditMsg
+type Msg
   = Consumer ChangeTypeMsg
   | Supplier ChangeTypeMsg
-
-type Msg
-  = Edit EditMsg
   | BoundedContextsLoaded (Result Http.Error (List BoundedContextDependency))
   | DomainsLoaded (Result Http.Error (List DomainDependency))
 
-updateAddingDependency : FieldMsg -> DependencyEdit -> (DependencyEdit, Cmd FieldMsg)
-updateAddingDependency msg model =
+
+updateDependency : ChangeTypeMsg -> DependencyEdit -> (DependencyEdit, Cmd ChangeTypeMsg)
+updateDependency msg model =
   case msg of
     SetSystem system ->
       ({ model | system = system }, Cmd.none)
@@ -117,48 +102,28 @@ updateAddingDependency msg model =
         ( { model | dependencySelectState = updated }, cmd )
     OnSelect item ->
       ({ model | selectedSystem = item }, Cmd.none)
-
-updateDependency : ChangeTypeMsg -> (DependencyEdit, Bcc.DependencyMap) -> ((DependencyEdit, Bcc.DependencyMap), Cmd ChangeTypeMsg)
-updateDependency msg (model, depdendencies) =
-  case msg of
     DepdendencyChanged change ->
-      ( ({model | system = "", relationship = Nothing }, Bcc.updateDependencyAction change depdendencies)
+      ( {model | system = "", relationship = Nothing , existingDependencies = Bcc.updateDependencyAction change model.existingDependencies}
       , Cmd.none
       )
-    FieldEdit depMsg ->
-      let 
-        (fieldModel, fieldCmd) = updateAddingDependency depMsg model
-      in
-        ( (fieldModel, depdendencies)
-        , fieldCmd |> Cmd.map FieldEdit
-        )
-
-updateEdit : EditMsg -> EditModel -> (EditModel, Cmd EditMsg)
-updateEdit msg { edit, dependencies } =
-  case msg of
-    Consumer conMsg ->
-      let
-        ((m, dependency), dependencyCmd) = updateDependency conMsg (edit.consumer, dependencies.consumers)
-      in
-        ( { edit = { edit | consumer = m }, dependencies = { dependencies | consumers = dependency } }
-        , dependencyCmd |> Cmd.map Consumer
-        )
-    Supplier supMsg ->
-      let
-        ((m, dependency),dependencyCmd) = updateDependency supMsg (edit.supplier, dependencies.suppliers)
-      in
-        ( { edit = { edit | supplier = m }, dependencies = { dependencies | suppliers = dependency } }
-        , dependencyCmd |> Cmd.map Consumer
-        )
 
 update : Msg -> Model -> (Model, Cmd Msg)
 update msg model =
   case msg of
-    Edit edit ->
+    Consumer conMsg ->
       let
-        (editModel, editCmd) = updateEdit edit model.edit
+        (consumerModel, dependencyCmd) = updateDependency conMsg model.consumer
       in
-        ({ model | edit = editModel }, editCmd |> Cmd.map Edit)
+        ( { model | consumer = consumerModel }
+        , dependencyCmd |> Cmd.map Consumer
+        )
+    Supplier supMsg ->
+      let
+        (supplierModel,dependencyCmd) = updateDependency supMsg model.supplier
+      in
+        ( { model | supplier = supplierModel }
+        , dependencyCmd |> Cmd.map Consumer
+        )
     BoundedContextsLoaded (Ok contexts) ->
       ( { model | availableDependencies = List.append model.availableDependencies (contexts |> List.map BoundedContext) }
       , Cmd.none
@@ -173,10 +138,9 @@ update msg model =
       in
         (model, Cmd.none)
 
-
 -- VIEW
 
-filter : Int -> String -> List Dependency_ -> Maybe (List Dependency_)
+filter : Int -> String -> List DependencyReference -> Maybe (List DependencyReference)
 filter minChars query items =
   if String.length query < minChars then
       Nothing
@@ -186,7 +150,7 @@ filter minChars query items =
       containsLowerString text =
         text
         |> String.toLower
-        |> String.contains lowerQuery 
+        |> String.contains lowerQuery
       searchable i =
         case i of
           BoundedContext bc ->
@@ -198,13 +162,13 @@ filter minChars query items =
         |> List.filter searchable
         |> Just
 
-noOpLabel : Dependency_ -> String
+noOpLabel : DependencyReference -> String
 noOpLabel _ =
   ""
 
-renderItem : Dependency_ -> Html Never
+renderItem : DependencyReference -> Html Never
 renderItem item =
-  let 
+  let
     content =
       case item of
       BoundedContext bc ->
@@ -213,9 +177,9 @@ renderItem item =
       Domain d ->
         [ Html.h5 [] [ text d.name ] ]
   in
-    Html.span [] content      
+    Html.span [] content
 
-selectConfig : Autocomplete.Config FieldMsg Dependency_
+selectConfig : Autocomplete.Config ChangeTypeMsg DependencyReference
 selectConfig =
     Autocomplete.newConfig
         { onSelect = OnSelect
@@ -267,7 +231,7 @@ viewAddedDepencency (system, relationship) =
       ]
     ]
 
-viewAddDependency : List Dependency_ -> DependencyEdit -> Html ChangeTypeMsg
+viewAddDependency : List DependencyReference -> DependencyEdit -> Html ChangeTypeMsg
 viewAddDependency dependencies model =
   let
     items =
@@ -284,7 +248,7 @@ viewAddDependency dependencies model =
         |> List.map (\r -> (r, translateRelationship r))
         |> List.map (\(v,t) -> Select.item [value (Bcc.relationshipToString v)] [ text t])
 
-    selectedItem = 
+    selectedItem =
       case model.selectedSystem of
         Just s -> [ s ]
         Nothing -> []
@@ -307,12 +271,12 @@ viewAddDependency dependencies model =
       [ Grid.col []
         [ Input.text
           [ Input.value model.system
-          , Input.onInput (SetSystem >> FieldEdit)
+          , Input.onInput SetSystem
           ]
-        , autocompleteSelect |> Html.map (SelectMsg >> FieldEdit)
+        , autocompleteSelect |> Html.map SelectMsg
         ]
       , Grid.col []
-        [ Select.select [ Select.onChange (SetRelationship >> FieldEdit) ]
+        [ Select.select [ Select.onChange SetRelationship ]
             (List.append [ Select.item [ selected (model.relationship == Nothing), value "" ] [text "unknown"] ] items)
         ]
       , Grid.col [ Col.xs2 ]
@@ -325,8 +289,8 @@ viewAddDependency dependencies model =
       ]
     ]
 
-viewDependency : List Dependency_ -> String -> DependencyEdit -> Bcc.DependencyMap -> Html ChangeTypeMsg
-viewDependency items title model addedDependencies =
+viewDependency : List DependencyReference -> String -> DependencyEdit -> Html ChangeTypeMsg
+viewDependency items title model =
   div []
     [ Html.h6
       [ class "text-center", Spacing.p2 ]
@@ -337,14 +301,14 @@ viewDependency items title model addedDependencies =
       , Grid.col [Col.xs2] []
       ]
     , div []
-      (addedDependencies
+      (model.existingDependencies
       |> Dict.toList
       |> List.map viewAddedDepencency)
     , viewAddDependency items model
     ]
 
-viewEdit : List Dependency_ -> EditModel -> Html EditMsg
-viewEdit items { edit, dependencies } =
+view : Model -> Html Msg
+view model =
   div []
     [ Html.span
       [ class "text-center"
@@ -356,15 +320,11 @@ viewEdit items { edit, dependencies } =
     , Form.help [] [ text "To create loosely coupled systems it's essential to be wary of dependencies. In this section you should write the name of each dependency and a short explanation of why the dependency exists." ]
     , Grid.row []
       [ Grid.col []
-        [ viewDependency items "Message Suppliers" edit.supplier dependencies.suppliers |> Html.map Supplier ]
+        [ viewDependency model.availableDependencies "Message Suppliers" model.supplier |> Html.map Supplier ]
       , Grid.col []
-        [ viewDependency items "Message Consumers" edit.consumer dependencies.consumers |> Html.map Consumer ]
+        [ viewDependency model.availableDependencies "Message Consumers" model.consumer |> Html.map Consumer ]
       ]
     ]
-
-view : Model -> Html Msg
-view model =
-  viewEdit model.availableDependencies model.edit |> Html.map Edit
 
 domainDecoder : Decoder DomainDependency
 domainDecoder =
