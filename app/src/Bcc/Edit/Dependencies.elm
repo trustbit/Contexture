@@ -185,10 +185,10 @@ renderItem item =
     content =
       case item of
       BoundedContext bc ->
-        [ Html.h5 [ class "text-muted" ] [ text bc.domain.name ]
-        , Html.h6 [] [ text bc.name ] ]
+        [ Html.h6 [ class "text-muted" ] [ text bc.domain.name ]
+        , Html.span [] [ text bc.name ] ]
       Domain d ->
-        [ Html.h5 [] [ text d.name ] ]
+        [ Html.span [] [ text d.name ] ]
   in
     Html.span [] content
 
@@ -233,12 +233,12 @@ viewAddedDepencency items (collaborator, relationship) =
       |> Maybe.map renderItem
       |> Maybe.withDefault (text "Unknown name")
   in
-  Grid.row []
+  Grid.row [Row.attrs [ class "border-top", Spacing.mb2, Spacing.pt1 ] ]
     [ Grid.col [] [ collaboratorCaption ]
     , Grid.col [] [text (Maybe.withDefault "not specified" (relationship |> Maybe.map translateRelationship))]
     , Grid.col [ Col.xs2 ]
       [ Button.button
-        [ Button.danger
+        [ Button.secondary
         , Button.onClick (
             (collaborator, relationship)
             |> Bcc.Remove |> DepdendencyChanged
@@ -280,11 +280,21 @@ viewAddDependency dependencies model =
         Just s -> [ s ]
         Nothing -> []
 
+    -- TODO: this is probably very unefficient
+    existingDependencies =
+      model.existingDependencies
+      |> Bcc.dependencyList
+      |> List.map Tuple.first
+
+    relevantDependencies =
+      dependencies
+      |> List.filter (\d -> existingDependencies |> List.any (\existing -> (d |> toCollaborator)  == existing ) |> not )
+
     autocompleteSelect =
       Autocomplete.view
         selectConfig
         model.dependencySelectState
-        dependencies
+        relevantDependencies
         selectedItem
   in
   Form.form

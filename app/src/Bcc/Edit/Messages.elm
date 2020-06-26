@@ -113,7 +113,7 @@ viewMessageOption model =
   ListGroup.li
     [ ListGroup.attrs [ Flex.block, Flex.justifyBetween, Flex.alignItemsCenter, Spacing.p1 ] ]
     [ text model
-    , Button.button [Button.danger, Button.small, Button.onClick (MessageChanged (Bcc.Remove model))] [ text "x"]
+    , Button.button [Button.secondary, Button.small, Button.onClick (MessageChanged (Bcc.Remove model))] [ text "x"]
     ]
 
 viewMessage : String -> String -> (Bcc.Message, Bcc.MessageCollection) -> Html ChangeTypeMsg
