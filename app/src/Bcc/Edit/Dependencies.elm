@@ -36,25 +36,25 @@ type alias BoundedContextDependency =
   , name: String
   , domain: DomainDependency }
 
-type DependencyReference
+type CollaboratorReference
   = BoundedContext BoundedContextDependency
   | Domain DomainDependency
 
 type alias DependencyEdit =
-  { selectedSystem : Maybe DependencyReference
-  , dependencySelectState: Autocomplete.State
-  , relationship: Maybe Bcc.RelationshipPattern
-  , existingDependencies: Bcc.DependencyMap }
+  { selectedCollaborator : Maybe CollaboratorReference
+  , dependencySelectState : Autocomplete.State
+  , relationship : Maybe Bcc.RelationshipPattern
+  , existingDependencies : Bcc.DependencyMap }
 
 type alias Model =
   { consumer: DependencyEdit
   , supplier: DependencyEdit
-  , availableDependencies : List DependencyReference
+  , availableDependencies : List CollaboratorReference
   }
 
 initDependency : Bcc.DependencyMap -> String -> DependencyEdit
 initDependency existing id =
-  { selectedSystem = Nothing
+  { selectedCollaborator = Nothing
   , dependencySelectState = Autocomplete.newState id
   , relationship = Nothing
   , existingDependencies = existing }
@@ -74,8 +74,8 @@ init baseUrl dependencies =
 -- UPDATE
 
 type ChangeTypeMsg
-  = SelectMsg (Autocomplete.Msg DependencyReference)
-  | OnSelect (Maybe DependencyReference)
+  = SelectMsg (Autocomplete.Msg CollaboratorReference)
+  | OnSelect (Maybe CollaboratorReference)
   | SetRelationship String
   | DepdendencyChanged Bcc.DependencyAction
 
@@ -98,10 +98,10 @@ updateDependency msg model =
       in
         ( { model | dependencySelectState = updated }, cmd )
     OnSelect item ->
-      ({ model | selectedSystem = item }, Cmd.none)
+      ({ model | selectedCollaborator = item }, Cmd.none)
     DepdendencyChanged change ->
       ( { model
-        | selectedSystem = Nothing
+        | selectedCollaborator = Nothing
         , relationship = Nothing
         , existingDependencies = Bcc.updateDependencyAction change model.existingDependencies
         }
@@ -141,15 +141,15 @@ update msg model =
 
 -- VIEW
 
-toSystem : DependencyReference -> Bcc.System
-toSystem dependency =
+toCollaborator : CollaboratorReference -> Bcc.Collaborator
+toCollaborator dependency =
   case dependency of
     BoundedContext bc ->
       Bcc.BoundedContext bc.id
     Domain d ->
       Bcc.Domain d.id
 
-filter : Int -> String -> List DependencyReference -> Maybe (List DependencyReference)
+filter : Int -> String -> List CollaboratorReference -> Maybe (List CollaboratorReference)
 filter minChars query items =
   if String.length query < minChars then
       Nothing
@@ -171,7 +171,7 @@ filter minChars query items =
         |> List.filter searchable
         |> Just
 
-noOpLabel : DependencyReference -> String
+noOpLabel : CollaboratorReference -> String
 noOpLabel item =
   case item of
     BoundedContext bc ->
@@ -179,7 +179,7 @@ noOpLabel item =
     Domain d ->
       d.name
 
-renderItem : DependencyReference -> Html msg
+renderItem : CollaboratorReference -> Html msg
 renderItem item =
   let
     content =
@@ -192,7 +192,7 @@ renderItem item =
   in
     Html.span [] content
 
-selectConfig : Autocomplete.Config ChangeTypeMsg DependencyReference
+selectConfig : Autocomplete.Config ChangeTypeMsg CollaboratorReference
 selectConfig =
     Autocomplete.newConfig
         { onSelect = OnSelect
@@ -223,24 +223,24 @@ translateRelationship relationship =
     Bcc.Partnership -> "Partnership"
     Bcc.CustomerSupplier -> "Customer/Supplier"
 
-viewAddedDepencency : List DependencyReference -> Bcc.Dependency -> Html ChangeTypeMsg
-viewAddedDepencency items (system, relationship) =
+viewAddedDepencency : List CollaboratorReference -> Bcc.Dependency -> Html ChangeTypeMsg
+viewAddedDepencency items (collaborator, relationship) =
   let
-    systemCaption =
+    collaboratorCaption =
       items
-      |> List.filter (\r -> toSystem r == system )
+      |> List.filter (\r -> toCollaborator r == collaborator )
       |> List.head
       |> Maybe.map renderItem
       |> Maybe.withDefault (text "Unknown name")
   in
   Grid.row []
-    [ Grid.col [] [ systemCaption ]
+    [ Grid.col [] [ collaboratorCaption ]
     , Grid.col [] [text (Maybe.withDefault "not specified" (relationship |> Maybe.map translateRelationship))]
     , Grid.col [ Col.xs2 ]
       [ Button.button
         [ Button.danger
         , Button.onClick (
-            (system, relationship)
+            (collaborator, relationship)
             |> Bcc.Remove |> DepdendencyChanged
           )
         ]
@@ -258,7 +258,7 @@ onSubmitMaybe maybeMsg =
       Html.Events.preventDefaultOn "submit" (Decode.map (\m -> ( m, True )) (Decode.fail "No message to submit"))
 
 
-viewAddDependency : List DependencyReference -> DependencyEdit -> Html ChangeTypeMsg
+viewAddDependency : List CollaboratorReference -> DependencyEdit -> Html ChangeTypeMsg
 viewAddDependency dependencies model =
   let
     items =
@@ -276,7 +276,7 @@ viewAddDependency dependencies model =
         |> List.map (\(v,t) -> Select.item [value (Bcc.relationshipToString v)] [ text t])
 
     selectedItem =
-      case model.selectedSystem of
+      case model.selectedCollaborator of
         Just s -> [ s ]
         Nothing -> []
 
@@ -289,8 +289,8 @@ viewAddDependency dependencies model =
   in
   Form.form
     [ onSubmitMaybe
-      ( model.selectedSystem
-        |> Maybe.map toSystem
+      ( model.selectedCollaborator
+        |> Maybe.map toCollaborator
         |> Maybe.map (\s -> (s, model.relationship))
         |> Maybe.map (Bcc.Add >> DepdendencyChanged)
       )
@@ -306,7 +306,7 @@ viewAddDependency dependencies model =
         [ Button.submitButton
           [ Button.secondary
           , Button.disabled
-            ( model.selectedSystem
+            ( model.selectedCollaborator
               |> Maybe.map (\_ -> False)
               |> Maybe.withDefault True
             )
@@ -316,7 +316,7 @@ viewAddDependency dependencies model =
       ]
     ]
 
-viewDependency : List DependencyReference -> String -> DependencyEdit -> Html ChangeTypeMsg
+viewDependency : List CollaboratorReference -> String -> DependencyEdit -> Html ChangeTypeMsg
 viewDependency items title model =
   div []
     [ Html.h6

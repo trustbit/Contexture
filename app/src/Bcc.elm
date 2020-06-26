@@ -74,11 +74,11 @@ type RelationshipPattern
   | CustomerSupplier
 
 
-type System
+type Collaborator
   = BoundedContext BoundedContextId
   | Domain Domain.DomainId
 
-type alias Dependency = (System, Maybe RelationshipPattern)
+type alias Dependency = (Collaborator, Maybe RelationshipPattern)
 
 type DependencyMap
   = DependencyMap (Dict String (Maybe RelationshipPattern))
@@ -208,7 +208,7 @@ dependencyCount (DependencyMap dict) =
 dependencyList : DependencyMap -> List Dependency
 dependencyList (DependencyMap dict) =
   let
-    buildSystem key =
+    buildCollaborator key =
       case key |> String.split ":" of
         [ "boundedcontext", potentialId ] ->
           potentialId
@@ -225,24 +225,24 @@ dependencyList (DependencyMap dict) =
     |> List.filterMap
       ( \(key,r) ->
         key
-        |> buildSystem
+        |> buildCollaborator
         |> Maybe.map (\s -> (s, r) )
       )
 
 updateDependencyAction : Action Dependency -> DependencyMap -> DependencyMap
 updateDependencyAction action (DependencyMap dict) =
   let
-    buildKey system =
-      case system of
+    buildKey collaborator =
+      case collaborator of
         BoundedContext id ->
           "boundedcontext:" ++ idToString id
         Domain id ->
           "domain:" ++ Domain.idToString id
   in case action of
-    Add (system, relationship) ->
-      DependencyMap (Dict.insert (system |> buildKey) relationship dict)
-    Remove (system, _) ->
-      DependencyMap (Dict.remove (system |> buildKey) dict)
+    Add (collaborator, relationship) ->
+      DependencyMap (Dict.insert (collaborator |> buildKey) relationship dict)
+    Remove (collaborator, _) ->
+      DependencyMap (Dict.remove (collaborator |> buildKey) dict)
 
 updateDependencies : DependenciesMsg -> Dependencies -> Dependencies
 updateDependencies msg model =
