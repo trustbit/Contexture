@@ -20,6 +20,7 @@ import Json.Decode as Decode exposing (Decoder)
 import Json.Decode.Pipeline as JP
 
 import Dict
+import List
 import Url
 import Http
 
@@ -40,8 +41,7 @@ type DependencyReference
   | Domain DomainDependency
 
 type alias DependencyEdit =
-  { system: Bcc.System
-  , selectedSystem : Maybe DependencyReference
+  { selectedSystem : Maybe DependencyReference
   , dependencySelectState: Autocomplete.State
   , relationship: Maybe Bcc.RelationshipPattern
   , existingDependencies: Bcc.DependencyMap }
@@ -54,8 +54,7 @@ type alias Model =
 
 initDependency : Bcc.DependencyMap -> String -> DependencyEdit
 initDependency existing id =
-  { system = ""
-  , selectedSystem = Nothing
+  { selectedSystem = Nothing
   , dependencySelectState = Autocomplete.newState id
   , relationship = Nothing
   , existingDependencies = existing }
@@ -75,8 +74,7 @@ init baseUrl dependencies =
 -- UPDATE
 
 type ChangeTypeMsg
-  = SetSystem Bcc.System
-  | SelectMsg (Autocomplete.Msg DependencyReference)
+  = SelectMsg (Autocomplete.Msg DependencyReference)
   | OnSelect (Maybe DependencyReference)
   | SetRelationship String
   | DepdendencyChanged Bcc.DependencyAction
@@ -91,8 +89,6 @@ type Msg
 updateDependency : ChangeTypeMsg -> DependencyEdit -> (DependencyEdit, Cmd ChangeTypeMsg)
 updateDependency msg model =
   case msg of
-    SetSystem system ->
-      ({ model | system = system }, Cmd.none)
     SetRelationship relationship ->
       ({ model | relationship = Bcc.relationshipParser relationship }, Cmd.none)
     SelectMsg selMsg ->
@@ -104,7 +100,11 @@ updateDependency msg model =
     OnSelect item ->
       ({ model | selectedSystem = item }, Cmd.none)
     DepdendencyChanged change ->
-      ( {model | system = "", relationship = Nothing , existingDependencies = Bcc.updateDependencyAction change model.existingDependencies}
+      ( { model
+        | selectedSystem = Nothing
+        , relationship = Nothing
+        , existingDependencies = Bcc.updateDependencyAction change model.existingDependencies
+        }
       , Cmd.none
       )
 
@@ -123,7 +123,7 @@ update msg model =
         (supplierModel,dependencyCmd) = updateDependency supMsg model.supplier
       in
         ( { model | supplier = supplierModel }
-        , dependencyCmd |> Cmd.map Consumer
+        , dependencyCmd |> Cmd.map Supplier
         )
     BoundedContextsLoaded (Ok contexts) ->
       ( { model | availableDependencies = List.append model.availableDependencies (contexts |> List.map BoundedContext) }
@@ -140,6 +140,14 @@ update msg model =
         (model, Cmd.none)
 
 -- VIEW
+
+toSystem : DependencyReference -> Bcc.System
+toSystem dependency =
+  case dependency of
+    BoundedContext bc ->
+      Bcc.BoundedContext bc.id
+    Domain d ->
+      Bcc.Domain d.id
 
 filter : Int -> String -> List DependencyReference -> Maybe (List DependencyReference)
 filter minChars query items =
@@ -164,8 +172,12 @@ filter minChars query items =
         |> Just
 
 noOpLabel : DependencyReference -> String
-noOpLabel _ =
-  ""
+noOpLabel item =
+  case item of
+    BoundedContext bc ->
+      bc.domain.name ++ " - " ++ bc.name
+    Domain d ->
+      d.name
 
 renderItem : DependencyReference -> Html Never
 renderItem item =
@@ -190,16 +202,12 @@ selectConfig =
         |> Autocomplete.withCutoff 12
         |> Autocomplete.withInputClass "text-control border rounded form-control-lg"
         |> Autocomplete.withInputWrapperClass "text-control mt-2"
-        -- |> Autocomplete.withInputWrapperStyles
-        --     [ ( "padding", "0.4rem" ) ]
         |> Autocomplete.withItemClass " border p-2 "
         |> Autocomplete.withMenuClass "bg-light"
         |> Autocomplete.withNotFound "No matches"
         |> Autocomplete.withNotFoundClass "text-danger"
         |> Autocomplete.withHighlightedItemClass "bg-white"
-        |> Autocomplete.withPrompt "Select a Dependency"
-        -- |> Autocomplete.withPromptClass "text-gray-800"
-        -- |> Autocomplete.withUnderlineClass "underline"
+        |> Autocomplete.withPrompt "Search for a Dependency"
         |> Autocomplete.withItemHtml renderItem
 
 translateRelationship : Bcc.RelationshipPattern -> String
@@ -215,10 +223,18 @@ translateRelationship relationship =
     Bcc.Partnership -> "Partnership"
     Bcc.CustomerSupplier -> "Customer/Supplier"
 
-viewAddedDepencency :Bcc.Dependency -> Html ChangeTypeMsg
-viewAddedDepencency (system, relationship) =
+viewAddedDepencency : List DependencyReference -> Bcc.Dependency -> Html ChangeTypeMsg
+viewAddedDepencency items (system, relationship) =
+  let
+    systemCaption =
+      items
+      |> List.filter (\r -> toSystem r == system )
+      |> List.head
+      |> Maybe.map noOpLabel
+      |> Maybe.withDefault "Unknown name"
+  in
   Grid.row []
-    [ Grid.col [] [text system]
+    [ Grid.col [] [text systemCaption]
     , Grid.col [] [text (Maybe.withDefault "not specified" (relationship |> Maybe.map translateRelationship))]
     , Grid.col [ Col.xs2 ]
       [ Button.button
@@ -231,6 +247,16 @@ viewAddedDepencency (system, relationship) =
         [ text "x" ]
       ]
     ]
+
+onSubmitMaybe : Maybe msg -> Html.Attribute msg
+onSubmitMaybe maybeMsg =
+  -- https://thoughtbot.com/blog/advanced-dom-event-handlers-in-elm
+  case maybeMsg of
+    Just msg ->
+      Html.Events.preventDefaultOn "submit" (Decode.map (\m -> ( m, True )) (Decode.succeed msg))
+    Nothing ->
+      Html.Events.preventDefaultOn "submit" (Decode.map (\m -> ( m, True )) (Decode.fail "No message to submit"))
+
 
 viewAddDependency : List DependencyReference -> DependencyEdit -> Html ChangeTypeMsg
 viewAddDependency dependencies model =
@@ -262,20 +288,16 @@ viewAddDependency dependencies model =
         selectedItem
   in
   Form.form
-    [ Html.Events.onSubmit
-      (
-        (model.system, model.relationship)
-        |> Bcc.Add >> DepdendencyChanged
+    [ onSubmitMaybe
+      ( model.selectedSystem
+        |> Maybe.map toSystem
+        |> Maybe.map (\s -> (s, model.relationship))
+        |> Maybe.map (Bcc.Add >> DepdendencyChanged)
       )
     ]
     [ Grid.row []
       [ Grid.col []
-        [ Input.text
-          [ Input.value model.system
-          , Input.onInput SetSystem
-          ]
-        , autocompleteSelect |> Html.map SelectMsg
-        ]
+        [ autocompleteSelect |> Html.map SelectMsg ]
       , Grid.col []
         [ Select.select [ Select.onChange SetRelationship ]
             (List.append [ Select.item [ selected (model.relationship == Nothing), value "" ] [text "unknown"] ] items)
@@ -283,7 +305,11 @@ viewAddDependency dependencies model =
       , Grid.col [ Col.xs2 ]
         [ Button.submitButton
           [ Button.secondary
-          , Button.disabled (String.length model.system <= 0)
+          , Button.disabled
+            ( model.selectedSystem
+              |> Maybe.map (\_ -> False)
+              |> Maybe.withDefault True
+            )
           ]
           [ text "+" ]
         ]
@@ -298,13 +324,13 @@ viewDependency items title model =
       [ Html.strong [] [ text title ] ]
     , Grid.row []
       [ Grid.col [] [ Html.h6 [] [ text "Name"] ]
-      , Grid.col [] [ Html.h6 [] [ text "Relationship"] ]
+      , Grid.col [] [ Html.h6 [] [ text "Relationship Pattern"] ]
       , Grid.col [Col.xs2] []
       ]
     , div []
       (model.existingDependencies
-      |> Dict.toList
-      |> List.map viewAddedDepencency)
+      |> Bcc.dependencyList
+      |> List.map (viewAddedDepencency items))
     , viewAddDependency items model
     ]
 

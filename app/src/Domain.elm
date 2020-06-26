@@ -1,7 +1,7 @@
 module Domain exposing (
   DomainId(..), Domain, Model, init,
   Msg(..),update,ifNameValid,
-  idToString, idParser, idEncoder, idDecoder,
+  idToString, idFromString, idParser, idEncoder, idDecoder,
   domainDecoder, domainsDecoder, modelEncoder, idFieldDecoder, nameFieldDecoder
   )
 

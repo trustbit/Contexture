@@ -74,15 +74,14 @@ type RelationshipPattern
   | CustomerSupplier
 
 
-type System_
+type System
   = BoundedContext BoundedContextId
   | Domain Domain.DomainId
 
-type alias System = String
-
 type alias Dependency = (System, Maybe RelationshipPattern)
 
-type alias DependencyMap = Dict System (Maybe RelationshipPattern)
+type DependencyMap
+  = DependencyMap (Dict String (Maybe RelationshipPattern))
 
 type alias Dependencies =
   { suppliers : DependencyMap
@@ -114,8 +113,8 @@ initMessages _ =
 
 initDependencies : () -> Dependencies
 initDependencies _ =
-  { suppliers = Dict.empty
-  , consumers = Dict.empty
+  { suppliers = DependencyMap Dict.empty
+  , consumers = DependencyMap Dict.empty
   }
 
 initStrategicClassification =
@@ -201,13 +200,49 @@ updateMessages msg model =
     QueriesInvoked event ->
       { model | queriesInvoked = updateMessageAction event model.queriesInvoked }
 
+
+dependencyCount : DependencyMap -> Int
+dependencyCount (DependencyMap dict) =
+  Dict.size dict
+
+dependencyList : DependencyMap -> List Dependency
+dependencyList (DependencyMap dict) =
+  let
+    buildSystem key =
+      case key |> String.split ":" of
+        [ "boundedcontext", potentialId ] ->
+          potentialId
+          |> idFromString
+          |> Maybe.map BoundedContext
+        [ "domain", potentialId ] ->
+          potentialId
+          |> Domain.idFromString
+          |> Maybe.map Domain
+        _ -> Nothing
+  in
+    dict
+    |> Dict.toList
+    |> List.filterMap
+      ( \(key,r) ->
+        key
+        |> buildSystem
+        |> Maybe.map (\s -> (s, r) )
+      )
+
 updateDependencyAction : Action Dependency -> DependencyMap -> DependencyMap
-updateDependencyAction action dependencies =
-  case action of
+updateDependencyAction action (DependencyMap dict) =
+  let
+    buildKey system =
+      case system of
+        BoundedContext id ->
+          "boundedcontext:" ++ idToString id
+        Domain id ->
+          "domain:" ++ Domain.idToString id
+  in case action of
     Add (system, relationship) ->
-      Dict.insert system relationship dependencies
+      DependencyMap (Dict.insert (system |> buildKey) relationship dict)
     Remove (system, _) ->
-      Dict.remove system dependencies
+      DependencyMap (Dict.remove (system |> buildKey) dict)
 
 updateDependencies : DependenciesMsg -> Dependencies -> Dependencies
 updateDependencies msg model =
@@ -361,6 +396,12 @@ relationshipParser relationship =
 
 -- encoders
 
+idFromString : String -> Maybe BoundedContextId
+idFromString value =
+  value
+  |> String.toInt
+  |> Maybe.map BoundedContextId
+
 idDecoder : Decoder BoundedContextId
 idDecoder =
   Decode.map BoundedContextId Decode.int
@@ -376,11 +417,15 @@ messagesEncoder messages =
     , ("queriesInvoked" , Encode.set Encode.string messages.queriesInvoked)
     ]
 
+dependencyEncoder : DependencyMap -> Encode.Value
+dependencyEncoder (DependencyMap dict) =
+  Encode.dict identity (maybeStringEncoder relationshipToString) dict
+
 dependenciesEncoder : Dependencies -> Encode.Value
 dependenciesEncoder dependencies =
   Encode.object
-    [ ("suppliers", Encode.dict identity (maybeStringEncoder relationshipToString) dependencies.suppliers )
-    , ("consumers", Encode.dict identity (maybeStringEncoder relationshipToString) dependencies.consumers )
+    [ ("suppliers", dependencyEncoder dependencies.suppliers)
+    , ("consumers", dependencyEncoder dependencies.consumers)
     ]
 
 strategicClassificationEncoder : StrategicClassification -> Encode.Value
@@ -435,11 +480,15 @@ messagesDecoder =
     |> JP.required "queriesHandled" setDecoder
     |> JP.required "queriesInvoked" setDecoder
 
+dependencyDecoder : Decoder DependencyMap
+dependencyDecoder =
+  Decode.map DependencyMap (Decode.dict (maybeStringDecoder relationshipParser))
+
 dependenciesDecoder : Decoder Dependencies
 dependenciesDecoder =
   Decode.succeed Dependencies
-    |> JP.optional "suppliers" (Decode.dict (maybeStringDecoder relationshipParser)) Dict.empty
-    |> JP.optional "consumers" (Decode.dict (maybeStringDecoder relationshipParser)) Dict.empty
+    |> JP.optional "suppliers" dependencyDecoder (DependencyMap Dict.empty)
+    |> JP.optional "consumers" dependencyDecoder (DependencyMap Dict.empty)
 
 businessModelDecoder : Decoder (List BusinessModel)
 businessModelDecoder =

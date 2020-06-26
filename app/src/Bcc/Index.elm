@@ -148,11 +148,11 @@ viewItem item =
 
     dependencies =
       item.dependencies.consumers
-      |> Dict.size
+      |> Bcc.dependencyCount
       |> viewPillMessage "Consumers"
       |> List.append
         ( item.dependencies.suppliers
-          |> Dict.size
+          |> Bcc.dependencyCount
           |> viewPillMessage "Suppliers"
         )
   in
