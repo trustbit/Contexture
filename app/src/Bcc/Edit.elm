@@ -22,7 +22,6 @@ import Bootstrap.Utilities.Display as Display
 import RemoteData
 import Url
 import Http
-import Dict
 
 import Route
 
@@ -35,7 +34,6 @@ import Bcc.Edit.Messages as Messages
 
 type alias EditingCanvas =
   { canvas : Bcc.BoundedContextCanvas
-  , tooltips : Dict.Dict String Bool
   , addingMessage : Messages.Model
   , addingDependencies : Dependencies.Model
   }
@@ -52,8 +50,7 @@ initWithCanvas url canvas =
   let
     (addingDependency, addingDependencyCmd) = Dependencies.init url canvas.dependencies
   in
-    ( { tooltips = Dict.empty
-      , addingMessage = Messages.init canvas.messages
+    ( { addingMessage = Messages.init canvas.messages
       , addingDependencies = addingDependency
       , canvas = canvas
       }
@@ -80,7 +77,6 @@ type EditingMsg
   = Field Bcc.Msg
   | MessageField Messages.Msg
   | DependencyField Dependencies.Msg
-  | TooltipMsg String
 
 type Msg
   = Loaded (Result Http.Error Bcc.BoundedContextCanvas)
@@ -115,17 +111,6 @@ updateEdit msg model =
           }
       in
         ({ model | canvas = c, addingDependencies = addingDependencies }, addingCmd |> Cmd.map DependencyField)
-    TooltipMsg key ->
-      let
-        updatedTooltip =
-          model.tooltips
-          |> Dict.update key (\b ->
-              case b of
-                Just v -> not v |> Just
-                Nothing -> True |> Just
-            )
-      in
-        ({ model | tooltips = updatedTooltip }, Cmd.none)
 
 
 update : Msg -> Model -> (Model, Cmd Msg)
@@ -220,7 +205,6 @@ view model =
               ]
             ]
           ]
-
         _ ->
           [ Grid.row []
             [ Grid.col [] [ text "Loading Bounded Context details..."]]
@@ -228,24 +212,18 @@ view model =
   in
     Grid.containerFluid [] details
 
-viewInfoTooltip : EditingCanvas -> String -> String -> Html EditingMsg -> Html EditingMsg
-viewInfoTooltip model id title description =
-  let
-    state =
-      model.tooltips
-      |> Dict.get id
-      |> Maybe.withDefault False
-  in
-    div
-      []
-      [ Form.help
-          [ style "cursor" "pointer", onClick (TooltipMsg id) ]
-          [ text title ]
-      , Form.help [ class ( if state then "" else "collapse") ] [ description ]
+viewInfoTooltip : String -> Html msg -> Html msg
+viewInfoTooltip title description =
+  Form.help []
+    [ Html.details []
+      [ Html.summary []
+        [ text title ]
+      , Html.p [ ] [ description ]
       ]
+    ]
 
 
-viewDescriptionList : List (String, String) -> Maybe String -> Html EditingMsg
+viewDescriptionList : List (String, String) -> Maybe String -> Html msg
 viewDescriptionList model sourceReference =
   let
     footer =
@@ -293,8 +271,8 @@ viewCheckbox id title value currentValues =
     ]
     title
 
-viewStrategicClassification : EditingCanvas -> List (Html EditingMsg)
-viewStrategicClassification canvas =
+viewStrategicClassification : Bcc.StrategicClassification -> List (Html Bcc.StrategicClassificationMsg)
+viewStrategicClassification model =
   let
     domainDescriptions =
       [ ("Core domain", "A key strategic initiative")
@@ -313,7 +291,6 @@ viewStrategicClassification canvas =
       , ("Product", "Off-the-shelf versions exist with differentiation")
       , ("Commodity", "Highly-standardised versions exist")
       ]
-    model = canvas.canvas.classification
   in
   [ Grid.row []
       [ Grid.col [] [ viewCaption "" "Strategic Classification"]]
@@ -321,47 +298,44 @@ viewStrategicClassification canvas =
       [ Grid.col []
         [ viewLabel "classification" "Domain"
         , div []
-            (Radio.radioList "classification"
+            ( Radio.radioList "classification"
               [ viewRadioButton "core" (model.domain == Just Bcc.Core) (Bcc.SetDomainType Bcc.Core) (text "Core")
               , viewRadioButton "supporting" (model.domain == Just Bcc.Supporting) (Bcc.SetDomainType Bcc.Supporting)  (text "Supporting")
               , viewRadioButton "generic" (model.domain == Just Bcc.Generic) (Bcc.SetDomainType Bcc.Generic)  (text "Generic")
               -- TODO: Other
               ]
             )
-            |> Html.map (Bcc.ChangeStrategicClassification >> Field)
           , viewDescriptionList domainDescriptions Nothing
-            |> viewInfoTooltip canvas "classification" "How important is this context to the success of your organisation?"
+            |> viewInfoTooltip "How important is this context to the success of your organisation?"
           ]
         , Grid.col []
           [ viewLabel "businessModel" "Business Model"
           , div []
-            (
               [ viewCheckbox "revenue" "Revenue" Bcc.Revenue model.business
               , viewCheckbox "engagement" "Engagement" Bcc.Engagement model.business
               , viewCheckbox "Compliance" "Compliance" Bcc.Compliance model.business
               , viewCheckbox "costReduction" "Cost reduction" Bcc.CostReduction model.business
               -- TODO: Other
               ]
-              |> List.map (Html.map Bcc.ChangeBusinessModel)
-            )
-            |> Html.map (Bcc.ChangeStrategicClassification >> Field)
+              |> Html.map Bcc.ChangeBusinessModel
+
           , viewDescriptionList businessDescriptions Nothing
-            |> viewInfoTooltip canvas "businessModel" "What role does the context play in your business model?"
+            |> viewInfoTooltip "What role does the context play in your business model?"
           ]
         , Grid.col []
           [ viewLabel "evolution" "Evolution"
           , div []
-              (Radio.radioList "evolution"
-              [ viewRadioButton "genesis" (model.evolution == Just Bcc.Genesis) (Bcc.SetEvolution Bcc.Genesis) (text "Genesis")
-              , viewRadioButton "customBuilt" (model.evolution == Just Bcc.CustomBuilt) (Bcc.SetEvolution Bcc.CustomBuilt) (text "Custom built")
-              , viewRadioButton "product" (model.evolution == Just Bcc.Product) (Bcc.SetEvolution Bcc.Product) (text "Product")
-              , viewRadioButton "commodity" (model.evolution == Just Bcc.Commodity) (Bcc.SetEvolution Bcc.Commodity) (text "Commodity")
-              -- TODO: Other
-              ]
+              ( Radio.radioList "evolution"
+                [ viewRadioButton "genesis" (model.evolution == Just Bcc.Genesis) (Bcc.SetEvolution Bcc.Genesis) (text "Genesis")
+                , viewRadioButton "customBuilt" (model.evolution == Just Bcc.CustomBuilt) (Bcc.SetEvolution Bcc.CustomBuilt) (text "Custom built")
+                , viewRadioButton "product" (model.evolution == Just Bcc.Product) (Bcc.SetEvolution Bcc.Product) (text "Product")
+                , viewRadioButton "commodity" (model.evolution == Just Bcc.Commodity) (Bcc.SetEvolution Bcc.Commodity) (text "Commodity")
+                -- TODO: Other
+                ]
               )
-              |> Html.map (Bcc.ChangeStrategicClassification >> Field)
+
             , viewDescriptionList evolutionDescriptions Nothing
-            |> viewInfoTooltip canvas "evolution" "How evolved is the concept (see Wardley Maps)"
+            |> viewInfoTooltip "How evolved is the concept (see Wardley Maps)"
           ]
       ]
   ]
@@ -393,7 +367,12 @@ viewLeftside canvas =
         , Form.help [] [ text "A few sentences describing the why and what of the context in business language. No technical details here."] ]
       ]
       |> List.map (Html.map Field)
-    , [ Form.group [] (viewStrategicClassification canvas) ]
+    , [ Form.group []
+        ( model.classification
+          |> viewStrategicClassification
+          |> List.map(Html.map (Bcc.ChangeStrategicClassification >> Field))
+        )
+      ]
     , [ Form.group []
         [ viewCaption "businessDecisions" "Business Decisions"
           , Textarea.textarea
@@ -419,7 +398,7 @@ viewLeftside canvas =
     ]
 
 
-viewModelTraits : EditingCanvas -> Html EditingMsg
+viewModelTraits : Bcc.BoundedContextCanvas -> Html Bcc.Msg
 viewModelTraits model =
   let
     traits =
@@ -444,18 +423,17 @@ viewModelTraits model =
       [ viewCaption "modelTraits" "Model traits"
       , Input.text
         [ Input.id "modelTraits"
-        , Input.value model.canvas.modelTraits
+        , Input.value model.modelTraits
         , Input.onInput Bcc.SetModelTraits
         ]
-        |> Html.map Field
     , viewDescriptionList traits (Just "https://github.com/ddd-crew/bounded-context-canvas/blob/master/resources/model-traits-worksheet.md")
-      |> viewInfoTooltip model "modelTraits" "How can you characterise the behaviour of this bounded context?"
+      |> viewInfoTooltip "How can you characterise the behaviour of this bounded context?"
     ]
 
 
 viewRightside : EditingCanvas -> List (Html EditingMsg)
 viewRightside model =
-  [ viewModelTraits model
+  [ viewModelTraits model.canvas |> Html.map Field
   , model.addingMessage |> Messages.view |> Html.map MessageField
   , model.addingDependencies |> Dependencies.view |> Html.map DependencyField
   ]
