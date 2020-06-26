@@ -43,7 +43,7 @@ type alias DependencyEdit =
   { system: Bcc.System
   , selectedSystem : Maybe DependencyReference
   , dependencySelectState: Autocomplete.State
-  , relationship: Maybe Bcc.Relationship
+  , relationship: Maybe Bcc.RelationshipPattern
   , existingDependencies: Bcc.DependencyMap }
 
 type alias Model =
@@ -52,6 +52,7 @@ type alias Model =
   , availableDependencies : List DependencyReference
   }
 
+initDependency : Bcc.DependencyMap -> String -> DependencyEdit
 initDependency existing id =
   { system = ""
   , selectedSystem = Nothing
@@ -201,7 +202,7 @@ selectConfig =
         -- |> Autocomplete.withUnderlineClass "underline"
         |> Autocomplete.withItemHtml renderItem
 
-translateRelationship : Bcc.Relationship -> String
+translateRelationship : Bcc.RelationshipPattern -> String
 translateRelationship relationship =
   case relationship of
     Bcc.AntiCorruptionLayer -> "Anti Corruption Layer"

@@ -62,7 +62,7 @@ type alias Messages =
   , queriesInvoked : Set Query
   }
 
-type Relationship
+type RelationshipPattern
   = AntiCorruptionLayer
   | OpenHostService
   | PublishedLanguage
@@ -80,9 +80,9 @@ type System_
 
 type alias System = String
 
-type alias Dependency = (System, Maybe Relationship)
+type alias Dependency = (System, Maybe RelationshipPattern)
 
-type alias DependencyMap = Dict System (Maybe Relationship)
+type alias DependencyMap = Dict System (Maybe RelationshipPattern)
 
 type alias Dependencies =
   { suppliers : DependencyMap
@@ -332,7 +332,7 @@ evolutionParser evolution =
       "Commodity" -> Just Commodity
       _ -> Nothing
 
-relationshipToString: Relationship -> String
+relationshipToString: RelationshipPattern -> String
 relationshipToString relationship =
   case relationship of
     AntiCorruptionLayer -> "AntiCorruptionLayer"
@@ -345,7 +345,7 @@ relationshipToString relationship =
     Partnership -> "Partnership"
     CustomerSupplier -> "CustomerSupplier"
 
-relationshipParser: String -> Maybe Relationship
+relationshipParser: String -> Maybe RelationshipPattern
 relationshipParser relationship =
   case relationship of
     "AntiCorruptionLayer" -> Just AntiCorruptionLayer
