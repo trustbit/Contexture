@@ -176,29 +176,39 @@ viewItem item =
           [ text "Edit Bounded Context" ]
       ]
 
-viewExisting : List BccItem  -> Html Msg
-viewExisting items =
+viewLoaded : String -> List BccItem  -> List(Html Msg)
+viewLoaded name items =
   if List.isEmpty items then
-    Html.p
-      [ class "lead" ]
-      [ text "No exsisting Bounded Contexts found - do you want to create one?" ]
+    [ Grid.row [ Row.attrs [ Spacing.pt3 ] ]
+      [ Grid.col [ Col.attrs [ Spacing.pt2, Spacing.pl5, Spacing.pr5] ]
+        [ Html.p
+          [ class "lead", class "text-center" ]
+          [ text "No existing bounded contexts found - do you want to create one?" ]
+        , createWithName name
+        ]
+      ]
+    ]
   else
-    items
-    |> List.sortBy (\i -> i.name)
-    |> List.map viewItem
-    |> chunksOfLeft 2
-    |> List.map Card.deck
-    |> div []
+    let
+      cards =
+        items
+        |> List.sortBy (\i -> i.name)
+        |> List.map viewItem
+        |> chunksOfLeft 2
+        |> List.map Card.deck
+        |> div []
+    in
+      [ Grid.row [ Row.attrs [ Spacing.pt3 ] ]
+        [ Grid.col [] [cards] ]
+        , Grid.row [ Row.attrs [Spacing.mt3]]
+        [ Grid.col [] [ createWithName name ] ]
+      ]
 
 view : Model -> List (Html Msg)
 view model =
   case model.bccs of
     RemoteData.Success contexts ->
-      [ Grid.row [ Row.attrs [ Spacing.pt3 ] ]
-        [ Grid.col [] [viewExisting contexts] ]
-        , Grid.row [ Row.attrs [Spacing.mt3]]
-        [ Grid.col [] [ createWithName model.bccName ] ]
-      ]
+      viewLoaded model.bccName contexts
     _ -> [ text "Loading your contexts"]
 
 

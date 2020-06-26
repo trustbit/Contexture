@@ -13,6 +13,7 @@ import Bootstrap.Form.Select as Select
 import Bootstrap.Button as Button
 import Bootstrap.Utilities.Spacing as Spacing
 import Bootstrap.Utilities.Display as Display
+import Bootstrap.Utilities.Border as Border
 
 import Select as Autocomplete
 
@@ -233,7 +234,7 @@ viewAddedDepencency items (collaborator, relationship) =
       |> Maybe.map renderItem
       |> Maybe.withDefault (text "Unknown name")
   in
-  Grid.row [Row.attrs [ class "border-top", Spacing.mb2, Spacing.pt1 ] ]
+  Grid.row [Row.attrs [ Border.top, Spacing.mb2, Spacing.pt1 ] ]
     [ Grid.col [] [ collaboratorCaption ]
     , Grid.col [] [text (Maybe.withDefault "not specified" (relationship |> Maybe.map translateRelationship))]
     , Grid.col [ Col.xs2 ]

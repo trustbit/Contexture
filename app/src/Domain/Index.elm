@@ -79,7 +79,7 @@ update msg model =
         filtered =
           items
           |> List.filter (\i ->
-            case i.parentDomain of 
+            case i.parentDomain of
               Just _ -> model.showSubdomains
               Nothing -> not model.showSubdomains
             )
@@ -109,14 +109,28 @@ viewDomain item =
         [ text "View Domain" ]
       ]
 
-viewExisting : List Domain  -> Html Msg
-viewExisting items =
+viewLoaded : Domain.Create.Model -> List Domain  -> List (Html Msg)
+viewLoaded create items =
   if List.isEmpty items then
-    Html.p
-        [ class "lead" ]
-        [ text "No existing domains found - do you want to create one?" ]
+    [ Grid.row []
+      [ Grid.col [ Col.attrs [ Spacing.pt2, Spacing.pl5, Spacing.pr5] ]
+        [ Html.p
+          [ class "lead", class "text-center" ]
+          [ text "No existing domains found - do you want to create one?"]
+        , create |> Domain.Create.view |> Html.map CreateMsg
+        ]
+      ]
+    ]
   else
-    Card.deck (items |> List.map viewDomain)
+    [ Grid.row [ Row.attrs [ Spacing.pt3 ] ]
+        [ Grid.col [] [ Card.deck (items |> List.map viewDomain) ] ]
+    , Grid.row [ Row.attrs [ Spacing.mt3 ] ]
+        [ Grid.col []
+          [ create |> Domain.Create.view |> Html.map CreateMsg ]
+        ]
+    ]
+
+
 
 view : Model -> Html Msg
 view model =
@@ -124,13 +138,7 @@ view model =
     details =
       case model.domains of
         RemoteData.Success items ->
-          [ Grid.row [ Row.attrs [ Spacing.pt3 ] ]
-              [ Grid.col [] [viewExisting items ] ]
-          , Grid.row [ Row.attrs [ Spacing.mt3 ] ]
-              [ Grid.col []
-                [ model.createDomain |> Domain.Create.view |> Html.map CreateMsg ]
-              ]
-          ]
+          viewLoaded model.createDomain items
         _ ->
           [ Grid.row []
               [ Grid.col [] [ text "Loading your domains"] ]
