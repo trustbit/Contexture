@@ -179,7 +179,7 @@ noOpLabel item =
     Domain d ->
       d.name
 
-renderItem : DependencyReference -> Html Never
+renderItem : DependencyReference -> Html msg
 renderItem item =
   let
     content =
@@ -201,7 +201,7 @@ selectConfig =
         }
         |> Autocomplete.withCutoff 12
         |> Autocomplete.withInputClass "text-control border rounded form-control-lg"
-        |> Autocomplete.withInputWrapperClass "text-control mt-2"
+        |> Autocomplete.withInputWrapperClass ""
         |> Autocomplete.withItemClass " border p-2 "
         |> Autocomplete.withMenuClass "bg-light"
         |> Autocomplete.withNotFound "No matches"
@@ -230,11 +230,11 @@ viewAddedDepencency items (system, relationship) =
       items
       |> List.filter (\r -> toSystem r == system )
       |> List.head
-      |> Maybe.map noOpLabel
-      |> Maybe.withDefault "Unknown name"
+      |> Maybe.map renderItem
+      |> Maybe.withDefault (text "Unknown name")
   in
   Grid.row []
-    [ Grid.col [] [text systemCaption]
+    [ Grid.col [] [ systemCaption ]
     , Grid.col [] [text (Maybe.withDefault "not specified" (relationship |> Maybe.map translateRelationship))]
     , Grid.col [ Col.xs2 ]
       [ Button.button
