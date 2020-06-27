@@ -18,9 +18,8 @@ import Route exposing ( Route)
 import Domain
 import Domain.Index
 import Domain.Edit
-import Bcc
+import BoundedContext
 import Bcc.Edit
-import Bcc.Index
 import Url exposing (Protocol)
 
 -- MAIN
@@ -84,7 +83,7 @@ initCurrentPage ( model, existingCmds ) =
           Route.Bcc id ->
             let
               url = model.baseUrl
-              bccUrl = { url | path = url.path ++ "/bccs/" ++ Bcc.idToString id}
+              bccUrl = { url | path = url.path ++ "/bccs/" ++ BoundedContext.idToString id}
             
               ( pageModel, pageCmds ) = Bcc.Edit.init model.key bccUrl
             in

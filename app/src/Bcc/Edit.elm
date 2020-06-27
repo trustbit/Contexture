@@ -26,6 +26,7 @@ import Http
 import Route
 
 import Domain
+import BoundedContext
 import Bcc
 import Bcc.Edit.Dependencies as Dependencies
 import Bcc.Edit.Messages as Messages
@@ -75,6 +76,7 @@ init key url =
 
 type EditingMsg
   = Field Bcc.Msg
+  | ChangeName BoundedContext.Msg
   | MessageField Messages.Msg
   | DependencyField Dependencies.Msg
 
@@ -98,6 +100,13 @@ updateEdit msg model =
         ({ model | addingMessage = updatedModel, canvas = c }, Cmd.none)
     Field fieldMsg ->
       ({ model | canvas = Bcc.update fieldMsg model.canvas }, Cmd.none)
+    ChangeName name ->
+      let
+        context = BoundedContext.update name model.canvas.boundedContext
+        canvas = model.canvas
+        c = { canvas | boundedContext = context }
+      in
+        ({ model | canvas = c }, Cmd.none)
     DependencyField dependency ->
       let
         (addingDependencies, addingCmd) = Dependencies.update dependency model.addingDependencies
@@ -128,7 +137,7 @@ update msg model =
     (Delete,_) ->
       (model, deleteBCC model)
     (Deleted (Ok _), RemoteData.Success editable) ->
-      (model, Route.pushUrl (Route.Domain editable.canvas.domain) model.key)
+      (model, Route.pushUrl (Route.Domain editable.canvas.boundedContext.domain) model.key)
     (Loaded (Ok m), _) ->
       let
         (canvasModel, canvasCmd) = initWithCanvas model.self m
@@ -171,7 +180,7 @@ view model =
             [ Grid.col []
               [ Button.linkButton
                 [ Button.roleLink
-                , Button.attrs [ href (Route.routeToString (Route.Domain edit.canvas.domain)) ]
+                , Button.attrs [ href (Route.routeToString (Route.Domain edit.canvas.boundedContext.domain)) ]
                 ]
                 [ text "Back" ]
               ]
@@ -191,7 +200,7 @@ view model =
                 [ Button.secondary
                 , Button.onClick Delete
                 , Button.attrs
-                  [ title ("Delete " ++ edit.canvas.name)
+                  [ title ("Delete " ++ edit.canvas.boundedContext.name)
                   , Spacing.mr3
                   ]
                 ]
@@ -199,7 +208,7 @@ view model =
               , Button.submitButton
                 [ Button.primary
                 , Button.onClick Save
-                , Button.disabled (edit.canvas.name |> Bcc.ifNameValid (\_ -> True) (\_ -> False))
+                , Button.disabled (edit.canvas.boundedContext.name |> Bcc.ifNameValid (\_ -> True) (\_ -> False))
                 ]
                 [ text "Save"]
               ]
@@ -351,8 +360,8 @@ viewLeftside canvas =
         [ viewCaption "name" "Name"
         , Input.text (
             List.concat
-            [ [ Input.id "name", Input.value model.name, Input.onInput Bcc.SetName ]
-            , model.name |> Bcc.ifNameValid (\_ -> [ Input.danger ]) (\_ -> [])
+            [ [ Input.id "name", Input.value model.boundedContext.name, Input.onInput (BoundedContext.SetName >> ChangeName)]
+            , model.boundedContext.name |> Bcc.ifNameValid (\_ -> [ Input.danger ]) (\_ -> [])
             ])
         , Form.invalidFeedback [] [ text "A name for a Bounded Context is required!" ]
         , Form.help [] [ text "Naming is hard. Writing down the name of your context and gaining agreement as a team will frame how you design the context." ]
@@ -362,11 +371,10 @@ viewLeftside canvas =
         , Textarea.textarea
           [ Textarea.id "description"
           , Textarea.value model.description
-          , Textarea.onInput Bcc.SetDescription
+          , Textarea.onInput (Bcc.SetDescription >> Field)
           ]
         , Form.help [] [ text "A few sentences describing the why and what of the context in business language. No technical details here."] ]
       ]
-      |> List.map (Html.map Field)
     , [ Form.group []
         ( model.classification
           |> viewStrategicClassification
@@ -457,7 +465,7 @@ loadBCC model =
 saveBCC: Url.Url -> EditingCanvas -> Cmd Msg
 saveBCC url model =
     Http.request
-      { method = "PUT"
+      { method = "PATCH"
       , headers = []
       , url = Url.toString url
       , body = Http.jsonBody <| Bcc.modelEncoder model.canvas

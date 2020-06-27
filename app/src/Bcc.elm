@@ -11,11 +11,10 @@ import Json.Decode as Decode exposing (Decoder)
 import Json.Decode.Pipeline as JP
 
 import Domain
+import BoundedContext exposing (BoundedContext, BoundedContextId, idFieldDecoder)
+import Dependency
 
 -- MODEL
-
-type BoundedContextId
-  = BoundedContextId Int
 
 type DomainType
   = Core
@@ -62,36 +61,13 @@ type alias Messages =
   , queriesInvoked : Set Query
   }
 
-type RelationshipPattern
-  = AntiCorruptionLayer
-  | OpenHostService
-  | PublishedLanguage
-  | SharedKernel
-  | UpstreamDownstream
-  | Conformist
-  | Octopus
-  | Partnership
-  | CustomerSupplier
-
-
-type Collaborator
-  = BoundedContext BoundedContextId
-  | Domain Domain.DomainId
-
-type alias Dependency = (Collaborator, Maybe RelationshipPattern)
-
-type DependencyMap
-  = DependencyMap (Dict String (Maybe RelationshipPattern))
-
 type alias Dependencies =
-  { suppliers : DependencyMap
-  , consumers : DependencyMap
+  { suppliers : Dependency.DependencyMap
+  , consumers : Dependency.DependencyMap
   }
 
 type alias BoundedContextCanvas =
-  { id : BoundedContextId
-  , domain : Domain.DomainId
-  , name : String
+  { boundedContext : BoundedContext
   , description : String
   , classification : StrategicClassification
   , businessDecisions : BusinessDecisions
@@ -113,8 +89,8 @@ initMessages _ =
 
 initDependencies : () -> Dependencies
 initDependencies _ =
-  { suppliers = DependencyMap Dict.empty
-  , consumers = DependencyMap Dict.empty
+  { suppliers = Dependency.DependencyMap Dict.empty
+  , consumers = Dependency.DependencyMap Dict.empty
   }
 
 initStrategicClassification =
@@ -123,11 +99,9 @@ initStrategicClassification =
   , evolution = Nothing
   }
 
-init: Domain.DomainId -> BoundedContextCanvas
-init domain =
-  { id = BoundedContextId(-1)
-  , domain = domain
-  , name = ""
+init: BoundedContext -> BoundedContextCanvas
+init context =
+  { boundedContext = context
   , description = ""
   , classification = initStrategicClassification
   , businessDecisions = ""
@@ -143,8 +117,8 @@ type Action t
   = Add t
   | Remove t
 
-type alias DependencyAction = Action Dependency
-
+type alias DependencyAction = Dependency.DependencyAction
+    
 type DependenciesMsg
   = Supplier DependencyAction
   | Consumer DependencyAction
@@ -167,8 +141,7 @@ type StrategicClassificationMsg
   | SetEvolution Evolution
 
 type Msg
-  = SetName String
-  | SetDescription String
+  = SetDescription String
   | ChangeStrategicClassification StrategicClassificationMsg
   | SetBusinessDecisions BusinessDecisions
   | SetUbiquitousLanguage UbiquitousLanguage
@@ -201,56 +174,14 @@ updateMessages msg model =
       { model | queriesInvoked = updateMessageAction event model.queriesInvoked }
 
 
-dependencyCount : DependencyMap -> Int
-dependencyCount (DependencyMap dict) =
-  Dict.size dict
-
-dependencyList : DependencyMap -> List Dependency
-dependencyList (DependencyMap dict) =
-  let
-    buildCollaborator key =
-      case key |> String.split ":" of
-        [ "boundedcontext", potentialId ] ->
-          potentialId
-          |> idFromString
-          |> Maybe.map BoundedContext
-        [ "domain", potentialId ] ->
-          potentialId
-          |> Domain.idFromString
-          |> Maybe.map Domain
-        _ -> Nothing
-  in
-    dict
-    |> Dict.toList
-    |> List.filterMap
-      ( \(key,r) ->
-        key
-        |> buildCollaborator
-        |> Maybe.map (\s -> (s, r) )
-      )
-
-updateDependencyAction : Action Dependency -> DependencyMap -> DependencyMap
-updateDependencyAction action (DependencyMap dict) =
-  let
-    buildKey collaborator =
-      case collaborator of
-        BoundedContext id ->
-          "boundedcontext:" ++ idToString id
-        Domain id ->
-          "domain:" ++ Domain.idToString id
-  in case action of
-    Add (collaborator, relationship) ->
-      DependencyMap (Dict.insert (collaborator |> buildKey) relationship dict)
-    Remove (collaborator, _) ->
-      DependencyMap (Dict.remove (collaborator |> buildKey) dict)
 
 updateDependencies : DependenciesMsg -> Dependencies -> Dependencies
 updateDependencies msg model =
   case msg of
     Supplier dependency ->
-      { model | suppliers = updateDependencyAction dependency model.suppliers }
+      { model | suppliers = Dependency.updateDependencyAction dependency model.suppliers }
     Consumer dependency ->
-      { model | consumers = updateDependencyAction dependency model.consumers }
+      { model | consumers = Dependency.updateDependencyAction dependency model.consumers }
 
 updateClassification : StrategicClassificationMsg -> StrategicClassification -> StrategicClassification
 updateClassification msg canvas =
@@ -267,8 +198,6 @@ updateClassification msg canvas =
 update: Msg -> BoundedContextCanvas -> BoundedContextCanvas
 update msg canvas =
   case msg of
-    SetName name ->
-      { canvas | name = name}
 
     SetDescription description ->
       { canvas | description = description}
@@ -302,17 +231,6 @@ ifNameValid =
   ifValid (\name -> String.length name <= 0)
 
 -- conversions
-
-idToString : BoundedContextId -> String
-idToString bccId =
-  case bccId of
-    BoundedContextId id -> String.fromInt id
-
-idParser : Parser (BoundedContextId -> a) a
-idParser =
-    custom "BCCID" <|
-        \bccId ->
-            Maybe.map BoundedContextId (String.toInt bccId)
 
 domainTypeToString: DomainType -> String
 domainTypeToString classification =
@@ -367,44 +285,8 @@ evolutionParser evolution =
       "Commodity" -> Just Commodity
       _ -> Nothing
 
-relationshipToString: RelationshipPattern -> String
-relationshipToString relationship =
-  case relationship of
-    AntiCorruptionLayer -> "AntiCorruptionLayer"
-    OpenHostService -> "OpenHostService"
-    PublishedLanguage -> "PublishedLanguage"
-    SharedKernel -> "SharedKernel"
-    UpstreamDownstream -> "UpstreamDownstream"
-    Conformist -> "Conformist"
-    Octopus -> "Octopus"
-    Partnership -> "Partnership"
-    CustomerSupplier -> "CustomerSupplier"
-
-relationshipParser: String -> Maybe RelationshipPattern
-relationshipParser relationship =
-  case relationship of
-    "AntiCorruptionLayer" -> Just AntiCorruptionLayer
-    "OpenHostService" -> Just OpenHostService
-    "PublishedLanguage" -> Just PublishedLanguage
-    "SharedKernel" -> Just SharedKernel
-    "UpstreamDownstream" -> Just UpstreamDownstream
-    "Conformist" -> Just Conformist
-    "Octopus" -> Just Octopus
-    "Partnership" -> Just Partnership
-    "CustomerSupplier" -> Just CustomerSupplier
-    _ -> Nothing
-
 -- encoders
 
-idFromString : String -> Maybe BoundedContextId
-idFromString value =
-  value
-  |> String.toInt
-  |> Maybe.map BoundedContextId
-
-idDecoder : Decoder BoundedContextId
-idDecoder =
-  Decode.map BoundedContextId Decode.int
 
 messagesEncoder : Messages -> Encode.Value
 messagesEncoder messages =
@@ -417,15 +299,12 @@ messagesEncoder messages =
     , ("queriesInvoked" , Encode.set Encode.string messages.queriesInvoked)
     ]
 
-dependencyEncoder : DependencyMap -> Encode.Value
-dependencyEncoder (DependencyMap dict) =
-  Encode.dict identity (maybeStringEncoder relationshipToString) dict
 
 dependenciesEncoder : Dependencies -> Encode.Value
 dependenciesEncoder dependencies =
   Encode.object
-    [ ("suppliers", dependencyEncoder dependencies.suppliers)
-    , ("consumers", dependencyEncoder dependencies.consumers)
+    [ ("suppliers", Dependency.dependencyEncoder dependencies.suppliers)
+    , ("consumers", Dependency.dependencyEncoder dependencies.consumers)
     ]
 
 strategicClassificationEncoder : StrategicClassification -> Encode.Value
@@ -439,9 +318,7 @@ strategicClassificationEncoder classification =
 modelEncoder : BoundedContextCanvas -> Encode.Value
 modelEncoder canvas =
   Encode.object
-    [ ("domainId", Domain.idEncoder canvas.domain)
-    , ("name", Encode.string canvas.name)
-    , ("description", Encode.string canvas.description)
+    [ ("description", Encode.string canvas.description)
     , ("classification", strategicClassificationEncoder canvas.classification)
     , ("businessDecisions", Encode.string canvas.businessDecisions)
     , ("ubiquitousLanguage", Encode.string canvas.ubiquitousLanguage)
@@ -480,15 +357,11 @@ messagesDecoder =
     |> JP.required "queriesHandled" setDecoder
     |> JP.required "queriesInvoked" setDecoder
 
-dependencyDecoder : Decoder DependencyMap
-dependencyDecoder =
-  Decode.map DependencyMap (Decode.dict (maybeStringDecoder relationshipParser))
-
 dependenciesDecoder : Decoder Dependencies
 dependenciesDecoder =
   Decode.succeed Dependencies
-    |> JP.optional "suppliers" dependencyDecoder (DependencyMap Dict.empty)
-    |> JP.optional "consumers" dependencyDecoder (DependencyMap Dict.empty)
+    |> JP.optional "suppliers" Dependency.dependencyDecoder (Dependency.DependencyMap Dict.empty)
+    |> JP.optional "consumers" Dependency.dependencyDecoder (Dependency.DependencyMap Dict.empty)
 
 businessModelDecoder : Decoder (List BusinessModel)
 businessModelDecoder =
@@ -510,24 +383,11 @@ strategicClassificationDecoder =
     |> JP.optional "businessModel" businessModelDecoder []
     |> JP.optional "evolution" (maybeStringDecoder evolutionParser) Nothing
 
-nameFieldDecoder : Decoder String
-nameFieldDecoder =
-  Decode.field "name" Decode.string
-
-idFieldDecoder : Decoder BoundedContextId
-idFieldDecoder =
-  Decode.field "id" idDecoder
-
-domainIdFieldDecoder : Decoder Domain.DomainId
-domainIdFieldDecoder =
-  Decode.field "domainId" Domain.idDecoder
 
 modelDecoder : Decoder BoundedContextCanvas
 modelDecoder =
   Decode.succeed BoundedContextCanvas
-    |> JP.custom idFieldDecoder
-    |> JP.custom domainIdFieldDecoder
-    |> JP.custom nameFieldDecoder
+    |> JP.custom BoundedContext.modelDecoder 
     |> JP.optional "description" Decode.string ""
     |> JP.optional "classification" strategicClassificationDecoder initStrategicClassification
     |> JP.optional "businessDecisions" Decode.string ""

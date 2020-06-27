@@ -31,6 +31,8 @@ import Dict
 import Set
 
 import Bcc
+import BoundedContext
+import Dependency
 import Route
 
 -- MODEL
@@ -57,7 +59,7 @@ type Msg
   = Loaded (Result Http.Error (List BccItem))
   | SetName String
   | CreateBcc
-  | Created (Result Http.Error BccItem)
+  | Created (Result Http.Error BoundedContext.BoundedContext)
 
 update : Msg -> Model -> (Model, Cmd Msg)
 update msg model =
@@ -148,16 +150,16 @@ viewItem item =
 
     dependencies =
       item.dependencies.consumers
-      |> Bcc.dependencyCount
+      |> Dependency.dependencyCount
       |> viewPillMessage "Consumers"
       |> List.append
         ( item.dependencies.suppliers
-          |> Bcc.dependencyCount
+          |> Dependency.dependencyCount
           |> viewPillMessage "Suppliers"
         )
   in
   Card.config [ Card.attrs [class "mb-3", class ""]]
-    |> Card.headerH4 [] [ text item.name ]
+    |> Card.headerH4 [] [ text item.boundedContext.name ]
     |> Card.block []
       ( List.concat
           [ if String.length item.description > 0
@@ -172,7 +174,7 @@ viewItem item =
       ]
     |> Card.footer []
       [ Html.a
-          [ href (Route.routeToString (Route.Bcc item.id)), class "stretched-link" ]
+          [ href (Route.routeToString (Route.Bcc item.boundedContext.id)), class "stretched-link" ]
           [ text "Edit Bounded Context" ]
       ]
 
@@ -192,7 +194,7 @@ viewLoaded name items =
     let
       cards =
         items
-        |> List.sortBy (\i -> i.name)
+        |> List.sortBy (\i -> i.boundedContext.name)
         |> List.map viewItem
         |> chunksOfLeft 2
         |> List.map Card.deck
@@ -232,7 +234,7 @@ createNewBcc model =
       Http.post
       { url = { baseUrl | path = baseUrl.path ++ "/bccs" } |> Url.toString
       , body = Http.jsonBody body
-      , expect = Http.expectJson Created Bcc.modelDecoder
+      , expect = Http.expectJson Created BoundedContext.modelDecoder
       }
 
 bccItemsDecoder: Decoder (List BccItem)

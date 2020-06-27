@@ -26,6 +26,8 @@ import Url
 import Http
 
 import Bcc
+import BoundedContext
+import Dependency
 import Domain
 
 type alias DomainDependency =
@@ -33,7 +35,7 @@ type alias DomainDependency =
   , name : String }
 
 type alias BoundedContextDependency =
-  { id : Bcc.BoundedContextId
+  { id : BoundedContext.BoundedContextId
   , name: String
   , domain: DomainDependency }
 
@@ -44,8 +46,8 @@ type CollaboratorReference
 type alias DependencyEdit =
   { selectedCollaborator : Maybe CollaboratorReference
   , dependencySelectState : Autocomplete.State
-  , relationship : Maybe Bcc.RelationshipPattern
-  , existingDependencies : Bcc.DependencyMap }
+  , relationship : Maybe Dependency.RelationshipPattern
+  , existingDependencies : Dependency.DependencyMap }
 
 type alias Model =
   { consumer: DependencyEdit
@@ -53,7 +55,7 @@ type alias Model =
   , availableDependencies : List CollaboratorReference
   }
 
-initDependency : Bcc.DependencyMap -> String -> DependencyEdit
+initDependency : Dependency.DependencyMap -> String -> DependencyEdit
 initDependency existing id =
   { selectedCollaborator = Nothing
   , dependencySelectState = Autocomplete.newState id
@@ -91,7 +93,7 @@ updateDependency : ChangeTypeMsg -> DependencyEdit -> (DependencyEdit, Cmd Chang
 updateDependency msg model =
   case msg of
     SetRelationship relationship ->
-      ({ model | relationship = Bcc.relationshipParser relationship }, Cmd.none)
+      ({ model | relationship = Dependency.relationshipParser relationship }, Cmd.none)
     SelectMsg selMsg ->
       let
         ( updated, cmd ) =
@@ -104,7 +106,7 @@ updateDependency msg model =
       ( { model
         | selectedCollaborator = Nothing
         , relationship = Nothing
-        , existingDependencies = Bcc.updateDependencyAction change model.existingDependencies
+        , existingDependencies = Dependency.updateDependencyAction change model.existingDependencies
         }
       , Cmd.none
       )
@@ -142,13 +144,13 @@ update msg model =
 
 -- VIEW
 
-toCollaborator : CollaboratorReference -> Bcc.Collaborator
+toCollaborator : CollaboratorReference -> Dependency.Collaborator
 toCollaborator dependency =
   case dependency of
     BoundedContext bc ->
-      Bcc.BoundedContext bc.id
+      Dependency.BoundedContext bc.id
     Domain d ->
-      Bcc.Domain d.id
+      Dependency.Domain d.id
 
 filter : Int -> String -> List CollaboratorReference -> Maybe (List CollaboratorReference)
 filter minChars query items =
@@ -211,20 +213,20 @@ selectConfig =
         |> Autocomplete.withPrompt "Search for a Dependency"
         |> Autocomplete.withItemHtml renderItem
 
-translateRelationship : Bcc.RelationshipPattern -> String
+translateRelationship : Dependency.RelationshipPattern -> String
 translateRelationship relationship =
   case relationship of
-    Bcc.AntiCorruptionLayer -> "Anti Corruption Layer"
-    Bcc.OpenHostService -> "Open Host Service"
-    Bcc.PublishedLanguage -> "Published Language"
-    Bcc.SharedKernel ->"Shared Kernel"
-    Bcc.UpstreamDownstream -> "Upstream/Downstream"
-    Bcc.Conformist -> "Conformist"
-    Bcc.Octopus -> "Octopus"
-    Bcc.Partnership -> "Partnership"
-    Bcc.CustomerSupplier -> "Customer/Supplier"
+    Dependency.AntiCorruptionLayer -> "Anti Corruption Layer"
+    Dependency.OpenHostService -> "Open Host Service"
+    Dependency.PublishedLanguage -> "Published Language"
+    Dependency.SharedKernel ->"Shared Kernel"
+    Dependency.UpstreamDownstream -> "Upstream/Downstream"
+    Dependency.Conformist -> "Conformist"
+    Dependency.Octopus -> "Octopus"
+    Dependency.Partnership -> "Partnership"
+    Dependency.CustomerSupplier -> "Customer/Supplier"
 
-viewAddedDepencency : List CollaboratorReference -> Bcc.Dependency -> Html ChangeTypeMsg
+viewAddedDepencency : List CollaboratorReference -> Dependency.Dependency -> Html ChangeTypeMsg
 viewAddedDepencency items (collaborator, relationship) =
   let
     collaboratorCaption =
@@ -242,7 +244,7 @@ viewAddedDepencency items (collaborator, relationship) =
         [ Button.secondary
         , Button.onClick (
             (collaborator, relationship)
-            |> Bcc.Remove |> DepdendencyChanged
+            |> Dependency.Remove |> DepdendencyChanged
           )
         ]
         [ text "x" ]
@@ -263,18 +265,18 @@ viewAddDependency : List CollaboratorReference -> DependencyEdit -> Html ChangeT
 viewAddDependency dependencies model =
   let
     items =
-      [ Bcc.AntiCorruptionLayer
-      , Bcc.OpenHostService
-      , Bcc.PublishedLanguage
-      , Bcc.SharedKernel
-      , Bcc.UpstreamDownstream
-      , Bcc.Conformist
-      , Bcc.Octopus
-      , Bcc.Partnership
-      , Bcc.CustomerSupplier
+      [ Dependency.AntiCorruptionLayer
+      , Dependency.OpenHostService
+      , Dependency.PublishedLanguage
+      , Dependency.SharedKernel
+      , Dependency.UpstreamDownstream
+      , Dependency.Conformist
+      , Dependency.Octopus
+      , Dependency.Partnership
+      , Dependency.CustomerSupplier
       ]
         |> List.map (\r -> (r, translateRelationship r))
-        |> List.map (\(v,t) -> Select.item [value (Bcc.relationshipToString v)] [ text t])
+        |> List.map (\(v,t) -> Select.item [value (Dependency.relationshipToString v)] [ text t])
 
     selectedItem =
       case model.selectedCollaborator of
@@ -284,7 +286,7 @@ viewAddDependency dependencies model =
     -- TODO: this is probably very unefficient
     existingDependencies =
       model.existingDependencies
-      |> Bcc.dependencyList
+      |> Dependency.dependencyList
       |> List.map Tuple.first
 
     relevantDependencies =
@@ -303,7 +305,7 @@ viewAddDependency dependencies model =
       ( model.selectedCollaborator
         |> Maybe.map toCollaborator
         |> Maybe.map (\s -> (s, model.relationship))
-        |> Maybe.map (Bcc.Add >> DepdendencyChanged)
+        |> Maybe.map (Dependency.Add >> DepdendencyChanged)
       )
     ]
     [ Grid.row []
@@ -340,7 +342,7 @@ viewDependency items title model =
       ]
     , div []
       (model.existingDependencies
-      |> Bcc.dependencyList
+      |> Dependency.dependencyList
       |> List.map (viewAddedDepencency items))
     , viewAddDependency items model
     ]
@@ -373,9 +375,9 @@ domainDecoder =
 boundedContextDecoder : Decoder BoundedContextDependency
 boundedContextDecoder =
   Decode.succeed BoundedContextDependency
-    |> JP.custom Bcc.idFieldDecoder
-    |> JP.custom Bcc.nameFieldDecoder
-    |> JP.required "domain" domainDecoder
+    |> JP.custom BoundedContext.idFieldDecoder
+    |> JP.custom BoundedContext.nameFieldDecoder
+    |> JP.required "domainId" domainDecoder
 
 loadBoundedContexts: Url.Url -> Cmd Msg
 loadBoundedContexts url =
