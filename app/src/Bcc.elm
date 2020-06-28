@@ -4,14 +4,13 @@ import Url.Parser exposing (Parser, custom)
 
 import Set exposing(Set)
 import Set as Set
-import Dict exposing(Dict)
+
 
 import Json.Encode as Encode
 import Json.Decode as Decode exposing (Decoder)
 import Json.Decode.Pipeline as JP
 
-import Domain
-import BoundedContext exposing (BoundedContext, BoundedContextId, idFieldDecoder)
+import BoundedContext exposing (BoundedContext)
 import Dependency
 
 -- MODEL
@@ -89,8 +88,8 @@ initMessages _ =
 
 initDependencies : () -> Dependencies
 initDependencies _ =
-  { suppliers = Dependency.DependencyMap Dict.empty
-  , consumers = Dependency.DependencyMap Dict.empty
+  { suppliers = Dependency.emptyDependencies
+  , consumers = Dependency.emptyDependencies
   }
 
 initStrategicClassification =
@@ -117,14 +116,6 @@ type Action t
   = Add t
   | Remove t
 
-type alias DependencyAction = Dependency.DependencyAction
-    
-type DependenciesMsg
-  = Supplier DependencyAction
-  | Consumer DependencyAction
-
-type alias DependencyType = DependencyAction -> DependenciesMsg
-
 type alias MessageAction = Action Message
 
 type MessageMsg
@@ -147,7 +138,6 @@ type Msg
   | SetUbiquitousLanguage UbiquitousLanguage
   | SetModelTraits ModelTraits
   | ChangeMessages MessageMsg
-  | ChangeDependencies DependenciesMsg
 
 updateMessageAction : Action Message -> Set Message -> Set Message
 updateMessageAction action messages =
@@ -172,16 +162,6 @@ updateMessages msg model =
       { model | queriesHandled = updateMessageAction event model.queriesHandled }
     QueriesInvoked event ->
       { model | queriesInvoked = updateMessageAction event model.queriesInvoked }
-
-
-
-updateDependencies : DependenciesMsg -> Dependencies -> Dependencies
-updateDependencies msg model =
-  case msg of
-    Supplier dependency ->
-      { model | suppliers = Dependency.updateDependencyAction dependency model.suppliers }
-    Consumer dependency ->
-      { model | consumers = Dependency.updateDependencyAction dependency model.consumers }
 
 updateClassification : StrategicClassificationMsg -> StrategicClassification -> StrategicClassification
 updateClassification msg canvas =
@@ -215,9 +195,6 @@ update msg canvas =
 
     ChangeMessages m ->
       { canvas | messages = updateMessages m canvas.messages }
-
-    ChangeDependencies m ->
-      { canvas | dependencies = updateDependencies m canvas.dependencies }
 
 
 ifValid : (model -> Bool) -> (model -> result) -> (model -> result) -> model -> result
@@ -360,8 +337,8 @@ messagesDecoder =
 dependenciesDecoder : Decoder Dependencies
 dependenciesDecoder =
   Decode.succeed Dependencies
-    |> JP.optional "suppliers" Dependency.dependencyDecoder (Dependency.DependencyMap Dict.empty)
-    |> JP.optional "consumers" Dependency.dependencyDecoder (Dependency.DependencyMap Dict.empty)
+    |> JP.optional "suppliers" Dependency.dependencyDecoder Dependency.emptyDependencies
+    |> JP.optional "consumers" Dependency.dependencyDecoder Dependency.emptyDependencies
 
 businessModelDecoder : Decoder (List BusinessModel)
 businessModelDecoder =

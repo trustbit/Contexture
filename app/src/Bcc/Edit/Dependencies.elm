@@ -20,7 +20,7 @@ import Select as Autocomplete
 import Json.Decode as Decode exposing (Decoder)
 import Json.Decode.Pipeline as JP
 
-import Dict
+
 import List
 import Url
 import Http
@@ -76,11 +76,18 @@ init baseUrl dependencies =
 
 -- UPDATE
 
+
+type Action t
+  = Add t
+  | Remove t
+
+type alias DependencyAction = Action Dependency.Dependency
+
 type ChangeTypeMsg
   = SelectMsg (Autocomplete.Msg CollaboratorReference)
   | OnSelect (Maybe CollaboratorReference)
   | SetRelationship String
-  | DepdendencyChanged Bcc.DependencyAction
+  | DepdendencyChanged DependencyAction
 
 type Msg
   = Consumer ChangeTypeMsg
@@ -88,6 +95,14 @@ type Msg
   | BoundedContextsLoaded (Result Http.Error (List BoundedContextDependency))
   | DomainsLoaded (Result Http.Error (List DomainDependency))
 
+
+updateDependencyAction : DependencyAction -> Dependency.DependencyMap -> Dependency.DependencyMap
+updateDependencyAction action depenencies =
+  case action of
+    Add dependency ->
+      Dependency.registerDependency dependency depenencies
+    Remove dependency  ->
+      Dependency.removeDependency dependency depenencies
 
 updateDependency : ChangeTypeMsg -> DependencyEdit -> (DependencyEdit, Cmd ChangeTypeMsg)
 updateDependency msg model =
@@ -106,7 +121,7 @@ updateDependency msg model =
       ( { model
         | selectedCollaborator = Nothing
         , relationship = Nothing
-        , existingDependencies = Dependency.updateDependencyAction change model.existingDependencies
+        , existingDependencies = updateDependencyAction change model.existingDependencies
         }
       , Cmd.none
       )
@@ -138,7 +153,8 @@ update msg model =
       )
     _ ->
       let
-        _ = Debug.log ("Dependencies: " ++ (Debug.toString msg) ++ (Debug.toString model))
+        _ = Debug.log "Dependencies msg" msg
+        _ = Debug.log "Dependencies model" model
       in
         (model, Cmd.none)
 
@@ -244,7 +260,7 @@ viewAddedDepencency items (collaborator, relationship) =
         [ Button.secondary
         , Button.onClick (
             (collaborator, relationship)
-            |> Dependency.Remove |> DepdendencyChanged
+            |> Remove |> DepdendencyChanged
           )
         ]
         [ text "x" ]
@@ -305,7 +321,7 @@ viewAddDependency dependencies model =
       ( model.selectedCollaborator
         |> Maybe.map toCollaborator
         |> Maybe.map (\s -> (s, model.relationship))
-        |> Maybe.map (Dependency.Add >> DepdendencyChanged)
+        |> Maybe.map (Add >> DepdendencyChanged)
       )
     ]
     [ Grid.row []
@@ -377,7 +393,7 @@ boundedContextDecoder =
   Decode.succeed BoundedContextDependency
     |> JP.custom BoundedContext.idFieldDecoder
     |> JP.custom BoundedContext.nameFieldDecoder
-    |> JP.required "domainId" domainDecoder
+    |> JP.required "domain" domainDecoder
 
 loadBoundedContexts: Url.Url -> Cmd Msg
 loadBoundedContexts url =

@@ -1,23 +1,12 @@
 module Dependency exposing (..)
 
-import Url.Parser exposing (Parser, custom)
-
-import Set exposing(Set)
-import Set as Set
 import Dict exposing(Dict)
 
 import Json.Encode as Encode
 import Json.Decode as Decode exposing (Decoder)
-import Json.Decode.Pipeline as JP
 
 import BoundedContext exposing (BoundedContextId, idFromString, idToString)
 import Domain
-
-type Action t
-  = Add t
-  | Remove t
-
-type alias DependencyAction = Action Dependency
 
 type RelationshipPattern
   = AntiCorruptionLayer
@@ -40,7 +29,9 @@ type alias Dependency = (Collaborator, Maybe RelationshipPattern)
 type DependencyMap
   = DependencyMap (Dict String (Maybe RelationshipPattern))
 
-
+emptyDependencies : DependencyMap
+emptyDependencies =
+  DependencyMap Dict.empty
 
 dependencyCount : DependencyMap -> Int
 dependencyCount (DependencyMap dict) =
@@ -70,21 +61,20 @@ dependencyList (DependencyMap dict) =
         |> Maybe.map (\s -> (s, r) )
       )
 
-updateDependencyAction : Action Dependency -> DependencyMap -> DependencyMap
-updateDependencyAction action (DependencyMap dict) =
-  let
-    buildKey collaborator =
-      case collaborator of
-        BoundedContext id ->
-          "boundedcontext:" ++ idToString id
-        Domain id ->
-          "domain:" ++ Domain.idToString id
-  in case action of
-    Add (collaborator, relationship) ->
-      DependencyMap (Dict.insert (collaborator |> buildKey) relationship dict)
-    Remove (collaborator, _) ->
-      DependencyMap (Dict.remove (collaborator |> buildKey) dict)
+buildKey collaborator =
+  case collaborator of
+    BoundedContext id ->
+      "boundedcontext:" ++ idToString id
+    Domain id ->
+      "domain:" ++ Domain.idToString id
 
+registerDependency : Dependency -> DependencyMap -> DependencyMap
+registerDependency (collaborator, relationship) (DependencyMap dict) =
+  DependencyMap (Dict.insert (collaborator |> buildKey) relationship dict)
+
+removeDependency : Dependency -> DependencyMap -> DependencyMap
+removeDependency (collaborator, _) (DependencyMap dict) =
+  DependencyMap (Dict.remove (collaborator |> buildKey) dict)
 
 
 relationshipToString: RelationshipPattern -> String

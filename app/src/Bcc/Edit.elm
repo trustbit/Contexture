@@ -464,11 +464,19 @@ loadBCC model =
 
 saveBCC: Url.Url -> EditingCanvas -> Cmd Msg
 saveBCC url model =
+  let
+    c = model.canvas
+    canvas =
+      { c | dependencies =
+        { suppliers = model.addingDependencies.supplier.existingDependencies
+        , consumers = model.addingDependencies.consumer.existingDependencies }
+      }
+  in
     Http.request
       { method = "PATCH"
       , headers = []
       , url = Url.toString url
-      , body = Http.jsonBody <| Bcc.modelEncoder model.canvas
+      , body = Http.jsonBody <| Bcc.modelEncoder canvas
       , expect = Http.expectWhatever Saved
       , timeout = Nothing
       , tracker = Nothing
