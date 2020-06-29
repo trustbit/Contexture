@@ -1,4 +1,8 @@
-module Dependency exposing (..)
+module Dependency exposing (
+  RelationshipPattern(..), Collaborator(..), Dependency, DependencyMap,
+  emptyDependencies, dependencyCount, dependencyList,
+  registerDependency, removeDependency,
+  dependencyEncoder, dependencyDecoder, relationshipParser, relationshipToString)
 
 import Dict exposing(Dict)
 
@@ -61,6 +65,7 @@ dependencyList (DependencyMap dict) =
         |> Maybe.map (\s -> (s, r) )
       )
 
+buildKey : Collaborator -> String
 buildKey collaborator =
   case collaborator of
     BoundedContext id ->

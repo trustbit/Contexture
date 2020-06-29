@@ -190,8 +190,8 @@ filter minChars query items =
         |> List.filter searchable
         |> Just
 
-noOpLabel : CollaboratorReference -> String
-noOpLabel item =
+oneLineLabel : CollaboratorReference -> String
+oneLineLabel item =
   case item of
     BoundedContext bc ->
       bc.domain.name ++ " - " ++ bc.name
@@ -215,7 +215,7 @@ selectConfig : Autocomplete.Config ChangeTypeMsg CollaboratorReference
 selectConfig =
     Autocomplete.newConfig
         { onSelect = OnSelect
-        , toLabel = noOpLabel
+        , toLabel = oneLineLabel
         , filter = filter 2
         }
         |> Autocomplete.withCutoff 12
@@ -270,11 +270,14 @@ viewAddedDepencency items (collaborator, relationship) =
 onSubmitMaybe : Maybe msg -> Html.Attribute msg
 onSubmitMaybe maybeMsg =
   -- https://thoughtbot.com/blog/advanced-dom-event-handlers-in-elm
-  case maybeMsg of
+  let
+    preventDefault m =
+      ( m, True )
+  in case maybeMsg of
     Just msg ->
-      Html.Events.preventDefaultOn "submit" (Decode.map (\m -> ( m, True )) (Decode.succeed msg))
+      Html.Events.preventDefaultOn "submit" (Decode.map preventDefault (Decode.succeed msg))
     Nothing ->
-      Html.Events.preventDefaultOn "submit" (Decode.map (\m -> ( m, True )) (Decode.fail "No message to submit"))
+      Html.Events.preventDefaultOn "submit" (Decode.map preventDefault (Decode.fail "No message to submit"))
 
 
 viewAddDependency : List CollaboratorReference -> DependencyEdit -> Html ChangeTypeMsg
@@ -384,12 +387,12 @@ view model =
 
 domainDecoder : Decoder DomainDependency
 domainDecoder =
-  Decode.succeed DomainDependency
-    |> JP.custom Domain.idFieldDecoder
-    |> JP.custom Domain.nameFieldDecoder
+  Domain.domainDecoder
+  |> Decode.map (\d -> { id = d.id, name = d.name})
 
 boundedContextDecoder : Decoder BoundedContextDependency
 boundedContextDecoder =
+  -- TODO: can we reuse BoundedContext.modelDecoder?
   Decode.succeed BoundedContextDependency
     |> JP.custom BoundedContext.idFieldDecoder
     |> JP.custom BoundedContext.nameFieldDecoder
@@ -398,7 +401,7 @@ boundedContextDecoder =
 loadBoundedContexts: Url.Url -> Cmd Msg
 loadBoundedContexts url =
   Http.get
-  -- todo this is wrong
+  -- todo this is wrong - we need an 'API' abstraction?
     { url = Url.toString { url | path = "/api/bccs?_expand=domain"}
     , expect = Http.expectJson BoundedContextsLoaded (Decode.list boundedContextDecoder)
     }
@@ -406,7 +409,7 @@ loadBoundedContexts url =
 loadDomains: Url.Url -> Cmd Msg
 loadDomains url =
   Http.get
-  -- todo this is wrong
+  -- todo this is wrong - we need an 'API' abstraction?
     { url = Url.toString { url | path = "/api/domains"}
     , expect = Http.expectJson DomainsLoaded (Decode.list domainDecoder)
     }
