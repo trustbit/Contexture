@@ -34,6 +34,7 @@ import Bcc
 import BoundedContext
 import Dependency
 import Route
+import StrategicClassification exposing (StrategicClassification)
 
 -- MODEL
 
@@ -119,15 +120,15 @@ viewItem item =
   let
     domainBadge =
       case item.classification.domain of
-        Just domain -> [ Badge.badgePrimary [] [ text <| Bcc.domainTypeToString domain ] ]
+        Just domain -> [ Badge.badgePrimary [] [ text <| StrategicClassification.domainTypeToString domain ] ]
         Nothing -> []
     businessBadges =
       item.classification.business
-      |> List.map Bcc.businessModelToString
+      |> List.map StrategicClassification.businessModelToString
       |> List.map (\b -> Badge.badgeSecondary [] [ text b ])
     evolutionBadge =
       case item.classification.evolution of
-        Just evolution -> [ Badge.badgeInfo [] [ text <| Bcc.evolutionToString evolution ] ]
+        Just evolution -> [ Badge.badgeInfo [] [ text <| StrategicClassification.evolutionToString evolution ] ]
         Nothing -> []
     badges =
       List.concat

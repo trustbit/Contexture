@@ -27,6 +27,7 @@ import Route
 
 import Domain
 import BoundedContext
+import StrategicClassification
 import Bcc
 import Bcc.Edit.Dependencies as Dependencies
 import Bcc.Edit.Messages as Messages
@@ -81,9 +82,9 @@ type Action t
   | Remove t
 
 type StrategicClassificationMsg
-  = SetDomainType Bcc.DomainType
-  | ChangeBusinessModel (Action Bcc.BusinessModel)
-  | SetEvolution Bcc.Evolution
+  = SetDomainType StrategicClassification.DomainType
+  | ChangeBusinessModel (Action StrategicClassification.BusinessModel)
+  | SetEvolution StrategicClassification.Evolution
 
 type FieldMsg
   = SetDescription String
@@ -94,6 +95,7 @@ type FieldMsg
 
 type EditingMsg
   = Field FieldMsg
+  -- TODO Name editing is actually part of the BoundedContext - move there!
   | SetName String
   | DependencyField Dependencies.Msg
   | MessageField Messages.Msg
@@ -106,17 +108,17 @@ type Msg
   | Delete
   | Deleted (Result Http.Error ())
 
-updateClassification : StrategicClassificationMsg -> Bcc.StrategicClassification -> Bcc.StrategicClassification
-updateClassification msg canvas =
+updateClassification : StrategicClassificationMsg -> StrategicClassification.StrategicClassification -> StrategicClassification.StrategicClassification
+updateClassification msg classification =
   case msg of
     SetDomainType class ->
-      { canvas | domain = Just class}
+      { classification | domain = Just class}
     ChangeBusinessModel (Add business) ->
-      { canvas | business = business :: canvas.business}
+      { classification | business = business :: classification.business}
     ChangeBusinessModel (Remove business) ->
-      { canvas | business = canvas.business |> List.filter (\bm -> bm /= business )}
+      { classification | business = classification.business |> List.filter (\bm -> bm /= business )}
     SetEvolution evo ->
-      { canvas | evolution = Just evo}
+      { classification | evolution = Just evo}
 
 updateField: FieldMsg -> Bcc.BoundedContextCanvas -> Bcc.BoundedContextCanvas
 updateField msg canvas =
@@ -335,7 +337,7 @@ viewCheckbox id title value currentValues =
     ]
     title
 
-viewStrategicClassification : Bcc.StrategicClassification -> List (Html StrategicClassificationMsg)
+viewStrategicClassification : StrategicClassification.StrategicClassification -> List (Html StrategicClassificationMsg)
 viewStrategicClassification model =
   let
     domainDescriptions =
@@ -363,9 +365,9 @@ viewStrategicClassification model =
         [ viewLabel "classification" "Domain"
         , div []
             ( Radio.radioList "classification"
-              [ viewRadioButton "core" (model.domain == Just Bcc.Core) (SetDomainType Bcc.Core) (text "Core")
-              , viewRadioButton "supporting" (model.domain == Just Bcc.Supporting) (SetDomainType Bcc.Supporting)  (text "Supporting")
-              , viewRadioButton "generic" (model.domain == Just Bcc.Generic) (SetDomainType Bcc.Generic)  (text "Generic")
+              [ viewRadioButton "core" (model.domain == Just StrategicClassification.Core) (SetDomainType StrategicClassification.Core) (text "Core")
+              , viewRadioButton "supporting" (model.domain == Just StrategicClassification.Supporting) (SetDomainType StrategicClassification.Supporting)  (text "Supporting")
+              , viewRadioButton "generic" (model.domain == Just StrategicClassification.Generic) (SetDomainType StrategicClassification.Generic)  (text "Generic")
               -- TODO: Other
               ]
             )
@@ -375,10 +377,10 @@ viewStrategicClassification model =
         , Grid.col []
           [ viewLabel "businessModel" "Business Model"
           , div []
-              [ viewCheckbox "revenue" "Revenue" Bcc.Revenue model.business
-              , viewCheckbox "engagement" "Engagement" Bcc.Engagement model.business
-              , viewCheckbox "Compliance" "Compliance" Bcc.Compliance model.business
-              , viewCheckbox "costReduction" "Cost reduction" Bcc.CostReduction model.business
+              [ viewCheckbox "revenue" "Revenue" StrategicClassification.Revenue model.business
+              , viewCheckbox "engagement" "Engagement" StrategicClassification.Engagement model.business
+              , viewCheckbox "Compliance" "Compliance" StrategicClassification.Compliance model.business
+              , viewCheckbox "costReduction" "Cost reduction" StrategicClassification.CostReduction model.business
               -- TODO: Other
               ]
               |> Html.map ChangeBusinessModel
@@ -390,10 +392,10 @@ viewStrategicClassification model =
           [ viewLabel "evolution" "Evolution"
           , div []
               ( Radio.radioList "evolution"
-                [ viewRadioButton "genesis" (model.evolution == Just Bcc.Genesis) (SetEvolution Bcc.Genesis) (text "Genesis")
-                , viewRadioButton "customBuilt" (model.evolution == Just Bcc.CustomBuilt) (SetEvolution Bcc.CustomBuilt) (text "Custom built")
-                , viewRadioButton "product" (model.evolution == Just Bcc.Product) (SetEvolution Bcc.Product) (text "Product")
-                , viewRadioButton "commodity" (model.evolution == Just Bcc.Commodity) (SetEvolution Bcc.Commodity) (text "Commodity")
+                [ viewRadioButton "genesis" (model.evolution == Just StrategicClassification.Genesis) (SetEvolution StrategicClassification.Genesis) (text "Genesis")
+                , viewRadioButton "customBuilt" (model.evolution == Just StrategicClassification.CustomBuilt) (SetEvolution StrategicClassification.CustomBuilt) (text "Custom built")
+                , viewRadioButton "product" (model.evolution == Just StrategicClassification.Product) (SetEvolution StrategicClassification.Product) (text "Product")
+                , viewRadioButton "commodity" (model.evolution == Just StrategicClassification.Commodity) (SetEvolution StrategicClassification.Commodity) (text "Commodity")
                 -- TODO: Other
                 ]
               )

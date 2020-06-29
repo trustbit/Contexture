@@ -1,0 +1,146 @@
+module StrategicClassification exposing (
+    StrategicClassification, DomainType(..),BusinessModel(..),Evolution(..),
+    noClassification,
+    encoder, decoder,
+    domainTypeToString, businessModelToString, evolutionToString
+    )
+
+import Json.Encode as Encode
+import Json.Decode as Decode exposing (Decoder)
+import Json.Decode.Pipeline as JP
+
+
+type DomainType
+  = Core
+  | Supporting
+  | Generic
+  | OtherDomainType String
+
+type BusinessModel
+  = Revenue
+  | Engagement
+  | Compliance
+  | CostReduction
+  | OtherBusinessModel String
+
+type Evolution
+  = Genesis
+  | CustomBuilt
+  | Product
+  | Commodity
+
+type alias StrategicClassification =
+    { domain : Maybe DomainType
+    , business : List BusinessModel
+    , evolution : Maybe Evolution
+    }
+
+noClassification : StrategicClassification
+noClassification =
+  { domain = Nothing
+  , business = []
+  , evolution = Nothing
+  }
+
+-- conversions
+
+domainTypeToString: DomainType -> String
+domainTypeToString classification =
+  case classification of
+      OtherDomainType value -> value
+      Generic -> "Generic"
+      Supporting -> "Supporting"
+      Core -> "Core"
+
+domainTypeParser: String -> Maybe DomainType
+domainTypeParser classification =
+  case classification of
+      "Generic" -> Just Generic
+      "Supporting" -> Just Supporting
+      "Core" -> Just Core
+      "" -> Nothing
+      value -> Just (OtherDomainType value)
+
+businessModelToString: BusinessModel -> String
+businessModelToString businessModel =
+  case businessModel of
+      OtherBusinessModel value -> value
+      Revenue -> "Revenue"
+      Engagement -> "Engagement"
+      Compliance -> "Compliance"
+      CostReduction -> "CostReduction"
+
+businessModelParser: String -> Maybe BusinessModel
+businessModelParser businessModel =
+  case businessModel of
+      "Revenue" -> Just Revenue
+      "Engagement" -> Just Engagement
+      "Compliance" -> Just Compliance
+      "CostReduction" -> Just CostReduction
+      "" -> Nothing
+      value -> Just (OtherBusinessModel value)
+
+evolutionToString: Evolution -> String
+evolutionToString evolution =
+  case evolution of
+      Genesis -> "Genesis"
+      CustomBuilt -> "CustomBuilt"
+      Product -> "Product"
+      Commodity -> "Commodity"
+
+evolutionParser: String -> Maybe Evolution
+evolutionParser evolution =
+  case evolution of
+      "Genesis" -> Just Genesis
+      "CustomBuilt" -> Just CustomBuilt
+      "Product" -> Just Product
+      "Commodity" -> Just Commodity
+      _ -> Nothing
+
+-- encoder
+
+
+maybeEncoder : (t -> Encode.Value) -> Maybe t -> Encode.Value
+maybeEncoder encode value =
+  case value of
+    Just v -> encode v
+    Nothing -> Encode.null
+
+maybeStringEncoder encode value =
+  maybeEncoder (encode >> Encode.string) value
+
+maybeStringDecoder : (String -> Maybe v) -> Decoder (Maybe v)
+maybeStringDecoder parser =
+  Decode.oneOf
+    [ Decode.null Nothing
+    , Decode.map parser Decode.string
+    ]
+
+encoder : StrategicClassification -> Encode.Value
+encoder classification =
+  Encode.object
+    [ ("domainType", maybeStringEncoder domainTypeToString classification.domain)
+    , ("businessModel", Encode.list (businessModelToString >> Encode.string)  classification.business)
+    , ("evolution", maybeStringEncoder evolutionToString classification.evolution)
+    ]
+
+
+businessModelDecoder : Decoder (List BusinessModel)
+businessModelDecoder =
+    let
+      maybeListDecoder = Decode.list (Decode.map businessModelParser Decode.string)
+      maybeAsList =
+        List.concatMap (\li ->
+          case li of
+            Just value -> [value]
+            Nothing -> []
+        )
+    in
+      maybeListDecoder |> Decode.map maybeAsList
+
+decoder : Decoder StrategicClassification
+decoder =
+  Decode.succeed StrategicClassification
+    |> JP.optional "domainType" (maybeStringDecoder domainTypeParser) Nothing
+    |> JP.optional "businessModel" businessModelDecoder []
+    |> JP.optional "evolution" (maybeStringDecoder evolutionParser) Nothing
