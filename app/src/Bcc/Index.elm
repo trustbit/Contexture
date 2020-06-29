@@ -73,7 +73,7 @@ update msg model =
     CreateBcc ->
       (model, createNewBcc model)
     Created (Ok item) ->
-        (model, Route.pushUrl (Route.Bcc item.id) model.navKey)
+        (model, Route.pushUrl (item |> BoundedContext.id |> Route.Bcc ) model.navKey)
     _ ->
         Debug.log ("Overview: " ++ Debug.toString msg ++ " " ++ Debug.toString model)
         (model, Cmd.none)
@@ -96,7 +96,7 @@ createWithName name =
         [ Button.attrs
             [ Html.Attributes.type_ "submit"]
             , Button.primary
-            , Button.disabled (name |> Bcc.ifNameValid (\_ -> True) (\_ -> False))
+            , Button.disabled (name |> BoundedContext.isNameValid)
             ]
         [ text "Create new Bounded Context"]
         ]
@@ -159,7 +159,7 @@ viewItem item =
         )
   in
   Card.config [ Card.attrs [class "mb-3", class ""]]
-    |> Card.headerH4 [] [ text item.boundedContext.name ]
+    |> Card.headerH4 [] [ text (item.boundedContext |> BoundedContext.name) ]
     |> Card.block []
       ( List.concat
           [ if String.length item.description > 0
@@ -174,7 +174,14 @@ viewItem item =
       ]
     |> Card.footer []
       [ Html.a
-          [ href (Route.routeToString (Route.Bcc item.boundedContext.id)), class "stretched-link" ]
+          [ href 
+            ( item.boundedContext
+              |> BoundedContext.id
+              |> Route.Bcc
+              |> Route.routeToString
+            )
+          , class "stretched-link"
+          ]
           [ text "Edit Bounded Context" ]
       ]
 
@@ -194,7 +201,7 @@ viewLoaded name items =
     let
       cards =
         items
-        |> List.sortBy (\i -> i.boundedContext.name)
+        |> List.sortBy (\i -> i.boundedContext |> BoundedContext.name)
         |> List.map viewItem
         |> chunksOfLeft 2
         |> List.map Card.deck

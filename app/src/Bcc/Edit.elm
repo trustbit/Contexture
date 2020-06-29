@@ -35,6 +35,7 @@ import Bcc.Edit.Messages as Messages
 
 type alias EditingCanvas =
   { canvas : Bcc.BoundedContextCanvas
+  , name: String
   , addingMessage : Messages.Model
   , addingDependencies : Dependencies.Model
   }
@@ -53,6 +54,7 @@ initWithCanvas url canvas =
   in
     ( { addingMessage = Messages.init canvas.messages
       , addingDependencies = addingDependency
+      , name = canvas.boundedContext |> BoundedContext.name
       , canvas = canvas
       }
     , addingDependencyCmd |> Cmd.map DependencyField
@@ -76,7 +78,7 @@ init key url =
 
 type EditingMsg
   = Field Bcc.Msg
-  | ChangeName BoundedContext.Msg
+  | SetName String
   | MessageField Messages.Msg
   | DependencyField Dependencies.Msg
 
@@ -100,13 +102,8 @@ updateEdit msg model =
         ({ model | addingMessage = updatedModel, canvas = c }, Cmd.none)
     Field fieldMsg ->
       ({ model | canvas = Bcc.update fieldMsg model.canvas }, Cmd.none)
-    ChangeName name ->
-      let
-        context = BoundedContext.update name model.canvas.boundedContext
-        canvas = model.canvas
-        c = { canvas | boundedContext = context }
-      in
-        ({ model | canvas = c }, Cmd.none)
+    SetName name ->
+      ({ model | name = name}, Cmd.none)
     DependencyField dependency ->
       let
         (addingDependencies, addingCmd) = Dependencies.update dependency model.addingDependencies
@@ -131,13 +128,26 @@ update msg model =
       in
         ({ model | edit = RemoteData.Success <| editModel }, editCmd |> Cmd.map Editing)
     (Save, RemoteData.Success editable) ->
-      (model, saveBCC model.self editable)
+      case editable.canvas.boundedContext |> BoundedContext.changeName editable.name of
+        Ok context ->
+          let
+            canvas = editable.canvas
+            c = { canvas | boundedContext = context }
+            e = { editable | canvas = c}
+          in
+            (model, saveBCC model.self e)
+            -- ({ model | canvas = c }, Cmd.none)
+        Err err ->
+          let
+            _ = Debug.log "error" err
+          in (Debug.log "namechange" model, Cmd.none)
+      
     (Saved (Ok _),_) ->
       (model, Cmd.none)
     (Delete,_) ->
       (model, deleteBCC model)
     (Deleted (Ok _), RemoteData.Success editable) ->
-      (model, Route.pushUrl (Route.Domain editable.canvas.boundedContext.domain) model.key)
+      (model, Route.pushUrl (editable.canvas.boundedContext |> BoundedContext.domain |> Route.Domain) model.key)
     (Loaded (Ok m), _) ->
       let
         (canvasModel, canvasCmd) = initWithCanvas model.self m
@@ -146,8 +156,10 @@ update msg model =
     (Loaded (Err e),_) ->
       ({ model | edit = RemoteData.Failure e } , Cmd.none)
     _ ->
-      Debug.log ("BCC: " ++ Debug.toString msg ++ " " ++ Debug.toString model)
-      (model, Cmd.none)
+      let
+        _ = Debug.log "bcc msg" msg
+      in
+      (Debug.log "bcc model" model, Cmd.none)
 
 -- VIEW
 
@@ -180,7 +192,14 @@ view model =
             [ Grid.col []
               [ Button.linkButton
                 [ Button.roleLink
-                , Button.attrs [ href (Route.routeToString (Route.Domain edit.canvas.boundedContext.domain)) ]
+                , Button.attrs
+                  [ href 
+                    ( edit.canvas.boundedContext
+                      |> BoundedContext.domain
+                      |> Route.Domain
+                      |> Route.routeToString
+                    )
+                  ]
                 ]
                 [ text "Back" ]
               ]
@@ -200,7 +219,7 @@ view model =
                 [ Button.secondary
                 , Button.onClick Delete
                 , Button.attrs
-                  [ title ("Delete " ++ edit.canvas.boundedContext.name)
+                  [ title ("Delete " ++ (edit.canvas.boundedContext |> BoundedContext.name))
                   , Spacing.mr3
                   ]
                 ]
@@ -208,7 +227,7 @@ view model =
               , Button.submitButton
                 [ Button.primary
                 , Button.onClick Save
-                , Button.disabled (edit.canvas.boundedContext.name |> Bcc.ifNameValid (\_ -> True) (\_ -> False))
+                , Button.disabled (edit.name |> BoundedContext.isNameValid |> not)
                 ]
                 [ text "Save"]
               ]
@@ -360,8 +379,8 @@ viewLeftside canvas =
         [ viewCaption "name" "Name"
         , Input.text (
             List.concat
-            [ [ Input.id "name", Input.value model.boundedContext.name, Input.onInput (BoundedContext.SetName >> ChangeName)]
-            , model.boundedContext.name |> Bcc.ifNameValid (\_ -> [ Input.danger ]) (\_ -> [])
+            [ [ Input.id "name", Input.value canvas.name, Input.onInput SetName]
+            , if canvas.name |> BoundedContext.isNameValid then [] else  [ Input.danger ]
             ])
         , Form.invalidFeedback [] [ text "A name for a Bounded Context is required!" ]
         , Form.help [] [ text "Naming is hard. Writing down the name of your context and gaining agreement as a team will frame how you design the context." ]

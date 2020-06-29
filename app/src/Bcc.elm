@@ -196,17 +196,6 @@ update msg canvas =
     ChangeMessages m ->
       { canvas | messages = updateMessages m canvas.messages }
 
-
-ifValid : (model -> Bool) -> (model -> result) -> (model -> result) -> model -> result
-ifValid predicate trueRenderer falseRenderer model =
-  if predicate model then
-    trueRenderer model
-  else
-    falseRenderer model
-
-ifNameValid =
-  ifValid (\name -> String.length name <= 0)
-
 -- conversions
 
 domainTypeToString: DomainType -> String
@@ -295,7 +284,8 @@ strategicClassificationEncoder classification =
 modelEncoder : BoundedContextCanvas -> Encode.Value
 modelEncoder canvas =
   Encode.object
-    [ ("description", Encode.string canvas.description)
+    [ ("name", Encode.string (canvas.boundedContext |> BoundedContext.name))
+    , ("description", Encode.string canvas.description)
     , ("classification", strategicClassificationEncoder canvas.classification)
     , ("businessDecisions", Encode.string canvas.businessDecisions)
     , ("ubiquitousLanguage", Encode.string canvas.ubiquitousLanguage)
