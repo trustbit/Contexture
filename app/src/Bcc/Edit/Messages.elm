@@ -65,7 +65,11 @@ init messages =
   }
 -- UPDATE
 
-type alias MessageAction = Bcc.Action Bcc.Message
+type Action t
+  = Add t
+  | Remove t
+
+type alias MessageAction = Action Bcc.Message
 
 type ChangeTypeMsg
   = FieldEdit String
@@ -82,9 +86,9 @@ type Msg
 updateMessageAction : MessageAction -> Set Bcc.Message  -> Set Bcc.Message
 updateMessageAction action messages =
   case action of
-    Bcc.Add m ->
+    Add m ->
       Set.insert m messages
-    Bcc.Remove m ->
+    Remove m ->
       Set.remove m messages
 
 updateAction : ChangeTypeMsg -> MessageReference Bcc.Message -> MessageReference Bcc.Message
@@ -122,7 +126,7 @@ viewMessageOption model =
   ListGroup.li
     [ ListGroup.attrs [ Flex.block, Flex.justifyBetween, Flex.alignItemsCenter, Spacing.p1 ] ]
     [ text model
-    , Button.button [Button.secondary, Button.small, Button.onClick (MessageChanged (Bcc.Remove model))] [ text "x"]
+    , Button.button [Button.secondary, Button.small, Button.onClick (MessageChanged (Remove model))] [ text "x"]
     ]
 
 viewMessage : String -> String -> MessageReference Bcc.Message -> Html ChangeTypeMsg
@@ -138,7 +142,7 @@ viewMessage id title { addingName, existingMessages } =
     , Form.form
       [ Html.Events.onSubmit
           (addingName
-            |> Bcc.Add
+            |> Add
             |> MessageChanged
           )
       , Flex.block, Flex.justifyBetween, Flex.alignItemsCenter

@@ -76,8 +76,24 @@ init key url =
 
 -- UPDATE
 
+type Action t
+  = Add t
+  | Remove t
+
+type StrategicClassificationMsg
+  = SetDomainType Bcc.DomainType
+  | ChangeBusinessModel (Action Bcc.BusinessModel)
+  | SetEvolution Bcc.Evolution
+
+type FieldMsg
+  = SetDescription String
+  | ChangeStrategicClassification StrategicClassificationMsg
+  | SetBusinessDecisions Bcc.BusinessDecisions
+  | SetUbiquitousLanguage Bcc.UbiquitousLanguage
+  | SetModelTraits Bcc.ModelTraits
+
 type EditingMsg
-  = Field Bcc.Msg
+  = Field FieldMsg
   | SetName String
   | DependencyField Dependencies.Msg
   | MessageField Messages.Msg
@@ -90,6 +106,36 @@ type Msg
   | Delete
   | Deleted (Result Http.Error ())
 
+updateClassification : StrategicClassificationMsg -> Bcc.StrategicClassification -> Bcc.StrategicClassification
+updateClassification msg canvas =
+  case msg of
+    SetDomainType class ->
+      { canvas | domain = Just class}
+    ChangeBusinessModel (Add business) ->
+      { canvas | business = business :: canvas.business}
+    ChangeBusinessModel (Remove business) ->
+      { canvas | business = canvas.business |> List.filter (\bm -> bm /= business )}
+    SetEvolution evo ->
+      { canvas | evolution = Just evo}
+
+updateField: FieldMsg -> Bcc.BoundedContextCanvas -> Bcc.BoundedContextCanvas
+updateField msg canvas =
+  case msg of
+
+    SetDescription description ->
+      { canvas | description = description}
+
+    ChangeStrategicClassification m ->
+      { canvas | classification = updateClassification m canvas.classification }
+
+    SetBusinessDecisions decisions ->
+      { canvas | businessDecisions = decisions}
+    SetUbiquitousLanguage language ->
+      { canvas | ubiquitousLanguage = language}
+
+    SetModelTraits traits ->
+      { canvas | modelTraits = traits}
+
 updateEdit : EditingMsg -> EditingCanvas -> (EditingCanvas, Cmd EditingMsg)
 updateEdit msg model =
   case msg of
@@ -99,7 +145,7 @@ updateEdit msg model =
       in
         ({ model | addingMessage = updatedModel }, Cmd.none)
     Field fieldMsg ->
-      ({ model | canvas = Bcc.update fieldMsg model.canvas }, Cmd.none)
+      ({ model | canvas = updateField fieldMsg model.canvas }, Cmd.none)
     SetName name ->
       ({ model | name = name}, Cmd.none)
     DependencyField dependency ->
@@ -280,16 +326,16 @@ viewRadioButton id checked msg title =
     [ Radio.id id, Radio.onClick msg, Radio.checked checked ]
     (Radio.label [] [ title ])
 
-viewCheckbox : String -> String -> value -> List value -> Html (Bcc.Action value)
+viewCheckbox : String -> String -> value -> List value -> Html (Action value)
 viewCheckbox id title value currentValues =
   Checkbox.checkbox
     [Checkbox.id id
-    , Checkbox.onCheck(\isChecked -> if isChecked then Bcc.Add value else Bcc.Remove value )
+    , Checkbox.onCheck(\isChecked -> if isChecked then Add value else Remove value )
     , Checkbox.checked (List.member value currentValues)
     ]
     title
 
-viewStrategicClassification : Bcc.StrategicClassification -> List (Html Bcc.StrategicClassificationMsg)
+viewStrategicClassification : Bcc.StrategicClassification -> List (Html StrategicClassificationMsg)
 viewStrategicClassification model =
   let
     domainDescriptions =
@@ -317,9 +363,9 @@ viewStrategicClassification model =
         [ viewLabel "classification" "Domain"
         , div []
             ( Radio.radioList "classification"
-              [ viewRadioButton "core" (model.domain == Just Bcc.Core) (Bcc.SetDomainType Bcc.Core) (text "Core")
-              , viewRadioButton "supporting" (model.domain == Just Bcc.Supporting) (Bcc.SetDomainType Bcc.Supporting)  (text "Supporting")
-              , viewRadioButton "generic" (model.domain == Just Bcc.Generic) (Bcc.SetDomainType Bcc.Generic)  (text "Generic")
+              [ viewRadioButton "core" (model.domain == Just Bcc.Core) (SetDomainType Bcc.Core) (text "Core")
+              , viewRadioButton "supporting" (model.domain == Just Bcc.Supporting) (SetDomainType Bcc.Supporting)  (text "Supporting")
+              , viewRadioButton "generic" (model.domain == Just Bcc.Generic) (SetDomainType Bcc.Generic)  (text "Generic")
               -- TODO: Other
               ]
             )
@@ -335,7 +381,7 @@ viewStrategicClassification model =
               , viewCheckbox "costReduction" "Cost reduction" Bcc.CostReduction model.business
               -- TODO: Other
               ]
-              |> Html.map Bcc.ChangeBusinessModel
+              |> Html.map ChangeBusinessModel
 
           , viewDescriptionList businessDescriptions Nothing
             |> viewInfoTooltip "What role does the context play in your business model?"
@@ -344,10 +390,10 @@ viewStrategicClassification model =
           [ viewLabel "evolution" "Evolution"
           , div []
               ( Radio.radioList "evolution"
-                [ viewRadioButton "genesis" (model.evolution == Just Bcc.Genesis) (Bcc.SetEvolution Bcc.Genesis) (text "Genesis")
-                , viewRadioButton "customBuilt" (model.evolution == Just Bcc.CustomBuilt) (Bcc.SetEvolution Bcc.CustomBuilt) (text "Custom built")
-                , viewRadioButton "product" (model.evolution == Just Bcc.Product) (Bcc.SetEvolution Bcc.Product) (text "Product")
-                , viewRadioButton "commodity" (model.evolution == Just Bcc.Commodity) (Bcc.SetEvolution Bcc.Commodity) (text "Commodity")
+                [ viewRadioButton "genesis" (model.evolution == Just Bcc.Genesis) (SetEvolution Bcc.Genesis) (text "Genesis")
+                , viewRadioButton "customBuilt" (model.evolution == Just Bcc.CustomBuilt) (SetEvolution Bcc.CustomBuilt) (text "Custom built")
+                , viewRadioButton "product" (model.evolution == Just Bcc.Product) (SetEvolution Bcc.Product) (text "Product")
+                , viewRadioButton "commodity" (model.evolution == Just Bcc.Commodity) (SetEvolution Bcc.Commodity) (text "Commodity")
                 -- TODO: Other
                 ]
               )
@@ -380,14 +426,14 @@ viewLeftside canvas =
         , Textarea.textarea
           [ Textarea.id "description"
           , Textarea.value model.description
-          , Textarea.onInput (Bcc.SetDescription >> Field)
+          , Textarea.onInput (SetDescription >> Field)
           ]
         , Form.help [] [ text "A few sentences describing the why and what of the context in business language. No technical details here."] ]
       ]
     , [ Form.group []
         ( model.classification
           |> viewStrategicClassification
-          |> List.map(Html.map (Bcc.ChangeStrategicClassification >> Field))
+          |> List.map(Html.map (ChangeStrategicClassification >> Field))
         )
       ]
     , [ Form.group []
@@ -396,7 +442,7 @@ viewLeftside canvas =
             [ Textarea.id "businessDecisions"
             , Textarea.rows 10
             , Textarea.value model.businessDecisions
-            , Textarea.onInput Bcc.SetBusinessDecisions
+            , Textarea.onInput SetBusinessDecisions
             ]
           , Form.help [] [ text "What are the key business rules and policies within this context?"]
         ]
@@ -406,7 +452,7 @@ viewLeftside canvas =
               [ Textarea.id "ubiquitousLanguage"
               , Textarea.rows 10
               , Textarea.value model.ubiquitousLanguage
-              , Textarea.onInput Bcc.SetUbiquitousLanguage
+              , Textarea.onInput SetUbiquitousLanguage
               ]
             , Form.help [] [ text "What are the key domain terms that exist within this context, and what do they mean?"]
           ]
@@ -415,7 +461,7 @@ viewLeftside canvas =
     ]
 
 
-viewModelTraits : Bcc.BoundedContextCanvas -> Html Bcc.Msg
+viewModelTraits : Bcc.BoundedContextCanvas -> Html FieldMsg
 viewModelTraits model =
   let
     traits =
@@ -441,7 +487,7 @@ viewModelTraits model =
       , Input.text
         [ Input.id "modelTraits"
         , Input.value model.modelTraits
-        , Input.onInput Bcc.SetModelTraits
+        , Input.onInput SetModelTraits
         ]
     , viewDescriptionList traits (Just "https://github.com/ddd-crew/bounded-context-canvas/blob/master/resources/model-traits-worksheet.md")
       |> viewInfoTooltip "How can you characterise the behaviour of this bounded context?"

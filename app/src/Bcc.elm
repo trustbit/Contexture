@@ -3,7 +3,6 @@ module Bcc exposing (..)
 import Set exposing(Set)
 import Set as Set
 
-
 import Json.Encode as Encode
 import Json.Decode as Decode exposing (Decoder)
 import Json.Decode.Pipeline as JP
@@ -107,56 +106,6 @@ init context =
   , messages = initMessages ()
   , dependencies = initDependencies ()
   }
-
--- UPDATE
-
-type Action t
-  = Add t
-  | Remove t
-
-type StrategicClassificationMsg
-  = SetDomainType DomainType
-  | ChangeBusinessModel (Action BusinessModel)
-  | SetEvolution Evolution
-
-type Msg
-  = SetDescription String
-  | ChangeStrategicClassification StrategicClassificationMsg
-  | SetBusinessDecisions BusinessDecisions
-  | SetUbiquitousLanguage UbiquitousLanguage
-  | SetModelTraits ModelTraits
-
-
-updateClassification : StrategicClassificationMsg -> StrategicClassification -> StrategicClassification
-updateClassification msg canvas =
-  case msg of
-    SetDomainType class ->
-      { canvas | domain = Just class}
-    ChangeBusinessModel (Add business) ->
-      { canvas | business = business :: canvas.business}
-    ChangeBusinessModel (Remove business) ->
-      { canvas | business = canvas.business |> List.filter (\bm -> bm /= business )}
-    SetEvolution evo ->
-      { canvas | evolution = Just evo}
-
-update: Msg -> BoundedContextCanvas -> BoundedContextCanvas
-update msg canvas =
-  case msg of
-
-    SetDescription description ->
-      { canvas | description = description}
-
-    ChangeStrategicClassification m ->
-      { canvas | classification = updateClassification m canvas.classification }
-
-    SetBusinessDecisions decisions ->
-      { canvas | businessDecisions = decisions}
-    SetUbiquitousLanguage language ->
-      { canvas | ubiquitousLanguage = language}
-
-    SetModelTraits traits ->
-      { canvas | modelTraits = traits}
-
 
 -- conversions
 
