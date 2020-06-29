@@ -1,4 +1,8 @@
-module Bcc.Edit.Messages exposing (Msg(..), Model, view, update, init)
+module Bcc.Edit.Messages exposing (
+  Msg(..), Model,
+  view, update, init,
+  asMessages
+  )
 
 import Html exposing (Html, button, div, text)
 import Html.Attributes exposing (..)
@@ -16,45 +20,56 @@ import Bootstrap.Utilities.Flex as Flex
 import Bootstrap.Utilities.Spacing as Spacing
 import Bootstrap.Utilities.Display as Display
 
-import Set
-
 import Bcc
+import Set exposing (Set)
 
 -- MODEL
 
-type alias AddingMessage =
-  { commandsHandled : Bcc.Command
-  , commandsSent : Bcc.Command
-  , eventsHandled : Bcc.Event
-  , eventsPublished : Bcc.Event
-  , queriesHandled : Bcc.Query
-  , queriesInvoked : Bcc.Query
-  }
+type alias MessageReference t =
+  { addingName : String
+  , existingMessages : Set t }
 
 type alias Model =
-  { adding: AddingMessage
-  , messages: Bcc.Messages
+  { commandsHandled : MessageReference Bcc.Command
+  , commandsSent : MessageReference Bcc.Command
+  , eventsHandled : MessageReference Bcc.Event
+  , eventsPublished : MessageReference Bcc.Event
+  , queriesHandled : MessageReference Bcc.Query
+  , queriesInvoked : MessageReference Bcc.Query
   }
 
-initAddingMessage =
-  { commandsHandled = ""
-  , commandsSent = ""
-  , eventsHandled = ""
-  , eventsPublished = ""
-  , queriesHandled = ""
-  , queriesInvoked = ""
+asMessages : Model -> Bcc.Messages
+asMessages model =
+  { commandsHandled = model.commandsHandled.existingMessages
+  , commandsSent = model.commandsSent.existingMessages
+  , eventsHandled = model.eventsHandled.existingMessages
+  , eventsPublished = model.eventsPublished.existingMessages
+  , queriesHandled = model.queriesHandled.existingMessages
+  , queriesInvoked = model.queriesInvoked.existingMessages
   }
+
+
+initReference : Set t -> MessageReference t
+initReference messages =
+  { addingName = ""
+  , existingMessages = messages}
 
 init : Bcc.Messages -> Model
 init messages =
-  { adding = initAddingMessage
-  , messages = messages }
-
+  { commandsHandled = initReference messages.commandsHandled
+  , commandsSent = initReference messages.commandsSent
+  , eventsHandled = initReference messages.eventsHandled
+  , eventsPublished = initReference messages.eventsPublished
+  , queriesHandled = initReference messages.queriesHandled
+  , queriesInvoked = initReference messages.queriesInvoked
+  }
 -- UPDATE
 
+type alias MessageAction = Bcc.Action Bcc.Message
+
 type ChangeTypeMsg
-  = FieldEdit Bcc.Message
-  | MessageChanged Bcc.MessageAction
+  = FieldEdit String
+  | MessageChanged MessageAction
 
 type Msg
   = CommandsHandled ChangeTypeMsg
@@ -64,47 +79,41 @@ type Msg
   | QueriesHandled ChangeTypeMsg
   | QueriesInvoked ChangeTypeMsg
 
-updateAction : ChangeTypeMsg -> Bcc.MessageCollection -> (Bcc.Message, Bcc.MessageCollection)
-updateAction msg existingMessages =
-    case msg of
-        FieldEdit m ->
-            (m, existingMessages)
-        MessageChanged changed ->
-            ("", Bcc.updateMessageAction changed existingMessages)
+updateMessageAction : MessageAction -> Set Bcc.Message  -> Set Bcc.Message
+updateMessageAction action messages =
+  case action of
+    Bcc.Add m ->
+      Set.insert m messages
+    Bcc.Remove m ->
+      Set.remove m messages
+
+updateAction : ChangeTypeMsg -> MessageReference Bcc.Message -> MessageReference Bcc.Message
+updateAction msg model =
+  case msg of
+    FieldEdit m ->
+      { model | addingName = m }
+    MessageChanged changed ->
+      { model
+      | existingMessages = updateMessageAction changed model.existingMessages
+      , addingName = ""
+      }
+
 
 update : Msg -> Model -> Model
-update msg { adding,  messages} =
+update msg model =
   case msg of
     CommandsHandled cmd ->
-        let
-          (edited, editMessages) = updateAction cmd messages.commandsHandled
-        in
-          { adding = { adding | commandsHandled = edited }, messages = { messages | commandsHandled = editMessages} }
+      { model | commandsHandled = updateAction cmd model.commandsHandled }
     CommandsSent cmd ->
-        let
-          (edited, editMessages) = updateAction cmd messages.commandsSent
-        in
-          { adding = { adding | commandsSent = edited }, messages = { messages | commandsSent = editMessages} }
+      { model | commandsSent = updateAction cmd model.commandsSent }
     EventsHandled event ->
-        let
-          (edited, editMessages) = updateAction event messages.eventsHandled
-        in
-          { adding = { adding | eventsHandled = edited }, messages = { messages | eventsHandled = editMessages} }
+      { model | eventsHandled = updateAction event model.eventsHandled }
     EventsPublished event ->
-        let
-          (edited, editMessages) = updateAction event messages.eventsPublished
-        in
-          { adding = { adding | eventsPublished = edited }, messages = { messages | eventsPublished = editMessages} }
+      { model | eventsPublished = updateAction event model.eventsPublished }
     QueriesHandled query ->
-        let
-          (edited, editMessages) = updateAction query messages.queriesHandled
-        in
-          { adding = { adding | queriesHandled = edited }, messages = { messages | queriesHandled = editMessages} }
+      { model | queriesHandled = updateAction query model.queriesHandled }
     QueriesInvoked query ->
-        let
-          (edited, editMessages) = updateAction query messages.queriesInvoked
-        in
-          { adding = { adding | queriesInvoked = edited }, messages = { messages | queriesInvoked = editMessages} }
+      { model | queriesInvoked = updateAction query model.queriesInvoked }
 
 -- VIEW
 
@@ -116,19 +125,19 @@ viewMessageOption model =
     , Button.button [Button.secondary, Button.small, Button.onClick (MessageChanged (Bcc.Remove model))] [ text "x"]
     ]
 
-viewMessage : String -> String -> (Bcc.Message, Bcc.MessageCollection) -> Html ChangeTypeMsg
-viewMessage id title (message, messages) =
+viewMessage : String -> String -> MessageReference Bcc.Message -> Html ChangeTypeMsg
+viewMessage id title { addingName, existingMessages } =
   Form.group [Form.attrs [style "min-height" "250px"]]
     [ Form.label [for id] [ text title ]
     , ListGroup.ul
       (
-        messages
+        existingMessages
         |> Set.toList
         |> List.map viewMessageOption
       )
     , Form.form
       [ Html.Events.onSubmit
-          (message
+          (addingName
             |> Bcc.Add
             |> MessageChanged
           )
@@ -137,7 +146,7 @@ viewMessage id title (message, messages) =
       [ InputGroup.config
           ( InputGroup.text
             [ Input.id id
-            , Input.value message
+            , Input.value addingName
             , Input.onInput FieldEdit
             ]
           )
@@ -146,7 +155,7 @@ viewMessage id title (message, messages) =
               [ Button.attrs
                 [ Html.Attributes.type_ "submit"]
                 ,  Button.secondary
-                , Button.disabled (String.length message <= 0)
+                , Button.disabled (String.length addingName <= 0)
                 ]
               [ text "Add"] ]
           |> InputGroup.view
@@ -155,7 +164,7 @@ viewMessage id title (message, messages) =
 
 
 view : Model -> Html Msg
-view { adding, messages } =
+view model =
   div []
     [ Html.span
       [ class "text-center"
@@ -170,13 +179,13 @@ view { adding, messages } =
         [ Html.h6
           [ class "text-center", Spacing.p2 ]
           [ Html.strong [] [ text "Messages consumed" ] ]
-        , (adding.commandsHandled,  messages.commandsHandled)
+        , model.commandsHandled
             |> viewMessage "commandsHandled" "Commands handled"
             |> Html.map CommandsHandled
-        , (adding.eventsHandled, messages.eventsHandled)
+        , model.eventsHandled
             |> viewMessage "eventsHandled" "Events handled"
             |> Html.map EventsHandled
-        , (adding.queriesHandled,messages.queriesHandled)
+        , model.queriesHandled
             |> viewMessage "queriesHandled" "Queries handled"
             |> Html.map QueriesHandled
         ]
@@ -184,13 +193,13 @@ view { adding, messages } =
         [ Html.h6
           [ class "text-center", Spacing.p2 ]
           [ Html.strong [] [ text "Messages produced" ] ]
-        , (adding.commandsSent, messages.commandsSent)
+        , model.commandsSent
             |> viewMessage "commandsSent" "Commands sent"
             |> Html.map CommandsSent
-        , (adding.eventsPublished, messages.eventsPublished)
+        , model.eventsPublished
             |> viewMessage "eventsPublished" "Events published"
             |> Html.map EventsPublished
-        , (adding.queriesInvoked, messages.queriesInvoked)
+        , model.queriesInvoked
             |> viewMessage "queriesInvoked" "Queries invoked"
             |> Html.map QueriesInvoked
         ]

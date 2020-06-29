@@ -1,7 +1,5 @@
 module Bcc exposing (..)
 
-import Url.Parser exposing (Parser, custom)
-
 import Set exposing(Set)
 import Set as Set
 
@@ -116,16 +114,6 @@ type Action t
   = Add t
   | Remove t
 
-type alias MessageAction = Action Message
-
-type MessageMsg
-  = CommandHandled MessageAction
-  | CommandSent MessageAction
-  | EventsHandled MessageAction
-  | EventsPublished MessageAction
-  | QueriesHandled MessageAction
-  | QueriesInvoked MessageAction
-
 type StrategicClassificationMsg
   = SetDomainType DomainType
   | ChangeBusinessModel (Action BusinessModel)
@@ -137,31 +125,7 @@ type Msg
   | SetBusinessDecisions BusinessDecisions
   | SetUbiquitousLanguage UbiquitousLanguage
   | SetModelTraits ModelTraits
-  | ChangeMessages MessageMsg
 
-updateMessageAction : Action Message -> Set Message -> Set Message
-updateMessageAction action messages =
-  case action of
-    Add m ->
-      Set.insert m messages
-    Remove m ->
-      Set.remove m messages
-
-updateMessages : MessageMsg -> Messages -> Messages
-updateMessages msg model =
-  case msg of
-    CommandHandled cmd ->
-      { model | commandsHandled = updateMessageAction cmd model.commandsHandled }
-    CommandSent cmd ->
-      { model | commandsSent = updateMessageAction cmd model.commandsSent }
-    EventsHandled event ->
-      { model | eventsHandled = updateMessageAction event model.eventsHandled }
-    EventsPublished event ->
-      { model | eventsPublished = updateMessageAction event model.eventsPublished }
-    QueriesHandled event ->
-      { model | queriesHandled = updateMessageAction event model.queriesHandled }
-    QueriesInvoked event ->
-      { model | queriesInvoked = updateMessageAction event model.queriesInvoked }
 
 updateClassification : StrategicClassificationMsg -> StrategicClassification -> StrategicClassification
 updateClassification msg canvas =
@@ -193,8 +157,6 @@ update msg canvas =
     SetModelTraits traits ->
       { canvas | modelTraits = traits}
 
-    ChangeMessages m ->
-      { canvas | messages = updateMessages m canvas.messages }
 
 -- conversions
 
@@ -354,7 +316,7 @@ strategicClassificationDecoder =
 modelDecoder : Decoder BoundedContextCanvas
 modelDecoder =
   Decode.succeed BoundedContextCanvas
-    |> JP.custom BoundedContext.modelDecoder 
+    |> JP.custom BoundedContext.modelDecoder
     |> JP.optional "description" Decode.string ""
     |> JP.optional "classification" strategicClassificationDecoder initStrategicClassification
     |> JP.optional "businessDecisions" Decode.string ""

@@ -79,8 +79,8 @@ init key url =
 type EditingMsg
   = Field Bcc.Msg
   | SetName String
-  | MessageField Messages.Msg
   | DependencyField Dependencies.Msg
+  | MessageField Messages.Msg
 
 type Msg
   = Loaded (Result Http.Error Bcc.BoundedContextCanvas)
@@ -96,10 +96,8 @@ updateEdit msg model =
     MessageField messageMsg ->
       let
         updatedModel = Messages.update messageMsg model.addingMessage
-        canvas = model.canvas
-        c = { canvas | messages = updatedModel.messages}
       in
-        ({ model | addingMessage = updatedModel, canvas = c }, Cmd.none)
+        ({ model | addingMessage = updatedModel }, Cmd.none)
     Field fieldMsg ->
       ({ model | canvas = Bcc.update fieldMsg model.canvas }, Cmd.none)
     SetName name ->
@@ -107,16 +105,8 @@ updateEdit msg model =
     DependencyField dependency ->
       let
         (addingDependencies, addingCmd) = Dependencies.update dependency model.addingDependencies
-        canvas = model.canvas
-        c =
-          { canvas |
-            dependencies =
-              { consumers = addingDependencies.consumer.existingDependencies
-              , suppliers = addingDependencies.supplier.existingDependencies
-              }
-          }
       in
-        ({ model | canvas = c, addingDependencies = addingDependencies }, addingCmd |> Cmd.map DependencyField)
+        ({ model | addingDependencies = addingDependencies }, addingCmd |> Cmd.map DependencyField)
 
 
 update : Msg -> Model -> (Model, Cmd Msg)
@@ -141,7 +131,7 @@ update msg model =
           let
             _ = Debug.log "error" err
           in (Debug.log "namechange" model, Cmd.none)
-      
+
     (Saved (Ok _),_) ->
       (model, Cmd.none)
     (Delete,_) ->
@@ -193,7 +183,7 @@ view model =
               [ Button.linkButton
                 [ Button.roleLink
                 , Button.attrs
-                  [ href 
+                  [ href
                     ( edit.canvas.boundedContext
                       |> BoundedContext.domain
                       |> Route.Domain
@@ -486,9 +476,9 @@ saveBCC url model =
   let
     c = model.canvas
     canvas =
-      { c | dependencies =
-        { suppliers = model.addingDependencies.supplier.existingDependencies
-        , consumers = model.addingDependencies.consumer.existingDependencies }
+      { c
+      | dependencies = model.addingDependencies |> Dependencies.asDependencies
+      , messages = model.addingMessage |> Messages.asMessages
       }
   in
     Http.request

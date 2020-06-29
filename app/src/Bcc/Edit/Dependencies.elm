@@ -1,4 +1,7 @@
-module Bcc.Edit.Dependencies exposing (Msg(..), Model, update, init, view)
+module Bcc.Edit.Dependencies exposing (
+  Msg(..), Model,
+  update, init, view,
+  asDependencies)
 
 import Html exposing (Html, button, div, text)
 import Html.Attributes exposing (..)
@@ -73,6 +76,11 @@ init baseUrl dependencies =
   (
     initDependencies dependencies
   , Cmd.batch [ loadBoundedContexts baseUrl, loadDomains baseUrl])
+
+asDependencies : Model -> Bcc.Dependencies
+asDependencies model =
+  { suppliers = model.supplier.existingDependencies
+  , consumers = model.consumer.existingDependencies }
 
 -- UPDATE
 
