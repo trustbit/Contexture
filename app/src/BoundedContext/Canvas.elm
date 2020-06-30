@@ -1,4 +1,4 @@
-module Bcc exposing (..)
+module BoundedContext.Canvas exposing (..)
 
 import Json.Encode as Encode
 import Json.Decode as Decode exposing (Decoder)
@@ -8,9 +8,9 @@ import Http
 import Url exposing (Url)
 
 import BoundedContext exposing (BoundedContext)
-import Dependency
-import StrategicClassification exposing(StrategicClassification)
-import Message exposing (Messages)
+import BoundedContext.Dependency as Dependency
+import BoundedContext.StrategicClassification as StrategicClassification exposing(StrategicClassification)
+import BoundedContext.Message as Message exposing (Messages)
 
 -- MODEL
 

@@ -1,19 +1,16 @@
 module Domain exposing (
-  DomainId(..), Domain, Model, init,
+  Domain, Model, init,
   Msg(..),update,ifNameValid,
-  idToString, idFromString, idParser, idEncoder, idDecoder,
   domainDecoder, domainsDecoder, modelEncoder, idFieldDecoder, nameFieldDecoder
   )
 
 import Json.Decode as Decode exposing(Decoder)
 import Json.Decode.Pipeline as JP
 import Json.Encode as Encode
-import Url.Parser exposing (Parser, custom)
+
+import Domain.DomainId exposing(DomainId(..), idDecoder)
 
 -- MODEL
-
-type DomainId
-  = DomainId Int
 
 type alias Domain =
   { id : DomainId
@@ -59,45 +56,6 @@ ifNameValid =
 
 
 -- CONVERSIONS
-
-extractInt : DomainId -> Int
-extractInt value =
-  case value of
-    DomainId v -> v
-
-idToString : DomainId -> String
-idToString domainId =
-  case domainId of
-    DomainId id -> String.fromInt id
-
-idFromString : String -> Maybe DomainId
-idFromString value =
-  value
-  |> String.toInt
-  |> Maybe.map DomainId
-
-idFromStringSuccess : String -> Decode.Decoder DomainId
-idFromStringSuccess value =
-  case idFromString value of
-    Just id -> Decode.succeed id
-    Nothing -> Decode.fail ("Could not decode into DomainId " ++ value)
-
-idParser : Parser (DomainId -> a) a
-idParser =
-    custom "DOMAINID" <|
-        \domainId ->
-            Maybe.map DomainId (String.toInt domainId)
-
-idDecoder : Decode.Decoder DomainId
-idDecoder =
-  Decode.oneOf
-    [ Decode.map DomainId Decode.int
-    , Decode.string |> Decode.andThen idFromStringSuccess]
-
-
-idEncoder : DomainId -> Encode.Value
-idEncoder value =
-  Encode.int (extractInt value)
 
 nameFieldDecoder : Decoder String
 nameFieldDecoder =

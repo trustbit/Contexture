@@ -28,10 +28,12 @@ import List
 import Url
 import Http
 
-import Bcc
+import BoundedContext.Canvas as Bcc
 import BoundedContext
-import Dependency
+import BoundedContext.BoundedContextId as BoundedContext
+import BoundedContext.Dependency as Dependency
 import Domain
+import Domain.DomainId as Domain
 
 type alias DomainDependency =
   { id : Domain.DomainId

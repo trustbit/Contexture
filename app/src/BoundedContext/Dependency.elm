@@ -1,4 +1,4 @@
-module Dependency exposing (
+module BoundedContext.Dependency exposing (
   RelationshipPattern(..), Collaborator(..), Dependency, DependencyMap,
   emptyDependencies, dependencyCount, dependencyList,
   registerDependency, removeDependency,
@@ -9,8 +9,9 @@ import Dict exposing(Dict)
 import Json.Encode as Encode
 import Json.Decode as Decode exposing (Decoder)
 
-import BoundedContext exposing (BoundedContextId, idFromString, idToString)
+import BoundedContext.BoundedContextId exposing (BoundedContextId, idFromString, idToString)
 import Domain
+import Domain.DomainId as Domain
 
 type RelationshipPattern
   = AntiCorruptionLayer

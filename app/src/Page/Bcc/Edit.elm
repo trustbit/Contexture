@@ -25,10 +25,9 @@ import Http
 
 import Route
 
-import Domain
 import BoundedContext
-import StrategicClassification
-import Bcc
+import BoundedContext.StrategicClassification as StrategicClassification 
+import BoundedContext.Canvas as Bcc
 import Page.Bcc.Edit.Dependencies as Dependencies
 import Page.Bcc.Edit.Messages as Messages
 

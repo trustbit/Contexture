@@ -27,14 +27,14 @@ import List.Split exposing (chunksOfLeft)
 import Url
 import Http
 import RemoteData
-import Dict
 import Set
 
-import Bcc
-import BoundedContext
-import Dependency
 import Route
-import StrategicClassification exposing (StrategicClassification)
+
+import BoundedContext
+import BoundedContext.Canvas as Bcc
+import BoundedContext.Dependency as Dependency
+import BoundedContext.StrategicClassification as StrategicClassification exposing (StrategicClassification)
 
 -- MODEL
 

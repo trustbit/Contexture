@@ -4,9 +4,8 @@ import Browser.Navigation as Nav
 import Url exposing (Url)
 import Url.Parser exposing (..)
 
-import Domain exposing(DomainId)
-import BoundedContext exposing (BoundedContextId)
-
+import Domain.DomainId as Domain exposing (DomainId)
+import BoundedContext.BoundedContextId as BoundedContext exposing (BoundedContextId)
 
 type Route
     = NotFound

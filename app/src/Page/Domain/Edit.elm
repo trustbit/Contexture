@@ -20,10 +20,6 @@ import Bootstrap.Card.Block as Block
 import Bootstrap.Text as Text
 import Bootstrap.Utilities.Spacing as Spacing
 
-import Json.Encode as Encode
-import Json.Decode.Pipeline as JP
-import Json.Decode as Decode
-
 import RemoteData
 
 import Url
@@ -32,7 +28,6 @@ import Http
 import Route
 
 import Domain
-import Page.Domain.Create
 import Page.Domain.Index as Index
 import Page.Bcc.Index
 

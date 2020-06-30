@@ -20,7 +20,7 @@ import Bootstrap.Utilities.Flex as Flex
 import Bootstrap.Utilities.Spacing as Spacing
 import Bootstrap.Utilities.Display as Display
 
-import Message exposing (..)
+import BoundedContext.Message exposing (..)
 import Set exposing (Set)
 
 -- MODEL

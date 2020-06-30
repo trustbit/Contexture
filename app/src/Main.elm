@@ -15,7 +15,8 @@ import Bootstrap.Utilities.Spacing as Spacing
 import Route exposing ( Route)
 
 
-import Domain
+import Domain.DomainId as Domain
+import BoundedContext.BoundedContextId as BoundedContext
 import Page.Domain.Index
 import Page.Domain.Edit
 import BoundedContext

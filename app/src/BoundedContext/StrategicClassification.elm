@@ -1,4 +1,4 @@
-module StrategicClassification exposing (
+module BoundedContext.StrategicClassification exposing (
     StrategicClassification, DomainType(..),BusinessModel(..),Evolution(..),
     noClassification,
     encoder, decoder,

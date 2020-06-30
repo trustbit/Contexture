@@ -1,4 +1,4 @@
-module Message exposing(
+module BoundedContext.Message exposing(
     Message, Command, Event, Query,
     Messages, MessageCollection,
     noMessages,
