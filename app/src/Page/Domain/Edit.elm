@@ -34,7 +34,7 @@ import Page.Bcc.Index
 -- MODEL
 
 type alias EditableDomain = Domain.Domain
-
+  
 type alias Model =
   { key: Nav.Key
   , self: Url.Url
@@ -42,6 +42,10 @@ type alias Model =
   , subDomains : Index.Model
   , contexts : Page.Bcc.Index.Model
   }
+
+initEdit : Domain.Domain -> EditableDomain
+initEdit domain =
+  domain
 
 init : Nav.Key -> Url.Url -> (Model, Cmd Msg)
 init key url =
@@ -67,8 +71,10 @@ init key url =
 
 -- UPDATE
 
+
 type EditingMsg
-  = Field Domain.Msg
+  = SetName String
+  | SetVision String
 
 type Msg
   = Loaded (Result Http.Error Domain.Domain)
@@ -80,11 +86,19 @@ type Msg
   | Deleted (Result Http.Error ())
   | BccMsg Page.Bcc.Index.Msg
 
+updateEditField : EditingMsg -> EditableDomain -> EditableDomain
+updateEditField msg model =
+  case msg of
+    SetName name ->
+      { model | name = name}
+    SetVision vision->
+      { model | vision = vision}
+
 updateEdit : EditingMsg -> RemoteData.WebData EditableDomain -> RemoteData.WebData EditableDomain
 updateEdit msg model =
-  case (msg, model) of
-    (Field fieldMsg, RemoteData.Success domain) ->
-      RemoteData.Success <| Domain.update fieldMsg domain
+  case model of
+    RemoteData.Success domain ->
+      RemoteData.Success <| updateEditField msg domain
     _ -> model
 
 update : Msg -> Model -> (Model, Cmd Msg)
@@ -106,7 +120,7 @@ update msg model =
     Deleted (Ok _) ->
       (model, Route.pushUrl Route.Home model.key)
     Loaded (Ok m) ->
-      ({ model | edit = RemoteData.Success m } , Cmd.none)
+      ({ model | edit = RemoteData.Success <| initEdit m } , Cmd.none)
     Loaded (Err e) ->
       ({ model | edit = RemoteData.Failure e } , Cmd.none)
     BccMsg m ->
@@ -218,7 +232,7 @@ viewDomain model =
       [ viewLabel "name" "Name"
       , Input.text (
         List.concat
-        [ [ Input.id "name", Input.value model.name, Input.onInput Domain.SetName ]
+        [ [ Input.id "name", Input.value model.name, Input.onInput SetName ]
         , model.name |> Domain.ifNameValid (\_ -> [ Input.danger ]) (\_ -> [])
         ]
       )
@@ -230,12 +244,11 @@ viewDomain model =
         , Textarea.textarea
           [ Textarea.id "vision"
           , Textarea.value model.vision
-          , Textarea.onInput Domain.SetVision
+          , Textarea.onInput SetVision
           , Textarea.rows 5
           ]
         , Form.help [] [ text "Summary of purpose"] ]
     ]
-    |> Html.map Field
 
 -- HTTP
 

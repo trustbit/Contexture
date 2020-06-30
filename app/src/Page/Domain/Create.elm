@@ -2,10 +2,8 @@ module Page.Domain.Create exposing (Msg, Model, update, view, init)
 
 import Browser.Navigation as Nav
 
-import Json.Encode as Encode
-
-import Html exposing (Html, button, div, text)
-import Html.Attributes exposing (..)
+import Html exposing (Html, button, text)
+import Html.Attributes
 import Html.Events
 
 import Bootstrap.Form as Form
@@ -15,7 +13,7 @@ import Bootstrap.Button as Button
 import Url
 import Http
 
-import Domain
+import Domain exposing (newDomain)
 import Route
 
 type alias Domain = Domain.Domain
@@ -47,7 +45,7 @@ update msg model =
     SetDomainName name ->
       ({ model | newDomainName = name}, Cmd.none)
     CreateDomain ->
-      (model, createNewDomain model)
+      (model, newDomain model.baseUrl model.newDomainName DomainCreated)
     DomainCreated (Ok item) ->
       (model, Route.pushUrl (Route.Domain item.id) model.navKey)
     DomainCreated (Err e) ->
@@ -78,17 +76,3 @@ view model =
         ]
       |> InputGroup.view
     ]
-
-createNewDomain : Model -> Cmd Msg
-createNewDomain model =
-  let
-    body =
-      Encode.object
-      [ ("name", Encode.string model.newDomainName) ]
-    url = model.baseUrl
-  in
-    Http.post
-      { url = {url | path = url.path ++ "/domains" } |> Url.toString
-      , body = Http.jsonBody body
-      , expect = Http.expectJson DomainCreated Domain.domainDecoder
-      }

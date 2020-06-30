@@ -1,12 +1,16 @@
 module Domain exposing (
-  Domain, Model, init,
-  Msg(..),update,ifNameValid,
-  domainDecoder, domainsDecoder, modelEncoder, idFieldDecoder, nameFieldDecoder
+  Domain,  
+  ifNameValid,
+  domainDecoder, domainsDecoder, modelEncoder, idFieldDecoder, nameFieldDecoder,
+  update, newDomain
   )
 
 import Json.Decode as Decode exposing(Decoder)
 import Json.Decode.Pipeline as JP
 import Json.Encode as Encode
+
+import Url
+import Http
 
 import Domain.DomainId exposing(DomainId(..), idDecoder)
 
@@ -19,28 +23,8 @@ type alias Domain =
   , parentDomain: Maybe DomainId
   }
 
-type alias Model = Domain
-
-init : () -> Domain
-init _ =
-    { id = DomainId(-1)
-    , name = ""
-    , vision = "" 
-    , parentDomain = Nothing}
-
 -- UPDATE
 
-type Msg
-  = SetName String
-  | SetVision String
-
-update : Msg -> Model -> Model
-update msg model =
-  case msg of
-    SetName name ->
-      { model | name = name}
-    SetVision vision->
-      { model | vision = vision}
 
 -- VIEW
 
@@ -84,3 +68,28 @@ modelEncoder model =
         , ("vision", Encode.string model.vision)
         ]
 
+newDomain : Url.Url -> String -> (Result Http.Error Domain -> msg) -> Cmd msg
+newDomain url name toMsg =
+  let
+    body =
+      Encode.object
+      [ ("name", Encode.string name) ]
+  in
+    Http.post
+      { url = {url | path = url.path ++ "/domains" } |> Url.toString
+      , body = Http.jsonBody body
+      , expect = Http.expectJson toMsg domainDecoder
+      }
+
+
+update : Url.Url -> Domain -> (Result Http.Error () -> msg) -> Cmd msg
+update url domain toMsg =
+  Http.request
+    { method = "PUT"
+    , headers = []
+    , url = Url.toString url
+    , body = Http.jsonBody <| modelEncoder domain
+    , expect = Http.expectWhatever toMsg
+    , timeout = Nothing
+    , tracker = Nothing
+    }
