@@ -8,6 +8,12 @@ In order to create a new BCC, you need to understand a lot of concepts from DDD 
 While other ways to build a [BCC exist](https://github.com/ddd-crew/bounded-context-canvas), we are building an application to support this modeling process with a dedicated tool from an DDD perspective.
 You can read about the ideas of Contexture in the [concept](./concept.md) and you can view the current status of the application at <https://contexture.azurewebsites.net/> (be careful: don't store any sensitive data there; everything you store will be deleted upon the next deployment.)
 
+Note:
+
+We think that most of the domain modelling should happen in an collaboritve way, by using whitepaper, Post-ITs or online collaboration tools.
+Contexture is not the right tool for these interactive modelling sessions!
+But Contexture might be useful to capture, document and structure some of the insights after a modelling session and make it accessible and shareable with other people.
+
 ## Contexture server backend
 
 The Contexture server implements a simple storage backend that uses `json-server` to expose a file system backed REST API and serving static assets through express.
