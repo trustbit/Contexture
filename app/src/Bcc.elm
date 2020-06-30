@@ -1,42 +1,22 @@
 module Bcc exposing (..)
 
-import Set exposing(Set)
-import Set as Set
-
 import Json.Encode as Encode
 import Json.Decode as Decode exposing (Decoder)
 import Json.Decode.Pipeline as JP
 
+import Http
+import Url exposing (Url)
+
 import BoundedContext exposing (BoundedContext)
 import Dependency
 import StrategicClassification exposing(StrategicClassification)
+import Message exposing (Messages)
 
 -- MODEL
 
 type alias BusinessDecisions = String
 type alias UbiquitousLanguage = String
 type alias ModelTraits = String
-
-type alias Message = String
-type alias Command = Message
-type alias Event = Message
-type alias Query = Message
-
-type alias MessageCollection = Set Message
-
-type alias Messages =
-  { commandsHandled : Set Command
-  , commandsSent : Set Command
-  , eventsHandled : Set Event
-  , eventsPublished : Set Event
-  , queriesHandled : Set Query
-  , queriesInvoked : Set Query
-  }
-
-type alias Dependencies =
-  { suppliers : Dependency.DependencyMap
-  , consumers : Dependency.DependencyMap
-  }
 
 type alias BoundedContextCanvas =
   { boundedContext : BoundedContext
@@ -49,18 +29,16 @@ type alias BoundedContextCanvas =
   , dependencies : Dependencies
   }
 
-initMessages : () -> Messages
-initMessages _ =
-  { commandsHandled = Set.empty
-  , commandsSent = Set.empty
-  , eventsHandled = Set.empty
-  , eventsPublished = Set.empty
-  , queriesHandled = Set.empty
-  , queriesInvoked = Set.empty
+-- TODO: should this be part of the BCC or part of message?
+type alias Dependencies =
+  { suppliers : Dependency.DependencyMap
+  , consumers : Dependency.DependencyMap
   }
 
-initDependencies : () -> Dependencies
-initDependencies _ =
+
+
+initDependencies : Dependencies
+initDependencies =
   { suppliers = Dependency.emptyDependencies
   , consumers = Dependency.emptyDependencies
   }
@@ -73,24 +51,11 @@ init context =
   , businessDecisions = ""
   , ubiquitousLanguage = ""
   , modelTraits = ""
-  , messages = initMessages ()
-  , dependencies = initDependencies ()
+  , messages = Message.noMessages
+  , dependencies = initDependencies
   }
 
 -- encoders
-
-
-messagesEncoder : Messages -> Encode.Value
-messagesEncoder messages =
-  Encode.object
-    [ ("commandsHandled", Encode.set Encode.string messages.commandsHandled)
-    , ("commandsSent", Encode.set Encode.string messages.commandsSent)
-    , ("eventsHandled", Encode.set Encode.string messages.eventsHandled)
-    , ("eventsPublished", Encode.set Encode.string messages.eventsPublished)
-    , ("queriesHandled", Encode.set Encode.string messages.queriesHandled)
-    , ("queriesInvoked" , Encode.set Encode.string messages.queriesInvoked)
-    ]
-
 
 dependenciesEncoder : Dependencies -> Encode.Value
 dependenciesEncoder dependencies =
@@ -108,18 +73,9 @@ modelEncoder canvas =
     , ("businessDecisions", Encode.string canvas.businessDecisions)
     , ("ubiquitousLanguage", Encode.string canvas.ubiquitousLanguage)
     , ("modelTraits", Encode.string canvas.modelTraits)
-    , ("messages", messagesEncoder canvas.messages)
+    , ("messages", Message.messagesEncoder canvas.messages)
     , ("dependencies", dependenciesEncoder canvas.dependencies)
     ]
-
-maybeEncoder : (t -> Encode.Value) -> Maybe t -> Encode.Value
-maybeEncoder encoder value =
-  case value of
-    Just v -> encoder v
-    Nothing -> Encode.null
-
-maybeStringEncoder encoder value =
-  maybeEncoder (encoder >> Encode.string) value
 
 maybeStringDecoder : (String -> Maybe v) -> Decoder (Maybe v)
 maybeStringDecoder parser =
@@ -127,20 +83,6 @@ maybeStringDecoder parser =
     [ Decode.null Nothing
     , Decode.map parser Decode.string
     ]
-
-setDecoder : Decoder (Set.Set String)
-setDecoder =
-  Decode.map Set.fromList (Decode.list Decode.string)
-
-messagesDecoder : Decoder Messages
-messagesDecoder =
-  Decode.succeed Messages
-    |> JP.required "commandsHandled" setDecoder
-    |> JP.required "commandsSent" setDecoder
-    |> JP.required "eventsHandled" setDecoder
-    |> JP.required "eventsPublished" setDecoder
-    |> JP.required "queriesHandled" setDecoder
-    |> JP.required "queriesInvoked" setDecoder
 
 dependenciesDecoder : Decoder Dependencies
 dependenciesDecoder =
@@ -159,5 +101,5 @@ modelDecoder =
     |> JP.optional "businessDecisions" Decode.string ""
     |> JP.optional "ubiquitousLanguage" Decode.string ""
     |> JP.optional "modelTraits" Decode.string ""
-    |> JP.optional "messages" messagesDecoder (initMessages ())
+    |> JP.optional "messages" Message.messagesDecoder Message.noMessages
     |> JP.optional "dependencies" dependenciesDecoder (initDependencies ())

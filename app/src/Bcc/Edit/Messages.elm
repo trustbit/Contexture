@@ -20,7 +20,7 @@ import Bootstrap.Utilities.Flex as Flex
 import Bootstrap.Utilities.Spacing as Spacing
 import Bootstrap.Utilities.Display as Display
 
-import Bcc
+import Message exposing (..)
 import Set exposing (Set)
 
 -- MODEL
@@ -30,15 +30,15 @@ type alias MessageReference t =
   , existingMessages : Set t }
 
 type alias Model =
-  { commandsHandled : MessageReference Bcc.Command
-  , commandsSent : MessageReference Bcc.Command
-  , eventsHandled : MessageReference Bcc.Event
-  , eventsPublished : MessageReference Bcc.Event
-  , queriesHandled : MessageReference Bcc.Query
-  , queriesInvoked : MessageReference Bcc.Query
+  { commandsHandled : MessageReference Command
+  , commandsSent : MessageReference Command
+  , eventsHandled : MessageReference Event
+  , eventsPublished : MessageReference Event
+  , queriesHandled : MessageReference Query
+  , queriesInvoked : MessageReference Query
   }
 
-asMessages : Model -> Bcc.Messages
+asMessages : Model -> Messages
 asMessages model =
   { commandsHandled = model.commandsHandled.existingMessages
   , commandsSent = model.commandsSent.existingMessages
@@ -54,7 +54,7 @@ initReference messages =
   { addingName = ""
   , existingMessages = messages}
 
-init : Bcc.Messages -> Model
+init : Messages -> Model
 init messages =
   { commandsHandled = initReference messages.commandsHandled
   , commandsSent = initReference messages.commandsSent
@@ -69,7 +69,7 @@ type Action t
   = Add t
   | Remove t
 
-type alias MessageAction = Action Bcc.Message
+type alias MessageAction = Action Message
 
 type ChangeTypeMsg
   = FieldEdit String
@@ -83,7 +83,7 @@ type Msg
   | QueriesHandled ChangeTypeMsg
   | QueriesInvoked ChangeTypeMsg
 
-updateMessageAction : MessageAction -> Set Bcc.Message  -> Set Bcc.Message
+updateMessageAction : MessageAction -> Set Message  -> Set Message
 updateMessageAction action messages =
   case action of
     Add m ->
@@ -91,7 +91,7 @@ updateMessageAction action messages =
     Remove m ->
       Set.remove m messages
 
-updateAction : ChangeTypeMsg -> MessageReference Bcc.Message -> MessageReference Bcc.Message
+updateAction : ChangeTypeMsg -> MessageReference Message -> MessageReference Message
 updateAction msg model =
   case msg of
     FieldEdit m ->
@@ -121,7 +121,7 @@ update msg model =
 
 -- VIEW
 
-viewMessageOption : Bcc.Message -> ListGroup.Item ChangeTypeMsg
+viewMessageOption : Message -> ListGroup.Item ChangeTypeMsg
 viewMessageOption model =
   ListGroup.li
     [ ListGroup.attrs [ Flex.block, Flex.justifyBetween, Flex.alignItemsCenter, Spacing.p1 ] ]
@@ -129,7 +129,7 @@ viewMessageOption model =
     , Button.button [Button.secondary, Button.small, Button.onClick (MessageChanged (Remove model))] [ text "x"]
     ]
 
-viewMessage : String -> String -> MessageReference Bcc.Message -> Html ChangeTypeMsg
+viewMessage : String -> String -> MessageReference Message -> Html ChangeTypeMsg
 viewMessage id title { addingName, existingMessages } =
   Form.group [Form.attrs [style "min-height" "250px"]]
     [ Form.label [for id] [ text title ]
