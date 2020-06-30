@@ -1,4 +1,4 @@
-module Bcc.Index exposing (Msg, Model, update, view, init)
+module Page.Bcc.Index exposing (Msg, Model, update, view, init)
 
 import Browser.Navigation as Nav
 

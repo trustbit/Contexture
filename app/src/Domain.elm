@@ -125,3 +125,4 @@ modelEncoder model =
         [ ("name", Encode.string model.name)
         , ("vision", Encode.string model.vision)
         ]
+

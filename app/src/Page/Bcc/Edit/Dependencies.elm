@@ -1,4 +1,4 @@
-module Bcc.Edit.Dependencies exposing (
+module Page.Bcc.Edit.Dependencies exposing (
   Msg(..), Model,
   update, init, view,
   asDependencies)

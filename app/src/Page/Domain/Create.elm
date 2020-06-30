@@ -1,4 +1,4 @@
-module Domain.Create exposing (Msg, Model, update, view, init)
+module Page.Domain.Create exposing (Msg, Model, update, view, init)
 
 import Browser.Navigation as Nav
 

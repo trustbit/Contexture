@@ -1,4 +1,4 @@
-module Domain.Index exposing (Msg, Model, update, view, initWithSubdomains, initWithoutSubdomains)
+module Page.Domain.Index exposing (Msg, Model, update, view, initWithSubdomains, initWithoutSubdomains)
 
 import Browser.Navigation as Nav
 
@@ -29,7 +29,7 @@ import Http
 
 import Bcc
 import Domain
-import Domain.Create
+import Page.Domain.Create
 import Route
 
 -- MODEL
@@ -40,14 +40,14 @@ type alias Model =
   { navKey : Nav.Key
   , baseUrl : Url.Url
   , showSubdomains : Bool
-  , createDomain: Domain.Create.Model
+  , createDomain: Page.Domain.Create.Model
   , domains: RemoteData.WebData (List Domain)
    }
 
 init: Bool -> Url.Url -> Nav.Key -> (Model, Cmd Msg)
 init subDomains baseUrl key =
   let
-    (createModel, createCmd) = Domain.Create.init baseUrl key
+    (createModel, createCmd) = Page.Domain.Create.init baseUrl key
   in
   ( { navKey = key
     , baseUrl = baseUrl
@@ -69,7 +69,7 @@ initWithoutSubdomains baseUrl key =
 
 type Msg
   = Loaded (Result Http.Error (List Domain))
-  | CreateMsg Domain.Create.Msg
+  | CreateMsg Page.Domain.Create.Msg
 
 update : Msg -> Model -> (Model, Cmd Msg)
 update msg model =
@@ -88,7 +88,7 @@ update msg model =
         ({ model | domains = RemoteData.Failure e }, Cmd.none)
     CreateMsg create ->
       let
-        (createModel, createCmd) = Domain.Create.update create model.createDomain
+        (createModel, createCmd) = Page.Domain.Create.update create model.createDomain
       in
         ({ model | createDomain = createModel }, createCmd |> Cmd.map CreateMsg)
 
@@ -109,7 +109,7 @@ viewDomain item =
         [ text "View Domain" ]
       ]
 
-viewLoaded : Domain.Create.Model -> List Domain  -> List (Html Msg)
+viewLoaded : Page.Domain.Create.Model -> List Domain  -> List (Html Msg)
 viewLoaded create items =
   if List.isEmpty items then
     [ Grid.row []
@@ -117,7 +117,7 @@ viewLoaded create items =
         [ Html.p
           [ class "lead", class "text-center" ]
           [ text "No existing domains found - do you want to create one?"]
-        , create |> Domain.Create.view |> Html.map CreateMsg
+        , create |> Page.Domain.Create.view |> Html.map CreateMsg
         ]
       ]
     ]
@@ -126,7 +126,7 @@ viewLoaded create items =
         [ Grid.col [] [ Card.deck (items |> List.map viewDomain) ] ]
     , Grid.row [ Row.attrs [ Spacing.mt3 ] ]
         [ Grid.col []
-          [ create |> Domain.Create.view |> Html.map CreateMsg ]
+          [ create |> Page.Domain.Create.view |> Html.map CreateMsg ]
         ]
     ]
 

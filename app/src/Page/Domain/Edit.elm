@@ -1,4 +1,4 @@
-module Domain.Edit exposing (Msg, Model, update, view, init)
+module Page.Domain.Edit exposing (Msg, Model, update, view, init)
 
 import Browser.Navigation as Nav
 
@@ -32,9 +32,9 @@ import Http
 import Route
 
 import Domain
-import Domain.Create
-import Domain.Index
-import Bcc.Index
+import Page.Domain.Create
+import Page.Domain.Index as Index
+import Page.Bcc.Index
 
 -- MODEL
 
@@ -44,15 +44,15 @@ type alias Model =
   { key: Nav.Key
   , self: Url.Url
   , edit: RemoteData.WebData EditableDomain
-  , subDomains : Domain.Index.Model
-  , contexts : Bcc.Index.Model
+  , subDomains : Index.Model
+  , contexts : Page.Bcc.Index.Model
   }
 
 init : Nav.Key -> Url.Url -> (Model, Cmd Msg)
 init key url =
   let
-    (contexts, contextCmd) = Bcc.Index.init url key
-    (subDomainsModel, subDomainsCmd) = Domain.Index.initWithSubdomains url key
+    (contexts, contextCmd) = Page.Bcc.Index.init url key
+    (subDomainsModel, subDomainsCmd) = Index.initWithSubdomains url key
     model =
       { key = key
       , self = url
@@ -78,12 +78,12 @@ type EditingMsg
 type Msg
   = Loaded (Result Http.Error Domain.Domain)
   | Editing EditingMsg
-  | SubDomainMsg Domain.Index.Msg
+  | SubDomainMsg Index.Msg
   | Save
   | Saved (Result Http.Error ())
   | Delete
   | Deleted (Result Http.Error ())
-  | BccMsg Bcc.Index.Msg
+  | BccMsg Page.Bcc.Index.Msg
 
 updateEdit : EditingMsg -> RemoteData.WebData EditableDomain -> RemoteData.WebData EditableDomain
 updateEdit msg model =
@@ -116,12 +116,12 @@ update msg model =
       ({ model | edit = RemoteData.Failure e } , Cmd.none)
     BccMsg m ->
       let
-        (bccModel, bccCmd) = Bcc.Index.update m model.contexts
+        (bccModel, bccCmd) = Page.Bcc.Index.update m model.contexts
       in
         ({ model | contexts = bccModel}, bccCmd |> Cmd.map BccMsg)
     SubDomainMsg subMsg ->
       let
-        (subModel, subCmd) = Domain.Index.update subMsg model.subDomains
+        (subModel, subCmd) = Index.update subMsg model.subDomains
       in
         ({ model | subDomains = subModel }, subCmd |> Cmd.map SubDomainMsg)
     _ ->
@@ -148,7 +148,7 @@ view model =
               , Grid.simpleRow
                 [ Grid.col []
                   [ Html.h5 [ Spacing.mt3 ] [ text "Subdomains" ]
-                  , Domain.Index.view model.subDomains |> Html.map SubDomainMsg ]
+                  , Index.view model.subDomains |> Html.map SubDomainMsg ]
                 ]
               , Grid.simpleRow
                 [ Grid.col []
@@ -210,9 +210,9 @@ viewDomainCard model =
     ]
   |> Card.view
 
-viewBccCard : Bcc.Index.Model -> List(Html Msg)
+viewBccCard : Page.Bcc.Index.Model -> List(Html Msg)
 viewBccCard model =
-  Bcc.Index.view model
+  Page.Bcc.Index.view model
   |> List.map (Html.map BccMsg)
 
 

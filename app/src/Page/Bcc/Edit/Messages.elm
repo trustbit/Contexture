@@ -1,4 +1,4 @@
-module Bcc.Edit.Messages exposing (
+module Page.Bcc.Edit.Messages exposing (
   Msg(..), Model,
   view, update, init,
   asMessages

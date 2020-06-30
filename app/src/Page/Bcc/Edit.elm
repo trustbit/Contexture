@@ -1,4 +1,4 @@
-module Bcc.Edit exposing (Msg, Model, update, view, init)
+module Page.Bcc.Edit exposing (Msg, Model, update, view, init)
 
 import Browser.Navigation as Nav
 
@@ -29,8 +29,8 @@ import Domain
 import BoundedContext
 import StrategicClassification
 import Bcc
-import Bcc.Edit.Dependencies as Dependencies
-import Bcc.Edit.Messages as Messages
+import Page.Bcc.Edit.Dependencies as Dependencies
+import Page.Bcc.Edit.Messages as Messages
 
 -- MODEL
 
