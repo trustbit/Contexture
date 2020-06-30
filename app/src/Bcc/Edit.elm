@@ -174,7 +174,6 @@ update msg model =
             e = { editable | canvas = c}
           in
             (model, saveBCC model.self e)
-            -- ({ model | canvas = c }, Cmd.none)
         Err err ->
           let
             _ = Debug.log "error" err
@@ -201,22 +200,6 @@ update msg model =
 
 -- VIEW
 
-viewCaption : String -> String -> Html msg
-viewCaption labelId caption =
-  Form.label
-    [ for labelId
-    , Display.block
-    , style "background-color" "lightGrey"
-    , Spacing.p2
-    ]
-    [ text caption ]
-
-viewLabel : String -> String -> Html msg
-viewLabel labelId caption =
-  Form.label
-    [ for labelId ]
-    [ Html.b [] [ text caption ] ]
-
 view : Model -> Html Msg
 view model =
   let
@@ -226,50 +209,7 @@ view model =
           [ viewCanvas edit |> Html.map Editing
           , Grid.row [ Row.attrs [ Spacing.mt3, Spacing.mb3 ] ]
             [ Grid.col [] [ Html.hr [] [] ] ]
-          , Grid.row []
-            [ Grid.col []
-              [ Button.linkButton
-                [ Button.roleLink
-                , Button.attrs
-                  [ href
-                    ( edit.canvas.boundedContext
-                      |> BoundedContext.domain
-                      |> Route.Domain
-                      |> Route.routeToString
-                    )
-                  ]
-                ]
-                [ text "Back" ]
-              ]
-            , Grid.col []
-              [ Button.linkButton
-                [ Button.roleLink
-                , Button.attrs
-                  [ target "_blank"
-                  , href "https://github.com/ddd-crew/bounded-context-canvas"
-                  , class "text-muted"
-                  ]
-                ]
-                [ text "Source of the descriptions & help text"]
-              ]
-            , Grid.col [ Col.textAlign Text.alignLgRight]
-              [ Button.button
-                [ Button.secondary
-                , Button.onClick Delete
-                , Button.attrs
-                  [ title ("Delete " ++ (edit.canvas.boundedContext |> BoundedContext.name))
-                  , Spacing.mr3
-                  ]
-                ]
-                [ text "Delete" ]
-              , Button.submitButton
-                [ Button.primary
-                , Button.onClick Save
-                , Button.disabled (edit.name |> BoundedContext.isNameValid |> not)
-                ]
-                [ text "Save"]
-              ]
-            ]
+          , viewActions edit
           ]
         _ ->
           [ Grid.row []
@@ -278,65 +218,121 @@ view model =
   in
     Grid.containerFluid [] details
 
-viewInfoTooltip : String -> Html msg -> Html msg
-viewInfoTooltip title description =
-  Form.help []
-    [ Html.details []
-      [ Html.summary []
-        [ text title ]
-      , Html.p [ ] [ description ]
+viewActions : EditingCanvas -> Html Msg
+viewActions model =
+  Grid.row []
+    [ Grid.col []
+      [ Button.linkButton
+        [ Button.roleLink
+        , Button.attrs
+          [ href
+            ( model.canvas.boundedContext
+              |> BoundedContext.domain
+              |> Route.Domain
+              |> Route.routeToString
+            )
+          ]
+        ]
+        [ text "Back" ]
+      ]
+    , Grid.col []
+      [ Button.linkButton
+        [ Button.roleLink
+        , Button.attrs
+          [ target "_blank"
+          , href "https://github.com/ddd-crew/bounded-context-canvas"
+          , class "text-muted"
+          ]
+        ]
+        [ text "Source of the descriptions & help text"]
+      ]
+    , Grid.col [ Col.textAlign Text.alignLgRight]
+      [ Button.button
+        [ Button.secondary
+        , Button.onClick Delete
+        , Button.attrs
+          [ title ("Delete " ++ (model.canvas.boundedContext |> BoundedContext.name))
+          , Spacing.mr3
+          ]
+        ]
+        [ text "Delete" ]
+      , Button.submitButton
+        [ Button.primary
+        , Button.onClick Save
+        , Button.disabled (model.name |> BoundedContext.isNameValid |> not)
+        ]
+        [ text "Save"]
       ]
     ]
 
+viewCanvas : EditingCanvas -> Html EditingMsg
+viewCanvas model =
+  Grid.row []
+    [ Grid.col [] (viewLeftside model)
+    , Grid.col [] (viewRightside model)
+    ]
 
-viewDescriptionList : List (String, String) -> Maybe String -> Html msg
-viewDescriptionList model sourceReference =
+viewLeftside : EditingCanvas -> List (Html EditingMsg)
+viewLeftside canvas =
   let
-    footer =
-      case sourceReference of
-        Just reference ->
-          [ Html.footer
-            [ class "blockquote-footer"]
-            [ Html.a
-              [target "_blank"
-              , href reference
-              ]
-              [ text "Source of the descriptions"]
-            ]
-          ]
-        Nothing -> []
+    model = canvas.canvas
   in
   List.concat
-    [ [ Html.dl []
-        (model
-          |> List.concatMap (
-            \(t, d) ->
-              [ Html.dt [] [ text t ]
-              , Html.dd [] [ text d ]
-              ]
-          )
-        )
+    [ [ Form.group []
+        [ viewCaption "name" "Name"
+        , Input.text (
+            List.concat
+            [ [ Input.id "name", Input.value canvas.name, Input.onInput SetName]
+            , if canvas.name |> BoundedContext.isNameValid then [] else  [ Input.danger ]
+            ])
+        , Form.invalidFeedback [] [ text "A name for a Bounded Context is required!" ]
+        , Form.help [] [ text "Naming is hard. Writing down the name of your context and gaining agreement as a team will frame how you design the context." ]
+        ]
+      , Form.group []
+        [ viewCaption "description" "Description"
+        , Textarea.textarea
+          [ Textarea.id "description"
+          , Textarea.value model.description
+          , Textarea.onInput (SetDescription >> Field)
+          ]
+        , Form.help [] [ text "A few sentences describing the why and what of the context in business language. No technical details here."] ]
       ]
-    , footer
+    , [ model.classification
+        |> viewStrategicClassification
+        |> Html.map (ChangeStrategicClassification >> Field)
+      ]
+    , [ Form.group []
+        [ viewCaption "businessDecisions" "Business Decisions"
+          , Textarea.textarea
+            [ Textarea.id "businessDecisions"
+            , Textarea.rows 10
+            , Textarea.value model.businessDecisions
+            , Textarea.onInput SetBusinessDecisions
+            ]
+          , Form.help [] [ text "What are the key business rules and policies within this context?"]
+        ]
+      , Form.group []
+          [ viewCaption "ubiquitousLanguage" "Ubiquitous Language"
+            , Textarea.textarea
+              [ Textarea.id "ubiquitousLanguage"
+              , Textarea.rows 10
+              , Textarea.value model.ubiquitousLanguage
+              , Textarea.onInput SetUbiquitousLanguage
+              ]
+            , Form.help [] [ text "What are the key domain terms that exist within this context, and what do they mean?"]
+          ]
+      ]
+      |> List.map (Html.map Field)
     ]
-  |> div []
 
-viewRadioButton : String  -> Maybe value -> value -> (value -> m) -> (value -> StrategicClassification.Description) -> Radio.Radio m
-viewRadioButton id currentValue option toMsg toTitle =
-  Radio.createAdvanced
-    [ Radio.id id, Radio.onClick (toMsg option), Radio.checked (currentValue == Just option) ]
-    (Radio.label [] [ text (toTitle option).name ])
+viewRightside : EditingCanvas -> List (Html EditingMsg)
+viewRightside model =
+  [ viewModelTraits model.canvas |> Html.map Field
+  , model.addingMessage |> Messages.view |> Html.map MessageField
+  , model.addingDependencies |> Dependencies.view |> Html.map DependencyField
+  ]
 
-viewCheckbox : String -> (value -> StrategicClassification.Description) -> value -> List value -> Html (Action value)
-viewCheckbox id description value currentValues =
-  Checkbox.checkbox
-    [Checkbox.id id
-    , Checkbox.onCheck(\isChecked -> if isChecked then Add value else Remove value )
-    , Checkbox.checked (List.member value currentValues)
-    ]
-    (description value).name
-
-viewStrategicClassification : StrategicClassification.StrategicClassification -> List (Html StrategicClassificationMsg)
+viewStrategicClassification : StrategicClassification.StrategicClassification -> Html StrategicClassificationMsg
 viewStrategicClassification model =
   let
     domainDescriptions =
@@ -352,9 +348,10 @@ viewStrategicClassification model =
       |> List.map StrategicClassification.evolutionDescription
       |> List.map (\d -> (d.name, d.description))
   in
-  [ Grid.row []
+  Form.group []
+    [ Grid.row []
       [ Grid.col [] [ viewCaption "" "Strategic Classification"]]
-  , Grid.row []
+    , Grid.row []
       [ Grid.col []
         [ viewLabel "classification" "Domain"
         , div []
@@ -393,69 +390,11 @@ viewStrategicClassification model =
                 -- TODO: Other
                 ]
               )
-
             , viewDescriptionList evolutionDescriptions Nothing
             |> viewInfoTooltip "How evolved is the concept (see Wardley Maps)"
           ]
       ]
-  ]
-
-
-viewLeftside : EditingCanvas -> List (Html EditingMsg)
-viewLeftside canvas =
-  let
-    model = canvas.canvas
-  in
-  List.concat
-    [ [ Form.group []
-        [ viewCaption "name" "Name"
-        , Input.text (
-            List.concat
-            [ [ Input.id "name", Input.value canvas.name, Input.onInput SetName]
-            , if canvas.name |> BoundedContext.isNameValid then [] else  [ Input.danger ]
-            ])
-        , Form.invalidFeedback [] [ text "A name for a Bounded Context is required!" ]
-        , Form.help [] [ text "Naming is hard. Writing down the name of your context and gaining agreement as a team will frame how you design the context." ]
-        ]
-      , Form.group []
-        [ viewCaption "description" "Description"
-        , Textarea.textarea
-          [ Textarea.id "description"
-          , Textarea.value model.description
-          , Textarea.onInput (SetDescription >> Field)
-          ]
-        , Form.help [] [ text "A few sentences describing the why and what of the context in business language. No technical details here."] ]
-      ]
-    , [ Form.group []
-        ( model.classification
-          |> viewStrategicClassification
-          |> List.map(Html.map (ChangeStrategicClassification >> Field))
-        )
-      ]
-    , [ Form.group []
-        [ viewCaption "businessDecisions" "Business Decisions"
-          , Textarea.textarea
-            [ Textarea.id "businessDecisions"
-            , Textarea.rows 10
-            , Textarea.value model.businessDecisions
-            , Textarea.onInput SetBusinessDecisions
-            ]
-          , Form.help [] [ text "What are the key business rules and policies within this context?"]
-        ]
-      , Form.group []
-          [ viewCaption "ubiquitousLanguage" "Ubiquitous Language"
-            , Textarea.textarea
-              [ Textarea.id "ubiquitousLanguage"
-              , Textarea.rows 10
-              , Textarea.value model.ubiquitousLanguage
-              , Textarea.onInput SetUbiquitousLanguage
-              ]
-            , Form.help [] [ text "What are the key domain terms that exist within this context, and what do they mean?"]
-          ]
-      ]
-      |> List.map (Html.map Field)
     ]
-
 
 viewModelTraits : Bcc.BoundedContextCanvas -> Html FieldMsg
 viewModelTraits model =
@@ -489,20 +428,78 @@ viewModelTraits model =
       |> viewInfoTooltip "How can you characterise the behaviour of this bounded context?"
     ]
 
+-- view utilities
 
-viewRightside : EditingCanvas -> List (Html EditingMsg)
-viewRightside model =
-  [ viewModelTraits model.canvas |> Html.map Field
-  , model.addingMessage |> Messages.view |> Html.map MessageField
-  , model.addingDependencies |> Dependencies.view |> Html.map DependencyField
-  ]
-
-viewCanvas : EditingCanvas -> Html EditingMsg
-viewCanvas model =
-  Grid.row []
-    [ Grid.col [] (viewLeftside model)
-    , Grid.col [] (viewRightside model)
+viewCaption : String -> String -> Html msg
+viewCaption labelId caption =
+  Form.label
+    [ for labelId
+    , Display.block
+    , style "background-color" "lightGrey"
+    , Spacing.p2
     ]
+    [ text caption ]
+
+viewLabel : String -> String -> Html msg
+viewLabel labelId caption =
+  Form.label
+    [ for labelId ]
+    [ Html.b [] [ text caption ] ]
+
+viewRadioButton : String  -> Maybe value -> value -> (value -> m) -> (value -> StrategicClassification.Description) -> Radio.Radio m
+viewRadioButton id currentValue option toMsg toTitle =
+  Radio.createAdvanced
+    [ Radio.id id, Radio.onClick (toMsg option), Radio.checked (currentValue == Just option) ]
+    (Radio.label [] [ text (toTitle option).name ])
+
+viewCheckbox : String -> (value -> StrategicClassification.Description) -> value -> List value -> Html (Action value)
+viewCheckbox id description value currentValues =
+  Checkbox.checkbox
+    [Checkbox.id id
+    , Checkbox.onCheck(\isChecked -> if isChecked then Add value else Remove value )
+    , Checkbox.checked (List.member value currentValues)
+    ]
+    (description value).name
+
+viewInfoTooltip : String -> Html msg -> Html msg
+viewInfoTooltip title description =
+  Form.help []
+    [ Html.details []
+      [ Html.summary []
+        [ text title ]
+      , Html.p [ ] [ description ]
+      ]
+    ]
+
+viewDescriptionList : List (String, String) -> Maybe String -> Html msg
+viewDescriptionList model sourceReference =
+  let
+    footer =
+      case sourceReference of
+        Just reference ->
+          [ Html.footer
+            [ class "blockquote-footer"]
+            [ Html.a
+              [target "_blank"
+              , href reference
+              ]
+              [ text "Source of the descriptions"]
+            ]
+          ]
+        Nothing -> []
+  in
+    Html.dl []
+      ( model
+        |> List.concatMap (
+          \(t, d) ->
+            [ Html.dt [] [ text t ]
+            , Html.dd [] [ text d ]
+            ]
+        )
+      )
+    :: footer
+    |> div []
+
 
 -- HTTP
 
