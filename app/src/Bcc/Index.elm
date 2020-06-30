@@ -119,16 +119,16 @@ viewItem : BccItem -> Card.Config Msg
 viewItem item =
   let
     domainBadge =
-      case item.classification.domain of
-        Just domain -> [ Badge.badgePrimary [] [ text <| StrategicClassification.domainTypeToString domain ] ]
+      case item.classification.domain |> Maybe.map StrategicClassification.domainDescription of
+        Just domain -> [ Badge.badgePrimary [ title domain.description ] [ text domain.name ] ]
         Nothing -> []
     businessBadges =
       item.classification.business
-      |> List.map StrategicClassification.businessModelToString
-      |> List.map (\b -> Badge.badgeSecondary [] [ text b ])
+      |> List.map StrategicClassification.businessDescription
+      |> List.map (\b -> Badge.badgeSecondary [ title b.description ] [ text b.name ])
     evolutionBadge =
-      case item.classification.evolution of
-        Just evolution -> [ Badge.badgeInfo [] [ text <| StrategicClassification.evolutionToString evolution ] ]
+      case item.classification.evolution |> Maybe.map StrategicClassification.evolutionDescription of
+        Just evolution -> [ Badge.badgeInfo [ title evolution.description ] [ text evolution.name ] ]
         Nothing -> []
     badges =
       List.concat

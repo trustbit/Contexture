@@ -2,7 +2,7 @@ module StrategicClassification exposing (
     StrategicClassification, DomainType(..),BusinessModel(..),Evolution(..),
     noClassification,
     encoder, decoder,
-    domainTypeToString, businessModelToString, evolutionToString
+    Description, domainDescription, businessDescription, evolutionDescription
     )
 
 import Json.Encode as Encode
@@ -41,6 +41,39 @@ noClassification =
   , business = []
   , evolution = Nothing
   }
+
+-- this should be placed in some 'localization component'?
+type alias Description =
+    { name : String
+    , description : String
+    }
+
+description name desc = { name = name, description = desc }
+
+domainDescription : DomainType -> Description
+domainDescription domainType =
+    case domainType of
+       Core -> description "Core" "A key strategic initiative"
+       Supporting -> description "Supporting" "Necessary but not a differentiator"
+       Generic -> description "Generic" "A common capability found in many domains"
+       OtherDomainType other -> description other "An unspecific domain"
+
+businessDescription : BusinessModel -> Description
+businessDescription business =
+    case business of
+        Revenue -> description "Revenue" "People pay directly for this"
+        Engagement -> description "Engagement" "Users like it but they don't pay for it"
+        Compliance -> description "Compliance" "Protects your business reputation and existence"
+        CostReduction -> description "Cost reduction" "Helps your business to reduce cost or effort"
+        OtherBusinessModel other -> description other "An unspecific business model"
+
+evolutionDescription : Evolution -> Description
+evolutionDescription evolution =
+    case evolution of
+        Genesis -> description "Genesis" "New unexplored domain"
+        CustomBuilt -> description "Custom built" "Companies are building their own versions"
+        Product -> description "Product" "Off-the-shelf versions exist with differentiation"
+        Commodity -> description "Commodity" "Highly-standardised versions exist"
 
 -- conversions
 

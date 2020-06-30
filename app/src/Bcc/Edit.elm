@@ -321,42 +321,36 @@ viewDescriptionList model sourceReference =
     ]
   |> div []
 
-
-viewRadioButton : String  -> Bool -> m -> Html m -> Radio.Radio m
-viewRadioButton id checked msg title =
+viewRadioButton : String  -> Maybe value -> value -> (value -> m) -> (value -> StrategicClassification.Description) -> Radio.Radio m
+viewRadioButton id currentValue option toMsg toTitle =
   Radio.createAdvanced
-    [ Radio.id id, Radio.onClick msg, Radio.checked checked ]
-    (Radio.label [] [ title ])
+    [ Radio.id id, Radio.onClick (toMsg option), Radio.checked (currentValue == Just option) ]
+    (Radio.label [] [ text (toTitle option).name ])
 
-viewCheckbox : String -> String -> value -> List value -> Html (Action value)
-viewCheckbox id title value currentValues =
+viewCheckbox : String -> (value -> StrategicClassification.Description) -> value -> List value -> Html (Action value)
+viewCheckbox id description value currentValues =
   Checkbox.checkbox
     [Checkbox.id id
     , Checkbox.onCheck(\isChecked -> if isChecked then Add value else Remove value )
     , Checkbox.checked (List.member value currentValues)
     ]
-    title
+    (description value).name
 
 viewStrategicClassification : StrategicClassification.StrategicClassification -> List (Html StrategicClassificationMsg)
 viewStrategicClassification model =
   let
     domainDescriptions =
-      [ ("Core domain", "A key strategic initiative")
-      , ("Supporting domain", "Necessary but not a differentiator")
-      , ("Generic","a common capability found in many domains")
-      ]
+      [ StrategicClassification.Core, StrategicClassification.Supporting, StrategicClassification.Generic ]
+      |> List.map StrategicClassification.domainDescription
+      |> List.map (\d -> (d.name, d.description))
     businessDescriptions =
-      [ ("Revenue", "People pay directly for this")
-      , ("Engagement","Users like it but they don't pay for it")
-      , ("Compliance", "Protects your business reputation and existence")
-      , ("Cost reduction", "Helps your business to reduce cost or effort")
-      ]
+      [ StrategicClassification.Revenue, StrategicClassification.Engagement, StrategicClassification.Compliance, StrategicClassification.CostReduction ]
+      |> List.map StrategicClassification.businessDescription
+      |> List.map (\d -> (d.name, d.description))
     evolutionDescriptions =
-      [ ("Genesis", "New unexplored domain")
-      , ("Custom built", "Companies are building their own versions")
-      , ("Product", "Off-the-shelf versions exist with differentiation")
-      , ("Commodity", "Highly-standardised versions exist")
-      ]
+      [ StrategicClassification.Genesis, StrategicClassification.CustomBuilt, StrategicClassification.Product, StrategicClassification.Commodity ]
+      |> List.map StrategicClassification.evolutionDescription
+      |> List.map (\d -> (d.name, d.description))
   in
   [ Grid.row []
       [ Grid.col [] [ viewCaption "" "Strategic Classification"]]
@@ -365,9 +359,9 @@ viewStrategicClassification model =
         [ viewLabel "classification" "Domain"
         , div []
             ( Radio.radioList "classification"
-              [ viewRadioButton "core" (model.domain == Just StrategicClassification.Core) (SetDomainType StrategicClassification.Core) (text "Core")
-              , viewRadioButton "supporting" (model.domain == Just StrategicClassification.Supporting) (SetDomainType StrategicClassification.Supporting)  (text "Supporting")
-              , viewRadioButton "generic" (model.domain == Just StrategicClassification.Generic) (SetDomainType StrategicClassification.Generic)  (text "Generic")
+              [ viewRadioButton "core" model.domain StrategicClassification.Core SetDomainType StrategicClassification.domainDescription
+              , viewRadioButton "supporting" model.domain StrategicClassification.Supporting SetDomainType StrategicClassification.domainDescription
+              , viewRadioButton "generic" model.domain StrategicClassification.Generic SetDomainType StrategicClassification.domainDescription
               -- TODO: Other
               ]
             )
@@ -377,10 +371,10 @@ viewStrategicClassification model =
         , Grid.col []
           [ viewLabel "businessModel" "Business Model"
           , div []
-              [ viewCheckbox "revenue" "Revenue" StrategicClassification.Revenue model.business
-              , viewCheckbox "engagement" "Engagement" StrategicClassification.Engagement model.business
-              , viewCheckbox "Compliance" "Compliance" StrategicClassification.Compliance model.business
-              , viewCheckbox "costReduction" "Cost reduction" StrategicClassification.CostReduction model.business
+              [ viewCheckbox "revenue" StrategicClassification.businessDescription StrategicClassification.Revenue model.business
+              , viewCheckbox "engagement" StrategicClassification.businessDescription StrategicClassification.Engagement model.business
+              , viewCheckbox "Compliance" StrategicClassification.businessDescription StrategicClassification.Compliance model.business
+              , viewCheckbox "costReduction" StrategicClassification.businessDescription StrategicClassification.CostReduction model.business
               -- TODO: Other
               ]
               |> Html.map ChangeBusinessModel
@@ -392,10 +386,10 @@ viewStrategicClassification model =
           [ viewLabel "evolution" "Evolution"
           , div []
               ( Radio.radioList "evolution"
-                [ viewRadioButton "genesis" (model.evolution == Just StrategicClassification.Genesis) (SetEvolution StrategicClassification.Genesis) (text "Genesis")
-                , viewRadioButton "customBuilt" (model.evolution == Just StrategicClassification.CustomBuilt) (SetEvolution StrategicClassification.CustomBuilt) (text "Custom built")
-                , viewRadioButton "product" (model.evolution == Just StrategicClassification.Product) (SetEvolution StrategicClassification.Product) (text "Product")
-                , viewRadioButton "commodity" (model.evolution == Just StrategicClassification.Commodity) (SetEvolution StrategicClassification.Commodity) (text "Commodity")
+                [ viewRadioButton "genesis" model.evolution StrategicClassification.Genesis SetEvolution StrategicClassification.evolutionDescription
+                , viewRadioButton "customBuilt" model.evolution StrategicClassification.CustomBuilt SetEvolution StrategicClassification.evolutionDescription
+                , viewRadioButton "product" model.evolution StrategicClassification.Product SetEvolution StrategicClassification.evolutionDescription
+                , viewRadioButton "commodity" model.evolution StrategicClassification.Commodity SetEvolution StrategicClassification.evolutionDescription
                 -- TODO: Other
                 ]
               )
