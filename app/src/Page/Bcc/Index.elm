@@ -97,7 +97,7 @@ createWithName name =
         [ Button.attrs
             [ Html.Attributes.type_ "submit"]
             , Button.primary
-            , Button.disabled (name |> BoundedContext.isNameValid)
+            , Button.disabled (name |> BoundedContext.isNameValid |> not)
             ]
         [ text "Create new Bounded Context"]
         ]
