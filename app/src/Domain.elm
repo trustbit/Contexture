@@ -1,6 +1,6 @@
 module Domain exposing (
   Domain,  
-  ifNameValid,
+  isNameValid,
   domainDecoder, domainsDecoder, modelEncoder, idFieldDecoder, nameFieldDecoder,
   update, newDomain
   )
@@ -23,21 +23,11 @@ type alias Domain =
   , parentDomain: Maybe DomainId
   }
 
--- UPDATE
+-- actions
 
-
--- VIEW
-
-ifValid : (model -> Bool) -> (model -> result) -> (model -> result) -> model -> result
-ifValid predicate trueRenderer falseRenderer model =
-  if predicate model then
-    trueRenderer model
-  else
-    falseRenderer model
-
-ifNameValid =
-  ifValid (\name -> String.length name <= 0)
-
+isNameValid : String -> Bool
+isNameValid couldBeName =
+  String.length couldBeName > 0
 
 -- CONVERSIONS
 
@@ -80,7 +70,6 @@ newDomain url name toMsg =
       , body = Http.jsonBody body
       , expect = Http.expectJson toMsg domainDecoder
       }
-
 
 update : Url.Url -> Domain -> (Result Http.Error () -> msg) -> Cmd msg
 update url domain toMsg =

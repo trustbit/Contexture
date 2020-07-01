@@ -70,7 +70,7 @@ view model =
           [ Button.attrs
             [ Html.Attributes.type_ "submit"]
             , Button.primary
-            , Button.disabled (model.newDomainName |> Domain.ifNameValid (\_ -> True) (\_ -> False))
+            , Button.disabled (model.newDomainName |> Domain.isNameValid |> not)
             ]
           [ text "Create new domain"]
         ]

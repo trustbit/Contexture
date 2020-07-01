@@ -211,7 +211,7 @@ viewDomainCard model =
         , Button.submitButton
           [ Button.primary
           , Button.onClick Save
-          , Button.disabled (model.name |> Domain.ifNameValid (\_ -> True) (\_ -> False))
+          , Button.disabled (model.name |> Domain.isNameValid |> not)
           ]
           [ text "Save"]
         ]
@@ -233,7 +233,7 @@ viewDomain model =
       , Input.text (
         List.concat
         [ [ Input.id "name", Input.value model.name, Input.onInput SetName ]
-        , model.name |> Domain.ifNameValid (\_ -> [ Input.danger ]) (\_ -> [])
+        , if model.name |> Domain.isNameValid then [] else [ Input.danger ]
         ]
       )
       , Form.invalidFeedback [] [ text "A name for the Domain is required!" ]
