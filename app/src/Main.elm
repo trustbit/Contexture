@@ -15,12 +15,12 @@ import Bootstrap.Utilities.Spacing as Spacing
 import Route exposing ( Route)
 
 
-import Domain
-import Domain.Index
-import Domain.Edit
-import Bcc
-import Bcc.Edit
-import Bcc.Index
+import Domain.DomainId as Domain
+import BoundedContext.BoundedContextId as BoundedContext
+import Page.Domain.Index
+import Page.Domain.Edit
+import BoundedContext
+import Page.Bcc.Edit
 import Url exposing (Protocol)
 
 -- MAIN
@@ -50,9 +50,9 @@ type alias Flags =
 
 type Page
   = NotFoundPage
-  | Domains Domain.Index.Model
-  | DomainsEdit Domain.Edit.Model
-  | Bcc Bcc.Edit.Model
+  | Domains Page.Domain.Index.Model
+  | DomainsEdit Page.Domain.Edit.Model
+  | Bcc Page.Bcc.Edit.Model
 
 type alias Model =
   { key : Nav.Key
@@ -71,22 +71,22 @@ initCurrentPage ( model, existingCmds ) =
 
           Route.Home ->
             let
-              ( pageModel, pageCmds ) = Domain.Index.initWithoutSubdomains model.baseUrl model.key
+              ( pageModel, pageCmds ) = Page.Domain.Index.initWithoutSubdomains model.baseUrl model.key
             in
               ( Domains pageModel, Cmd.map DomainMsg pageCmds )
           Route.Domain id ->
             let
               url = model.baseUrl
               domainUrl = { url | path = url.path ++ "/domains/" ++ Domain.idToString id }
-              ( pageModel, pageCmds ) = Domain.Edit.init model.key domainUrl
+              ( pageModel, pageCmds ) = Page.Domain.Edit.init model.key domainUrl
             in
               ( DomainsEdit pageModel, Cmd.map DomainEditMsg pageCmds )
           Route.Bcc id ->
             let
               url = model.baseUrl
-              bccUrl = { url | path = url.path ++ "/bccs/" ++ Bcc.idToString id}
+              bccUrl = { url | path = url.path ++ "/bccs/" ++ BoundedContext.idToString id}
             
-              ( pageModel, pageCmds ) = Bcc.Edit.init model.key bccUrl
+              ( pageModel, pageCmds ) = Page.Bcc.Edit.init model.key bccUrl
             in
               ( Bcc pageModel, Cmd.map BccMsg pageCmds )
 
@@ -132,9 +132,9 @@ type Msg
   = LinkClicked Browser.UrlRequest
   | UrlChanged Url.Url
   | NavMsg Navbar.State
-  | DomainMsg Domain.Index.Msg
-  | DomainEditMsg Domain.Edit.Msg
-  | BccMsg Bcc.Edit.Msg
+  | DomainMsg Page.Domain.Index.Msg
+  | DomainEditMsg Page.Domain.Edit.Msg
+  | BccMsg Page.Bcc.Edit.Msg
 
 update : Msg -> Model -> (Model, Cmd Msg)
 update msg model =
@@ -162,17 +162,17 @@ update msg model =
       )
     (DomainMsg m, Domains overview) ->
       let
-        (updatedModel, updatedMsg) = Domain.Index.update m overview
+        (updatedModel, updatedMsg) = Page.Domain.Index.update m overview
       in
         ({ model | page = Domains updatedModel}, updatedMsg |> Cmd.map DomainMsg)
     (DomainEditMsg m, DomainsEdit edit) ->
       let
-        (updatedModel, updatedMsg) = Domain.Edit.update m edit
+        (updatedModel, updatedMsg) = Page.Domain.Edit.update m edit
       in
         ({ model | page = DomainsEdit updatedModel}, updatedMsg |> Cmd.map DomainEditMsg)
     (BccMsg m, Bcc bccModel) ->
       let
-        (mo, msg2) = Bcc.Edit.update m bccModel
+        (mo, msg2) = Page.Bcc.Edit.update m bccModel
       in
         ({ model | page = Bcc mo}, Cmd.map BccMsg msg2)
 
@@ -204,11 +204,11 @@ view model =
     content =
       case model.page of
         Bcc m ->
-          Bcc.Edit.view m |> Html.map BccMsg
+          Page.Bcc.Edit.view m |> Html.map BccMsg
         Domains o ->
-          Domain.Index.view o |> Html.map DomainMsg
+          Page.Domain.Index.view o |> Html.map DomainMsg
         DomainsEdit o ->
-          Domain.Edit.view o |> Html.map DomainEditMsg
+          Page.Domain.Edit.view o |> Html.map DomainEditMsg
         NotFoundPage ->
           text "Not Found"
   in

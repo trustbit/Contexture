@@ -1,4 +1,4 @@
-module Bcc.Index exposing (Msg, Model, update, view, init)
+module Page.Bcc.Index exposing (Msg, Model, update, view, init)
 
 import Browser.Navigation as Nav
 
@@ -27,11 +27,14 @@ import List.Split exposing (chunksOfLeft)
 import Url
 import Http
 import RemoteData
-import Dict
 import Set
 
-import Bcc
 import Route
+
+import BoundedContext
+import BoundedContext.Canvas as Bcc
+import BoundedContext.Dependency as Dependency
+import BoundedContext.StrategicClassification as StrategicClassification exposing (StrategicClassification)
 
 -- MODEL
 
@@ -57,7 +60,7 @@ type Msg
   = Loaded (Result Http.Error (List BccItem))
   | SetName String
   | CreateBcc
-  | Created (Result Http.Error BccItem)
+  | Created (Result Http.Error BoundedContext.BoundedContext)
 
 update : Msg -> Model -> (Model, Cmd Msg)
 update msg model =
@@ -71,7 +74,7 @@ update msg model =
     CreateBcc ->
       (model, createNewBcc model)
     Created (Ok item) ->
-        (model, Route.pushUrl (Route.Bcc item.id) model.navKey)
+        (model, Route.pushUrl (item |> BoundedContext.id |> Route.Bcc ) model.navKey)
     _ ->
         Debug.log ("Overview: " ++ Debug.toString msg ++ " " ++ Debug.toString model)
         (model, Cmd.none)
@@ -94,7 +97,7 @@ createWithName name =
         [ Button.attrs
             [ Html.Attributes.type_ "submit"]
             , Button.primary
-            , Button.disabled (name |> Bcc.ifNameValid (\_ -> True) (\_ -> False))
+            , Button.disabled (name |> BoundedContext.isNameValid)
             ]
         [ text "Create new Bounded Context"]
         ]
@@ -116,16 +119,16 @@ viewItem : BccItem -> Card.Config Msg
 viewItem item =
   let
     domainBadge =
-      case item.classification.domain of
-        Just domain -> [ Badge.badgePrimary [] [ text <| Bcc.domainTypeToString domain ] ]
+      case item.classification.domain |> Maybe.map StrategicClassification.domainDescription of
+        Just domain -> [ Badge.badgePrimary [ title domain.description ] [ text domain.name ] ]
         Nothing -> []
     businessBadges =
       item.classification.business
-      |> List.map Bcc.businessModelToString
-      |> List.map (\b -> Badge.badgeSecondary [] [ text b ])
+      |> List.map StrategicClassification.businessDescription
+      |> List.map (\b -> Badge.badgeSecondary [ title b.description ] [ text b.name ])
     evolutionBadge =
-      case item.classification.evolution of
-        Just evolution -> [ Badge.badgeInfo [] [ text <| Bcc.evolutionToString evolution ] ]
+      case item.classification.evolution |> Maybe.map StrategicClassification.evolutionDescription of
+        Just evolution -> [ Badge.badgeInfo [ title evolution.description ] [ text evolution.name ] ]
         Nothing -> []
     badges =
       List.concat
@@ -148,16 +151,16 @@ viewItem item =
 
     dependencies =
       item.dependencies.consumers
-      |> Bcc.dependencyCount
+      |> Dependency.dependencyCount
       |> viewPillMessage "Consumers"
       |> List.append
         ( item.dependencies.suppliers
-          |> Bcc.dependencyCount
+          |> Dependency.dependencyCount
           |> viewPillMessage "Suppliers"
         )
   in
   Card.config [ Card.attrs [class "mb-3", class ""]]
-    |> Card.headerH4 [] [ text item.name ]
+    |> Card.headerH4 [] [ text (item.boundedContext |> BoundedContext.name) ]
     |> Card.block []
       ( List.concat
           [ if String.length item.description > 0
@@ -172,7 +175,14 @@ viewItem item =
       ]
     |> Card.footer []
       [ Html.a
-          [ href (Route.routeToString (Route.Bcc item.id)), class "stretched-link" ]
+          [ href 
+            ( item.boundedContext
+              |> BoundedContext.id
+              |> Route.Bcc
+              |> Route.routeToString
+            )
+          , class "stretched-link"
+          ]
           [ text "Edit Bounded Context" ]
       ]
 
@@ -192,7 +202,7 @@ viewLoaded name items =
     let
       cards =
         items
-        |> List.sortBy (\i -> i.name)
+        |> List.sortBy (\i -> i.boundedContext |> BoundedContext.name)
         |> List.map viewItem
         |> chunksOfLeft 2
         |> List.map Card.deck
@@ -232,7 +242,7 @@ createNewBcc model =
       Http.post
       { url = { baseUrl | path = baseUrl.path ++ "/bccs" } |> Url.toString
       , body = Http.jsonBody body
-      , expect = Http.expectJson Created Bcc.modelDecoder
+      , expect = Http.expectJson Created BoundedContext.modelDecoder
       }
 
 bccItemsDecoder: Decoder (List BccItem)

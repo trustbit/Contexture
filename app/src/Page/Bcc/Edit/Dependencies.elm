@@ -1,4 +1,7 @@
-module Bcc.Edit.Dependencies exposing (Msg(..), Model, update, init, view)
+module Page.Bcc.Edit.Dependencies exposing (
+  Msg(..), Model,
+  update, init, view,
+  asDependencies)
 
 import Html exposing (Html, button, div, text)
 import Html.Attributes exposing (..)
@@ -20,20 +23,24 @@ import Select as Autocomplete
 import Json.Decode as Decode exposing (Decoder)
 import Json.Decode.Pipeline as JP
 
-import Dict
+
 import List
 import Url
 import Http
 
-import Bcc
+import BoundedContext.Canvas as Bcc
+import BoundedContext
+import BoundedContext.BoundedContextId as BoundedContext
+import BoundedContext.Dependency as Dependency
 import Domain
+import Domain.DomainId as Domain
 
 type alias DomainDependency =
   { id : Domain.DomainId
   , name : String }
 
 type alias BoundedContextDependency =
-  { id : Bcc.BoundedContextId
+  { id : BoundedContext.BoundedContextId
   , name: String
   , domain: DomainDependency }
 
@@ -44,8 +51,8 @@ type CollaboratorReference
 type alias DependencyEdit =
   { selectedCollaborator : Maybe CollaboratorReference
   , dependencySelectState : Autocomplete.State
-  , relationship : Maybe Bcc.RelationshipPattern
-  , existingDependencies : Bcc.DependencyMap }
+  , relationship : Maybe Dependency.RelationshipPattern
+  , existingDependencies : Dependency.DependencyMap }
 
 type alias Model =
   { consumer: DependencyEdit
@@ -53,7 +60,7 @@ type alias Model =
   , availableDependencies : List CollaboratorReference
   }
 
-initDependency : Bcc.DependencyMap -> String -> DependencyEdit
+initDependency : Dependency.DependencyMap -> String -> DependencyEdit
 initDependency existing id =
   { selectedCollaborator = Nothing
   , dependencySelectState = Autocomplete.newState id
@@ -72,13 +79,25 @@ init baseUrl dependencies =
     initDependencies dependencies
   , Cmd.batch [ loadBoundedContexts baseUrl, loadDomains baseUrl])
 
+asDependencies : Model -> Bcc.Dependencies
+asDependencies model =
+  { suppliers = model.supplier.existingDependencies
+  , consumers = model.consumer.existingDependencies }
+
 -- UPDATE
+
+
+type Action t
+  = Add t
+  | Remove t
+
+type alias DependencyAction = Action Dependency.Dependency
 
 type ChangeTypeMsg
   = SelectMsg (Autocomplete.Msg CollaboratorReference)
   | OnSelect (Maybe CollaboratorReference)
   | SetRelationship String
-  | DepdendencyChanged Bcc.DependencyAction
+  | DepdendencyChanged DependencyAction
 
 type Msg
   = Consumer ChangeTypeMsg
@@ -87,11 +106,19 @@ type Msg
   | DomainsLoaded (Result Http.Error (List DomainDependency))
 
 
+updateDependencyAction : DependencyAction -> Dependency.DependencyMap -> Dependency.DependencyMap
+updateDependencyAction action depenencies =
+  case action of
+    Add dependency ->
+      Dependency.registerDependency dependency depenencies
+    Remove dependency  ->
+      Dependency.removeDependency dependency depenencies
+
 updateDependency : ChangeTypeMsg -> DependencyEdit -> (DependencyEdit, Cmd ChangeTypeMsg)
 updateDependency msg model =
   case msg of
     SetRelationship relationship ->
-      ({ model | relationship = Bcc.relationshipParser relationship }, Cmd.none)
+      ({ model | relationship = Dependency.relationshipParser relationship }, Cmd.none)
     SelectMsg selMsg ->
       let
         ( updated, cmd ) =
@@ -104,7 +131,7 @@ updateDependency msg model =
       ( { model
         | selectedCollaborator = Nothing
         , relationship = Nothing
-        , existingDependencies = Bcc.updateDependencyAction change model.existingDependencies
+        , existingDependencies = updateDependencyAction change model.existingDependencies
         }
       , Cmd.none
       )
@@ -136,19 +163,20 @@ update msg model =
       )
     _ ->
       let
-        _ = Debug.log ("Dependencies: " ++ (Debug.toString msg) ++ (Debug.toString model))
+        _ = Debug.log "Dependencies msg" msg
+        _ = Debug.log "Dependencies model" model
       in
         (model, Cmd.none)
 
 -- VIEW
 
-toCollaborator : CollaboratorReference -> Bcc.Collaborator
+toCollaborator : CollaboratorReference -> Dependency.Collaborator
 toCollaborator dependency =
   case dependency of
     BoundedContext bc ->
-      Bcc.BoundedContext bc.id
+      Dependency.BoundedContext bc.id
     Domain d ->
-      Bcc.Domain d.id
+      Dependency.Domain d.id
 
 filter : Int -> String -> List CollaboratorReference -> Maybe (List CollaboratorReference)
 filter minChars query items =
@@ -172,8 +200,8 @@ filter minChars query items =
         |> List.filter searchable
         |> Just
 
-noOpLabel : CollaboratorReference -> String
-noOpLabel item =
+oneLineLabel : CollaboratorReference -> String
+oneLineLabel item =
   case item of
     BoundedContext bc ->
       bc.domain.name ++ " - " ++ bc.name
@@ -197,7 +225,7 @@ selectConfig : Autocomplete.Config ChangeTypeMsg CollaboratorReference
 selectConfig =
     Autocomplete.newConfig
         { onSelect = OnSelect
-        , toLabel = noOpLabel
+        , toLabel = oneLineLabel
         , filter = filter 2
         }
         |> Autocomplete.withCutoff 12
@@ -211,20 +239,20 @@ selectConfig =
         |> Autocomplete.withPrompt "Search for a Dependency"
         |> Autocomplete.withItemHtml renderItem
 
-translateRelationship : Bcc.RelationshipPattern -> String
+translateRelationship : Dependency.RelationshipPattern -> String
 translateRelationship relationship =
   case relationship of
-    Bcc.AntiCorruptionLayer -> "Anti Corruption Layer"
-    Bcc.OpenHostService -> "Open Host Service"
-    Bcc.PublishedLanguage -> "Published Language"
-    Bcc.SharedKernel ->"Shared Kernel"
-    Bcc.UpstreamDownstream -> "Upstream/Downstream"
-    Bcc.Conformist -> "Conformist"
-    Bcc.Octopus -> "Octopus"
-    Bcc.Partnership -> "Partnership"
-    Bcc.CustomerSupplier -> "Customer/Supplier"
+    Dependency.AntiCorruptionLayer -> "Anti Corruption Layer"
+    Dependency.OpenHostService -> "Open Host Service"
+    Dependency.PublishedLanguage -> "Published Language"
+    Dependency.SharedKernel ->"Shared Kernel"
+    Dependency.UpstreamDownstream -> "Upstream/Downstream"
+    Dependency.Conformist -> "Conformist"
+    Dependency.Octopus -> "Octopus"
+    Dependency.Partnership -> "Partnership"
+    Dependency.CustomerSupplier -> "Customer/Supplier"
 
-viewAddedDepencency : List CollaboratorReference -> Bcc.Dependency -> Html ChangeTypeMsg
+viewAddedDepencency : List CollaboratorReference -> Dependency.Dependency -> Html ChangeTypeMsg
 viewAddedDepencency items (collaborator, relationship) =
   let
     collaboratorCaption =
@@ -242,7 +270,7 @@ viewAddedDepencency items (collaborator, relationship) =
         [ Button.secondary
         , Button.onClick (
             (collaborator, relationship)
-            |> Bcc.Remove |> DepdendencyChanged
+            |> Remove |> DepdendencyChanged
           )
         ]
         [ text "x" ]
@@ -252,29 +280,32 @@ viewAddedDepencency items (collaborator, relationship) =
 onSubmitMaybe : Maybe msg -> Html.Attribute msg
 onSubmitMaybe maybeMsg =
   -- https://thoughtbot.com/blog/advanced-dom-event-handlers-in-elm
-  case maybeMsg of
+  let
+    preventDefault m =
+      ( m, True )
+  in case maybeMsg of
     Just msg ->
-      Html.Events.preventDefaultOn "submit" (Decode.map (\m -> ( m, True )) (Decode.succeed msg))
+      Html.Events.preventDefaultOn "submit" (Decode.map preventDefault (Decode.succeed msg))
     Nothing ->
-      Html.Events.preventDefaultOn "submit" (Decode.map (\m -> ( m, True )) (Decode.fail "No message to submit"))
+      Html.Events.preventDefaultOn "submit" (Decode.map preventDefault (Decode.fail "No message to submit"))
 
 
 viewAddDependency : List CollaboratorReference -> DependencyEdit -> Html ChangeTypeMsg
 viewAddDependency dependencies model =
   let
     items =
-      [ Bcc.AntiCorruptionLayer
-      , Bcc.OpenHostService
-      , Bcc.PublishedLanguage
-      , Bcc.SharedKernel
-      , Bcc.UpstreamDownstream
-      , Bcc.Conformist
-      , Bcc.Octopus
-      , Bcc.Partnership
-      , Bcc.CustomerSupplier
+      [ Dependency.AntiCorruptionLayer
+      , Dependency.OpenHostService
+      , Dependency.PublishedLanguage
+      , Dependency.SharedKernel
+      , Dependency.UpstreamDownstream
+      , Dependency.Conformist
+      , Dependency.Octopus
+      , Dependency.Partnership
+      , Dependency.CustomerSupplier
       ]
         |> List.map (\r -> (r, translateRelationship r))
-        |> List.map (\(v,t) -> Select.item [value (Bcc.relationshipToString v)] [ text t])
+        |> List.map (\(v,t) -> Select.item [value (Dependency.relationshipToString v)] [ text t])
 
     selectedItem =
       case model.selectedCollaborator of
@@ -284,7 +315,7 @@ viewAddDependency dependencies model =
     -- TODO: this is probably very unefficient
     existingDependencies =
       model.existingDependencies
-      |> Bcc.dependencyList
+      |> Dependency.dependencyList
       |> List.map Tuple.first
 
     relevantDependencies =
@@ -303,7 +334,7 @@ viewAddDependency dependencies model =
       ( model.selectedCollaborator
         |> Maybe.map toCollaborator
         |> Maybe.map (\s -> (s, model.relationship))
-        |> Maybe.map (Bcc.Add >> DepdendencyChanged)
+        |> Maybe.map (Add >> DepdendencyChanged)
       )
     ]
     [ Grid.row []
@@ -340,7 +371,7 @@ viewDependency items title model =
       ]
     , div []
       (model.existingDependencies
-      |> Bcc.dependencyList
+      |> Dependency.dependencyList
       |> List.map (viewAddedDepencency items))
     , viewAddDependency items model
     ]
@@ -366,21 +397,21 @@ view model =
 
 domainDecoder : Decoder DomainDependency
 domainDecoder =
-  Decode.succeed DomainDependency
-    |> JP.custom Domain.idFieldDecoder
-    |> JP.custom Domain.nameFieldDecoder
+  Domain.domainDecoder
+  |> Decode.map (\d -> { id = d.id, name = d.name})
 
 boundedContextDecoder : Decoder BoundedContextDependency
 boundedContextDecoder =
+  -- TODO: can we reuse BoundedContext.modelDecoder?
   Decode.succeed BoundedContextDependency
-    |> JP.custom Bcc.idFieldDecoder
-    |> JP.custom Bcc.nameFieldDecoder
+    |> JP.custom BoundedContext.idFieldDecoder
+    |> JP.custom BoundedContext.nameFieldDecoder
     |> JP.required "domain" domainDecoder
 
 loadBoundedContexts: Url.Url -> Cmd Msg
 loadBoundedContexts url =
   Http.get
-  -- todo this is wrong
+  -- todo this is wrong - we need an 'API' abstraction?
     { url = Url.toString { url | path = "/api/bccs?_expand=domain"}
     , expect = Http.expectJson BoundedContextsLoaded (Decode.list boundedContextDecoder)
     }
@@ -388,7 +419,7 @@ loadBoundedContexts url =
 loadDomains: Url.Url -> Cmd Msg
 loadDomains url =
   Http.get
-  -- todo this is wrong
+  -- todo this is wrong - we need an 'API' abstraction?
     { url = Url.toString { url | path = "/api/domains"}
     , expect = Http.expectJson DomainsLoaded (Decode.list domainDecoder)
     }

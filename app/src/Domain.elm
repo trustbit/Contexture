@@ -1,19 +1,20 @@
 module Domain exposing (
-  DomainId(..), Domain, Model, init,
-  Msg(..),update,ifNameValid,
-  idToString, idFromString, idParser, idEncoder, idDecoder,
-  domainDecoder, domainsDecoder, modelEncoder, idFieldDecoder, nameFieldDecoder
+  Domain,  
+  isNameValid,
+  domainDecoder, domainsDecoder, modelEncoder, idFieldDecoder, nameFieldDecoder,
+  update, newDomain
   )
 
 import Json.Decode as Decode exposing(Decoder)
 import Json.Decode.Pipeline as JP
 import Json.Encode as Encode
-import Url.Parser exposing (Parser, custom)
+
+import Url
+import Http
+
+import Domain.DomainId exposing(DomainId(..), idDecoder)
 
 -- MODEL
-
-type DomainId
-  = DomainId Int
 
 type alias Domain =
   { id : DomainId
@@ -22,82 +23,13 @@ type alias Domain =
   , parentDomain: Maybe DomainId
   }
 
-type alias Model = Domain
+-- actions
 
-init : () -> Domain
-init _ =
-    { id = DomainId(-1)
-    , name = ""
-    , vision = "" 
-    , parentDomain = Nothing}
-
--- UPDATE
-
-type Msg
-  = SetName String
-  | SetVision String
-
-update : Msg -> Model -> Model
-update msg model =
-  case msg of
-    SetName name ->
-      { model | name = name}
-    SetVision vision->
-      { model | vision = vision}
-
--- VIEW
-
-ifValid : (model -> Bool) -> (model -> result) -> (model -> result) -> model -> result
-ifValid predicate trueRenderer falseRenderer model =
-  if predicate model then
-    trueRenderer model
-  else
-    falseRenderer model
-
-ifNameValid =
-  ifValid (\name -> String.length name <= 0)
-
+isNameValid : String -> Bool
+isNameValid couldBeName =
+  String.length couldBeName > 0
 
 -- CONVERSIONS
-
-extractInt : DomainId -> Int
-extractInt value =
-  case value of
-    DomainId v -> v
-
-idToString : DomainId -> String
-idToString domainId =
-  case domainId of
-    DomainId id -> String.fromInt id
-
-idFromString : String -> Maybe DomainId
-idFromString value =
-  value
-  |> String.toInt
-  |> Maybe.map DomainId
-
-idFromStringSuccess : String -> Decode.Decoder DomainId
-idFromStringSuccess value =
-  case idFromString value of
-    Just id -> Decode.succeed id
-    Nothing -> Decode.fail ("Could not decode into DomainId " ++ value)
-
-idParser : Parser (DomainId -> a) a
-idParser =
-    custom "DOMAINID" <|
-        \domainId ->
-            Maybe.map DomainId (String.toInt domainId)
-
-idDecoder : Decode.Decoder DomainId
-idDecoder =
-  Decode.oneOf
-    [ Decode.map DomainId Decode.int
-    , Decode.string |> Decode.andThen idFromStringSuccess]
-
-
-idEncoder : DomainId -> Encode.Value
-idEncoder value =
-  Encode.int (extractInt value)
 
 nameFieldDecoder : Decoder String
 nameFieldDecoder =
@@ -125,3 +57,28 @@ modelEncoder model =
         [ ("name", Encode.string model.name)
         , ("vision", Encode.string model.vision)
         ]
+
+newDomain : Url.Url -> String -> (Result Http.Error Domain -> msg) -> Cmd msg
+newDomain url name toMsg =
+  let
+    body =
+      Encode.object
+      [ ("name", Encode.string name) ]
+  in
+    Http.post
+      { url = {url | path = url.path ++ "/domains" } |> Url.toString
+      , body = Http.jsonBody body
+      , expect = Http.expectJson toMsg domainDecoder
+      }
+
+update : Url.Url -> Domain -> (Result Http.Error () -> msg) -> Cmd msg
+update url domain toMsg =
+  Http.request
+    { method = "PUT"
+    , headers = []
+    , url = Url.toString url
+    , body = Http.jsonBody <| modelEncoder domain
+    , expect = Http.expectWhatever toMsg
+    , timeout = Nothing
+    , tracker = Nothing
+    }

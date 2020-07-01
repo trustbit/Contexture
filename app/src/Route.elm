@@ -4,9 +4,8 @@ import Browser.Navigation as Nav
 import Url exposing (Url)
 import Url.Parser exposing (..)
 
-import Domain exposing(DomainId)
-import Bcc exposing (BoundedContextId)
-
+import Domain.DomainId as Domain exposing (DomainId)
+import BoundedContext.BoundedContextId as BoundedContext exposing (BoundedContextId)
 
 type Route
     = NotFound
@@ -30,7 +29,7 @@ matchRoute =
     oneOf
         [ map Home top
         , map Domain (s "domain" </> Domain.idParser)
-        , map Bcc (s "bccs" </> Bcc.idParser)
+        , map Bcc (s "bccs" </> BoundedContext.idParser)
         ]
 
 pushUrl : Route -> Nav.Key -> Cmd msg
@@ -53,4 +52,4 @@ routeToString route =
         Domain id ->
             "/domain/" ++ Domain.idToString id
         Bcc bccId ->
-            "/bccs/" ++ Bcc.idToString bccId
+            "/bccs/" ++ BoundedContext.idToString bccId
