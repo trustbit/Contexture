@@ -87,7 +87,7 @@ initMove baseUrl model =
 init : Api.Configuration -> Nav.Key -> Domain.DomainRelation -> (Model, Cmd Msg)
 init baseUrl key subDomains =
   let
-    (createModel, createCmd) = Page.Domain.Create.init baseUrl key
+    (createModel, createCmd) = Page.Domain.Create.init baseUrl key subDomains
   in
   ( { navKey = key
     , baseUrl = baseUrl

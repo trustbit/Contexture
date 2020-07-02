@@ -22,6 +22,7 @@ type alias Domain = Domain.Domain
 type alias Model =
   { navKey : Nav.Key
   , baseUrl : Api.Configuration
+  , relation : Domain.DomainRelation
   , newDomainName: String
   }
 
@@ -30,10 +31,11 @@ type Msg
   | CreateDomain
   | DomainCreated (Result Http.Error Domain)
 
-init: Api.Configuration -> Nav.Key -> (Model, Cmd Msg)
-init baseUrl key =
+init: Api.Configuration -> Nav.Key -> Domain.DomainRelation ->  (Model, Cmd Msg)
+init baseUrl key relation =
   ( { navKey = key
     , baseUrl = baseUrl
+    , relation = relation
     , newDomainName = ""
     }
   , Cmd.none
@@ -46,7 +48,7 @@ update msg model =
     SetDomainName name ->
       ({ model | newDomainName = name}, Cmd.none)
     CreateDomain ->
-      (model, newDomain model.baseUrl model.newDomainName DomainCreated)
+      (model, newDomain model.baseUrl model.relation model.newDomainName DomainCreated)
     DomainCreated (Ok item) ->
       (model, Route.pushUrl (Route.Domain item.id) model.navKey)
     DomainCreated (Err e) ->

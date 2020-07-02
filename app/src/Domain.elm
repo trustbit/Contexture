@@ -68,15 +68,19 @@ modelEncoder model =
         , ("vision", Encode.string model.vision)
         ]
 
-newDomain : Api.Configuration -> String ->  ApiResult Domain msg
-newDomain url name toMsg =
+newDomain : Api.Configuration -> DomainRelation -> String ->  ApiResult Domain msg
+newDomain url relation name toMsg =
   let
     body =
       Encode.object
       [ ("name", Encode.string name) ]
+    api =
+      case relation of
+        Root -> Api.domains []
+        Subdomain id -> Api.subDomains [] id
   in
     Http.post
-      { url = Api.domains [] |> Api.url url |> Url.toString
+      { url = api |> Api.url url |> Url.toString
       , body = Http.jsonBody body
       , expect = Http.expectJson toMsg domainDecoder
       }
