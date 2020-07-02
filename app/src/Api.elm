@@ -1,5 +1,5 @@
 module Api exposing (
-  Endpoint, Configuration,
+  Endpoint, Configuration, ApiResponse, ApiResult, Include(..),
   domains, domain, subDomains,
   boundedContexts, boundedContext,
   url, config, configFromScoped)
@@ -18,6 +18,10 @@ type alias PathSegment = String
 
 type Endpoint
   = Endpoint (List PathSegment) (List QueryParameter)
+
+type alias ApiResponse model = Result Http.Error model 
+type alias ApiResult model msg = (ApiResponse model-> msg) -> Cmd msg
+
 
 
 withoutQuery : List String -> Endpoint
@@ -41,18 +45,21 @@ url : Configuration -> Endpoint -> Url.Url
 url (Configuration baseUrl) (Endpoint segments query) =
   { baseUrl | path = baseUrl.path ++ Url.Builder.absolute segments query }
 
+type Include
+  = Subdomains
+  | BoundedContexts
 
-domains : Endpoint
-domains =
-  withoutQuery [ "domains" ]
+domains : List Include -> Endpoint
+domains include =
+  withQuery [ "domains" ] (include |> incudeInRequest)
 
-domain : DomainId -> Endpoint
-domain domainId =
-  withoutQuery [ "domains", Domain.idToString domainId ]
+domain : List Include -> DomainId -> Endpoint
+domain include domainId =
+  withQuery [ "domains", Domain.idToString domainId ] (include |> incudeInRequest)
 
-subDomains : DomainId -> Endpoint
-subDomains domainId =
-  withoutQuery [ "domains", Domain.idToString domainId, "domains" ]
+subDomains : List Include -> DomainId -> Endpoint
+subDomains include domainId =
+  withQuery [ "domains", Domain.idToString domainId, "domains" ] (include |> incudeInRequest)
 
 boundedContexts : DomainId -> Endpoint
 boundedContexts domainId =
@@ -61,3 +68,13 @@ boundedContexts domainId =
 boundedContext : BoundedContextId -> Endpoint
 boundedContext context =
   withoutQuery [ "bccs", BoundedContext.idToString context ]
+
+incudeInRequest : List Include -> List QueryParameter
+incudeInRequest include =
+  include
+  |> List.map
+    ( \i ->
+        case i of
+          Subdomains -> Url.Builder.string "_embed" "domains"
+          BoundedContexts -> Url.Builder.string "_embed" "bccs" 
+    )

@@ -6,6 +6,9 @@ import Html exposing (Html, button, div, text)
 import Html.Attributes exposing (..)
 import Html.Events
 
+import Json.Decode as Decode exposing(Decoder)
+import Json.Decode.Pipeline as JP
+
 import Bootstrap.Grid as Grid
 import Bootstrap.Grid.Row as Row
 import Bootstrap.Grid.Col as Col
@@ -29,15 +32,20 @@ import RemoteData
 import Url
 import Http
 
-import Api
-import Domain
+import Api exposing (ApiResult)
+import Domain exposing (DomainRelation)
 import Domain.DomainId exposing (DomainId)
 import Page.Domain.Create
 import Route
+import BoundedContext exposing (BoundedContext)
 
 -- MODEL
 
-type alias DomainItem = Domain.Domain
+type alias DomainItem =
+  { domain : Domain.Domain
+  , subDomains : List Domain.Domain
+  , contexts : List BoundedContext
+  }
 
 type MoveDomainTarget
   = AsSubdomain Autocomplete.State (Maybe Domain.Domain)
@@ -61,18 +69,19 @@ type alias Model =
    }
 
 initMove : Api.Configuration -> DomainItem -> (MoveDomainModel, Cmd MoveDomainMsg)
-initMove baseUrl item =
+initMove baseUrl model =
   let
+    item = model.domain
     canMoveToRoot =  not (item.parentDomain == Nothing)
   in
 
   ( { allDomains = RemoteData.Loading
     , moveTo = if canMoveToRoot then AsRoot else AsSubdomain (Autocomplete.newState "sub-domain") Nothing
-    , domainItem = item
+    , domainItem = model
     , canMoveToRoot = canMoveToRoot
     , modalVisibility = Modal.shown
     }
-  , Domain.findAllDomains baseUrl AllDomainsLoaded
+  , findAllDomains baseUrl AllDomainsLoaded
   )
 
 init : Api.Configuration -> Nav.Key -> Domain.DomainRelation -> (Model, Cmd Msg)
@@ -88,7 +97,7 @@ init baseUrl key subDomains =
     , moveToNewDomain = Nothing
     }
   , Cmd.batch
-    [ Domain.domainsOf baseUrl subDomains Loaded
+    [ domainsOf baseUrl subDomains Loaded
     , createCmd |> Cmd.map CreateMsg ] )
 
 initWithSubdomains : Api.Configuration -> Nav.Key -> DomainId -> (Model, Cmd Msg)
@@ -113,7 +122,7 @@ type MoveDomainMsg
   | SubdomainSelected (Maybe Domain.Domain)
 
 type Msg
-  = Loaded (Result Http.Error (List Domain.Domain))
+  = Loaded (Result Http.Error (List DomainItem))
   | CreateMsg Page.Domain.Create.Msg
   | StartMoveToDomain DomainItem
   | MoveToDomain MoveDomainMsg
@@ -141,9 +150,9 @@ updateMoveToDomain baseUrl msg model =
     (SubdomainSelected item, AsSubdomain state _)->
       ({ model | moveTo = AsSubdomain state item }, Cmd.none)
     (MoveDomainTo, AsRoot) ->
-      (model, Domain.moveDomain baseUrl model.domainItem.id Domain.Root DomainMoved)
+      (model, Domain.moveDomain baseUrl model.domainItem.domain.id Domain.Root DomainMoved)
     (MoveDomainTo, AsSubdomain _ (Just selected)) ->
-      (model, Domain.moveDomain baseUrl model.domainItem.id (Domain.Subdomain selected.id) DomainMoved)
+      (model, Domain.moveDomain baseUrl model.domainItem.domain.id (Domain.Subdomain selected.id) DomainMoved)
     (Cancel, _) ->
       ({ model | modalVisibility = Modal.hidden }, Cmd.none)
     (DomainMoved (Ok _), _) ->
@@ -158,19 +167,11 @@ update : Msg -> Model -> (Model, Cmd Msg)
 update msg model =
   case msg of
     Loaded (Ok items) ->
-      let
-        filtered =
-          items
-          |> List.filter (\i ->
-            case (i.parentDomain, model.showDomains) of
-              (Just _, Domain.Root) -> False
-              (Just id, Domain.Subdomain sub) -> id == sub
-              (Nothing, Domain.Subdomain _) -> True
-              (Nothing, Domain.Root) -> True
-            )
-      in ({ model | domains = RemoteData.Success filtered }, Cmd.none)
+      ({ model | domains = RemoteData.Success items }, Cmd.none)
+
     Loaded (Err e) ->
-        ({ model | domains = RemoteData.Failure e }, Cmd.none)
+      ({ model | domains = RemoteData.Failure e }, Cmd.none)
+
     StartMoveToDomain item ->
       let
         (moveModel, moveCmd) = initMove model.baseUrl item
@@ -184,7 +185,7 @@ update msg model =
             additional =
               case move of
                 DomainMoved (Ok _) ->
-                  [ Domain.domainsOf model.baseUrl model.showDomains Loaded ]
+                  [ domainsOf model.baseUrl model.showDomains Loaded ]
                 _ -> []
             (moveModel_, moveCmd) = updateMoveToDomain model.baseUrl move moveModel
           in
@@ -204,18 +205,30 @@ update msg model =
 viewDomain : DomainItem -> Card.Config Msg
 viewDomain item =
   Card.config [Card.attrs [ class "mb-3"] ]
-    |> Card.headerH4 [] [ text item.name ]
+    |> Card.headerH4 [] [ text item.domain.name ]
     |> Card.block []
-      ( if String.length item.vision > 0
-        then [ Block.text [] [ text item.vision ] ]
+      ( if String.length item.domain.vision > 0
+        then [ Block.text [] [ text item.domain.vision ] ]
         else []
       )
+    |> Card.block []
+      [ item.subDomains
+        |> List.map .name
+        |> List.map (\name -> Html.li [] [text name] )
+        |> Html.ul []
+        |> Block.custom
+      , item.contexts
+        |> List.map BoundedContext.name
+        |> List.map (\name -> Html.li [] [text name] )
+        |> Html.ul []
+        |> Block.custom
+      ]
     |> Card.footer []
       [ Grid.simpleRow
         [ Grid.col []
           [ Button.linkButton
             [ Button.roleLink
-            , Button.attrs [ href (Route.routeToString (Route.Domain item.id)) ]
+            , Button.attrs [ href (Route.routeToString (Route.Domain item.domain.id)) ]
             ]
             [ text "View Domain" ]
           ]
@@ -257,8 +270,8 @@ viewLoaded create items =
         ]
     ]
 
-filter : Int -> String -> List Domain.Domain -> Maybe (List Domain.Domain)
-filter minChars query items =
+filterAutocomplete : Int -> String -> List Domain.Domain -> Maybe (List Domain.Domain)
+filterAutocomplete minChars query items =
   if String.length query < minChars then
       Nothing
   else
@@ -279,7 +292,7 @@ selectConfig =
     Autocomplete.newConfig
         { onSelect = SubdomainSelected
         , toLabel = .name
-        , filter = filter 2
+        , filter = filterAutocomplete 2
         }
         |> Autocomplete.withCutoff 12
         |> Autocomplete.withInputClass "text-control border rounded form-control-lg"
@@ -321,7 +334,7 @@ viewMove : MoveDomainModel -> Html MoveDomainMsg
 viewMove model =
   Modal.config Cancel
   |> Modal.hideOnBackdropClick True
-  |> Modal.h5 [] [ text <| "Move " ++ model.domainItem.name ]
+  |> Modal.h5 [] [ text <| "Move " ++ model.domainItem.domain.name ]
   |> Modal.body []
     [ Html.p []
       ( Radio.radioList "move-target"
@@ -337,13 +350,13 @@ viewMove model =
           , Radio.checked (not (model.moveTo == AsRoot) || not model.canMoveToRoot )
           , Radio.onClick WillMoveToSubdomain
           ]
-          "Move to a subdomain"
+          "Make a subdomain of"
         ]
       )
     , case model.moveTo of
         AsRoot -> div [][]
         AsSubdomain state selected ->
-          viewSelect model.domainItem model.allDomains state selected
+          viewSelect model.domainItem.domain model.allDomains state selected
     ]
   |> Modal.footer []
       [ Button.button
@@ -381,3 +394,45 @@ view model =
     case model.showDomains of
       Domain.Subdomain _ -> div [] details
       Domain.Root -> Grid.container [] details
+
+
+
+findAllDomains : Api.Configuration -> ApiResult (List Domain.Domain) msg
+findAllDomains base =
+  let
+    request toMsg =
+      Http.get
+        { url = Api.domains [] |> Api.url base |> Url.toString
+        , expect = Http.expectJson toMsg Domain.domainsDecoder
+        }
+  in
+    request
+
+domainsOf : Api.Configuration -> DomainRelation -> ApiResult (List DomainItem) msg
+domainsOf base relation =
+  let
+    include = [ Api.Subdomains, Api.BoundedContexts ]
+    (api, predicate) =
+      case relation of
+        Domain.Root ->
+          (Api.domains include, Domain.isSubDomain >> not)
+        Domain.Subdomain id ->
+          (Api.subDomains include id, Domain.isSubDomain)
+
+    filter : Api.ApiResponse (List DomainItem) -> Api.ApiResponse (List DomainItem)
+    filter result =
+      case result of
+         Ok items -> items |> List.filter (.domain >> predicate) |> Ok
+         Err e -> Err e
+    decoder =
+      Decode.succeed DomainItem
+        |> JP.custom Domain.domainDecoder
+        |> JP.required "domains" (Decode.list Domain.domainDecoder)
+        |> JP.required "bccs" (Decode.list BoundedContext.modelDecoder)
+    request toMsg =
+      Http.get
+        { url = api |> Api.url base |> Url.toString
+        , expect = Http.expectJson (filter >> toMsg) (Decode.list decoder)
+        }
+  in
+    request

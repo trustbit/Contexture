@@ -1,8 +1,8 @@
 module Domain exposing (
   Domain, DomainRelation(..),
-  isNameValid,
+  isNameValid, isSubDomain,
   domainDecoder, domainsDecoder, modelEncoder, idFieldDecoder, nameFieldDecoder,
-  update, newDomain, moveDomain, findAllDomains, domainsOf)
+  update, newDomain, moveDomain)
 
 import Json.Decode as Decode exposing(Decoder)
 import Json.Decode.Pipeline as JP
@@ -12,7 +12,7 @@ import Url
 import Http
 
 import Domain.DomainId exposing(DomainId(..), idDecoder)
-import Api
+import Api exposing(ApiResult)
 
 -- MODEL
 
@@ -68,7 +68,6 @@ modelEncoder model =
         , ("vision", Encode.string model.vision)
         ]
 
-type alias ApiResult model msg = (Result Http.Error model -> msg) -> Cmd msg
 newDomain : Api.Configuration -> String ->  ApiResult Domain msg
 newDomain url name toMsg =
   let
@@ -77,7 +76,7 @@ newDomain url name toMsg =
       [ ("name", Encode.string name) ]
   in
     Http.post
-      { url = Api.domains |> Api.url url |> Url.toString
+      { url = Api.domains [] |> Api.url url |> Url.toString
       , body = Http.jsonBody body
       , expect = Http.expectJson toMsg domainDecoder
       }
@@ -93,45 +92,12 @@ moveDomain baseUrl domain target =
       Http.request
       { method = "PATCH"
       , headers = []
-      , url = domain |> Api.domain |> Api.url baseUrl |> Url.toString
+      , url = domain |> Api.domain [] |> Api.url baseUrl |> Url.toString
       , body = Http.jsonBody <| Encode.object[ ("domainId", value) ]
       , expect = Http.expectWhatever toMsg
       , timeout = Nothing
       , tracker = Nothing
       }
-  in
-    request
-
-findAllDomains : Api.Configuration -> ApiResult (List Domain) msg
-findAllDomains base =
-  let
-    request toMsg =
-      Http.get
-        { url = Api.domains |> Api.url base |> Url.toString
-        , expect = Http.expectJson toMsg domainsDecoder
-        }
-  in
-    request
-
-domainsOf : Api.Configuration -> DomainRelation -> ApiResult (List Domain) msg
-domainsOf base relation =
-  let
-    (api, predicate) =
-      case relation of
-        Root ->
-          (Api.domains, isSubDomain >> not)
-        Subdomain id ->
-          (Api.subDomains id, isSubDomain)
-
-    filter result =
-      case result of
-         Ok items -> items |> List.filter predicate |> Ok
-         Err e -> Err e
-    request toMsg =
-      Http.get
-        { url = api |> Api.url base |> Url.toString
-        , expect = Http.expectJson (filter >> toMsg) domainsDecoder
-        }
   in
     request
 
