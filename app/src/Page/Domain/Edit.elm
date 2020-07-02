@@ -264,7 +264,7 @@ loadDomain model =
 saveBCC: Url.Url -> EditableDomain -> Cmd Msg
 saveBCC url model =
   Http.request
-    { method = "PUT"
+    { method = "PATCH"
     , headers = []
     , url = Url.toString url
     , body = Http.jsonBody <| Domain.modelEncoder model
