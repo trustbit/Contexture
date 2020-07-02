@@ -13,7 +13,7 @@ import Bootstrap.Navbar as Navbar
 import Bootstrap.Utilities.Spacing as Spacing
 
 import Route exposing ( Route)
-
+import Api
 
 import Domain.DomainId as Domain
 import BoundedContext.BoundedContextId as BoundedContext
@@ -71,14 +71,14 @@ initCurrentPage ( model, existingCmds ) =
 
           Route.Home ->
             let
-              ( pageModel, pageCmds ) = Page.Domain.Index.initWithoutSubdomains model.baseUrl model.key
+              ( pageModel, pageCmds ) = Page.Domain.Index.initWithoutSubdomains (Api.config model.baseUrl) model.key
             in
               ( Domains pageModel, Cmd.map DomainMsg pageCmds )
           Route.Domain id ->
             let
               url = model.baseUrl
               domainUrl = { url | path = url.path ++ "/domains/" ++ Domain.idToString id }
-              ( pageModel, pageCmds ) = Page.Domain.Edit.init model.key domainUrl
+              ( pageModel, pageCmds ) = Page.Domain.Edit.init model.key domainUrl id
             in
               ( DomainsEdit pageModel, Cmd.map DomainEditMsg pageCmds )
           Route.Bcc id ->

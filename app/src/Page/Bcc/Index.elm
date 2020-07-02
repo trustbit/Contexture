@@ -159,7 +159,7 @@ viewItem item =
           |> viewPillMessage "Suppliers"
         )
   in
-  Card.config [ Card.attrs [class "mb-3", class ""]]
+  Card.config [ Card.attrs [class "mb-3"]]
     |> Card.headerH4 [] [ text (item.boundedContext |> BoundedContext.name) ]
     |> Card.block []
       ( List.concat

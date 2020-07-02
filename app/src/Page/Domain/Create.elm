@@ -14,13 +14,14 @@ import Url
 import Http
 
 import Domain exposing (newDomain)
+import Api
 import Route
 
 type alias Domain = Domain.Domain
 
 type alias Model =
   { navKey : Nav.Key
-  , baseUrl : Url.Url
+  , baseUrl : Api.Configuration
   , newDomainName: String
   }
 
@@ -29,7 +30,7 @@ type Msg
   | CreateDomain
   | DomainCreated (Result Http.Error Domain)
 
-init: Url.Url -> Nav.Key -> (Model, Cmd Msg)
+init: Api.Configuration -> Nav.Key -> (Model, Cmd Msg)
 init baseUrl key =
   ( { navKey = key
     , baseUrl = baseUrl

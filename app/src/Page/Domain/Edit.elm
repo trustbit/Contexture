@@ -25,11 +25,13 @@ import RemoteData
 import Url
 import Http
 
+import Api
 import Route
 
 import Domain
 import Page.Domain.Index as Index
 import Page.Bcc.Index
+import Domain.DomainId exposing (DomainId)
 
 -- MODEL
 
@@ -47,11 +49,11 @@ initEdit : Domain.Domain -> EditableDomain
 initEdit domain =
   domain
 
-init : Nav.Key -> Url.Url -> (Model, Cmd Msg)
-init key url =
+init : Nav.Key -> Url.Url -> DomainId -> (Model, Cmd Msg)
+init key url domain =
   let
     (contexts, contextCmd) = Page.Bcc.Index.init url key
-    (subDomainsModel, subDomainsCmd) = Index.initWithSubdomains url key
+    (subDomainsModel, subDomainsCmd) = Index.initWithSubdomains (Api.configFromScoped url) key domain
     model =
       { key = key
       , self = url
