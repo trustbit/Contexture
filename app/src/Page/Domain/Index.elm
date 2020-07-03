@@ -33,7 +33,7 @@ import Url
 import Http
 
 import Api exposing (ApiResult, ApiResponse)
-import Domain exposing (DomainRelation)
+import Domain exposing (DomainRelation, Domain)
 import Domain.DomainId exposing (DomainId)
 import Page.Domain.Create
 import Route
@@ -42,17 +42,21 @@ import BoundedContext exposing (BoundedContext)
 -- MODEL
 
 type alias DomainItem =
-  { domain : Domain.Domain
-  , subDomains : List Domain.Domain
+  { domain : Domain
+  , subDomains : List Domain
   , contexts : List BoundedContext
   }
 
+type alias SubdomainSelection = 
+  { state : Autocomplete.State
+  , selected : Maybe Domain.Domain }
+
 type MoveDomainTarget
-  = AsSubdomain Autocomplete.State (Maybe Domain.Domain)
+  = AsSubdomain SubdomainSelection
   | AsRoot
 
 type alias MoveDomainModel =
-  { domainItem : DomainItem
+  { domain : Domain
   , moveTo : MoveDomainTarget
   , canMoveToRoot : Bool
   , allDomains : RemoteData.WebData (List Domain.Domain)
@@ -68,16 +72,20 @@ type alias Model =
   , moveToNewDomain : Maybe MoveDomainModel
    }
 
+initSubdomainSelection = 
+  { state = Autocomplete.newState "sub-domain"
+  , selected = Nothing
+  }
+
 initMove : Api.Configuration -> DomainItem -> (MoveDomainModel, Cmd MoveDomainMsg)
-initMove baseUrl model =
+initMove baseUrl { domain } =
   let
-    item = model.domain
-    canMoveToRoot =  not (item.parentDomain == Nothing)
+    canMoveToRoot =  not (domain.parentDomain == Nothing)
   in
 
   ( { allDomains = RemoteData.Loading
-    , moveTo = if canMoveToRoot then AsRoot else AsSubdomain (Autocomplete.newState "sub-domain") Nothing
-    , domainItem = model
+    , moveTo = if canMoveToRoot then AsRoot else AsSubdomain initSubdomainSelection
+    , domain = domain
     , canMoveToRoot = canMoveToRoot
     , modalVisibility = Modal.shown
     }
@@ -134,36 +142,44 @@ updateMoveToDomain baseUrl msg model =
   case (msg, model.moveTo) of
     (AllDomainsLoaded (Ok allDomains), _) ->
       ({ model | allDomains = RemoteData.succeed allDomains }, Cmd.none)
-    (AllDomainsLoaded (Err e),_) ->
-      let
-        _ = Debug.log "domain loaded" e
-      in
-        (model, Cmd.none)
+
     (WillMoveToRoot, _) ->
       ({ model | moveTo = AsRoot }, Cmd.none)
+
     (WillMoveToSubdomain, _) ->
-      ({ model | moveTo = AsSubdomain (Autocomplete.newState "sub-domain") Nothing }, Cmd.none)
-    (SubdomainSelectMsg selMsg, AsSubdomain state selected) ->
+      ({ model | moveTo = AsSubdomain initSubdomainSelection }, Cmd.none)
+
+    (SubdomainSelectMsg selMsg, AsSubdomain selected) ->
       let
         ( updated, cmd ) =
-          Autocomplete.update selectConfig selMsg state
+          Autocomplete.update selectConfig selMsg selected.state
       in
-        ( { model | moveTo = AsSubdomain updated selected }, cmd )
-    (SubdomainSelected item, AsSubdomain state _)->
-      ({ model | moveTo = AsSubdomain state item }, Cmd.none)
+        ( { model | moveTo = AsSubdomain { selected | state = updated } }, cmd )
+
+    (SubdomainSelected item, AsSubdomain selectedModel )->
+      ({ model | moveTo = AsSubdomain { selectedModel | selected = item } }, Cmd.none)
+
     (MoveDomainTo, AsRoot) ->
-      (model, Domain.moveDomain baseUrl model.domainItem.domain.id Domain.Root DomainMoved)
-    (MoveDomainTo, AsSubdomain _ (Just selected)) ->
-      (model, Domain.moveDomain baseUrl model.domainItem.domain.id (Domain.Subdomain selected.id) DomainMoved)
+      (model, Domain.moveDomain baseUrl model.domain.id Domain.Root DomainMoved)
+
+    (MoveDomainTo, AsSubdomain { selected }) ->
+      case selected of
+        Just parentDomain ->
+          (model, Domain.moveDomain baseUrl model.domain.id (Domain.Subdomain parentDomain.id) DomainMoved)
+        Nothing ->
+          (model, Cmd.none)
+
     (Cancel, _) ->
       ({ model | modalVisibility = Modal.hidden }, Cmd.none)
+
     (DomainMoved (Ok _), _) ->
       ({ model | modalVisibility = Modal.hidden }, Cmd.none)
+
     (m, _) ->
       let
-        _ = Debug.log "domain moved" m
+        _ = Debug.log "Move: unhandled message" m
       in
-      (model, Cmd.none)
+        (Debug.log "Move: Unhandled model" model, Cmd.none)
 
 update : Msg -> Model -> (Model, Cmd Msg)
 update msg model =
@@ -324,7 +340,7 @@ selectConfig =
         |> Autocomplete.withNotFound "No matches"
         |> Autocomplete.withNotFoundClass "text-danger"
         |> Autocomplete.withHighlightedItemClass "bg-white"
-        |> Autocomplete.withPrompt "Search for a Dependency"
+        |> Autocomplete.withPrompt "Search for a domain"
 
 viewSelect item data state selected =
   case data of
@@ -351,46 +367,79 @@ viewSelect item data state selected =
               |> Fieldset.view
     _ -> Html.p[] [ text "Loading domains" ]
 
-viewMove : MoveDomainModel -> Html MoveDomainMsg
-viewMove model =
-  Modal.config Cancel
-  |> Modal.hideOnBackdropClick True
-  |> Modal.h5 [] [ text <| "Move " ++ model.domainItem.domain.name ]
-  |> Modal.body []
-    [ Html.p []
-      ( Radio.radioList "move-target"
-        [ Radio.create
-          [ Radio.id "root-domain"
-          , Radio.checked (model.moveTo == AsRoot && model.canMoveToRoot)
-          , Radio.onClick WillMoveToRoot
-          , Radio.attrs [ disabled (not model.canMoveToRoot) ]
+viewMoveSubdomainOrRoot : MoveDomainModel -> MoveDomainTarget -> Modal.Config MoveDomainMsg -> Modal.Config MoveDomainMsg
+viewMoveSubdomainOrRoot { domain, allDomains } target modal =
+  let
+    rootIsChecked = target == AsRoot
+  in
+    modal
+    |> Modal.body []
+      [ Html.p []
+        ( Radio.radioList "move-target"
+          [ Radio.create
+            [ Radio.id "root-domain"
+            , Radio.checked rootIsChecked
+            , Radio.onClick WillMoveToRoot 
+            ]
+            "Promote to root domain"
+          , Radio.create
+            [ Radio.id "sub-domain"
+            , Radio.checked (not rootIsChecked)
+            , Radio.onClick WillMoveToSubdomain
+            ]
+            "Make a subdomain of"
           ]
-          "Promote to root domain"
-        , Radio.create
-          [ Radio.id "sub-domain"
-          , Radio.checked (not (model.moveTo == AsRoot) || not model.canMoveToRoot )
-          , Radio.onClick WillMoveToSubdomain
-          ]
-          "Make a subdomain of"
-        ]
-      )
-    , case model.moveTo of
-        AsRoot -> div [][]
-        AsSubdomain state selected ->
-          viewSelect model.domainItem.domain model.allDomains state selected
-    ]
-  |> Modal.footer []
+        )
+      , case target of
+          AsRoot -> div [][]
+          AsSubdomain { state, selected } ->
+            viewSelect domain allDomains state selected
+      ]
+    |> Modal.footer []
       [ Button.button
         [ Button.primary
         , Button.disabled
-          ( case model.moveTo of
-              AsSubdomain _ Nothing -> True
+          ( case target of
+              AsSubdomain { selected } -> selected == Nothing
               _ -> False
           )
         , Button.attrs [ Html.Events.onClick MoveDomainTo ]
         ]
         [ text "Move domain" ]
       ]
+
+viewMoveSubdomainOnly : MoveDomainModel -> SubdomainSelection -> Modal.Config MoveDomainMsg -> Modal.Config MoveDomainMsg
+viewMoveSubdomainOnly { domain, allDomains } { state, selected } modal =
+  modal
+  |> Modal.body []
+    [ Html.p []
+      [ text "This domain is already a root domain, but you can chose a new parent and convert it into a subdomain."]
+    , viewSelect domain allDomains state selected
+    ]
+  |> Modal.footer []
+    [ Button.button
+      [ Button.primary
+      , Button.disabled (selected == Nothing)
+      , Button.attrs [ Html.Events.onClick MoveDomainTo ]
+      ]
+      [ text "Move domain to new parent" ]
+    ]
+
+
+viewMove : MoveDomainModel -> Html MoveDomainMsg
+viewMove model =
+  Modal.config Cancel
+  |> Modal.hideOnBackdropClick True
+  |> Modal.h5 [] [ text <| "Move " ++ model.domain.name ]
+  |>
+    ( case model.moveTo of
+        AsRoot -> 
+          viewMoveSubdomainOrRoot model model.moveTo
+        AsSubdomain selected ->
+          if model.canMoveToRoot
+          then viewMoveSubdomainOrRoot model model.moveTo
+          else viewMoveSubdomainOnly model selected
+    )
   |> Modal.view model.modalVisibility
 
 view : Model -> Html Msg
