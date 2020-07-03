@@ -2,7 +2,7 @@ module Domain exposing (
   Domain, DomainRelation(..),
   isNameValid, isSubDomain,
   domainDecoder, domainsDecoder, modelEncoder, idFieldDecoder, nameFieldDecoder,
-  update, newDomain, moveDomain)
+  newDomain, moveDomain, remove)
 
 import Json.Decode as Decode exposing(Decoder)
 import Json.Decode.Pipeline as JP
@@ -91,7 +91,9 @@ moveDomain baseUrl domain target =
     value =
       case target of
         Subdomain id -> Domain.DomainId.idEncoder id
-        Root -> Encode.null
+        Root ->
+          -- we can't encode the root domain as 'null' otherwise json-server will fail
+          Encode.string ""
     request toMsg =
       Http.request
       { method = "PATCH"
@@ -105,15 +107,18 @@ moveDomain baseUrl domain target =
   in
     request
 
-
-update : Url.Url -> Domain -> (Result Http.Error () -> msg) -> Cmd msg
-update url domain toMsg =
-  Http.request
-    { method = "PUT"
-    , headers = []
-    , url = Url.toString url
-    , body = Http.jsonBody <| modelEncoder domain
-    , expect = Http.expectWhatever toMsg
-    , timeout = Nothing
-    , tracker = Nothing
-    }
+remove: Api.Configuration -> DomainId -> ApiResult () msg
+remove base id =
+  let
+    request toMsg =
+      Http.request
+      { method = "DELETE"
+      , headers = []
+      , url = id |> Api.domain [] |> Api.url base |> Url.toString
+      , body = Http.emptyBody
+      , expect = Http.expectWhatever toMsg
+      , timeout = Nothing
+      , tracker = Nothing
+      }
+  in
+    request

@@ -32,7 +32,7 @@ import RemoteData
 import Url
 import Http
 
-import Api exposing (ApiResult)
+import Api exposing (ApiResult, ApiResponse)
 import Domain exposing (DomainRelation)
 import Domain.DomainId exposing (DomainId)
 import Page.Domain.Create
@@ -62,7 +62,7 @@ type alias MoveDomainModel =
 type alias Model =
   { navKey : Nav.Key
   , baseUrl : Api.Configuration
-  , showDomains : Domain.DomainRelation
+  , domainPosition : Domain.DomainRelation
   , createDomain : Page.Domain.Create.Model
   , domains : RemoteData.WebData (List DomainItem)
   , moveToNewDomain : Maybe MoveDomainModel
@@ -85,19 +85,19 @@ initMove baseUrl model =
   )
 
 init : Api.Configuration -> Nav.Key -> Domain.DomainRelation -> (Model, Cmd Msg)
-init baseUrl key subDomains =
+init baseUrl key domainPosition =
   let
-    (createModel, createCmd) = Page.Domain.Create.init baseUrl key subDomains
+    (createModel, createCmd) = Page.Domain.Create.init baseUrl key domainPosition
   in
   ( { navKey = key
     , baseUrl = baseUrl
-    , showDomains = subDomains
+    , domainPosition = domainPosition
     , createDomain = createModel
     , domains = RemoteData.Loading
     , moveToNewDomain = Nothing
     }
   , Cmd.batch
-    [ domainsOf baseUrl subDomains Loaded
+    [ domainsOf baseUrl domainPosition Loaded
     , createCmd |> Cmd.map CreateMsg ] )
 
 initWithSubdomains : Api.Configuration -> Nav.Key -> DomainId -> (Model, Cmd Msg)
@@ -112,18 +112,20 @@ initWithoutSubdomains baseUrl key =
 -- UPDATE
 
 type MoveDomainMsg
-  = AllDomainsLoaded (Result Http.Error (List Domain.Domain))
+  = AllDomainsLoaded (ApiResponse (List Domain.Domain))
   | WillMoveToRoot
   | WillMoveToSubdomain
   | MoveDomainTo
-  | DomainMoved (Result Http.Error ())
+  | DomainMoved (ApiResponse ())
   | Cancel
   | SubdomainSelectMsg (Autocomplete.Msg Domain.Domain)
   | SubdomainSelected (Maybe Domain.Domain)
 
 type Msg
-  = Loaded (Result Http.Error (List DomainItem))
+  = Loaded (ApiResponse (List DomainItem))
   | CreateMsg Page.Domain.Create.Msg
+  | DeleteDomain DomainId
+  | DomainDeleted (ApiResponse ())
   | StartMoveToDomain DomainItem
   | MoveToDomain MoveDomainMsg
 
@@ -185,7 +187,7 @@ update msg model =
             additional =
               case move of
                 DomainMoved (Ok _) ->
-                  [ domainsOf model.baseUrl model.showDomains Loaded ]
+                  [ domainsOf model.baseUrl model.domainPosition Loaded ]
                 _ -> []
             (moveModel_, moveCmd) = updateMoveToDomain model.baseUrl move moveModel
           in
@@ -194,11 +196,22 @@ update msg model =
               |> Cmd.batch )
         Nothing ->
           (model,Cmd.none)
+
     CreateMsg create ->
       let
         (createModel, createCmd) = Page.Domain.Create.update create model.createDomain
       in
         ({ model | createDomain = createModel }, createCmd |> Cmd.map CreateMsg)
+
+    DeleteDomain id ->
+      (model, Domain.remove model.baseUrl id DomainDeleted)
+
+    DomainDeleted (Ok _) ->
+      (model, domainsOf model.baseUrl model.domainPosition Loaded)
+
+    DomainDeleted (Err _) ->
+      (model, Cmd.none)
+
 
 -- VIEW
 
@@ -238,6 +251,15 @@ viewDomain item =
             , Button.onClick (StartMoveToDomain item)
             ]
             [ text "Move Domain"]
+          , Button.button
+            [ Button.secondary
+            , Button.onClick (DeleteDomain item.domain.id)
+            , Button.attrs
+              [ title ("Delete " ++ item.domain.name)
+              , Spacing.ml3
+              ]
+            ]
+            [ text "Delete" ]
           ]
         ]
       ]
@@ -303,7 +325,6 @@ selectConfig =
         |> Autocomplete.withNotFoundClass "text-danger"
         |> Autocomplete.withHighlightedItemClass "bg-white"
         |> Autocomplete.withPrompt "Search for a Dependency"
-        -- |> Autocomplete.withItemHtml renderItem
 
 viewSelect item data state selected =
   case data of
@@ -360,15 +381,15 @@ viewMove model =
     ]
   |> Modal.footer []
       [ Button.button
-          [ Button.primary
-          , Button.disabled
-            ( case model.moveTo of
-                AsSubdomain _ Nothing -> True
-                _ -> False
-            )
-          , Button.attrs [ Html.Events.onClick MoveDomainTo ]
-          ]
-          [ text "Move domain" ]
+        [ Button.primary
+        , Button.disabled
+          ( case model.moveTo of
+              AsSubdomain _ Nothing -> True
+              _ -> False
+          )
+        , Button.attrs [ Html.Events.onClick MoveDomainTo ]
+        ]
+        [ text "Move domain" ]
       ]
   |> Modal.view model.modalVisibility
 
@@ -391,7 +412,7 @@ view model =
               [ Grid.col [] [ text "Loading your domains"] ]
           ]
   in
-    case model.showDomains of
+    case model.domainPosition of
       Domain.Subdomain _ -> div [] details
       Domain.Root -> Grid.container [] details
 

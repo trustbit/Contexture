@@ -84,8 +84,6 @@ type Msg
   | SubDomainMsg Index.Msg
   | Save
   | Saved (Result Http.Error ())
-  | Delete
-  | Deleted (Result Http.Error ())
   | BccMsg Page.Bcc.Index.Msg
 
 updateEditField : EditingMsg -> EditableDomain -> EditableDomain
@@ -117,14 +115,6 @@ update msg model =
           (model, Cmd.none)
     Saved (Ok _) ->
       (model, Cmd.none)
-    Delete ->
-      (model, deleteBCC model)
-    Deleted (Ok _) ->
-      (model, Route.pushUrl Route.Home model.key)
-    Loaded (Ok m) ->
-      ({ model | edit = RemoteData.Success <| initEdit m } , Cmd.none)
-    Loaded (Err e) ->
-      ({ model | edit = RemoteData.Failure e } , Cmd.none)
     BccMsg m ->
       let
         (bccModel, bccCmd) = Page.Bcc.Index.update m model.contexts
@@ -135,6 +125,9 @@ update msg model =
         (subModel, subCmd) = Index.update subMsg model.subDomains
       in
         ({ model | subDomains = subModel }, subCmd |> Cmd.map SubDomainMsg)
+    Loaded (Ok m) ->
+      ({ model | edit = RemoteData.Success <| initEdit m } , Cmd.none)
+
     _ ->
       Debug.log ("BCC: " ++ Debug.toString msg ++ " " ++ Debug.toString model)
       (model, Cmd.none)
@@ -201,16 +194,7 @@ viewDomainCard model =
           [ Button.attrs [ href (Route.routeToString backLink) ], Button.roleLink ]
           [ text "Back" ] ]
       , Grid.col [ Col.textAlign Text.alignLgRight ]
-        [ Button.button
-          [ Button.secondary
-          , Button.onClick Delete
-          , Button.attrs
-            [ title ("Delete " ++ model.name)
-            , Spacing.mr3
-            ]
-          ]
-          [ text "Delete" ]
-        , Button.submitButton
+        [ Button.submitButton
           [ Button.primary
           , Button.onClick Save
           , Button.disabled (model.name |> Domain.isNameValid |> not)
@@ -269,18 +253,6 @@ saveBCC url model =
     , url = Url.toString url
     , body = Http.jsonBody <| Domain.modelEncoder model
     , expect = Http.expectWhatever Saved
-    , timeout = Nothing
-    , tracker = Nothing
-    }
-
-deleteBCC: Model -> Cmd Msg
-deleteBCC model =
-  Http.request
-    { method = "DELETE"
-    , headers = []
-    , url = Url.toString model.self
-    , body = Http.emptyBody
-    , expect = Http.expectWhatever Deleted
     , timeout = Nothing
     , tracker = Nothing
     }
