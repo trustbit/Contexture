@@ -63,6 +63,11 @@ type alias MoveDomainModel =
   , modalVisibility : Modal.Visibility
   }
 
+type alias DeleteDomainModel =
+  { domain : Domain
+  , modalVisibility : Modal.Visibility
+  }
+
 type alias Model =
   { navKey : Nav.Key
   , baseUrl : Api.Configuration
@@ -70,6 +75,7 @@ type alias Model =
   , createDomain : Page.Domain.Create.Model
   , domains : RemoteData.WebData (List DomainItem)
   , moveToNewDomain : Maybe MoveDomainModel
+  , deleteDomain : Maybe DeleteDomainModel
    }
 
 initSubdomainSelection = 
@@ -103,6 +109,7 @@ init baseUrl key domainPosition =
     , createDomain = createModel
     , domains = RemoteData.Loading
     , moveToNewDomain = Nothing
+    , deleteDomain = Nothing
     }
   , Cmd.batch
     [ domainsOf baseUrl domainPosition Loaded
@@ -132,6 +139,8 @@ type MoveDomainMsg
 type Msg
   = Loaded (ApiResponse (List DomainItem))
   | CreateMsg Page.Domain.Create.Msg
+  | ShouldDelete Domain
+  | CancelDelete
   | DeleteDomain DomainId
   | DomainDeleted (ApiResponse ())
   | StartMoveToDomain DomainItem
@@ -218,12 +227,17 @@ update msg model =
         (createModel, createCmd) = Page.Domain.Create.update create model.createDomain
       in
         ({ model | createDomain = createModel }, createCmd |> Cmd.map CreateMsg)
+    ShouldDelete domain ->
+      ( { model | deleteDomain = Just { domain = domain, modalVisibility = Modal.shown } }, Cmd.none)
+
+    CancelDelete ->
+      ( { model | deleteDomain = Nothing }, Cmd.none)
 
     DeleteDomain id ->
-      (model, Domain.remove model.baseUrl id DomainDeleted)
+      ( { model | deleteDomain = Nothing }, Domain.remove model.baseUrl id DomainDeleted)
 
     DomainDeleted (Ok _) ->
-      (model, domainsOf model.baseUrl model.domainPosition Loaded)
+      ( { model | deleteDomain = Nothing }, domainsOf model.baseUrl model.domainPosition Loaded)
 
     DomainDeleted (Err _) ->
       (model, Cmd.none)
@@ -269,7 +283,7 @@ viewDomain item =
             [ text "Move Domain"]
           , Button.button
             [ Button.secondary
-            , Button.onClick (DeleteDomain item.domain.id)
+            , Button.onClick (ShouldDelete item.domain)
             , Button.attrs
               [ title ("Delete " ++ item.domain.name)
               , Spacing.ml3
@@ -311,7 +325,7 @@ viewLoaded create items =
 filterAutocomplete : Int -> String -> List Domain.Domain -> Maybe (List Domain.Domain)
 filterAutocomplete minChars query items =
   if String.length query < minChars then
-      Nothing
+    Nothing
   else
     let
       lowerQuery = query |> String.toLower
@@ -442,6 +456,17 @@ viewMove model =
     )
   |> Modal.view model.modalVisibility
 
+viewDelete : DeleteDomainModel -> Html Msg
+viewDelete model =
+  Modal.config CancelDelete
+  |> Modal.hideOnBackdropClick True
+  |> Modal.h5 [] [ text <| "Delete " ++ model.domain.name ]
+  |> Modal.body [] [  text "Should the domain, all of it's sub-domains and bounded contexts be deleted?" ]
+  |> Modal.footer []
+    [ Button.button [ Button.outlinePrimary, Button.onClick CancelDelete ] [ text "Cancel delete" ] 
+    , Button.button [ Button.primary, Button.onClick <| DeleteDomain model.domain.id ] [ text "Delete domain" ] ]
+  |> Modal.view model.modalVisibility
+
 view : Model -> Html Msg
 view model =
   let
@@ -450,12 +475,14 @@ view model =
         RemoteData.Success items ->
           items
           |> viewLoaded model.createDomain
-          |> List.append [
-              model.moveToNewDomain
-              |> Maybe.map viewMove
-              |> Maybe.map (Html.map MoveToDomain)
-              |> Maybe.withDefault (Html.div [] [])
-          ]
+          |> List.append
+            ( [ model.moveToNewDomain
+                |> Maybe.map viewMove
+                |> Maybe.map (Html.map MoveToDomain)
+              , model.deleteDomain
+                |> Maybe.map  viewDelete
+              ] |> List.map (Maybe.withDefault (text ""))
+            )
         _ ->
           [ Grid.row []
               [ Grid.col [] [ text "Loading your domains"] ]
