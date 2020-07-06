@@ -28,7 +28,7 @@ type alias Model =
 
 type Msg
   = SetDomainName String
-  | CreateDomain
+  | CreateDomain (Result Domain.Problem Domain.Name)
   | DomainCreated (Result Http.Error Domain)
 
 init: Api.Configuration -> Nav.Key -> Domain.DomainRelation ->  (Model, Cmd Msg)
@@ -47,10 +47,12 @@ update msg model =
   case msg of
     SetDomainName name ->
       ({ model | newDomainName = name}, Cmd.none)
-    CreateDomain ->
-      (model, newDomain model.baseUrl model.relation model.newDomainName DomainCreated)
+    CreateDomain (Ok name) ->
+      (model, newDomain model.baseUrl model.relation name DomainCreated)
+    CreateDomain (Err name) ->
+      (model, Cmd.none)
     DomainCreated (Ok item) ->
-      (model, Route.pushUrl (Route.Domain item.id) model.navKey)
+      (model, Route.pushUrl (item |> Domain.id |> Route.Domain) model.navKey)
     DomainCreated (Err e) ->
       Debug.log ("Error on creating domain: " ++ Debug.toString e ++ Debug.toString msg ++ " " ++ Debug.toString model)
       (model, Cmd.none)
@@ -58,7 +60,7 @@ update msg model =
 
 view : Model -> Html Msg
 view model =
-  Form.form [Html.Events.onSubmit CreateDomain]
+  Form.form [Html.Events.onSubmit <| CreateDomain (Domain.asName model.newDomainName)]
     [ InputGroup.config
       (
         InputGroup.text

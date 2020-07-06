@@ -398,7 +398,7 @@ view model =
 domainDecoder : Decoder DomainDependency
 domainDecoder =
   Domain.domainDecoder
-  |> Decode.map (\d -> { id = d.id, name = d.name})
+  |> Decode.map (\d -> { id = d |> Domain.id, name = d |> Domain.name})
 
 boundedContextDecoder : Decoder BoundedContextDependency
 boundedContextDecoder =

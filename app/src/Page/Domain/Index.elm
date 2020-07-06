@@ -85,7 +85,7 @@ initSubdomainSelection =
 initMove : Api.Configuration -> DomainItem -> (MoveDomainModel, Cmd MoveDomainMsg)
 initMove baseUrl { domain } =
   let
-    canMoveToRoot =  not (domain.parentDomain == Nothing)
+    canMoveToRoot =  not ((domain |> Domain.domainRelation) == Domain.Root)
   in
 
   ( { allDomains = RemoteData.Loading
@@ -168,12 +168,12 @@ updateMoveToDomain baseUrl msg model =
       ({ model | moveTo = AsSubdomain { selectedModel | selected = item } }, Cmd.none)
 
     (MoveDomainTo, AsRoot) ->
-      (model, Domain.moveDomain baseUrl model.domain.id Domain.Root DomainMoved)
+      (model, Domain.moveDomain baseUrl (model.domain |> Domain.id) Domain.Root DomainMoved)
 
     (MoveDomainTo, AsSubdomain { selected }) ->
       case selected of
         Just parentDomain ->
-          (model, Domain.moveDomain baseUrl model.domain.id (Domain.Subdomain parentDomain.id) DomainMoved)
+          (model, Domain.moveDomain baseUrl (model.domain |> Domain.id) (parentDomain |> Domain.id |> Domain.Subdomain) DomainMoved)
         Nothing ->
           (model, Cmd.none)
 
@@ -247,15 +247,17 @@ update msg model =
 viewDomain : DomainItem -> Card.Config Msg
 viewDomain item =
   Card.config [Card.attrs [ class "mb-3"] ]
-    |> Card.headerH4 [] [ text item.domain.name ]
+    |> Card.headerH4 [] [ text (item.domain |> Domain.name) ]
     |> Card.block []
-      ( if String.length item.domain.vision > 0
-        then [ Block.text [] [ text item.domain.vision ] ]
-        else []
+      ( item.domain
+        |> Domain.vision
+        |> Maybe.map (\v -> Block.text [] [ text v ] )
+        |> Maybe.map List.singleton
+        |> Maybe.withDefault []
       )
     |> Card.block []
       [ item.subDomains
-        |> List.map .name
+        |> List.map Domain.name
         |> List.map (\name -> Badge.badgePrimary [ Spacing.mr1, title <| "Subdomain " ++ name ] [text name] )
         |> Html.div []
         |> Block.custom
@@ -270,7 +272,7 @@ viewDomain item =
         [ Grid.col []
           [ Button.linkButton
             [ Button.roleLink
-            , Button.attrs [ href (Route.routeToString (Route.Domain item.domain.id)) ]
+            , Button.attrs [ href (Route.routeToString (item.domain |> Domain.id |> Route.Domain)) ]
             ]
             [ text "View Domain" ]
           ]
@@ -284,7 +286,7 @@ viewDomain item =
             [ Button.secondary
             , Button.onClick (ShouldDelete item.domain)
             , Button.attrs
-              [ title ("Delete " ++ item.domain.name)
+              [ title ("Delete " ++ (item.domain |> Domain.name))
               , Spacing.ml3
               ]
             ]
@@ -350,7 +352,7 @@ filterAutocomplete minChars query items =
         |> String.contains lowerQuery
       in
         items
-        |> List.filter (\i -> i.name |> containsLowerString)
+        |> List.filter (\i -> i |> Domain.name |> containsLowerString)
         |> Just
 
 
@@ -358,7 +360,7 @@ selectConfig : Autocomplete.Config MoveDomainMsg Domain.Domain
 selectConfig =
     Autocomplete.newConfig
         { onSelect = SubdomainSelected
-        , toLabel = .name
+        , toLabel = Domain.name
         , filter = filterAutocomplete 2
         }
         |> Autocomplete.withCutoff 12
@@ -383,7 +385,8 @@ viewSelect item data state selected =
 
         relevantDomains =
           allDomains
-          |> List.filter (\d -> not (d.id == item.id) )
+          |> List.filter (\d -> not (d == item))
+
         autocompleteSelect =
           Autocomplete.view
             selectConfig
@@ -460,7 +463,7 @@ viewMove : MoveDomainModel -> Html MoveDomainMsg
 viewMove model =
   Modal.config Cancel
   |> Modal.hideOnBackdropClick True
-  |> Modal.h5 [] [ text <| "Move " ++ model.domain.name ]
+  |> Modal.h5 [] [ text <| "Move " ++ (model.domain |> Domain.name) ]
   |>
     ( case model.moveTo of
         AsRoot -> 
@@ -476,11 +479,11 @@ viewDelete : DeleteDomainModel -> Html Msg
 viewDelete model =
   Modal.config CancelDelete
   |> Modal.hideOnBackdropClick True
-  |> Modal.h5 [] [ text <| "Delete " ++ model.domain.name ]
+  |> Modal.h5 [] [ text <| "Delete " ++ (model.domain |> Domain.name) ]
   |> Modal.body [] [  text "Should the domain, all of it's sub-domains and bounded contexts be deleted?" ]
   |> Modal.footer []
     [ Button.button [ Button.outlinePrimary, Button.onClick CancelDelete ] [ text "Cancel delete" ] 
-    , Button.button [ Button.primary, Button.onClick <| DeleteDomain model.domain.id ] [ text "Delete domain" ] ]
+    , Button.button [ Button.primary, Button.onClick (model.domain |> Domain.id |> DeleteDomain ) ] [ text "Delete domain" ] ]
   |> Modal.view model.modalVisibility
 
 view : Model -> Html Msg
@@ -525,12 +528,15 @@ domainsOf : Api.Configuration -> DomainRelation -> ApiResult (List DomainItem) m
 domainsOf base relation =
   let
     include = [ Api.Subdomains, Api.BoundedContexts ]
+    isRootDomain domain =
+      (domain |> Domain.domainRelation) == Domain.Root
+
     (api, predicate) =
       case relation of
         Domain.Root ->
-          (Api.domains include, Domain.isSubDomain >> not)
+          (Api.domains include, isRootDomain)
         Domain.Subdomain id ->
-          (Api.subDomains include id, Domain.isSubDomain)
+          (Api.subDomains include id, isRootDomain >> not)
 
     filter : Api.ApiResponse (List DomainItem) -> Api.ApiResponse (List DomainItem)
     filter result =

@@ -16,9 +16,6 @@ import Bootstrap.Form as Form
 import Bootstrap.Form.Input as Input
 import Bootstrap.Form.Textarea as Textarea
 import Bootstrap.Button as Button
-import Bootstrap.Card as Card
-import Bootstrap.Card.Block as Block
-import Bootstrap.Text as Text
 import Bootstrap.Utilities.Spacing as Spacing
 
 import RemoteData
@@ -39,8 +36,8 @@ import Page.Bcc.Index
 -- MODEL
 
 type EditDomain
-  = ChangeName String
-  | ChangeVision String
+  = ChangingName String
+  | ChangingVision String
 
 type alias EditableDomain =
   { domain : Domain.Domain
@@ -88,11 +85,11 @@ init key url domain =
 type Msg
   = Loaded (Result Http.Error Domain.Domain)
   | SubDomainMsg Index.Msg
-  | Saved (Result Http.Error ())
+  | Saved (Result Http.Error Domain.Domain)
   | BccMsg Page.Bcc.Index.Msg
   | StartToChangeName
   | UpdateName String
-  | RenameDomain String
+  | RenameDomain (Result Domain.Problem Domain.Name)
   | StartToChangeVision
   | UpdateVision String
   | RefineVision String
@@ -106,64 +103,69 @@ changeEdit change model =
 update : Msg -> Model -> (Model, Cmd Msg)
 update msg model =
   case msg of
-    Saved (Ok _) ->
-      (model |> changeEdit (\e -> { e | editDomain = Nothing }), Cmd.none)
     BccMsg m ->
       let
         (bccModel, bccCmd) = Page.Bcc.Index.update m model.contexts
       in
         ({ model | contexts = bccModel}, bccCmd |> Cmd.map BccMsg)
+
     SubDomainMsg subMsg ->
       let
         (subModel, subCmd) = Index.update subMsg model.subDomains
       in
         ({ model | subDomains = subModel }, subCmd |> Cmd.map SubDomainMsg)
+
     Loaded (Ok m) ->
       ( { model
         | edit = RemoteData.Success <| initEdit m
         }
       , Cmd.none
       )
+
+    Saved (Ok domain) ->
+      ({ model | edit = RemoteData.Success <| initEdit domain }, Cmd.none)
+
     StartToChangeName ->
-      ( model |> changeEdit (\e -> { e | editDomain = Just (ChangeName e.domain.name) })
+      ( model |> changeEdit (\e -> { e | editDomain = Just (e.domain |> Domain.name |> ChangingName) })
       , Task.attempt (\_ -> NoOp) (Dom.focus "name")
       )
+
     UpdateName name ->
-      ( model |> changeEdit (\e -> { e | editDomain = Just (ChangeName name) })
+      ( model |> changeEdit (\e -> { e | editDomain = Just (ChangingName name) })
       , Cmd.none
       )
-    RenameDomain newName ->
+
+    RenameDomain (Ok newName) ->
       case model.edit of
         RemoteData.Success { domain }  ->
-          let
-              d = { domain | name = newName }
-          in
-
-            ( model |> changeEdit (\e -> { e | domain = d})
-            , saveBCC model.self d
+            ( model
+            , Domain.renameDomain (Api.configFromScoped model.self) (domain |> Domain.id) newName Saved
             )
         _ ->
           Debug.log ("Cannot save unloaded model: " ++ Debug.toString msg ++ " " ++ Debug.toString model)
           (model, Cmd.none)
 
     StartToChangeVision ->
-      ( model |> changeEdit (\e -> { e | editDomain = Just (ChangeVision e.domain.vision) })
+      ( model |> changeEdit (\e -> { e | editDomain = Just (e.domain |> Domain.vision |> Maybe.withDefault "" |> ChangingVision) })
       , Task.attempt (\_ -> NoOp) (Dom.focus "vision")
       )
 
     UpdateVision name ->
-      ( model |> changeEdit (\e -> { e | editDomain = Just (ChangeVision name) })
+      ( model |> changeEdit (\e -> { e | editDomain = Just (ChangingVision name) })
       , Cmd.none
       )
+
     RefineVision newVision ->
       case model.edit of
         RemoteData.Success { domain } ->
           let
-              d = { domain | vision = newVision }
+              vision =
+                if String.isEmpty newVision
+                then Nothing
+                else Just newVision
           in
-
-            ( model |> changeEdit (\e -> { e | domain = d})
-            , saveBCC model.self d
+            ( model
+            , Domain.updateVision (Api.configFromScoped model.self) (domain |> Domain.id) vision Saved
             )
         _ ->
           Debug.log ("Cannot save unloaded model: " ++ Debug.toString msg ++ " " ++ Debug.toString model)
@@ -178,10 +180,6 @@ update msg model =
 
 -- VIEW
 
-viewLabel : String -> String -> Html msg
-viewLabel labelId caption =
-  Form.label [ for labelId] [ Html.h6 [] [ text caption ] ]
-
 view : Model -> Html Msg
 view model =
   let
@@ -190,10 +188,10 @@ view model =
         RemoteData.Success domain2 ->
           let
             backLink =
-              case domain2.domain.parentDomain of
-                Just id ->
+              case domain2.domain |> Domain.domainRelation of
+                Domain.Subdomain id ->
                   Route.Domain id
-                Nothing ->
+                Domain.Root ->
                   Route.Home
           in
           ( List.concat
@@ -229,7 +227,7 @@ viewBccCard model =
 
 viewEditName : String -> Html Msg
 viewEditName name =
-  Form.form [ onSubmit (RenameDomain name) ]
+  Form.form [ onSubmit (name |> Domain.asName |> RenameDomain) ]
     [ Grid.row [ Row.betweenXs ]
       [ Grid.col []
         [ Input.text
@@ -287,28 +285,28 @@ viewDomain2 model =
     displayDomain =
       Grid.row [ Row.attrs [ Spacing.mb3 ] ]
       [ Grid.col []
-        [ Html.h3 [ ] [ text model.domain.name ] ]
+        [ Html.h3 [ ] [ text <| Domain.name model.domain ] ]
       , Grid.col [ Col.sm3 ]
         [ Button.button [ Button.outlinePrimary, Button.onClick StartToChangeName ] [ text "Change Domain Name" ] ]
       ]
     displayVision =
         Grid.simpleRow
         [ Grid.col []
-          [ if model.domain.vision |> String.isEmpty then
-              Html.p [ class "text-center" ] [ Html.i [] [ text "This domain has no vision :-("] ]
-            else
-              Html.p [ class "text-muted" ] [ text model.domain.vision ]
+          [ model.domain
+            |> Domain.vision
+            |> Maybe.map (\v -> Html.p [ class "text-muted" ] [ text v ])
+            |> Maybe.withDefault (Html.p [ class "text-center" ] [ Html.i [] [ text "This domain has no vision :-("] ])
           ]
         , Grid.col [ Col.sm3 ]
           [ Button.button [ Button.outlinePrimary, Button.onClick StartToChangeVision ] [ text "Refine Vision" ] ]
         ]
   in
     ( case model.editDomain of
-        Just (ChangeName name) ->
+        Just (ChangingName name) ->
           [ viewEditName name
           , displayVision
           ]
-        Just (ChangeVision vision) ->
+        Just (ChangingVision vision) ->
           [ displayDomain
           , viewEditVision vision
           ]
@@ -327,16 +325,4 @@ loadDomain model =
   Http.get
     { url = Url.toString model.self
     , expect = Http.expectJson Loaded Domain.domainDecoder
-    }
-
-saveBCC: Url.Url -> Domain.Domain -> Cmd Msg
-saveBCC url model =
-  Http.request
-    { method = "PATCH"
-    , headers = []
-    , url = Url.toString url
-    , body = Http.jsonBody <| Domain.modelEncoder model
-    , expect = Http.expectWhatever Saved
-    , timeout = Nothing
-    , tracker = Nothing
     }
