@@ -6,19 +6,17 @@ import Html exposing (Html, button, div, text)
 import Html.Attributes exposing (..)
 import Html.Events
 
-import Json.Decode as Decode exposing(Decoder)
+import Json.Decode as Decode
 import Json.Decode.Pipeline as JP
 
 import Bootstrap.Grid as Grid
 import Bootstrap.Grid.Row as Row
 import Bootstrap.Grid.Col as Col
-import Bootstrap.Form as Form
 import Bootstrap.Form.Radio as Radio
 import Bootstrap.Form.Fieldset as Fieldset
-import Bootstrap.Form.InputGroup as InputGroup
 import Bootstrap.Button as Button
-import Bootstrap.ListGroup as ListGroup
 import Bootstrap.Modal as Modal
+import Bootstrap.Badge as Badge
 import Bootstrap.Card as Card
 import Bootstrap.Card.Block as Block
 import Bootstrap.Utilities.Spacing as Spacing
@@ -78,6 +76,7 @@ type alias Model =
   , deleteDomain : Maybe DeleteDomainModel
    }
 
+initSubdomainSelection : SubdomainSelection
 initSubdomainSelection = 
   { state = Autocomplete.newState "sub-domain"
   , selected = Nothing
@@ -257,13 +256,13 @@ viewDomain item =
     |> Card.block []
       [ item.subDomains
         |> List.map .name
-        |> List.map (\name -> Html.li [] [text name] )
-        |> Html.ul []
+        |> List.map (\name -> Badge.badgePrimary [ Spacing.mr1, title <| "Subdomain " ++ name ] [text name] )
+        |> Html.div []
         |> Block.custom
       , item.contexts
         |> List.map BoundedContext.name
-        |> List.map (\name -> Html.li [] [text name] )
-        |> Html.ul []
+        |> List.map (\name -> Badge.pillSecondary [ Spacing.mr1, title <| "Bounded context " ++ name ] [text name] )
+        |> Html.div []
         |> Block.custom
       ]
     |> Card.footer []
@@ -356,6 +355,7 @@ selectConfig =
         |> Autocomplete.withHighlightedItemClass "bg-white"
         |> Autocomplete.withPrompt "Search for a domain"
 
+viewSelect : Domain -> (RemoteData.WebData (List Domain)) -> Autocomplete.State -> Maybe Domain -> Html MoveDomainMsg
 viewSelect item data state selected =
   case data of
     RemoteData.Success allDomains ->
@@ -379,7 +379,7 @@ viewSelect item data state selected =
               |> Fieldset.attrs [ Spacing.ml4 ]
               |> Fieldset.children (autocompleteSelect |> Html.map SubdomainSelectMsg |> List.singleton)
               |> Fieldset.view
-    _ -> Html.p[] [ text "Loading domains" ]
+    _ -> Html.p [] [ text "Loading domains" ]
 
 viewMoveSubdomainOrRoot : MoveDomainModel -> MoveDomainTarget -> Modal.Config MoveDomainMsg -> Modal.Config MoveDomainMsg
 viewMoveSubdomainOrRoot { domain, allDomains } target modal =
