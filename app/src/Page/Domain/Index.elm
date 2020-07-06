@@ -296,30 +296,46 @@ viewDomain item =
 viewLoaded : Page.Domain.Create.Model -> List DomainItem  -> List (Html Msg)
 viewLoaded create items =
   if List.isEmpty items then
+    let
+      caption =
+        case create.relation of
+          Domain.Root -> "No existing domains found - do you want to create one?"
+          Domain.Subdomain _ -> "No subdomains found - do you want to create one?"
+    in  
     [ Grid.row []
-      [ Grid.col [ Col.attrs [ Spacing.pt2, Spacing.pl5, Spacing.pr5] ]
-        [ Html.p
-          [ class "lead", class "text-center" ]
-          [ text "No existing domains found - do you want to create one?"]
-        , create |> Page.Domain.Create.view |> Html.map CreateMsg
+      [ Grid.col []
+        [ div [ Spacing.p5, class "shadow" ]
+          [ Html.p
+            [ class "lead", class "text-center" ]
+            [ text caption ]
+          , create |> Page.Domain.Create.view |> Html.map CreateMsg
+          ]
         ]
       ]
     ]
   else
-    [ Grid.row [ Row.attrs [ Spacing.pt3 ] ]
+    let
+      header =
+        case create.relation of
+          Domain.Root -> text ""
+          Domain.Subdomain _ -> Html.h5 [ Spacing.mt3 ] [ text "Subdomains" ]
+    in
+      [ Grid.row [ Row.attrs [ Spacing.pt3 ] ]
         [ Grid.col
           []
-          ( items
-            |> List.map viewDomain
-            |> chunksOfLeft 2
-            |> List.map Card.deck
+          ( header :: (
+              items
+              |> List.map viewDomain
+              |> chunksOfLeft 2
+              |> List.map Card.deck
+            )
           )
         ]
-    , Grid.row [ Row.attrs [ Spacing.mt3 ] ]
-        [ Grid.col []
-          [ create |> Page.Domain.Create.view |> Html.map CreateMsg ]
-        ]
-    ]
+      , Grid.row [ Row.attrs [ Spacing.mt3 ] ]
+          [ Grid.col []
+            [ create |> Page.Domain.Create.view |> Html.map CreateMsg ]
+          ]
+      ]
 
 filterAutocomplete : Int -> String -> List Domain.Domain -> Maybe (List Domain.Domain)
 filterAutocomplete minChars query items =

@@ -190,11 +190,13 @@ viewLoaded : String -> List BccItem  -> List(Html Msg)
 viewLoaded name items =
   if List.isEmpty items then
     [ Grid.row [ Row.attrs [ Spacing.pt3 ] ]
-      [ Grid.col [ Col.attrs [ Spacing.pt2, Spacing.pl5, Spacing.pr5] ]
-        [ Html.p
-          [ class "lead", class "text-center" ]
-          [ text "No existing bounded contexts found - do you want to create one?" ]
-        , createWithName name
+      [ Grid.col [ ]
+        [ div [ Spacing.p5, class "shadow" ]
+          [ Html.p
+            [ class "lead", class "text-center" ]
+            [ text "No existing bounded contexts found - do you want to create one?" ]
+          , createWithName name
+          ]
         ]
       ]
     ]
@@ -209,7 +211,10 @@ viewLoaded name items =
         |> div []
     in
       [ Grid.row [ Row.attrs [ Spacing.pt3 ] ]
-        [ Grid.col [] [cards] ]
+        [ Grid.col []
+          [ Html.h5 [ Spacing.mt3 ] [ text "Bounded Context of the Domain" ]
+          , cards ]
+        ]
         , Grid.row [ Row.attrs [Spacing.mt3]]
         [ Grid.col [] [ createWithName name ] ]
       ]

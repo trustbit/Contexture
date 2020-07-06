@@ -1,6 +1,9 @@
 module Page.Domain.Edit exposing (Msg, Model, update, view, init)
 
 import Browser.Navigation as Nav
+import Browser.Dom as Dom
+
+import Task
 
 import Html exposing (Html, div, text)
 import Html.Attributes exposing (..)
@@ -148,13 +151,8 @@ view model =
                     [ viewDomainCard domain ]
                 ]
               , Grid.simpleRow
-                [ Grid.col []
-                  [ Html.h5 [ Spacing.mt3 ] [ text "Subdomains" ]
-                  , Index.view model.subDomains |> Html.map SubDomainMsg ]
-                ]
-              , Grid.simpleRow
-                [ Grid.col []
-                  [ Html.h5 [ Spacing.mt3 ] [ text "Bounded Context of the domain" ] ]
+                [ Grid.col [ Col.attrs [ Spacing.mt2 ] ]
+                  [ Index.view model.subDomains |> Html.map SubDomainMsg ]
                 ]
               ]
             , viewBccCard model.contexts
