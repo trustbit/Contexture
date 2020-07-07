@@ -21,7 +21,9 @@ import Bootstrap.Utilities.Border as Border
 import Bootstrap.Card as Card
 import Bootstrap.Card.Block as Block
 import Bootstrap.Badge as Badge
+import Bootstrap.Modal as Modal
 import Bootstrap.Utilities.Spacing as Spacing
+import Bootstrap.Text as Text
 
 import List.Split exposing (chunksOfLeft)
 import Url
@@ -30,27 +32,36 @@ import RemoteData
 import Set
 
 import Route
+import Api exposing (ApiResponse)
 
-import BoundedContext
+import BoundedContext exposing (BoundedContext)
+import BoundedContext.BoundedContextId exposing (BoundedContextId)
 import BoundedContext.Canvas as Bcc
 import BoundedContext.Dependency as Dependency
-import BoundedContext.StrategicClassification as StrategicClassification exposing (StrategicClassification)
+import BoundedContext.StrategicClassification as StrategicClassification
 
 -- MODEL
 
 type alias BccItem = Bcc.BoundedContextCanvas
 
+type alias DeleteBoundedContextModel =
+  { boundedContext : BoundedContext
+  , modalVisibility : Modal.Visibility
+  }
+
 type alias Model =
   { navKey : Nav.Key
   , bccName : String
   , baseUrl : Url.Url
-  , bccs: RemoteData.WebData (List BccItem) }
+  , deleteContext : Maybe DeleteBoundedContextModel
+  , bccs : RemoteData.WebData (List BccItem) }
 
 init: Url.Url -> Nav.Key -> (Model, Cmd Msg)
 init baseUrl key =
   ( { navKey = key
     , bccs = RemoteData.Loading
     , baseUrl = baseUrl
+    , deleteContext = Nothing
     , bccName = "" }
   , loadAll baseUrl )
 
@@ -61,6 +72,10 @@ type Msg
   | SetName String
   | CreateBcc
   | Created (Result Http.Error BoundedContext.BoundedContext)
+  | ShouldDelete BoundedContext
+  | CancelDelete
+  | DeleteContext BoundedContextId
+  | ContextDeleted (ApiResponse ())
 
 update : Msg -> Model -> (Model, Cmd Msg)
 update msg model =
@@ -74,7 +89,20 @@ update msg model =
     CreateBcc ->
       (model, createNewBcc model)
     Created (Ok item) ->
-        (model, Route.pushUrl (item |> BoundedContext.id |> Route.Bcc ) model.navKey)
+      (model, Route.pushUrl (item |> BoundedContext.id |> Route.Bcc ) model.navKey)
+
+    ShouldDelete context ->
+      ({ model | deleteContext = Just { boundedContext = context, modalVisibility = Modal.shown } }, Cmd.none)
+
+    CancelDelete ->
+      ({ model | deleteContext = Nothing }, Cmd.none)
+
+    DeleteContext contextId ->
+      ({ model | deleteContext = Nothing }, BoundedContext.remove (Api.configFromScoped model.baseUrl) contextId ContextDeleted)
+
+    ContextDeleted (Ok _) ->
+      (model, loadAll model.baseUrl)
+
     _ ->
         Debug.log ("Overview: " ++ Debug.toString msg ++ " " ++ Debug.toString model)
         (model, Cmd.none)
@@ -103,6 +131,17 @@ createWithName name =
         ]
       |> InputGroup.view
     ]
+
+viewDelete : DeleteBoundedContextModel -> Html Msg
+viewDelete model =
+  Modal.config CancelDelete
+  |> Modal.hideOnBackdropClick True
+  |> Modal.h5 [] [ text <| "Delete " ++ (model.boundedContext |> BoundedContext.name) ]
+  |> Modal.body [] [  text "Should the bounded context and all of it's data be deleted?" ]
+  |> Modal.footer []
+    [ Button.button [ Button.outlinePrimary, Button.onClick CancelDelete ] [ text "Cancel" ]
+    , Button.button [ Button.primary, Button.onClick (model.boundedContext |> BoundedContext.id |> DeleteContext ) ] [ text "Delete Bounded Context" ] ]
+  |> Modal.view model.modalVisibility
 
 viewPillMessage : String -> Int -> List (Html msg)
 viewPillMessage caption value =
@@ -172,16 +211,29 @@ viewItem item =
       , Block.custom (div [] messages)
       ]
     |> Card.footer []
-      [ Html.a
-          [ href 
-            ( item.boundedContext
-              |> BoundedContext.id
-              |> Route.Bcc
-              |> Route.routeToString
-            )
-          , class "stretched-link"
+      [ Grid.simpleRow
+        [ Grid.col [ Col.md8]
+          [ Button.linkButton
+            [ Button.roleLink
+            , Button.attrs
+              [ href
+                ( item.boundedContext
+                  |> BoundedContext.id
+                  |> Route.Bcc
+                  |> Route.routeToString
+                )
+              ]
+            ]
+            [ text "Open Bounded Context Canvas" ]
           ]
-          [ text "Edit Bounded Context" ]
+        , Grid.col [ Col.textAlign Text.alignLgRight ]
+          [ Button.button
+            [ Button.secondary
+            , Button.onClick (ShouldDelete item.boundedContext)
+            ]
+            [ text "Delete" ]
+          ]
+        ]
       ]
 
 viewLoaded : String -> List BccItem  -> List(Html Msg)
@@ -221,7 +273,13 @@ view : Model -> List (Html Msg)
 view model =
   case model.bccs of
     RemoteData.Success contexts ->
-      viewLoaded model.bccName contexts
+      contexts
+      |> viewLoaded model.bccName
+      |> List.append
+        [ model.deleteContext
+          |> Maybe.map viewDelete
+          |> Maybe.withDefault (text "")
+        ]
     _ -> [ text "Loading your contexts"]
 
 

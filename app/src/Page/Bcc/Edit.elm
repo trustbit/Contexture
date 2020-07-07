@@ -104,8 +104,6 @@ type Msg
   | Editing EditingMsg
   | Save
   | Saved (Result Http.Error ())
-  | Delete
-  | Deleted (Result Http.Error ())
 
 updateClassification : StrategicClassificationMsg -> StrategicClassification.StrategicClassification -> StrategicClassification.StrategicClassification
 updateClassification msg classification =
@@ -180,10 +178,7 @@ update msg model =
 
     (Saved (Ok _),_) ->
       (model, Cmd.none)
-    (Delete,_) ->
-      (model, deleteBCC model)
-    (Deleted (Ok _), RemoteData.Success editable) ->
-      (model, Route.pushUrl (editable.canvas.boundedContext |> BoundedContext.domain |> Route.Domain) model.key)
+
     (Loaded (Ok m), _) ->
       let
         (canvasModel, canvasCmd) = initWithCanvas model.self m
@@ -246,16 +241,7 @@ viewActions model =
         [ text "Source of the descriptions & help text"]
       ]
     , Grid.col [ Col.textAlign Text.alignLgRight]
-      [ Button.button
-        [ Button.secondary
-        , Button.onClick Delete
-        , Button.attrs
-          [ title ("Delete " ++ (model.canvas.boundedContext |> BoundedContext.name))
-          , Spacing.mr3
-          ]
-        ]
-        [ text "Delete" ]
-      , Button.submitButton
+      [ Button.submitButton
         [ Button.primary
         , Button.onClick Save
         , Button.disabled (model.name |> BoundedContext.isNameValid |> not)
@@ -525,18 +511,6 @@ saveBCC url model =
       , url = Url.toString url
       , body = Http.jsonBody <| Bcc.modelEncoder canvas
       , expect = Http.expectWhatever Saved
-      , timeout = Nothing
-      , tracker = Nothing
-      }
-
-deleteBCC: Model -> Cmd Msg
-deleteBCC model =
-    Http.request
-      { method = "DELETE"
-      , headers = []
-      , url = Url.toString model.self
-      , body = Http.emptyBody
-      , expect = Http.expectWhatever Deleted
       , timeout = Nothing
       , tracker = Nothing
       }

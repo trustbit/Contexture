@@ -280,7 +280,7 @@ viewDomain item =
             ]
             [ text "View Domain" ]
           ]
-        , Grid.col [ Col.textAlign Text.alignLgRight]
+        , Grid.col [ Col.textAlign Text.alignLgRight ]
           [ Button.button
             [ Button.secondary
             , Button.onClick (StartMoveToDomain item)

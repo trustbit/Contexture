@@ -2,11 +2,16 @@ module BoundedContext exposing (
   BoundedContext, Problem,
   changeName, name, isNameValid,
   domain, id,
-  idFieldDecoder, nameFieldDecoder, modelDecoder)
+  idFieldDecoder, nameFieldDecoder, modelDecoder,
+  remove)
 
 import Json.Encode as Encode
 import Json.Decode as Decode exposing (Decoder)
 import Json.Decode.Pipeline as JP
+
+import Http
+import Url
+import Api exposing (ApiResult)
 
 import Domain
 import Domain.DomainId as Domain exposing (DomainId)
@@ -80,3 +85,19 @@ modelEncoder (BoundedContext canvas) =
     [ ("domainId", Domain.idEncoder canvas.domain)
     , ("name", Encode.string canvas.name)
     ]
+
+remove : Api.Configuration -> BoundedContextId -> ApiResult () msg
+remove base contextId =
+  let
+    request toMsg =
+      Http.request
+      { method = "DELETE"
+      , headers = []
+      , url = contextId |> Api.boundedContext |> Api.url base |> Url.toString
+      , body = Http.emptyBody
+      , expect = Http.expectWhatever toMsg
+      , timeout = Nothing
+      , tracker = Nothing
+      }
+  in
+    request
