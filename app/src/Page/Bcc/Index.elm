@@ -17,7 +17,7 @@ import Bootstrap.Form.Fieldset as Fieldset
 import Bootstrap.Form.Input as Input
 import Bootstrap.Form.InputGroup as InputGroup
 import Bootstrap.Button as Button
-import Bootstrap.ListGroup as ListGroup
+import Bootstrap.Utilities.Border as Border
 import Bootstrap.Card as Card
 import Bootstrap.Card.Block as Block
 import Bootstrap.Badge as Badge
@@ -159,16 +159,14 @@ viewItem item =
           |> viewPillMessage "Suppliers"
         )
   in
-  Card.config [ Card.attrs [class "mb-3"]]
-    |> Card.headerH4 [] [ text (item.boundedContext |> BoundedContext.name) ]
+  Card.config [ Card.attrs [ class "mb-3", class "shadow" ] ]
     |> Card.block []
-      ( List.concat
-          [ if String.length item.description > 0
-                then [ Block.text [] [ text item.description  ] ]
-                else []
-            , [ Block.custom (div [] badges) ]
-          ]
-      )
+      [ Block.titleH4 [] [ text (item.boundedContext |> BoundedContext.name) ]
+      , if String.length item.description > 0
+        then Block.text [ class "text-muted"] [ text item.description  ]
+        else Block.text [class "text-muted", class "text-center" ] [ Html.i [] [ text "No description :-(" ] ]
+      , Block.custom (div [] badges)
+      ]
     |> Card.block []
       [ Block.custom (div [] dependencies)
       , Block.custom (div [] messages)
@@ -191,7 +189,7 @@ viewLoaded name items =
   if List.isEmpty items then
     [ Grid.row [ Row.attrs [ Spacing.pt3 ] ]
       [ Grid.col [ ]
-        [ div [ Spacing.p5, class "shadow" ]
+        [ div [ Spacing.p5, class "shadow", Border.all ]
           [ Html.p
             [ class "lead", class "text-center" ]
             [ text "No existing bounded contexts found - do you want to create one?" ]

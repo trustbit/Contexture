@@ -20,6 +20,7 @@ import Bootstrap.Badge as Badge
 import Bootstrap.Card as Card
 import Bootstrap.Card.Block as Block
 import Bootstrap.Utilities.Spacing as Spacing
+import Bootstrap.Utilities.Border as Border
 import Bootstrap.Text as Text
 
 import Select as Autocomplete
@@ -246,15 +247,18 @@ update msg model =
 
 viewDomain : DomainItem -> Card.Config Msg
 viewDomain item =
-  Card.config [Card.attrs [ class "mb-3"] ]
-    |> Card.headerH4 [] [ text (item.domain |> Domain.name) ]
+  Card.config [ Card.attrs [ class "mb-3", class "shadow"] ]
     |> Card.block []
-      ( item.domain
+      [ Block.titleH4 [] [ text (item.domain |> Domain.name) ]
+      , item.domain
         |> Domain.vision
-        |> Maybe.map (\v -> Block.text [] [ text v ] )
-        |> Maybe.map List.singleton
-        |> Maybe.withDefault []
-      )
+        |> Maybe.map (\v -> Block.text [ class "text-muted"] [ text v ] )
+        |> Maybe.withDefault
+          ( Block.text
+            [ class "text-muted", class "text-center"]
+            [ Html.i [] [ text "This domain is not backed by any vision :-(" ] ]
+          )
+      ]
     |> Card.block []
       [ item.subDomains
         |> List.map Domain.name
@@ -306,7 +310,7 @@ viewLoaded create items =
     in  
     [ Grid.row []
       [ Grid.col []
-        [ div [ Spacing.p5, class "shadow" ]
+        [ div [ Spacing.p5, class "shadow", Border.all]
           [ Html.p
             [ class "lead", class "text-center" ]
             [ text caption ]

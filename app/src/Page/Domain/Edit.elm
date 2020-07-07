@@ -185,10 +185,10 @@ view model =
   let
     detail =
       case model.edit of
-        RemoteData.Success domain2 ->
+        RemoteData.Success domain ->
           let
             backLink =
-              case domain2.domain |> Domain.domainRelation of
+              case domain.domain |> Domain.domainRelation of
                 Domain.Subdomain id ->
                   Route.Domain id
                 Domain.Root ->
@@ -200,11 +200,11 @@ view model =
                     [ Button.linkButton
                       [ Button.attrs [ href (Route.routeToString backLink) ], Button.roleLink ]
                       [ text "Back" ]
-                    , viewDomain2 domain2
+                    , viewDomain domain
                     ]
                 ]
               , Grid.simpleRow
-                [ Grid.col [ Col.attrs [ Spacing.mt2 ] ]
+                [ Grid.col [ Col.attrs [ Spacing.mt3 ] ]
                   [ Index.view model.subDomains |> Html.map SubDomainMsg ]
                 ]
               ]
@@ -279,8 +279,8 @@ viewEditVision vision =
     ]
 
 
-viewDomain2 : EditableDomain -> Html Msg
-viewDomain2 model =
+viewDomain : EditableDomain -> Html Msg
+viewDomain model =
   let
     displayDomain =
       Grid.row [ Row.attrs [ Spacing.mb3 ] ]
@@ -295,7 +295,7 @@ viewDomain2 model =
           [ model.domain
             |> Domain.vision
             |> Maybe.map (\v -> Html.p [ class "text-muted" ] [ text v ])
-            |> Maybe.withDefault (Html.p [ class "text-center" ] [ Html.i [] [ text "This domain has no vision :-("] ])
+            |> Maybe.withDefault (Html.p [ class "text-center", class "text-muted" ] [ Html.i [] [ text "This domain is not backed by any vision :-("] ])
           ]
         , Grid.col [ Col.sm3 ]
           [ Button.button [ Button.outlinePrimary, Button.onClick StartToChangeVision ] [ text "Refine Vision" ] ]
