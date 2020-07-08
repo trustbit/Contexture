@@ -1,10 +1,12 @@
 module BoundedContext.BoundedContextId exposing (
   BoundedContextId,
-  idToString, idFromString, idParser, idDecoder)
+  idToString, idEncoder,
+  idFromString, idParser, idDecoder)
 
 import Url.Parser exposing (Parser, custom)
 
 import Json.Decode as Decode exposing (Decoder)
+import Json.Encode as Encode
 
 type BoundedContextId
   = BoundedContextId Int
@@ -31,3 +33,7 @@ idFromString value =
 idDecoder : Decoder BoundedContextId
 idDecoder =
   Decode.map BoundedContextId Decode.int
+
+idEncoder : BoundedContextId -> Encode.Value
+idEncoder (BoundedContextId value) =
+  Encode.int value

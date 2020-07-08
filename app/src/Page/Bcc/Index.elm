@@ -25,6 +25,8 @@ import Bootstrap.Modal as Modal
 import Bootstrap.Utilities.Spacing as Spacing
 import Bootstrap.Text as Text
 
+import Select as Autocomplete
+
 import List.Split exposing (chunksOfLeft)
 import Url
 import Http
@@ -32,7 +34,9 @@ import RemoteData
 import Set
 
 import Route
-import Api exposing (ApiResponse)
+import Api exposing (ApiResponse, ApiResult)
+
+import Domain exposing (Domain)
 
 import BoundedContext exposing (BoundedContext)
 import BoundedContext.BoundedContextId exposing (BoundedContextId)
@@ -44,6 +48,15 @@ import BoundedContext.StrategicClassification as StrategicClassification
 
 type alias BccItem = Bcc.BoundedContextCanvas
 
+type alias MoveContextModel =
+  { context : BoundedContext
+  , allDomains : RemoteData.WebData (List Domain)
+  , selectState : Autocomplete.State
+  , selectedDomain : Maybe Domain
+  , modalVisibility : Modal.Visibility
+  }
+
+
 type alias DeleteBoundedContextModel =
   { boundedContext : BoundedContext
   , modalVisibility : Modal.Visibility
@@ -54,7 +67,16 @@ type alias Model =
   , bccName : String
   , baseUrl : Url.Url
   , deleteContext : Maybe DeleteBoundedContextModel
+  , moveContext : Maybe MoveContextModel
   , bccs : RemoteData.WebData (List BccItem) }
+
+initMoveContext context =
+  { context = context
+  , allDomains = RemoteData.Loading
+  , selectState = Autocomplete.newState "move-find-domains"
+  , selectedDomain = Nothing
+  , modalVisibility = Modal.shown
+  }
 
 init: Url.Url -> Nav.Key -> (Model, Cmd Msg)
 init baseUrl key =
@@ -62,6 +84,7 @@ init baseUrl key =
     , bccs = RemoteData.Loading
     , baseUrl = baseUrl
     , deleteContext = Nothing
+    , moveContext = Nothing
     , bccName = "" }
   , loadAll baseUrl )
 
@@ -76,6 +99,19 @@ type Msg
   | CancelDelete
   | DeleteContext BoundedContextId
   | ContextDeleted (ApiResponse ())
+  | StartToMoveContext BoundedContext
+  | AllDomainsLoaded (ApiResponse (List Domain))
+  | DomainSelectMsg (Autocomplete.Msg Domain)
+  | DomainSelected (Maybe Domain)
+  | MoveContext
+  | ContextMoved (ApiResponse ())
+  | CancelMoveContext
+
+updateMove model updateFunction =
+  let
+    move = model.moveContext |> Maybe.map updateFunction
+  in
+    { model | moveContext = move}
 
 update : Msg -> Model -> (Model, Cmd Msg)
 update msg model =
@@ -102,6 +138,49 @@ update msg model =
 
     ContextDeleted (Ok _) ->
       (model, loadAll model.baseUrl)
+
+    StartToMoveContext context ->
+      ( { model | moveContext = Just (initMoveContext context) }
+      , findAllDomains (Api.configFromScoped model.baseUrl) AllDomainsLoaded
+      )
+
+    AllDomainsLoaded (Ok domains) ->
+      ( updateMove model (\v -> { v | allDomains = RemoteData.succeed domains })
+      , Cmd.none
+      )
+
+    DomainSelectMsg selMsg ->
+      case model.moveContext of
+        Just move ->
+          let
+            (updated, cmd) = Autocomplete.update selectConfig selMsg move.selectState
+          in
+            ( updateMove model (\v -> { v | selectState = updated}), cmd)
+        Nothing ->
+          (model, Cmd.none)
+
+    DomainSelected selected ->
+      ( updateMove model (\v -> { v | selectedDomain = selected}), Cmd.none)
+
+    MoveContext ->
+      case model.moveContext of
+        Just { context, selectedDomain } ->
+          case selectedDomain of
+            Just domain ->
+              ( model
+              , BoundedContext.move
+                  (Api.configFromScoped model.baseUrl)
+                  (context |> BoundedContext.id)
+                  (domain |> Domain.id)
+                  ContextMoved
+              )
+            Nothing -> (model, Cmd.none)
+        Nothing -> (model, Cmd.none)
+    ContextMoved (Ok _) ->
+      ( { model | moveContext = Nothing }, loadAll model.baseUrl)
+
+    CancelMoveContext ->
+      ( { model | moveContext = Nothing }, Cmd.none)
 
     _ ->
         Debug.log ("Overview: " ++ Debug.toString msg ++ " " ++ Debug.toString model)
@@ -212,7 +291,7 @@ viewItem item =
       ]
     |> Card.footer []
       [ Grid.simpleRow
-        [ Grid.col [ Col.md8]
+        [ Grid.col [ Col.md6]
           [ Button.linkButton
             [ Button.roleLink
             , Button.attrs
@@ -224,12 +303,17 @@ viewItem item =
                 )
               ]
             ]
-            [ text "Open Bounded Context Canvas" ]
+            [ text "Bounded Context Canvas" ]
           ]
         , Grid.col [ Col.textAlign Text.alignLgRight ]
           [ Button.button
             [ Button.secondary
+            , Button.onClick (StartToMoveContext item.boundedContext) ]
+            [ text "Move Context"]
+          , Button.button
+            [ Button.secondary
             , Button.onClick (ShouldDelete item.boundedContext)
+            , Button.attrs [ Spacing.ml2]
             ]
             [ text "Delete" ]
           ]
@@ -269,6 +353,85 @@ viewLoaded name items =
         [ Grid.col [] [ createWithName name ] ]
       ]
 
+filterAutocomplete : Int -> String -> List Domain.Domain -> Maybe (List Domain.Domain)
+filterAutocomplete minChars query items =
+  if String.length query < minChars then
+    Nothing
+  else
+    let
+      lowerQuery = query |> String.toLower
+      containsLowerString text =
+        text
+        |> String.toLower
+        |> String.contains lowerQuery
+      in
+        items
+        |> List.filter (\i -> i |> Domain.name |> containsLowerString)
+        |> Just
+
+selectConfig : Autocomplete.Config Msg Domain.Domain
+selectConfig =
+    Autocomplete.newConfig
+        { onSelect = DomainSelected
+        , toLabel = Domain.name
+        , filter = filterAutocomplete 2
+        }
+        |> Autocomplete.withCutoff 12
+        |> Autocomplete.withInputClass "text-control border rounded form-control-lg"
+        |> Autocomplete.withInputWrapperClass ""
+        |> Autocomplete.withItemClass " border p-2 "
+        |> Autocomplete.withMenuClass "bg-light"
+        |> Autocomplete.withNotFound "No matches"
+        |> Autocomplete.withNotFoundClass "text-danger"
+        |> Autocomplete.withHighlightedItemClass "bg-white"
+        |> Autocomplete.withPrompt "Search for a domain"
+
+viewMove : MoveContextModel -> Html Msg
+viewMove model =
+  let
+    select =
+      case model.allDomains of
+        RemoteData.Success data ->
+          let
+            selectedItem =
+              case model.selectedDomain of
+                Just s -> [ s ]
+                _ -> []
+
+            relevantDomains =
+              data
+              |> List.filter (\d -> not ((d |> Domain.id) == (model.context |> BoundedContext.domain)))
+
+            autocompleteSelect =
+              Autocomplete.view
+                selectConfig
+                model.selectState
+                relevantDomains
+                selectedItem
+            in
+              Fieldset.config
+                  |> Fieldset.attrs [ Spacing.ml4 ]
+                  |> Fieldset.children (autocompleteSelect |> List.singleton)
+                  |> Fieldset.view
+        _ -> Html.p [] [ text "Loading domains" ]
+  in
+    Modal.config CancelMoveContext
+    |> Modal.hideOnBackdropClick True
+    |> Modal.h5 [] [ text <| "Move " ++ (model.context |> BoundedContext.name) ]
+    |> Modal.body []
+      [ Html.p [] [ text "Select the new domain of the context" ]
+      , select |> Html.map DomainSelectMsg
+      ]
+    |> Modal.footer []
+      [ Button.button
+        [ Button.primary
+        , Button.disabled (model.selectedDomain == Nothing)
+        , Button.attrs [ Html.Events.onClick MoveContext ]
+        ]
+        [ text "Move context to domain" ]
+      ]
+    |> Modal.view model.modalVisibility
+
 view : Model -> List (Html Msg)
 view model =
   case model.bccs of
@@ -276,10 +439,13 @@ view model =
       contexts
       |> viewLoaded model.bccName
       |> List.append
-        [ model.deleteContext
-          |> Maybe.map viewDelete
-          |> Maybe.withDefault (text "")
-        ]
+        ( [ model.deleteContext
+            |> Maybe.map viewDelete
+          , model.moveContext
+            |> Maybe.map viewMove
+          ] |> List.map (Maybe.withDefault (text ""))
+        )
+
     _ -> [ text "Loading your contexts"]
 
 
@@ -289,7 +455,7 @@ loadAll: Url.Url -> Cmd Msg
 loadAll baseUrl =
   Http.get
     { url = { baseUrl | path = baseUrl.path ++ "/bccs" } |> Url.toString
-    , expect = Http.expectJson Loaded bccItemsDecoder
+    , expect = Http.expectJson Loaded (Decode.list Bcc.modelDecoder)
     }
 
 createNewBcc : Model -> Cmd Msg
@@ -306,6 +472,13 @@ createNewBcc model =
       , expect = Http.expectJson Created BoundedContext.modelDecoder
       }
 
-bccItemsDecoder: Decoder (List BccItem)
-bccItemsDecoder =
-  Decode.list Bcc.modelDecoder
+findAllDomains : Api.Configuration -> ApiResult (List Domain.Domain) msg
+findAllDomains base =
+  let
+    request toMsg =
+      Http.get
+        { url = Api.domains [] |> Api.url base |> Url.toString
+        , expect = Http.expectJson toMsg Domain.domainsDecoder
+        }
+  in
+    request
