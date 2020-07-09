@@ -20,12 +20,15 @@ import Bootstrap.Utilities.Spacing as Spacing
 
 import RemoteData
 
+import Set
+
 import Url
 import Http
 
 import Api
 import Route
 
+import Key
 import Domain
 import Domain.DomainId exposing (DomainId)
 
@@ -38,6 +41,7 @@ import Page.Bcc.Index
 type EditDomain
   = ChangingName String
   | ChangingVision String
+  | ChangingKey String
 
 type alias EditableDomain =
   { domain : Domain.Domain
@@ -93,7 +97,10 @@ type Msg
   | StartToChangeVision
   | UpdateVision String
   | RefineVision String
-  | StopToChangeDomain
+  | StartToChangeKey
+  | UpdateKey String
+  | AssignKey (Result Key.Problem Key.Key)
+  | StopToEdit
   | NoOp
 
 changeEdit : (EditableDomain -> EditableDomain) -> Model -> Model
@@ -145,6 +152,42 @@ update msg model =
           Debug.log ("Cannot save unloaded model: " ++ Debug.toString msg ++ " " ++ Debug.toString model)
           (model, Cmd.none)
 
+    StartToChangeKey ->
+      let
+        edit { domain } =
+          domain
+          |> Domain.key
+          |> Maybe.map Key.toString
+          |> Maybe.withDefault ""
+          |> ChangingKey
+      in
+      ( model |> changeEdit (\e -> { e | editDomain = Just (edit e) })
+      , Task.attempt (\_ -> NoOp) (Dom.focus "key")
+      )
+
+    UpdateKey key ->
+      ( model |> changeEdit (\e -> { e | editDomain = Just (ChangingKey key) })
+      , Cmd.none
+      )
+
+    AssignKey newKey ->
+      case model.edit of
+        RemoteData.Success { domain } ->
+          let
+            action = Domain.assignKey (Api.configFromScoped model.self) (domain |> Domain.id)
+            cmd =
+              case newKey of
+                Ok k -> action (Just k) |> List.singleton
+                Err Key.Empty -> action Nothing |> List.singleton
+                Err e -> []
+          in
+            ( model
+            , cmd |> List.map (\a -> a Saved) |> Cmd.batch
+            )
+        _ ->
+          Debug.log ("Cannot save unloaded model: " ++ Debug.toString msg ++ " " ++ Debug.toString model)
+          (model, Cmd.none)
+
     StartToChangeVision ->
       ( model |> changeEdit (\e -> { e | editDomain = Just (e.domain |> Domain.vision |> Maybe.withDefault "" |> ChangingVision) })
       , Task.attempt (\_ -> NoOp) (Dom.focus "vision")
@@ -171,7 +214,7 @@ update msg model =
           Debug.log ("Cannot save unloaded model: " ++ Debug.toString msg ++ " " ++ Debug.toString model)
           (model, Cmd.none)
 
-    StopToChangeDomain ->
+    StopToEdit ->
       ( model |> changeEdit (\e -> { e | editDomain = Nothing }), Cmd.none)
 
     _ ->
@@ -248,7 +291,56 @@ viewEditName name =
           ]
           [ text "Change Domain Name"]
         , Button.button
-          [ Button.secondary, Button.onClick StopToChangeDomain ]
+          [ Button.secondary, Button.onClick StopToEdit ]
+          [ text "X"]
+        ]
+      ]
+    ]
+
+viewEditKey : String -> Html Msg
+viewEditKey key =
+  let
+    currentKey = key |> Key.fromString
+    keyIsValid =
+      case currentKey of
+      Ok _ -> True
+      -- while an empty key is not valid it's Ok to enter empty string as they will be converted in to Nothing
+      Err Key.Empty -> True
+      Err _ -> False
+  in
+  Form.form [ onSubmit (currentKey |> AssignKey) ]
+    [ Grid.row [ Row.betweenXs ]
+      [ Grid.col []
+        [ Input.text
+          [ Input.id "key"
+          , Input.value key
+          , Input.onInput UpdateKey
+          , Input.placeholder "Choose a domain key"
+          , if keyIsValid
+            then Input.success
+            else Input.danger
+          ]
+        , Form.help []
+          [ text "You can hoose a unique, readable key among all domains and bounded contexts, to help you identify this domain!" ]
+        , Form.invalidFeedback
+          []
+          [ text <| "The key is invalid: "  ++
+            ( case currentKey of
+                Err Key.StartsWithNumber -> "it must not start with a number"
+                Err Key.ContainsWhitespace -> "it should not contain any whitespaces"
+                Err (Key.ContainsSpecialChars chars) -> "it should not contain the following charachters: " ++ String.join " " (chars |> Set.toList |> List.map String.fromChar)
+                _ -> ""
+            )
+          ]
+        ]
+      , Grid.col [ Col.sm3 ]
+        [ Button.submitButton
+          [ Button.primary
+          , Button.disabled (keyIsValid |> not)
+          ]
+          [ text "Assign Key"]
+        , Button.button
+          [ Button.secondary, Button.onClick StopToEdit ]
           [ text "X"]
         ]
       ]
@@ -272,7 +364,7 @@ viewEditVision vision =
         [ Button.submitButton [ Button.primary ]
           [ text "Refine Vision" ]
         , Button.button
-          [ Button.secondary, Button.onClick StopToChangeDomain ]
+          [ Button.secondary, Button.onClick StopToEdit ]
           [ text "X"]
         ]
       ]
@@ -300,19 +392,38 @@ viewDomain model =
         , Grid.col [ Col.sm3 ]
           [ Button.button [ Button.outlinePrimary, Button.onClick StartToChangeVision ] [ text "Refine Vision" ] ]
         ]
+    displayKey =
+      Grid.simpleRow
+        [ Grid.col []
+          [ model.domain
+            |> Domain.key
+            |> Maybe.map (\v -> Html.p [] [ text <| Key.toString v])
+            |> Maybe.withDefault (Html.p [ class "text-muted", class "text-center" ] [Html.i [] [text "No key assigned" ] ] )
+          ]
+        , Grid.col [ Col.sm3 ]
+          [ Button.button [ Button.outlinePrimary, Button.onClick StartToChangeKey ] [ text "Assign Key"] ]
+        ]
   in
     ( case model.editDomain of
         Just (ChangingName name) ->
           [ viewEditName name
           , displayVision
+          , displayKey
           ]
         Just (ChangingVision vision) ->
           [ displayDomain
           , viewEditVision vision
+          , displayKey
+          ]
+        Just (ChangingKey key) ->
+          [ displayDomain
+          , displayVision
+          , viewEditKey key
           ]
         _ ->
           [ displayDomain
           , displayVision
+          , displayKey
           ]
     )
     |> div [ class "shadow", class "border", Spacing.p3 ]

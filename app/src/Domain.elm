@@ -1,8 +1,8 @@
 module Domain exposing (
   Domain, DomainRelation(..), Problem(..), Name,
-  domainRelation, asName, isNameValid, name, id, vision,
+  domainRelation, asName, isNameValid, name, id, vision, key,
   domainDecoder, domainsDecoder,
-  newDomain, moveDomain, remove, renameDomain, updateVision)
+  newDomain, moveDomain, remove, renameDomain, updateVision, assignKey)
 
 import Json.Decode as Decode exposing(Decoder)
 import Json.Decode.Pipeline as JP
@@ -11,6 +11,7 @@ import Json.Encode as Encode
 import Url
 import Http
 
+import Key exposing (Key)
 import Domain.DomainId exposing(DomainId(..), idDecoder)
 import Api exposing(ApiResult)
 
@@ -24,9 +25,10 @@ type Domain
 
 type alias Internal =
   { id : DomainId
-  , name: String
-  , vision: String
-  , parentDomain: Maybe DomainId
+  , name : String
+  , vision : String
+  , key : Maybe Key
+  , parentDomain : Maybe DomainId
   }
 
 type DomainRelation
@@ -68,6 +70,10 @@ domainRelation (Domain domain) =
     Nothing -> Root
     Just subId -> Subdomain subId
 
+key : Domain -> Maybe Key
+key (Domain domain) =
+  domain.key
+
 -- CONVERSIONS
 
 nameFieldDecoder : Decoder String
@@ -88,6 +94,7 @@ domainDecoder =
     |> JP.custom idFieldDecoder
     |> JP.custom nameFieldDecoder
     |> JP.optional "vision" Decode.string ""
+    |> JP.optional "key" (Decode.maybe Key.keyDecoder) Nothing
     |> JP.optional "domainId" (Decode.maybe idDecoder) Nothing
   ) |> Decode.map Domain
 
@@ -125,7 +132,6 @@ renameDomain baseUrl domain (InternalName newName) =
       }
   in
     request
-
 
 updateVision : Api.Configuration -> DomainId -> Maybe String -> ApiResult Domain msg
 updateVision baseUrl domain theVision =
@@ -169,7 +175,7 @@ moveDomain baseUrl domain target =
   in
     request
 
-remove: Api.Configuration -> DomainId -> ApiResult () msg
+remove : Api.Configuration -> DomainId -> ApiResult () msg
 remove base domainId =
   let
     request toMsg =
@@ -179,6 +185,26 @@ remove base domainId =
       , url = domainId |> Api.domain [] |> Api.url base |> Url.toString
       , body = Http.emptyBody
       , expect = Http.expectWhatever toMsg
+      , timeout = Nothing
+      , tracker = Nothing
+      }
+  in
+    request
+
+assignKey : Api.Configuration -> DomainId -> Maybe Key -> ApiResult Domain msg
+assignKey base domainId domainKey =
+  let
+    encodedKey =
+      case domainKey of
+        Just v -> Key.keyEncoder v
+        Nothing -> Encode.null
+    request toMsg =
+      Http.request
+      { method = "PATCH"
+      , headers = []
+      , url = domainId |> Api.domain [] |> Api.url base |> Url.toString
+      , body = Http.jsonBody <| Encode.object[ ("key", encodedKey) ]
+      , expect = Http.expectJson toMsg domainDecoder
       , timeout = Nothing
       , tracker = Nothing
       }

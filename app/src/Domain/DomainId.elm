@@ -2,9 +2,9 @@ module Domain.DomainId exposing (
     DomainId(..),
     idToString, idFromString, idParser, idEncoder, idDecoder)
 
-
 import Json.Decode as Decode exposing(Decoder)
 import Json.Encode as Encode
+
 import Url.Parser exposing (Parser, custom)
 
 type DomainId

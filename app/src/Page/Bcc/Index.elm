@@ -313,7 +313,7 @@ viewItem item =
           , Button.button
             [ Button.secondary
             , Button.onClick (ShouldDelete item.boundedContext)
-            , Button.attrs [ Spacing.ml2]
+            , Button.attrs [ Spacing.ml2 ]
             ]
             [ text "Delete" ]
           ]
