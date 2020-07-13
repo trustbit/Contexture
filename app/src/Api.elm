@@ -1,7 +1,7 @@
 module Api exposing (
   Endpoint, Configuration, ApiResponse, ApiResult, Include(..),
   domains, domain, subDomains,
-  boundedContexts, boundedContext,
+  allBoundedContexts, boundedContexts, boundedContext,
   url, config, configFromScoped)
 
 import Http
@@ -64,6 +64,10 @@ subDomains include domainId =
 boundedContexts : DomainId -> Endpoint
 boundedContexts domainId =
    withoutQuery [ "domains", Domain.idToString domainId, "bccs" ]
+
+allBoundedContexts : Endpoint
+allBoundedContexts =
+  withoutQuery [ "bccs" ]
 
 boundedContext : BoundedContextId -> Endpoint
 boundedContext context =
