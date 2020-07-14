@@ -1,18 +1,18 @@
 # Contexture - the Bounded Context Canvas Wizard
 
 The Bounded-Context-Canvas (BCC) was introduced by [Nick Tune](https://medium.com/nick-tune-tech-strategy-blog/bounded-context-canvas-v2-simplifications-and-additions-229ed35f825f) as a tool to document and visualize contexts and their connections in a system.
-The canvas can be used to document business aspects, the most important behaviors and the interactions of a bounded context with other parts of the system.
+The canvas can be used to certain document business aspects, the most important behaviors and interactions of a bounded context with other parts of the system.
 Reading and understanding an existing canvas is simple, even for people who are not familiar with concepts from Domain Driven Design.
 In order to create a new BCC, you need to understand a lot of concepts from DDD and filling in all the fields is not a simple task.
 
-While other ways to build a [BCC exist](https://github.com/ddd-crew/bounded-context-canvas), we are building an application to support this modeling process with a dedicated tool from an DDD perspective.
+While other ways to build a [BCC exist](https://github.com/ddd-crew/bounded-context-canvas), we are building an application to support this modeling process with a dedicated tool developed with an DDD mindset.
 You can read about the ideas of Contexture in the [concept](./concept.md) and you can view the current status of the application at <https://contexture.azurewebsites.net/> (be careful: don't store any sensitive data there; everything you store will be deleted upon the next deployment.)
 
 Note:
 
-We think that most of the domain modelling should happen in an collaboritve way, by using whitepaper, Post-ITs or online collaboration tools.
-Contexture is not the right tool for these interactive modelling sessions!
-But Contexture might be useful to capture, document and structure some of the insights after a modelling session and make it accessible and shareable with other people.
+We think that most of the domain modelling should happen in a collaboritve way, by using whitepaper, Post-ITs or online collaboration tools.
+Contexture is and will not be the right tool for these interactive modelling sessions!
+But Contexture might be useful to capture, document and structure some of the insights *after* a modelling session and make them accessible and shareable with other people!
 
 ## Contexture server backend
 
@@ -76,3 +76,10 @@ docker run -p 8081:3000 contexture
 ```
 
 Now head to your browser and access the Contexture through http://localhost:8081
+
+## Contributors
+
+Thanks to all [existing and future contributors](https://github.com/Softwarepark/Contexture/graphs/contributors) and to the following individuals who have contributed with ideas, feedback or testing:
+
+- [Nick Tune](https://github.com/NTCoding)
+- Peter Rosner
