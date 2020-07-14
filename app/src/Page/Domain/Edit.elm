@@ -3,8 +3,6 @@ module Page.Domain.Edit exposing (Msg, Model, update, view, init)
 import Browser.Navigation as Nav
 import Browser.Dom as Dom
 
-import Json.Decode as Decode
-
 import Task
 
 import Html exposing (Html, div, text)
@@ -34,6 +32,7 @@ import Key
 import Domain
 import Domain.DomainId exposing (DomainId)
 
+import Page.ChangeKey as ChangeKey
 import Page.Domain.Index as Index
 import Page.Bcc.Index
 import BoundedContext exposing (BoundedContext)
@@ -41,25 +40,11 @@ import BoundedContext exposing (BoundedContext)
 
 -- MODEL
 
-type ExistingKey
-  = KeyFromDomain Key.Key String
-  | KeyFromBoundedContext Key.Key String
-
-type KeyError
-  = Problem Key.Problem
-  | NotUnique ExistingKey
-
-type alias ChangeKeyModel =
-  { existingKeys : List ExistingKey
-  , enteredKey : String
-  , value : Result KeyError (Maybe Key.Key)
-  }
-
 
 type EditDomain
   = ChangingName String
   | ChangingVision String
-  | ChangingKey ChangeKeyModel
+  | ChangingKey ChangeKey.Model
 
 type alias EditableDomain =
   { domain : Domain.Domain
@@ -116,9 +101,7 @@ type Msg
   | UpdateVision String
   | RefineVision String
   | StartToChangeKey
-  | DomainKeysLoaded (Api.ApiResponse (List Domain.Domain))
-  | BoundedContextKeysLoaded (Api.ApiResponse (List BoundedContext))
-  | UpdateKey String
+  | ChangeKeyMsg ChangeKey.Msg
   | AssignKey (Maybe Key.Key)
   | StopToEdit
   | NoOp
@@ -173,74 +156,37 @@ update msg model =
           (model, Cmd.none)
 
     StartToChangeKey ->
-      let
-        edit { domain } =
-          domain
-          |> Domain.key
-          |> Maybe.map (\key -> ChangingKey { existingKeys = [], enteredKey = key |> Key.toString, value =Ok (Just key) } )
-          |> Maybe.withDefault (ChangingKey { existingKeys = [], enteredKey = "", value = Ok Nothing })
-      in
-      ( model |> changeEdit (\e -> { e | editDomain = Just (edit e) })
-      , Cmd.batch
-        [ loadDomains (Api.configFromScoped model.self)
-        , loadBoundedContexts (Api.configFromScoped model.self)
-        , Task.attempt (\_ -> NoOp) (Dom.focus "key") ]
-      )
-
-    DomainKeysLoaded (Ok domains) ->
-      let
-        domainKeys =
-          domains
-          |> List.filterMap
-            ( \domain ->
-              domain
+      case model.edit of
+        RemoteData.Success editable ->
+          let
+            (changeModel, changeCmd) = 
+              editable.domain
               |> Domain.key
-              |> Maybe.map (\key ->KeyFromDomain key (Domain.name domain))
+              |> ChangeKey.init (Api.configFromScoped model.self)
+          in
+            ( model |> changeEdit (\e -> { e | editDomain = Just (ChangingKey changeModel) } )
+            , Cmd.batch
+              [ Task.attempt (\_ -> NoOp) (Dom.focus "key") 
+              , changeCmd |> Cmd.map ChangeKeyMsg
+              ]
             )
-        updateKey edit =
-          case edit of
-            Just (ChangingKey keyModel) -> Just (ChangingKey { keyModel | existingKeys = List.append keyModel.existingKeys domainKeys })
-            m -> m
-      in
-        ( model |> changeEdit (\e -> { e | editDomain = updateKey e.editDomain})
-        , Cmd.none
-        )
+        _ ->
+          (model, Cmd.none)
 
-    UpdateKey newKey ->
-      let
-        keyValue = Key.fromString newKey
-        updateKey edit =
-          case edit of
-            Just (ChangingKey keyModel) ->
+    ChangeKeyMsg changeMsg ->
+      case model.edit of
+        RemoteData.Success { editDomain } ->
+          case editDomain of
+            Just (ChangingKey changingModel) ->
               let
-                v =
-                  case keyValue of
-                    Ok k ->
-                      let
-                        existingKey =
-                          keyModel.existingKeys
-                          |> List.filter (\key ->
-                            case key of
-                              KeyFromDomain domainKey _ ->
-                                (domainKey |> Key.toString |> String.toLower) == String.toLower newKey
-                              _ -> False
-                          )
-                          |> List.head
-                      in
-                        case existingKey of
-                          Just existing -> Err (NotUnique existing)
-                          Nothing -> Ok (Just k)
-                    Err (Key.Empty) -> Ok Nothing
-                    Err e -> Err (Problem e)
-
+                (changeModel, changeCmd) = ChangeKey.update changeMsg changingModel
               in
-                Just (ChangingKey { keyModel | enteredKey = newKey, value = v })
-            m -> m
-      in
-        ( model |> changeEdit (\e -> { e | editDomain = updateKey e.editDomain})
-        , Cmd.none
-        )
-
+                (model |> changeEdit (\e -> { e | editDomain = Just (ChangingKey changeModel) })
+                , changeCmd |> Cmd.map ChangeKeyMsg
+                )
+            _ -> (model, Cmd.none)
+        _ -> (model, Cmd.none)
+      
     AssignKey newKey ->
       case model.edit of
         RemoteData.Success { domain } ->
@@ -360,7 +306,7 @@ viewEditName name =
       ]
     ]
 
-viewEditKey : ChangeKeyModel -> Html Msg
+viewEditKey : ChangeKey.Model -> Html Msg
 viewEditKey model =
   let
     keyIsValid =
@@ -375,35 +321,7 @@ viewEditKey model =
   Form.form submit
     [ Grid.row [ Row.betweenXs ]
       [ Grid.col []
-        [ Input.text
-          [ Input.id "key"
-          , Input.value model.enteredKey
-          , Input.onInput UpdateKey
-          , Input.placeholder "Choose a domain key"
-          , if keyIsValid
-            then Input.success
-            else Input.danger
-          ]
-        , Form.help []
-          [ text "You can hoose a unique, readable key among all domains and bounded contexts, to help you identify this domain!" ]
-        , Form.invalidFeedback
-          []
-          [ text <| "The key '" ++ model.enteredKey ++ "' is invalid: "  ++
-            ( case model.value of
-                Err (Problem Key.StartsWithNumber) -> "it must not start with a number"
-                Err (Problem Key.ContainsWhitespace) -> "it should not contain any whitespaces"
-                Err (Problem (Key.ContainsSpecialChars chars)) ->
-                  "it should not contain the following charachters: " ++ String.join " " (chars |> Set.toList |> List.map String.fromChar)
-                Err (NotUnique other) ->
-                  "it is already in use by " ++
-                  ( case other of
-                      KeyFromDomain key name -> "domain '" ++ name ++ "' - " ++ (key |> Key.toString)
-                      _ -> ""
-                  )
-                _ -> ""
-            )
-          ]
-        ]
+        [ ChangeKey.view model |> Html.map ChangeKeyMsg ]
       , Grid.col [ Col.sm3 ]
         [ Button.submitButton
           [ Button.primary
@@ -507,18 +425,4 @@ loadDomain model =
   Http.get
     { url = Url.toString model.self
     , expect = Http.expectJson Loaded Domain.domainDecoder
-    }
-
-loadBoundedContexts: Api.Configuration -> Cmd Msg
-loadBoundedContexts configuration =
-  Http.get
-    { url = Api.allBoundedContexts |> Api.url configuration |> Url.toString
-    , expect = Http.expectJson BoundedContextKeysLoaded (Decode.list BoundedContext.modelDecoder)
-    }
-
-loadDomains: Api.Configuration -> Cmd Msg
-loadDomains configuration =
-  Http.get
-    { url = Api.domains [] |> Api.url configuration |> Url.toString
-    , expect = Http.expectJson DomainKeysLoaded (Decode.list Domain.domainDecoder)
     }
