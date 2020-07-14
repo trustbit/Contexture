@@ -36,8 +36,8 @@ import Set
 import Route
 import Api exposing (ApiResponse, ApiResult)
 
+import Key
 import Domain exposing (Domain)
-
 import BoundedContext exposing (BoundedContext)
 import BoundedContext.BoundedContextId exposing (BoundedContextId)
 import BoundedContext.Canvas as Bcc
@@ -279,7 +279,11 @@ viewItem item =
   in
   Card.config [ Card.attrs [ class "mb-3", class "shadow" ] ]
     |> Card.block []
-      [ Block.titleH4 [] [ text (item.boundedContext |> BoundedContext.name) ]
+      [ Block.titleH4 []
+        [ text (item.boundedContext |> BoundedContext.name)
+        , Html.small [ class "text-muted", class "float-right" ]
+          [ text (item.boundedContext |> BoundedContext.key |> Maybe.map Key.toString |> Maybe.withDefault "") ]
+        ]
       , if String.length item.description > 0
         then Block.text [ class "text-muted"] [ text item.description  ]
         else Block.text [class "text-muted", class "text-center" ] [ Html.i [] [ text "No description :-(" ] ]

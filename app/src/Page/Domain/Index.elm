@@ -31,12 +31,15 @@ import RemoteData
 import Url
 import Http
 
+import Route
 import Api exposing (ApiResult, ApiResponse)
+
+import Key
 import Domain exposing (DomainRelation, Domain)
 import Domain.DomainId exposing (DomainId)
-import Page.Domain.Create
-import Route
 import BoundedContext exposing (BoundedContext)
+
+import Page.Domain.Create
 
 -- MODEL
 
@@ -249,7 +252,11 @@ viewDomain : DomainItem -> Card.Config Msg
 viewDomain item =
   Card.config [ Card.attrs [ class "mb-3", class "shadow"] ]
     |> Card.block []
-      [ Block.titleH4 [] [ text (item.domain |> Domain.name) ]
+      [ Block.titleH4 []
+        [ text (item.domain |> Domain.name)
+        , Html.small [ class "text-muted", class "float-right"]
+          [ text (item.domain |> Domain.key |> Maybe.map Key.toString |> Maybe.withDefault "") ] 
+        ]
       , item.domain
         |> Domain.vision
         |> Maybe.map (\v -> Block.text [ class "text-muted"] [ text v ] )
