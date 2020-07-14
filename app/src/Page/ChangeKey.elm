@@ -1,19 +1,16 @@
-module Page.ChangeKey exposing (..)
+module Page.ChangeKey exposing (
+  Model, KeyError(..), init,
+  Msg, update,
+  view
+  )
 
 import Json.Decode as Decode
 
 import Html exposing (Html, div, text)
 import Html.Attributes exposing (..)
-import Html.Events exposing (onClick, onSubmit)
 
-import Bootstrap.Grid as Grid
-import Bootstrap.Grid.Row as Row
-import Bootstrap.Grid.Col as Col
 import Bootstrap.Form as Form
 import Bootstrap.Form.Input as Input
-import Bootstrap.Form.Textarea as Textarea
-import Bootstrap.Button as Button
-import Bootstrap.Utilities.Spacing as Spacing
 
 import Http
 import Url
@@ -73,10 +70,25 @@ update msg model =
             ( \domain ->
               domain
               |> Domain.key
-              |> Maybe.map (\key ->KeyFromDomain key (Domain.name domain))
+              |> Maybe.map (\key -> KeyFromDomain key (Domain.name domain))
             )
       in
         ( { model | existingKeys = List.append model.existingKeys domainKeys}
+        , Cmd.none
+        )
+
+    BoundedContextKeysLoaded (Ok contexts) ->
+      let
+        contextKeys =
+          contexts
+          |> List.filterMap
+            ( \context ->
+              context
+              |> BoundedContext.key
+              |> Maybe.map (\key -> KeyFromBoundedContext key (BoundedContext.name context))
+            )
+      in
+        ( { model | existingKeys = List.append model.existingKeys contextKeys}
         , Cmd.none
         )
 
@@ -92,7 +104,8 @@ update msg model =
                     case key of
                       KeyFromDomain domainKey _ ->
                         (domainKey |> Key.toString |> String.toLower) == String.toLower newKey
-                      _ -> False
+                      KeyFromBoundedContext contextKey _ ->
+                        (contextKey |> Key.toString |> String.toLower) == String.toLower newKey
                   )
                   |> List.head
               in
@@ -106,7 +119,8 @@ update msg model =
         ( { model | enteredKey = newKey, value = value }
         , Cmd.none
         )
-    _ -> (model,Cmd.none)
+    _ -> 
+      (Debug.log "ChangeKey" model, Cmd.none)
 
 view : Model -> Html Msg
 view model =
@@ -127,28 +141,25 @@ view model =
           else Input.danger
         ]
       , Form.help []
-        [ text "You can hoose a unique, readable key among all domains and bounded contexts, to help you identify this domain!" ]
+        [ text "To help you identify this entity a readable key can be assigned, which must be unique among all domains and bounded contexts!" ]
       , Form.invalidFeedback
         []
-        [ text <| "The key '" ++ model.enteredKey ++ "' is invalid: "  ++
+        [ text <| "The key '" ++ model.enteredKey ++ "' is invalid because "  ++
           ( case model.value of
-              Err (Problem Key.StartsWithNumber) -> "it must not start with a number"
-              Err (Problem Key.ContainsWhitespace) -> "it should not contain any whitespaces"
+              Err (Problem Key.StartsWithNumber) -> "a key must not start with a number"
+              Err (Problem Key.ContainsWhitespace) -> "a key should not contain any whitespaces"
               Err (Problem (Key.ContainsSpecialChars chars)) ->
-                "it should not contain the following charachters: " ++ String.join " " (chars |> Set.toList |> List.map String.fromChar)
+                "a key should not contain the following charachters: " ++ String.join " " (chars |> Set.toList |> List.map String.fromChar)
               Err (NotUnique other) ->
-                "it is already in use by " ++
+                "the key is already in use by " ++
                 ( case other of
-                    KeyFromDomain key name -> "domain '" ++ name ++ "' - " ++ (key |> Key.toString)
-                    _ -> ""
+                    KeyFromDomain key name -> "domain '" ++ name ++ " - " ++ (key |> Key.toString) ++ "'"
+                    KeyFromBoundedContext key name -> "bounded context '" ++ name ++ " - " ++ (key |> Key.toString) ++ "'"
                 )
               _ -> ""
           )
         ]
       ]
-  
-
-
 
 loadBoundedContexts: Api.Configuration -> Cmd Msg
 loadBoundedContexts configuration =

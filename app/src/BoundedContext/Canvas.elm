@@ -7,6 +7,7 @@ import Json.Decode.Pipeline as JP
 import Http
 import Url exposing (Url)
 
+import Key as Key
 import BoundedContext exposing (BoundedContext)
 import BoundedContext.Dependency as Dependency
 import BoundedContext.StrategicClassification as StrategicClassification exposing(StrategicClassification)
@@ -68,6 +69,11 @@ modelEncoder : BoundedContextCanvas -> Encode.Value
 modelEncoder canvas =
   Encode.object
     [ ("name", Encode.string (canvas.boundedContext |> BoundedContext.name))
+    , ("key",
+        case canvas.boundedContext |> BoundedContext.key of
+          Just v -> Key.keyEncoder v
+          Nothing -> Encode.null
+      )
     , ("description", Encode.string canvas.description)
     , ("classification", StrategicClassification.encoder canvas.classification)
     , ("businessDecisions", Encode.string canvas.businessDecisions)
@@ -103,44 +109,3 @@ modelDecoder =
     |> JP.optional "modelTraits" Decode.string ""
     |> JP.optional "messages" Message.messagesDecoder Message.noMessages
     |> JP.optional "dependencies" dependenciesDecoder initDependencies
-
--- load
-
--- load : Url -> BoundedContext -> (Result Http.Error BoundedContextCanvas -> msg) -> Cmd msg
--- load base boundedContext toMsg =
---   Http.get
---     { url = Url.toString { base | path = base.path ++ "/bccs/" ++ (boundedContext |> BoundedContext.id |> BoundedContext.idToString ) }
---     , expect = Http.expectJson toMsg modelDecoder
---     }
-
--- saveBCC: Url.Url -> EditingCanvas -> Cmd Msg
--- saveBCC url model =
---   let
---     c = model.canvas
---     canvas =
---       { c
---       | dependencies = model.addingDependencies |> Dependencies.asDependencies
---       , messages = model.addingMessage |> Messages.asMessages
---       }
---   in
---     Http.request
---       { method = "PATCH"
---       , headers = []
---       , url = Url.toString url
---       , body = Http.jsonBody <| Bcc.modelEncoder canvas
---       , expect = Http.expectWhatever Saved
---       , timeout = Nothing
---       , tracker = Nothing
---       }
-
--- deleteBCC: Model -> Cmd Msg
--- deleteBCC model =
---     Http.request
---       { method = "DELETE"
---       , headers = []
---       , url = Url.toString model.self
---       , body = Http.emptyBody
---       , expect = Http.expectWhatever Deleted
---       , timeout = Nothing
---       , tracker = Nothing
---       }

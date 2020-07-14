@@ -23,11 +23,15 @@ import RemoteData
 import Url
 import Http
 
+import Api
 import Route
 
+import Key
 import BoundedContext
-import BoundedContext.StrategicClassification as StrategicClassification 
+import BoundedContext.StrategicClassification as StrategicClassification
 import BoundedContext.Canvas as Bcc
+
+import Page.ChangeKey as ChangeKey
 import Page.Bcc.Edit.Dependencies as Dependencies
 import Page.Bcc.Edit.Messages as Messages
 
@@ -35,10 +39,16 @@ import Page.Bcc.Edit.Messages as Messages
 
 type alias EditingCanvas =
   { canvas : Bcc.BoundedContextCanvas
-  , name: String
+  , name : String
+  , key : ChangeKey.Model
   , addingMessage : Messages.Model
   , addingDependencies : Dependencies.Model
+  , problem : Maybe Problem
   }
+
+type Problem
+  = KeyProblem ChangeKey.KeyError
+  | ContextProblem BoundedContext.Problem
 
 type alias Model =
   { key: Nav.Key
@@ -51,13 +61,19 @@ initWithCanvas : Url.Url -> Bcc.BoundedContextCanvas -> (EditingCanvas, Cmd Edit
 initWithCanvas url canvas =
   let
     (addingDependency, addingDependencyCmd) = Dependencies.init url canvas.dependencies
+    (changeKeyModel, changeKeyCmd) = ChangeKey.init (Api.configFromScoped url) (canvas.boundedContext |> BoundedContext.key)
   in
     ( { addingMessage = Messages.init canvas.messages
       , addingDependencies = addingDependency
       , name = canvas.boundedContext |> BoundedContext.name
+      , key = changeKeyModel
       , canvas = canvas
+      , problem = Nothing
       }
-    , addingDependencyCmd |> Cmd.map DependencyField
+    , Cmd.batch
+      [ addingDependencyCmd |> Cmd.map DependencyField
+      , changeKeyCmd |> Cmd.map ChangeKeyMsg
+      ]
     )
 
 init : Nav.Key -> Url.Url -> (Model, Cmd Msg)
@@ -94,8 +110,9 @@ type FieldMsg
 
 type EditingMsg
   = Field FieldMsg
-  -- TODO Name editing is actually part of the BoundedContext - move there!
+  -- TODO the editing is actually part of the BoundedContext - move there?!
   | SetName String
+  | ChangeKeyMsg ChangeKey.Msg
   | DependencyField Dependencies.Msg
   | MessageField Messages.Msg
 
@@ -147,11 +164,24 @@ updateEdit msg model =
       ({ model | canvas = updateField fieldMsg model.canvas }, Cmd.none)
     SetName name ->
       ({ model | name = name}, Cmd.none)
+    ChangeKeyMsg changeMsg ->
+      let
+        (changeKeyModel, changeKeyCmd) = ChangeKey.update changeMsg model.key
+        problem =
+          case changeKeyModel.value of
+            Ok _ -> Nothing
+            Err e -> e |> KeyProblem |> Just
+      in
+        ( { model | key = changeKeyModel, problem = problem }
+        , changeKeyCmd |> Cmd.map ChangeKeyMsg
+        )
     DependencyField dependency ->
       let
         (addingDependencies, addingCmd) = Dependencies.update dependency model.addingDependencies
       in
-        ({ model | addingDependencies = addingDependencies }, addingCmd |> Cmd.map DependencyField)
+        ( { model | addingDependencies = addingDependencies }
+        , addingCmd |> Cmd.map DependencyField
+        )
 
 
 update : Msg -> Model -> (Model, Cmd Msg)
@@ -163,7 +193,12 @@ update msg model =
       in
         ({ model | edit = RemoteData.Success <| editModel }, editCmd |> Cmd.map Editing)
     (Save, RemoteData.Success editable) ->
-      case editable.canvas.boundedContext |> BoundedContext.changeName editable.name of
+      case
+        editable.key.value
+        |> Result.mapError KeyProblem
+        |> Result.map (\k -> BoundedContext.changeKey k editable.canvas.boundedContext)
+        |> Result.andThen (BoundedContext.changeName editable.name >> Result.mapError ContextProblem)
+      of
         Ok context ->
           let
             canvas = editable.canvas
@@ -244,7 +279,10 @@ viewActions model =
       [ Button.submitButton
         [ Button.primary
         , Button.onClick Save
-        , Button.disabled (model.name |> BoundedContext.isNameValid |> not)
+        , Button.disabled
+          ( (model.name |> BoundedContext.isNameValid |> not)
+          || (model.problem |> Maybe.map (\_ -> True) |> Maybe.withDefault False)
+          )
         ]
         [ text "Save"]
       ]
@@ -265,13 +303,18 @@ viewLeftside canvas =
   List.concat
     [ [ Form.group []
         [ viewCaption "name" "Name"
-        , Input.text (
-            List.concat
-            [ [ Input.id "name", Input.value canvas.name, Input.onInput SetName]
-            , if canvas.name |> BoundedContext.isNameValid then [] else  [ Input.danger ]
-            ])
-        , Form.invalidFeedback [] [ text "A name for a Bounded Context is required!" ]
+        , Input.text
+          [ Input.id "name", Input.value canvas.name, Input.onInput SetName
+          , if canvas.name |> BoundedContext.isNameValid
+            then Input.success
+            else Input.danger
+          ]
         , Form.help [] [ text "Naming is hard. Writing down the name of your context and gaining agreement as a team will frame how you design the context." ]
+        , Form.invalidFeedback [] [ text "A name for a Bounded Context is required!" ]
+        ]
+      , Form.group []
+        [ viewCaption "key" "Key"
+        , ChangeKey.view canvas.key |> Html.map ChangeKeyMsg
         ]
       , Form.group []
         [ viewCaption "description" "Description"
