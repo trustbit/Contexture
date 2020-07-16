@@ -72,7 +72,9 @@ elm make src/Main.elm --output=../server/public/index.html
 
 cd ../server
 docker build -t contexture .
-docker run -p 8081:3000 --mount source=contexture-data,target=/usr/src/app/data contexture
+
+docker volume create contexture_data
+docker run -p 8081:3000 -v contexture_data:/data contexture
 ```
 
 Now head to your browser and access the Contexture through http://localhost:8081
