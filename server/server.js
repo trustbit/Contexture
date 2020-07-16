@@ -1,8 +1,19 @@
 const jsonServer = require("json-server");
 const path = require("path");
+const fs = require("fs");
+
+const dbPath = process.env.NODE_ENV == "production" ? "/data/db.json" : "db.json";
+
+if (!fs.existsSync(dbPath)) {
+  fs.writeFileSync(dbPath, JSON.stringify({
+    "domains": [],
+    "bccs": []
+  }), { encoding: 'utf-8'});
+}
 
 const server = jsonServer.create();
-const router = jsonServer.router("data/db.json");
+const router = jsonServer.router(dbPath);
+
 const middlewares = jsonServer.defaults();
 const port = parseInt(process.env.PORT, 10) || 3000;
 
