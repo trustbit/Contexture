@@ -5,10 +5,14 @@ const fs = require("fs");
 const dbPath = process.env.NODE_ENV == "production" ? "/data/db.json" : "db.json";
 
 if (!fs.existsSync(dbPath)) {
-  fs.writeFileSync(dbPath, JSON.stringify({
-    "domains": [],
-    "bccs": []
-  }), { encoding: 'utf-8'});
+  try {
+    fs.writeFileSync(dbPath, JSON.stringify({
+      "domains": [],
+      "bccs": []
+    }), { encoding: 'utf-8'});
+  } catch(e) {
+    console.log(`${dbPath} already exists`);
+  }
 }
 
 const server = jsonServer.create();
