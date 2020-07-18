@@ -558,7 +558,7 @@ domainsOf base relation =
       Decode.succeed DomainItem
         |> JP.custom Domain.domainDecoder
         |> JP.required "domains" (Decode.list Domain.domainDecoder)
-        |> JP.required "bccs" (Decode.list BoundedContext.modelDecoder)
+        |> JP.required "boundedContexts" (Decode.list BoundedContext.modelDecoder)
     request toMsg =
       Http.get
         { url = api |> Api.url base |> Url.toString

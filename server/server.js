@@ -8,7 +8,7 @@ if (!fs.existsSync(dbPath)) {
   try {
     fs.writeFileSync(dbPath, JSON.stringify({
       "domains": [],
-      "bccs": []
+      "boundedContexts": []
     }), { encoding: 'utf-8'});
   } catch(e) {
     console.log(`${dbPath} already exists`);

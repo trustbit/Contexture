@@ -59,15 +59,15 @@ subDomains include domainId =
 
 boundedContexts : DomainId -> Endpoint
 boundedContexts domainId =
-   withoutQuery [ "domains", Domain.idToString domainId, "bccs" ]
+   withoutQuery [ "domains", Domain.idToString domainId, "boundedContexts" ]
 
 allBoundedContexts : List Expand -> Endpoint 
 allBoundedContexts expand =
-  withQuery [ "bccs" ] ( expand |> expandInRequest)
+  withQuery [ "boundedContexts" ] ( expand |> expandInRequest)
 
 boundedContext : BoundedContextId -> Endpoint
 boundedContext context =
-  withoutQuery [ "bccs", BoundedContext.idToString context ]
+  withoutQuery [ "boundedContexts", BoundedContext.idToString context ]
 
 includeInRequest : List Include -> List QueryParameter
 includeInRequest include =
@@ -76,7 +76,7 @@ includeInRequest include =
     ( \i ->
         case i of
           Subdomains -> Url.Builder.string "_embed" "domains"
-          BoundedContexts -> Url.Builder.string "_embed" "bccs" 
+          BoundedContexts -> Url.Builder.string "_embed" "boundedContexts" 
     )
 
 expandInRequest : List Expand -> List QueryParameter

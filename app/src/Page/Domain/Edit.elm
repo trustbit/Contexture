@@ -74,8 +74,7 @@ init key config domain =
       , subDomains = subDomainsModel
       }
   in
-    (
-      model
+    ( model
     , Cmd.batch
       [ loadDomain config domain
       , contextCmd |> Cmd.map BccMsg
