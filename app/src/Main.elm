@@ -76,9 +76,7 @@ initCurrentPage ( model, existingCmds ) =
               ( Domains pageModel, Cmd.map DomainMsg pageCmds )
           Route.Domain id ->
             let
-              url = model.baseUrl
-              domainUrl = { url | path = url.path ++ "/domains/" ++ Domain.idToString id }
-              ( pageModel, pageCmds ) = Page.Domain.Edit.init model.key domainUrl id
+              ( pageModel, pageCmds ) = Page.Domain.Edit.init model.key (Api.config model.baseUrl) id
             in
               ( DomainsEdit pageModel, Cmd.map DomainEditMsg pageCmds )
           Route.Bcc id ->

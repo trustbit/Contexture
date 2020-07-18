@@ -4,9 +4,6 @@ import Json.Encode as Encode
 import Json.Decode as Decode exposing (Decoder)
 import Json.Decode.Pipeline as JP
 
-import Http
-import Url exposing (Url)
-
 import Key as Key
 import BoundedContext exposing (BoundedContext)
 import BoundedContext.Dependency as Dependency
@@ -35,8 +32,6 @@ type alias Dependencies =
   { suppliers : Dependency.DependencyMap
   , consumers : Dependency.DependencyMap
   }
-
-
 
 initDependencies : Dependencies
 initDependencies =

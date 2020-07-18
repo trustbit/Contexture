@@ -72,7 +72,7 @@ type alias DeleteDomainModel =
 
 type alias Model =
   { navKey : Nav.Key
-  , baseUrl : Api.Configuration
+  , config : Api.Configuration
   , domainPosition : Domain.DomainRelation
   , createDomain : Page.Domain.Create.Model
   , domains : RemoteData.WebData (List DomainItem)
@@ -87,7 +87,7 @@ initSubdomainSelection =
   }
 
 initMove : Api.Configuration -> DomainItem -> (MoveDomainModel, Cmd MoveDomainMsg)
-initMove baseUrl { domain } =
+initMove config { domain } =
   let
     canMoveToRoot =  not ((domain |> Domain.domainRelation) == Domain.Root)
   in
@@ -98,16 +98,16 @@ initMove baseUrl { domain } =
     , canMoveToRoot = canMoveToRoot
     , modalVisibility = Modal.shown
     }
-  , findAllDomains baseUrl AllDomainsLoaded
+  , findAllDomains config AllDomainsLoaded
   )
 
 init : Api.Configuration -> Nav.Key -> Domain.DomainRelation -> (Model, Cmd Msg)
-init baseUrl key domainPosition =
+init config key domainPosition =
   let
-    (createModel, createCmd) = Page.Domain.Create.init baseUrl key domainPosition
+    (createModel, createCmd) = Page.Domain.Create.init config key domainPosition
   in
   ( { navKey = key
-    , baseUrl = baseUrl
+    , config = config
     , domainPosition = domainPosition
     , createDomain = createModel
     , domains = RemoteData.Loading
@@ -115,7 +115,7 @@ init baseUrl key domainPosition =
     , deleteDomain = Nothing
     }
   , Cmd.batch
-    [ domainsOf baseUrl domainPosition Loaded
+    [ domainsOf config domainPosition Loaded
     , createCmd |> Cmd.map CreateMsg ] )
 
 initWithSubdomains : Api.Configuration -> Nav.Key -> DomainId -> (Model, Cmd Msg)
@@ -204,7 +204,7 @@ update msg model =
 
     StartMoveToDomain item ->
       let
-        (moveModel, moveCmd) = initMove model.baseUrl item
+        (moveModel, moveCmd) = initMove model.config item
       in
         ( { model | moveToNewDomain = Just moveModel }, moveCmd |> Cmd.map MoveToDomain)
     MoveToDomain move ->
@@ -215,9 +215,9 @@ update msg model =
             additional =
               case move of
                 DomainMoved (Ok _) ->
-                  [ domainsOf model.baseUrl model.domainPosition Loaded ]
+                  [ domainsOf model.config model.domainPosition Loaded ]
                 _ -> []
-            (moveModel_, moveCmd) = updateMoveToDomain model.baseUrl move moveModel
+            (moveModel_, moveCmd) = updateMoveToDomain model.config move moveModel
           in
             ( { model | moveToNewDomain = Just moveModel_ }
             , (moveCmd |> Cmd.map MoveToDomain) :: additional
@@ -237,10 +237,10 @@ update msg model =
       ( { model | deleteDomain = Nothing }, Cmd.none)
 
     DeleteDomain id ->
-      ( { model | deleteDomain = Nothing }, Domain.remove model.baseUrl id DomainDeleted)
+      ( { model | deleteDomain = Nothing }, Domain.remove model.config id DomainDeleted)
 
     DomainDeleted (Ok _) ->
-      ( { model | deleteDomain = Nothing }, domainsOf model.baseUrl model.domainPosition Loaded)
+      ( { model | deleteDomain = Nothing }, domainsOf model.config model.domainPosition Loaded)
 
     DomainDeleted (Err _) ->
       (model, Cmd.none)

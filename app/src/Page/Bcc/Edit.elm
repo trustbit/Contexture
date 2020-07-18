@@ -2,7 +2,7 @@ module Page.Bcc.Edit exposing (Msg, Model, update, view, init)
 
 import Browser.Navigation as Nav
 
-import Html exposing (Html, button, div, text)
+import Html exposing (Html, div, text)
 import Html.Attributes exposing (..)
 import Html.Events exposing (onClick)
 
@@ -110,7 +110,7 @@ type FieldMsg
 
 type EditingMsg
   = Field FieldMsg
-  -- TODO the editing is actually part of the BoundedContext - move there?!
+  -- TODO the editing is actually part of the BoundedContext - move there or to the index page?!
   | SetName String
   | ChangeKeyMsg ChangeKey.Msg
   | DependencyField Dependencies.Msg

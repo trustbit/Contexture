@@ -2,8 +2,7 @@ module Page.Bcc.Index exposing (Msg, Model, update, view, init)
 
 import Browser.Navigation as Nav
 
-import Json.Encode as Encode
-import Json.Decode as Decode exposing (Decoder)
+import Json.Decode as Decode
 
 import Html exposing (Html, button, div, text)
 import Html.Attributes exposing (..)
@@ -38,6 +37,7 @@ import Api exposing (ApiResponse, ApiResult)
 
 import Key
 import Domain exposing (Domain)
+import Domain.DomainId exposing (DomainId)
 import BoundedContext exposing (BoundedContext)
 import BoundedContext.BoundedContextId exposing (BoundedContextId)
 import BoundedContext.Canvas as Bcc
@@ -56,7 +56,6 @@ type alias MoveContextModel =
   , modalVisibility : Modal.Visibility
   }
 
-
 type alias DeleteBoundedContextModel =
   { boundedContext : BoundedContext
   , modalVisibility : Modal.Visibility
@@ -65,11 +64,13 @@ type alias DeleteBoundedContextModel =
 type alias Model =
   { navKey : Nav.Key
   , bccName : String
-  , baseUrl : Url.Url
+  , config : Api.Configuration
+  , domain : DomainId
   , deleteContext : Maybe DeleteBoundedContextModel
   , moveContext : Maybe MoveContextModel
   , bccs : RemoteData.WebData (List BccItem) }
 
+initMoveContext : BoundedContext -> MoveContextModel
 initMoveContext context =
   { context = context
   , allDomains = RemoteData.Loading
@@ -78,15 +79,16 @@ initMoveContext context =
   , modalVisibility = Modal.shown
   }
 
-init: Url.Url -> Nav.Key -> (Model, Cmd Msg)
-init baseUrl key =
+init: Api.Configuration -> Nav.Key -> DomainId -> (Model, Cmd Msg)
+init config key domain =
   ( { navKey = key
     , bccs = RemoteData.Loading
-    , baseUrl = baseUrl
+    , config = config
+    , domain = domain
     , deleteContext = Nothing
     , moveContext = Nothing
     , bccName = "" }
-  , loadAll baseUrl )
+  , loadAll config domain )
 
 -- UPDATE
 
@@ -107,6 +109,7 @@ type Msg
   | ContextMoved (ApiResponse ())
   | CancelMoveContext
 
+updateMove : Model -> (MoveContextModel -> MoveContextModel) -> Model
 updateMove model updateFunction =
   let
     move = model.moveContext |> Maybe.map updateFunction
@@ -118,12 +121,16 @@ update msg model =
   case msg of
     Loaded (Ok items) ->
       ({ model | bccs = RemoteData.Success items }, Cmd.none)
+
     Loaded (Err e) ->
       ({ model | bccs = RemoteData.Failure e }, Cmd.none)
+
     SetName name ->
       ({ model | bccName = name}, Cmd.none)
+
     CreateBcc ->
-      (model, createNewBcc model)
+      (model, BoundedContext.newBoundedContext model.config model.domain model.bccName Created)
+
     Created (Ok item) ->
       (model, Route.pushUrl (item |> BoundedContext.id |> Route.Bcc ) model.navKey)
 
@@ -134,14 +141,14 @@ update msg model =
       ({ model | deleteContext = Nothing }, Cmd.none)
 
     DeleteContext contextId ->
-      ({ model | deleteContext = Nothing }, BoundedContext.remove (Api.configFromScoped model.baseUrl) contextId ContextDeleted)
+      ({ model | deleteContext = Nothing }, BoundedContext.remove model.config contextId ContextDeleted)
 
     ContextDeleted (Ok _) ->
-      (model, loadAll model.baseUrl)
+      (model, loadAll model.config model.domain)
 
     StartToMoveContext context ->
       ( { model | moveContext = Just (initMoveContext context) }
-      , findAllDomains (Api.configFromScoped model.baseUrl) AllDomainsLoaded
+      , findAllDomains model.config AllDomainsLoaded
       )
 
     AllDomainsLoaded (Ok domains) ->
@@ -169,7 +176,7 @@ update msg model =
             Just domain ->
               ( model
               , BoundedContext.move
-                  (Api.configFromScoped model.baseUrl)
+                  model.config
                   (context |> BoundedContext.id)
                   (domain |> Domain.id)
                   ContextMoved
@@ -177,7 +184,7 @@ update msg model =
             Nothing -> (model, Cmd.none)
         Nothing -> (model, Cmd.none)
     ContextMoved (Ok _) ->
-      ( { model | moveContext = Nothing }, loadAll model.baseUrl)
+      ( { model | moveContext = Nothing }, loadAll model.config model.domain)
 
     CancelMoveContext ->
       ( { model | moveContext = Nothing }, Cmd.none)
@@ -455,26 +462,12 @@ view model =
 
 -- helpers
 
-loadAll: Url.Url -> Cmd Msg
-loadAll baseUrl =
+loadAll : Api.Configuration -> DomainId -> Cmd Msg
+loadAll config domain =
   Http.get
-    { url = { baseUrl | path = baseUrl.path ++ "/bccs" } |> Url.toString
+    { url = Api.boundedContexts domain |> Api.url config |> Url.toString
     , expect = Http.expectJson Loaded (Decode.list Bcc.modelDecoder)
     }
-
-createNewBcc : Model -> Cmd Msg
-createNewBcc model =
-  let
-      body =
-          Encode.object
-          [ ("name", Encode.string model.bccName) ]
-      baseUrl = model.baseUrl
-  in
-      Http.post
-      { url = { baseUrl | path = baseUrl.path ++ "/bccs" } |> Url.toString
-      , body = Http.jsonBody body
-      , expect = Http.expectJson Created BoundedContext.modelDecoder
-      }
 
 findAllDomains : Api.Configuration -> ApiResult (List Domain.Domain) msg
 findAllDomains base =

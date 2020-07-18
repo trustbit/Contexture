@@ -3,6 +3,7 @@ module BoundedContext exposing (
   changeName, name, isNameValid,
   domain, id, key, changeKey,
   move, remove, assignKey,
+  newBoundedContext,
   idFieldDecoder, nameFieldDecoder, modelDecoder)
 
 import Json.Encode as Encode
@@ -146,5 +147,18 @@ assignKey base contextId contextKey =
       , timeout = Nothing
       , tracker = Nothing
       }
+  in
+    request
+
+  
+newBoundedContext : Api.Configuration -> DomainId -> String -> ApiResult BoundedContext msg
+newBoundedContext config domainId contextName =
+  let
+    request toMsg =
+      Http.post
+        { url = Api.boundedContexts domainId |> Api.url config |> Url.toString
+        , body = Http.jsonBody <| Encode.object [ ("name", Encode.string contextName) ]
+        , expect = Http.expectJson toMsg modelDecoder
+        }
   in
     request

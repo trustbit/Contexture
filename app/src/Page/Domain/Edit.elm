@@ -20,8 +20,6 @@ import Bootstrap.Utilities.Spacing as Spacing
 
 import RemoteData
 
-import Set
-
 import Url
 import Http
 
@@ -35,11 +33,9 @@ import Domain.DomainId exposing (DomainId)
 import Page.ChangeKey as ChangeKey
 import Page.Domain.Index as Index
 import Page.Bcc.Index
-import BoundedContext exposing (BoundedContext)
 
 
 -- MODEL
-
 
 type EditDomain
   = ChangingName String
@@ -53,7 +49,7 @@ type alias EditableDomain =
 
 type alias Model =
   { key : Nav.Key
-  , self : Url.Url
+  , config : Api.Configuration
   , edit : RemoteData.WebData EditableDomain
   , subDomains : Index.Model
   , contexts : Page.Bcc.Index.Model
@@ -65,14 +61,14 @@ initEdit domain =
   , editDomain = Nothing
   }
 
-init : Nav.Key -> Url.Url -> DomainId -> (Model, Cmd Msg)
-init key url domain =
+init : Nav.Key -> Api.Configuration -> DomainId -> (Model, Cmd Msg)
+init key config domain =
   let
-    (contexts, contextCmd) = Page.Bcc.Index.init url key
-    (subDomainsModel, subDomainsCmd) = Index.initWithSubdomains (Api.configFromScoped url) key domain
+    (contexts, contextCmd) = Page.Bcc.Index.init config key domain
+    (subDomainsModel, subDomainsCmd) = Index.initWithSubdomains config key domain
     model =
       { key = key
-      , self = url
+      , config = config
       , edit = RemoteData.Loading
       , contexts = contexts
       , subDomains = subDomainsModel
@@ -81,7 +77,7 @@ init key url domain =
     (
       model
     , Cmd.batch
-      [ loadDomain model
+      [ loadDomain config domain
       , contextCmd |> Cmd.map BccMsg
       , subDomainsCmd |> Cmd.map SubDomainMsg
       ]
@@ -149,7 +145,7 @@ update msg model =
       case model.edit of
         RemoteData.Success { domain }  ->
             ( model
-            , Domain.renameDomain (Api.configFromScoped model.self) (domain |> Domain.id) newName Saved
+            , Domain.renameDomain model.config (domain |> Domain.id) newName Saved
             )
         _ ->
           Debug.log ("Cannot save unloaded model: " ++ Debug.toString msg ++ " " ++ Debug.toString model)
@@ -162,7 +158,7 @@ update msg model =
             (changeModel, changeCmd) = 
               editable.domain
               |> Domain.key
-              |> ChangeKey.init (Api.configFromScoped model.self)
+              |> ChangeKey.init model.config
           in
             ( model |> changeEdit (\e -> { e | editDomain = Just (ChangingKey changeModel) } )
             , Cmd.batch
@@ -191,7 +187,7 @@ update msg model =
       case model.edit of
         RemoteData.Success { domain } ->
           ( model
-          , Domain.assignKey (Api.configFromScoped model.self) (domain |> Domain.id) newKey Saved
+          , Domain.assignKey model.config (domain |> Domain.id) newKey Saved
           )
         _ ->
           Debug.log ("Cannot save unloaded model: " ++ Debug.toString msg ++ " " ++ Debug.toString model)
@@ -217,7 +213,7 @@ update msg model =
                 else Just newVision
           in
             ( model
-            , Domain.updateVision (Api.configFromScoped model.self) (domain |> Domain.id) vision Saved
+            , Domain.updateVision model.config (domain |> Domain.id) vision Saved
             )
         _ ->
           Debug.log ("Cannot save unloaded model: " ++ Debug.toString msg ++ " " ++ Debug.toString model)
@@ -420,9 +416,9 @@ viewDomain model =
 
 -- HTTP
 
-loadDomain: Model -> Cmd Msg
-loadDomain model =
+loadDomain: Api.Configuration -> DomainId -> Cmd Msg
+loadDomain config domain =
   Http.get
-    { url = Url.toString model.self
+    { url = Api.domain [] domain |> Api.url config |> Url.toString
     , expect = Http.expectJson Loaded Domain.domainDecoder
     }
