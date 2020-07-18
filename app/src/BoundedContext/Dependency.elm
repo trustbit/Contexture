@@ -126,6 +126,7 @@ maybeEncoder encoder value =
     Just v -> encoder v
     Nothing -> Encode.null
 
+maybeStringEncoder : (t -> String) -> Maybe t -> Encode.Value
 maybeStringEncoder encoder value =
   maybeEncoder (encoder >> Encode.string) value
 

@@ -28,6 +28,8 @@ import List
 import Url
 import Http
 
+import Api
+
 import BoundedContext.Canvas as Bcc
 import BoundedContext
 import BoundedContext.BoundedContextId as BoundedContext
@@ -67,17 +69,18 @@ initDependency existing id =
   , relationship = Nothing
   , existingDependencies = existing }
 
+initDependencies : Bcc.Dependencies -> Model
 initDependencies dependencies =
   { consumer = initDependency dependencies.consumers "consumer-select"
   , supplier = initDependency dependencies.suppliers "supplier-select"
   , availableDependencies = []
   }
 
-init : Url.Url -> Bcc.Dependencies -> (Model, Cmd Msg)
-init baseUrl dependencies =
+init : Api.Configuration -> BoundedContext.BoundedContext -> Bcc.Dependencies -> (Model, Cmd Msg)
+init config _ dependencies =
   (
     initDependencies dependencies
-  , Cmd.batch [ loadBoundedContexts baseUrl, loadDomains baseUrl])
+  , Cmd.batch [ loadBoundedContexts config, loadDomains config])
 
 asDependencies : Model -> Bcc.Dependencies
 asDependencies model =
@@ -408,18 +411,16 @@ boundedContextDecoder =
     |> JP.custom BoundedContext.nameFieldDecoder
     |> JP.required "domain" domainDecoder
 
-loadBoundedContexts: Url.Url -> Cmd Msg
-loadBoundedContexts url =
+loadBoundedContexts: Api.Configuration -> Cmd Msg
+loadBoundedContexts config =
   Http.get
-  -- todo this is wrong - we need an 'API' abstraction?
-    { url = Url.toString { url | path = "/api/bccs?_expand=domain"}
+    { url = Api.allBoundedContexts [ Api.Domain ] |> Api.url config |> Url.toString
     , expect = Http.expectJson BoundedContextsLoaded (Decode.list boundedContextDecoder)
     }
 
-loadDomains: Url.Url -> Cmd Msg
-loadDomains url =
+loadDomains: Api.Configuration -> Cmd Msg
+loadDomains config =
   Http.get
-  -- todo this is wrong - we need an 'API' abstraction?
-    { url = Url.toString { url | path = "/api/domains"}
+    { url = Api.domains [] |> Api.url config |> Url.toString
     , expect = Http.expectJson DomainsLoaded (Decode.list domainDecoder)
     }

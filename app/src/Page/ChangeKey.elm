@@ -162,9 +162,9 @@ view model =
       ]
 
 loadBoundedContexts: Api.Configuration -> Cmd Msg
-loadBoundedContexts configuration =
+loadBoundedContexts config =
   Http.get
-    { url = Api.allBoundedContexts |> Api.url configuration |> Url.toString
+    { url = Api.allBoundedContexts [] |> Api.url config |> Url.toString
     , expect = Http.expectJson BoundedContextKeysLoaded (Decode.list BoundedContext.modelDecoder)
     }
 

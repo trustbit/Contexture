@@ -15,13 +15,10 @@ import Bootstrap.Utilities.Spacing as Spacing
 import Route exposing ( Route)
 import Api
 
-import Domain.DomainId as Domain
-import BoundedContext.BoundedContextId as BoundedContext
 import Page.Domain.Index
 import Page.Domain.Edit
-import BoundedContext
 import Page.Bcc.Edit
-import Url exposing (Protocol)
+import Url
 
 -- MAIN
 
@@ -81,10 +78,7 @@ initCurrentPage ( model, existingCmds ) =
               ( DomainsEdit pageModel, Cmd.map DomainEditMsg pageCmds )
           Route.Bcc id ->
             let
-              url = model.baseUrl
-              bccUrl = { url | path = url.path ++ "/bccs/" ++ BoundedContext.idToString id}
-            
-              ( pageModel, pageCmds ) = Page.Bcc.Edit.init model.key bccUrl
+              ( pageModel, pageCmds ) = Page.Bcc.Edit.init model.key (Api.config model.baseUrl) id
             in
               ( Bcc pageModel, Cmd.map BccMsg pageCmds )
 

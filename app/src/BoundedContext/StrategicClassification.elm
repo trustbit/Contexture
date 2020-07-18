@@ -42,12 +42,13 @@ noClassification =
   , evolution = Nothing
   }
 
--- this should be placed in some 'localization component'?
+-- TODO: this should be placed in some 'localization component'?
 type alias Description =
     { name : String
     , description : String
     }
 
+description : String -> String -> Description
 description name desc = { name = name, description = desc }
 
 domainDescription : DomainType -> Description

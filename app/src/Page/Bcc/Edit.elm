@@ -26,8 +26,8 @@ import Http
 import Api
 import Route
 
-import Key
 import BoundedContext
+import BoundedContext.BoundedContextId exposing (BoundedContextId)
 import BoundedContext.StrategicClassification as StrategicClassification
 import BoundedContext.Canvas as Bcc
 
@@ -52,16 +52,16 @@ type Problem
 
 type alias Model =
   { key: Nav.Key
-  , self: Url.Url
+  , self : Api.Configuration
   -- TODO: discuss we want this in edit or BCC - it's not persisted after all!
   , edit: RemoteData.WebData EditingCanvas
   }
 
-initWithCanvas : Url.Url -> Bcc.BoundedContextCanvas -> (EditingCanvas, Cmd EditingMsg)
-initWithCanvas url canvas =
+initWithCanvas : Api.Configuration -> Bcc.BoundedContextCanvas -> (EditingCanvas, Cmd EditingMsg)
+initWithCanvas config canvas =
   let
-    (addingDependency, addingDependencyCmd) = Dependencies.init url canvas.dependencies
-    (changeKeyModel, changeKeyCmd) = ChangeKey.init (Api.configFromScoped url) (canvas.boundedContext |> BoundedContext.key)
+    (addingDependency, addingDependencyCmd) = Dependencies.init config canvas.boundedContext canvas.dependencies
+    (changeKeyModel, changeKeyCmd) = ChangeKey.init config (canvas.boundedContext |> BoundedContext.key)
   in
     ( { addingMessage = Messages.init canvas.messages
       , addingDependencies = addingDependency
@@ -76,18 +76,18 @@ initWithCanvas url canvas =
       ]
     )
 
-init : Nav.Key -> Url.Url -> (Model, Cmd Msg)
-init key url =
+init : Nav.Key -> Api.Configuration -> BoundedContextId -> (Model, Cmd Msg)
+init key config contextId =
   let
     model =
       { key = key
-      , self = url
+      , self = config
       , edit = RemoteData.Loading
       }
   in
     (
       model
-    , loadBCC model
+    , loadBCC config contextId
     )
 
 -- UPDATE
@@ -531,15 +531,15 @@ viewDescriptionList model sourceReference =
 
 -- HTTP
 
-loadBCC: Model -> Cmd Msg
-loadBCC model =
+loadBCC: Api.Configuration -> BoundedContextId -> Cmd Msg
+loadBCC config contextId =
   Http.get
-    { url = Url.toString model.self
+    { url = Api.boundedContext contextId |> Api.url config |> Url.toString
     , expect = Http.expectJson Loaded Bcc.modelDecoder
     }
 
-saveBCC: Url.Url -> EditingCanvas -> Cmd Msg
-saveBCC url model =
+saveBCC: Api.Configuration -> EditingCanvas -> Cmd Msg
+saveBCC config model =
   let
     c = model.canvas
     canvas =
@@ -551,7 +551,12 @@ saveBCC url model =
     Http.request
       { method = "PATCH"
       , headers = []
-      , url = Url.toString url
+      , url = 
+        c.boundedContext
+        |> BoundedContext.id
+        |> Api.boundedContext
+        |> Api.url config
+        |> Url.toString
       , body = Http.jsonBody <| Bcc.modelEncoder canvas
       , expect = Http.expectWhatever Saved
       , timeout = Nothing

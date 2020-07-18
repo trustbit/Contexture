@@ -1,8 +1,8 @@
 module Api exposing (
-  Endpoint, Configuration, ApiResponse, ApiResult, Include(..),
+  Endpoint, Configuration, ApiResponse, ApiResult, Include(..), Expand(..),
   domains, domain, subDomains,
   allBoundedContexts, boundedContexts, boundedContext,
-  url, config, configFromScoped)
+  url, config)
 
 import Http
 import Url
@@ -22,8 +22,6 @@ type Endpoint
 type alias ApiResponse model = Result Http.Error model 
 type alias ApiResult model msg = (ApiResponse model-> msg) -> Cmd msg
 
-
-
 withoutQuery : List String -> Endpoint
 withoutQuery segments =
   Endpoint segments []
@@ -31,11 +29,6 @@ withoutQuery segments =
 withQuery : List String -> List QueryParameter -> Endpoint
 withQuery segments query =
   Endpoint segments query
-
--- TODO: this is only temporary
-configFromScoped : Url.Url -> Configuration
-configFromScoped base =
-  Configuration { base | path = "/api" }
 
 config : Url.Url -> Configuration
 config base =
@@ -49,32 +42,35 @@ type Include
   = Subdomains
   | BoundedContexts
 
+type Expand
+  = Domain
+
 domains : List Include -> Endpoint
 domains include =
-  withQuery [ "domains" ] (include |> incudeInRequest)
+  withQuery [ "domains" ] (include |> includeInRequest)
 
 domain : List Include -> DomainId -> Endpoint
 domain include domainId =
-  withQuery [ "domains", Domain.idToString domainId ] (include |> incudeInRequest)
+  withQuery [ "domains", Domain.idToString domainId ] (include |> includeInRequest)
 
 subDomains : List Include -> DomainId -> Endpoint
 subDomains include domainId =
-  withQuery [ "domains", Domain.idToString domainId, "domains" ] (include |> incudeInRequest)
+  withQuery [ "domains", Domain.idToString domainId, "domains" ] (include |> includeInRequest)
 
 boundedContexts : DomainId -> Endpoint
 boundedContexts domainId =
    withoutQuery [ "domains", Domain.idToString domainId, "bccs" ]
 
-allBoundedContexts : Endpoint
-allBoundedContexts =
-  withoutQuery [ "bccs" ]
+allBoundedContexts : List Expand -> Endpoint 
+allBoundedContexts expand =
+  withQuery [ "bccs" ] ( expand |> expandInRequest)
 
 boundedContext : BoundedContextId -> Endpoint
 boundedContext context =
   withoutQuery [ "bccs", BoundedContext.idToString context ]
 
-incudeInRequest : List Include -> List QueryParameter
-incudeInRequest include =
+includeInRequest : List Include -> List QueryParameter
+includeInRequest include =
   include
   |> List.map
     ( \i ->
@@ -82,3 +78,11 @@ incudeInRequest include =
           Subdomains -> Url.Builder.string "_embed" "domains"
           BoundedContexts -> Url.Builder.string "_embed" "bccs" 
     )
+
+expandInRequest : List Expand -> List QueryParameter
+expandInRequest expand =
+  expand
+  |> List.map
+    ( \e ->
+      case e of
+         Domain -> Url.Builder.string "_expand" "domain")
