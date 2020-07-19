@@ -13,9 +13,8 @@ type BoundedContextId
 
 
 idToString : BoundedContextId -> String
-idToString bccId =
-  case bccId of
-    BoundedContextId bcId -> String.fromInt bcId
+idToString (BoundedContextId contextId) =
+  String.fromInt contextId
 
 idParser : Parser (BoundedContextId -> a) a
 idParser =

@@ -1,4 +1,4 @@
-module Main exposing (..)
+module Main exposing (main)
 
 import Browser
 import Browser.Navigation as Nav
@@ -18,7 +18,6 @@ import Api
 import Page.Domain.Index
 import Page.Domain.Edit
 import Page.Bcc.Edit
-import Url
 
 -- MAIN
 
@@ -49,7 +48,7 @@ type Page
   = NotFoundPage
   | Domains Page.Domain.Index.Model
   | DomainsEdit Page.Domain.Edit.Model
-  | Bcc Page.Bcc.Edit.Model
+  | BoundedContextCanvas Page.Bcc.Edit.Model
 
 type alias Model =
   { key : Nav.Key
@@ -76,11 +75,11 @@ initCurrentPage ( model, existingCmds ) =
               ( pageModel, pageCmds ) = Page.Domain.Edit.init model.key (Api.config model.baseUrl) id
             in
               ( DomainsEdit pageModel, Cmd.map DomainEditMsg pageCmds )
-          Route.Bcc id ->
+          Route.BoundedContextCanvas id ->
             let
               ( pageModel, pageCmds ) = Page.Bcc.Edit.init model.key (Api.config model.baseUrl) id
             in
-              ( Bcc pageModel, Cmd.map BccMsg pageCmds )
+              ( BoundedContextCanvas pageModel, Cmd.map BccMsg pageCmds )
 
     in
     ( { model | page = currentPage }
@@ -162,11 +161,11 @@ update msg model =
         (updatedModel, updatedMsg) = Page.Domain.Edit.update m edit
       in
         ({ model | page = DomainsEdit updatedModel}, updatedMsg |> Cmd.map DomainEditMsg)
-    (BccMsg m, Bcc bccModel) ->
+    (BccMsg m, BoundedContextCanvas bccModel) ->
       let
         (mo, msg2) = Page.Bcc.Edit.update m bccModel
       in
-        ({ model | page = Bcc mo}, Cmd.map BccMsg msg2)
+        ({ model | page = BoundedContextCanvas mo}, Cmd.map BccMsg msg2)
 
     (_, _) ->
       Debug.log ("Main: " ++ Debug.toString msg ++ " " ++ Debug.toString model)
@@ -195,7 +194,7 @@ view model =
   let
     content =
       case model.page of
-        Bcc m ->
+        BoundedContextCanvas m ->
           Page.Bcc.Edit.view m |> Html.map BccMsg
         Domains o ->
           Page.Domain.Index.view o |> Html.map DomainMsg

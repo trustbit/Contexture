@@ -132,7 +132,7 @@ update msg model =
       (model, BoundedContext.newBoundedContext model.config model.domain model.bccName Created)
 
     Created (Ok item) ->
-      (model, Route.pushUrl (item |> BoundedContext.id |> Route.Bcc ) model.navKey)
+      (model, Route.pushUrl (item |> BoundedContext.id |> Route.BoundedContextCanvas ) model.navKey)
 
     ShouldDelete context ->
       ({ model | deleteContext = Just { boundedContext = context, modalVisibility = Modal.shown } }, Cmd.none)
@@ -309,7 +309,7 @@ viewItem item =
               [ href
                 ( item.boundedContext
                   |> BoundedContext.id
-                  |> Route.Bcc
+                  |> Route.BoundedContextCanvas
                   |> Route.routeToString
                 )
               ]

@@ -11,8 +11,7 @@ type Route
     = NotFound
     | Home
     | Domain DomainId
-    | Bcc BoundedContextId
-
+    | BoundedContextCanvas BoundedContextId
 
 parseUrl : Url -> Route
 parseUrl url =
@@ -27,7 +26,7 @@ matchRoute =
     oneOf
         [ map Home top
         , map Domain (s "domain" </> Domain.idParser)
-        , map Bcc (s "bccs" </> BoundedContext.idParser)
+        , map BoundedContextCanvas (s "boundedContext" </> BoundedContext.idParser </> s "canvas")
         ]
 
 pushUrl : Route -> Nav.Key -> Cmd msg
@@ -49,5 +48,5 @@ routeToString route =
             "/"
         Domain id ->
             "/domain/" ++ Domain.idToString id
-        Bcc bccId ->
-            "/bccs/" ++ BoundedContext.idToString bccId
+        BoundedContextCanvas contextId ->
+            "/boundedContext/" ++ BoundedContext.idToString contextId ++ "/canvas"
