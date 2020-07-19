@@ -23,6 +23,9 @@ import RemoteData
 import Url
 import Http
 
+import Json.Decode as Decode
+import Json.Decode.Pipeline as JP
+
 import Api
 import Route
 
@@ -37,8 +40,14 @@ import Page.Bcc.Edit.Messages as Messages
 
 -- MODEL
 
+type alias CanvasModel =
+  { boundedContext : BoundedContext.BoundedContext
+  , canvas : Bcc.BoundedContextCanvas
+  }
+
 type alias EditingCanvas =
-  { canvas : Bcc.BoundedContextCanvas
+  { edit : CanvasModel
+    -- TODO: discuss we want this in edit or BCC - it's not persisted after all!
   , name : String
   , key : ChangeKey.Model
   , addingMessage : Messages.Model
@@ -53,21 +62,20 @@ type Problem
 type alias Model =
   { key: Nav.Key
   , self : Api.Configuration
-  -- TODO: discuss we want this in edit or BCC - it's not persisted after all!
   , edit: RemoteData.WebData EditingCanvas
   }
 
-initWithCanvas : Api.Configuration -> Bcc.BoundedContextCanvas -> (EditingCanvas, Cmd EditingMsg)
-initWithCanvas config canvas =
+initWithCanvas : Api.Configuration -> CanvasModel -> (EditingCanvas, Cmd EditingMsg)
+initWithCanvas config model =
   let
-    (addingDependency, addingDependencyCmd) = Dependencies.init config canvas.boundedContext canvas.dependencies
-    (changeKeyModel, changeKeyCmd) = ChangeKey.init config (canvas.boundedContext |> BoundedContext.key)
+    (addingDependency, addingDependencyCmd) = Dependencies.init config model.boundedContext model.canvas.dependencies
+    (changeKeyModel, changeKeyCmd) = ChangeKey.init config (model.boundedContext |> BoundedContext.key)
   in
-    ( { addingMessage = Messages.init canvas.messages
+    ( { addingMessage = Messages.init model.canvas.messages
       , addingDependencies = addingDependency
-      , name = canvas.boundedContext |> BoundedContext.name
+      , name = model.boundedContext |> BoundedContext.name
       , key = changeKeyModel
-      , canvas = canvas
+      , edit = model
       , problem = Nothing
       }
     , Cmd.batch
@@ -117,7 +125,7 @@ type EditingMsg
   | MessageField Messages.Msg
 
 type Msg
-  = Loaded (Result Http.Error Bcc.BoundedContextCanvas)
+  = Loaded (Result Http.Error CanvasModel)
   | Editing EditingMsg
   | Save
   | Saved (Result Http.Error ())
@@ -160,10 +168,16 @@ updateEdit msg model =
         updatedModel = Messages.update messageMsg model.addingMessage
       in
         ({ model | addingMessage = updatedModel }, Cmd.none)
+
     Field fieldMsg ->
-      ({ model | canvas = updateField fieldMsg model.canvas }, Cmd.none)
+      let
+        canvasModel = model.edit
+      in
+        ( { model | edit = { canvasModel | canvas = updateField fieldMsg model.edit.canvas } }, Cmd.none)
+
     SetName name ->
       ({ model | name = name}, Cmd.none)
+
     ChangeKeyMsg changeMsg ->
       let
         (changeKeyModel, changeKeyCmd) = ChangeKey.update changeMsg model.key
@@ -175,6 +189,7 @@ updateEdit msg model =
         ( { model | key = changeKeyModel, problem = problem }
         , changeKeyCmd |> Cmd.map ChangeKeyMsg
         )
+
     DependencyField dependency ->
       let
         (addingDependencies, addingCmd) = Dependencies.update dependency model.addingDependencies
@@ -182,7 +197,6 @@ updateEdit msg model =
         ( { model | addingDependencies = addingDependencies }
         , addingCmd |> Cmd.map DependencyField
         )
-
 
 update : Msg -> Model -> (Model, Cmd Msg)
 update msg model =
@@ -196,16 +210,19 @@ update msg model =
       case
         editable.key.value
         |> Result.mapError KeyProblem
-        |> Result.map (\k -> BoundedContext.changeKey k editable.canvas.boundedContext)
+        |> Result.map (\k -> BoundedContext.changeKey k editable.edit.boundedContext)
         |> Result.andThen (BoundedContext.changeName editable.name >> Result.mapError ContextProblem)
       of
         Ok context ->
           let
-            canvas = editable.canvas
-            c = { canvas | boundedContext = context }
-            e = { editable | canvas = c}
+            c = editable.edit.canvas
+            canvas =
+              { c
+              | dependencies = editable.addingDependencies |> Dependencies.asDependencies
+              , messages = editable.addingMessage |> Messages.asMessages
+              }
           in
-            (model, saveBCC model.self e)
+            (model, saveBCC model.self context canvas)
         Err err ->
           let
             _ = Debug.log "error" err
@@ -255,7 +272,7 @@ viewActions model =
         [ Button.roleLink
         , Button.attrs
           [ href
-            ( model.canvas.boundedContext
+            ( model.edit.boundedContext
               |> BoundedContext.domain
               |> Route.Domain
               |> Route.routeToString
@@ -298,7 +315,7 @@ viewCanvas model =
 viewLeftside : EditingCanvas -> List (Html EditingMsg)
 viewLeftside canvas =
   let
-    model = canvas.canvas
+    model = canvas.edit.canvas
   in
   List.concat
     [ [ Form.group []
@@ -355,7 +372,7 @@ viewLeftside canvas =
 
 viewRightside : EditingCanvas -> List (Html EditingMsg)
 viewRightside model =
-  [ viewModelTraits model.canvas |> Html.map Field
+  [ viewModelTraits model.edit.canvas |> Html.map Field
   , model.addingMessage |> Messages.view |> Html.map MessageField
   , model.addingDependencies |> Dependencies.view |> Html.map DependencyField
   ]
@@ -533,32 +550,29 @@ viewDescriptionList model sourceReference =
 
 loadBCC: Api.Configuration -> BoundedContextId -> Cmd Msg
 loadBCC config contextId =
-  Http.get
+  let
+    decoder =
+      Decode.succeed CanvasModel
+      |> JP.custom BoundedContext.modelDecoder
+      |> JP.custom Bcc.modelDecoder
+  in Http.get
     { url = Api.boundedContext contextId |> Api.url config |> Url.toString
-    , expect = Http.expectJson Loaded Bcc.modelDecoder
+    , expect = Http.expectJson Loaded decoder
     }
 
-saveBCC: Api.Configuration -> EditingCanvas -> Cmd Msg
-saveBCC config model =
-  let
-    c = model.canvas
-    canvas =
-      { c
-      | dependencies = model.addingDependencies |> Dependencies.asDependencies
-      , messages = model.addingMessage |> Messages.asMessages
-      }
-  in
-    Http.request
-      { method = "PATCH"
-      , headers = []
-      , url = 
-        c.boundedContext
-        |> BoundedContext.id
-        |> Api.boundedContext
-        |> Api.url config
-        |> Url.toString
-      , body = Http.jsonBody <| Bcc.modelEncoder canvas
-      , expect = Http.expectWhatever Saved
-      , timeout = Nothing
-      , tracker = Nothing
-      }
+saveBCC: Api.Configuration -> BoundedContext.BoundedContext -> Bcc.BoundedContextCanvas -> Cmd Msg
+saveBCC config context canvas =
+  Http.request
+    { method = "PATCH"
+    , headers = []
+    , url =
+      context
+      |> BoundedContext.id
+      |> Api.boundedContext
+      |> Api.url config
+      |> Url.toString
+    , body = Http.jsonBody <| Bcc.modelEncoder context canvas
+    , expect = Http.expectWhatever Saved
+    , timeout = Nothing
+    , tracker = Nothing
+    }

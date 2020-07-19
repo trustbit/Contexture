@@ -17,8 +17,7 @@ type alias UbiquitousLanguage = String
 type alias ModelTraits = String
 
 type alias BoundedContextCanvas =
-  { boundedContext : BoundedContext
-  , description : String
+  { description : String
   , classification : StrategicClassification
   , businessDecisions : BusinessDecisions
   , ubiquitousLanguage : UbiquitousLanguage
@@ -41,8 +40,7 @@ initDependencies =
 
 init: BoundedContext -> BoundedContextCanvas
 init context =
-  { boundedContext = context
-  , description = ""
+  { description = ""
   , classification = StrategicClassification.noClassification
   , businessDecisions = ""
   , ubiquitousLanguage = ""
@@ -60,12 +58,12 @@ dependenciesEncoder dependencies =
     , ("consumers", Dependency.dependencyEncoder dependencies.consumers)
     ]
 
-modelEncoder : BoundedContextCanvas -> Encode.Value
-modelEncoder canvas =
+modelEncoder : BoundedContext -> BoundedContextCanvas -> Encode.Value
+modelEncoder context canvas =
   Encode.object
-    [ ("name", Encode.string (canvas.boundedContext |> BoundedContext.name))
+    [ ("name", Encode.string (context |> BoundedContext.name))
     , ("key",
-        case canvas.boundedContext |> BoundedContext.key of
+        case context |> BoundedContext.key of
           Just v -> Key.keyEncoder v
           Nothing -> Encode.null
       )
@@ -96,7 +94,6 @@ dependenciesDecoder =
 modelDecoder : Decoder BoundedContextCanvas
 modelDecoder =
   Decode.succeed BoundedContextCanvas
-    |> JP.custom BoundedContext.modelDecoder
     |> JP.optional "description" Decode.string ""
     |> JP.optional "classification" StrategicClassification.decoder StrategicClassification.noClassification
     |> JP.optional "businessDecisions" Decode.string ""

@@ -3,6 +3,7 @@ module Page.Bcc.Index exposing (Msg, Model, update, view, init)
 import Browser.Navigation as Nav
 
 import Json.Decode as Decode
+import Json.Decode.Pipeline as JP
 
 import Html exposing (Html, button, div, text)
 import Html.Attributes exposing (..)
@@ -46,7 +47,10 @@ import BoundedContext.StrategicClassification as StrategicClassification
 
 -- MODEL
 
-type alias BccItem = Bcc.BoundedContextCanvas
+type alias Item =
+  { context : BoundedContext
+  , canvas : Bcc.BoundedContextCanvas
+  }
 
 type alias MoveContextModel =
   { context : BoundedContext
@@ -68,7 +72,7 @@ type alias Model =
   , domain : DomainId
   , deleteContext : Maybe DeleteBoundedContextModel
   , moveContext : Maybe MoveContextModel
-  , bccs : RemoteData.WebData (List BccItem) }
+  , contextItems : RemoteData.WebData (List Item) }
 
 initMoveContext : BoundedContext -> MoveContextModel
 initMoveContext context =
@@ -82,7 +86,7 @@ initMoveContext context =
 init: Api.Configuration -> Nav.Key -> DomainId -> (Model, Cmd Msg)
 init config key domain =
   ( { navKey = key
-    , bccs = RemoteData.Loading
+    , contextItems = RemoteData.Loading
     , config = config
     , domain = domain
     , deleteContext = Nothing
@@ -93,7 +97,7 @@ init config key domain =
 -- UPDATE
 
 type Msg
-  = Loaded (Result Http.Error (List BccItem))
+  = Loaded (Result Http.Error (List Item))
   | SetName String
   | CreateBcc
   | Created (Result Http.Error BoundedContext.BoundedContext)
@@ -120,10 +124,10 @@ update : Msg -> Model -> (Model, Cmd Msg)
 update msg model =
   case msg of
     Loaded (Ok items) ->
-      ({ model | bccs = RemoteData.Success items }, Cmd.none)
+      ({ model | contextItems = RemoteData.Success items }, Cmd.none)
 
     Loaded (Err e) ->
-      ({ model | bccs = RemoteData.Failure e }, Cmd.none)
+      ({ model | contextItems = RemoteData.Failure e }, Cmd.none)
 
     SetName name ->
       ({ model | bccName = name}, Cmd.none)
@@ -240,19 +244,19 @@ viewPillMessage caption value =
   ]
   else []
 
-viewItem : BccItem -> Card.Config Msg
-viewItem item =
+viewItem : Item -> Card.Config Msg
+viewItem { context, canvas} =
   let
     domainBadge =
-      case item.classification.domain |> Maybe.map StrategicClassification.domainDescription of
+      case canvas.classification.domain |> Maybe.map StrategicClassification.domainDescription of
         Just domain -> [ Badge.badgePrimary [ title domain.description ] [ text domain.name ] ]
         Nothing -> []
     businessBadges =
-      item.classification.business
+      canvas.classification.business
       |> List.map StrategicClassification.businessDescription
       |> List.map (\b -> Badge.badgeSecondary [ title b.description ] [ text b.name ])
     evolutionBadge =
-      case item.classification.evolution |> Maybe.map StrategicClassification.evolutionDescription of
+      case canvas.classification.evolution |> Maybe.map StrategicClassification.evolutionDescription of
         Just evolution -> [ Badge.badgeInfo [ title evolution.description ] [ text evolution.name ] ]
         Nothing -> []
     badges =
@@ -263,23 +267,23 @@ viewItem item =
         ]
 
     messages =
-      [ item.messages.commandsHandled, item.messages.eventsHandled, item.messages.queriesHandled ]
+      [ canvas.messages.commandsHandled, canvas.messages.eventsHandled, canvas.messages.queriesHandled ]
       |> List.map Set.size
       |> List.sum
       |> viewPillMessage "Handled Messages"
       |> List.append
-        ( [ item.messages.commandsSent, item.messages.eventsPublished, item.messages.queriesInvoked]
+        ( [ canvas.messages.commandsSent, canvas.messages.eventsPublished, canvas.messages.queriesInvoked]
           |> List.map Set.size
           |> List.sum
           |> viewPillMessage "Published Messages"
         )
 
     dependencies =
-      item.dependencies.consumers
+      canvas.dependencies.consumers
       |> Dependency.dependencyCount
       |> viewPillMessage "Consumers"
       |> List.append
-        ( item.dependencies.suppliers
+        ( canvas.dependencies.suppliers
           |> Dependency.dependencyCount
           |> viewPillMessage "Suppliers"
         )
@@ -287,12 +291,12 @@ viewItem item =
   Card.config [ Card.attrs [ class "mb-3", class "shadow" ] ]
     |> Card.block []
       [ Block.titleH4 []
-        [ text (item.boundedContext |> BoundedContext.name)
+        [ text (context |> BoundedContext.name)
         , Html.small [ class "text-muted", class "float-right" ]
-          [ text (item.boundedContext |> BoundedContext.key |> Maybe.map Key.toString |> Maybe.withDefault "") ]
+          [ text (context |> BoundedContext.key |> Maybe.map Key.toString |> Maybe.withDefault "") ]
         ]
-      , if String.length item.description > 0
-        then Block.text [ class "text-muted"] [ text item.description  ]
+      , if String.length canvas.description > 0
+        then Block.text [ class "text-muted"] [ text canvas.description  ]
         else Block.text [class "text-muted", class "text-center" ] [ Html.i [] [ text "No description :-(" ] ]
       , Block.custom (div [] badges)
       ]
@@ -307,7 +311,7 @@ viewItem item =
             [ Button.roleLink
             , Button.attrs
               [ href
-                ( item.boundedContext
+                ( context
                   |> BoundedContext.id
                   |> Route.BoundedContextCanvas
                   |> Route.routeToString
@@ -319,11 +323,11 @@ viewItem item =
         , Grid.col [ Col.textAlign Text.alignLgRight ]
           [ Button.button
             [ Button.secondary
-            , Button.onClick (StartToMoveContext item.boundedContext) ]
+            , Button.onClick (StartToMoveContext context) ]
             [ text "Move Context"]
           , Button.button
             [ Button.secondary
-            , Button.onClick (ShouldDelete item.boundedContext)
+            , Button.onClick (ShouldDelete context)
             , Button.attrs [ Spacing.ml2 ]
             ]
             [ text "Delete" ]
@@ -331,7 +335,7 @@ viewItem item =
         ]
       ]
 
-viewLoaded : String -> List BccItem  -> List(Html Msg)
+viewLoaded : String -> List Item  -> List(Html Msg)
 viewLoaded name items =
   if List.isEmpty items then
     [ Grid.row [ Row.attrs [ Spacing.pt3 ] ]
@@ -349,7 +353,7 @@ viewLoaded name items =
     let
       cards =
         items
-        |> List.sortBy (\i -> i.boundedContext |> BoundedContext.name)
+        |> List.sortBy (\{ context } -> context |> BoundedContext.name)
         |> List.map viewItem
         |> chunksOfLeft 2
         |> List.map Card.deck
@@ -445,7 +449,7 @@ viewMove model =
 
 view : Model -> List (Html Msg)
 view model =
-  case model.bccs of
+  case model.contextItems of
     RemoteData.Success contexts ->
       contexts
       |> viewLoaded model.bccName
@@ -464,9 +468,14 @@ view model =
 
 loadAll : Api.Configuration -> DomainId -> Cmd Msg
 loadAll config domain =
-  Http.get
+  let
+    decoder =
+      Decode.succeed Item
+      |> JP.custom BoundedContext.modelDecoder
+      |> JP.custom Bcc.modelDecoder
+  in Http.get
     { url = Api.boundedContexts domain |> Api.url config |> Url.toString
-    , expect = Http.expectJson Loaded (Decode.list Bcc.modelDecoder)
+    , expect = Http.expectJson Loaded (Decode.list decoder)
     }
 
 findAllDomains : Api.Configuration -> ApiResult (List Domain.Domain) msg
