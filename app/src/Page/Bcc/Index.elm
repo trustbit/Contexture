@@ -41,7 +41,7 @@ import Domain exposing (Domain)
 import Domain.DomainId exposing (DomainId)
 import BoundedContext exposing (BoundedContext)
 import BoundedContext.BoundedContextId exposing (BoundedContextId)
-import BoundedContext.Canvas as Bcc
+import BoundedContext.Canvas exposing (BoundedContextCanvas)
 import BoundedContext.Dependency as Dependency
 import BoundedContext.StrategicClassification as StrategicClassification
 
@@ -49,7 +49,7 @@ import BoundedContext.StrategicClassification as StrategicClassification
 
 type alias Item =
   { context : BoundedContext
-  , canvas : Bcc.BoundedContextCanvas
+  , canvas : BoundedContextCanvas
   }
 
 type alias MoveContextModel =
@@ -67,7 +67,7 @@ type alias DeleteBoundedContextModel =
 
 type alias Model =
   { navKey : Nav.Key
-  , bccName : String
+  , boundedContextName : String
   , config : Api.Configuration
   , domain : DomainId
   , deleteContext : Maybe DeleteBoundedContextModel
@@ -91,7 +91,7 @@ init config key domain =
     , domain = domain
     , deleteContext = Nothing
     , moveContext = Nothing
-    , bccName = "" }
+    , boundedContextName = "" }
   , loadAll config domain )
 
 -- UPDATE
@@ -99,7 +99,7 @@ init config key domain =
 type Msg
   = Loaded (Result Http.Error (List Item))
   | SetName String
-  | CreateBcc
+  | CreateBoundedContext
   | Created (Result Http.Error BoundedContext.BoundedContext)
   | ShouldDelete BoundedContext
   | CancelDelete
@@ -130,10 +130,10 @@ update msg model =
       ({ model | contextItems = RemoteData.Failure e }, Cmd.none)
 
     SetName name ->
-      ({ model | bccName = name}, Cmd.none)
+      ({ model | boundedContextName = name}, Cmd.none)
 
-    CreateBcc ->
-      (model, BoundedContext.newBoundedContext model.config model.domain model.bccName Created)
+    CreateBoundedContext ->
+      (model, BoundedContext.newBoundedContext model.config model.domain model.boundedContextName Created)
 
     Created (Ok item) ->
       (model, Route.pushUrl (item |> BoundedContext.id |> Route.BoundedContextCanvas ) model.navKey)
@@ -201,7 +201,7 @@ update msg model =
 
 createWithName : String -> Html Msg
 createWithName name =
-  Form.form [Html.Events.onSubmit CreateBcc]
+  Form.form [Html.Events.onSubmit CreateBoundedContext]
     [ InputGroup.config (
         InputGroup.text
           [ Input.id name
@@ -452,7 +452,7 @@ view model =
   case model.contextItems of
     RemoteData.Success contexts ->
       contexts
-      |> viewLoaded model.bccName
+      |> viewLoaded model.boundedContextName
       |> List.append
         ( [ model.deleteContext
             |> Maybe.map viewDelete
@@ -472,7 +472,7 @@ loadAll config domain =
     decoder =
       Decode.succeed Item
       |> JP.custom BoundedContext.modelDecoder
-      |> JP.custom Bcc.modelDecoder
+      |> JP.custom BoundedContext.Canvas.modelDecoder
   in Http.get
     { url = Api.boundedContexts domain |> Api.url config |> Url.toString
     , expect = Http.expectJson Loaded (Decode.list decoder)

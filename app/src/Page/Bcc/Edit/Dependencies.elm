@@ -30,7 +30,7 @@ import Http
 
 import Api
 
-import BoundedContext.Canvas as Bcc
+import BoundedContext.Canvas exposing (Dependencies)
 import BoundedContext
 import BoundedContext.BoundedContextId as BoundedContext
 import BoundedContext.Dependency as Dependency
@@ -69,20 +69,20 @@ initDependency existing id =
   , relationship = Nothing
   , existingDependencies = existing }
 
-initDependencies : Bcc.Dependencies -> Model
+initDependencies : Dependencies -> Model
 initDependencies dependencies =
   { consumer = initDependency dependencies.consumers "consumer-select"
   , supplier = initDependency dependencies.suppliers "supplier-select"
   , availableDependencies = []
   }
 
-init : Api.Configuration -> BoundedContext.BoundedContext -> Bcc.Dependencies -> (Model, Cmd Msg)
+init : Api.Configuration -> BoundedContext.BoundedContext -> Dependencies -> (Model, Cmd Msg)
 init config _ dependencies =
   (
     initDependencies dependencies
   , Cmd.batch [ loadBoundedContexts config, loadDomains config])
 
-asDependencies : Model -> Bcc.Dependencies
+asDependencies : Model -> Dependencies
 asDependencies model =
   { suppliers = model.supplier.existingDependencies
   , consumers = model.consumer.existingDependencies }

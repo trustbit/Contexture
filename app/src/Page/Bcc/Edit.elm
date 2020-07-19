@@ -32,7 +32,7 @@ import Route
 import BoundedContext
 import BoundedContext.BoundedContextId exposing (BoundedContextId)
 import BoundedContext.StrategicClassification as StrategicClassification
-import BoundedContext.Canvas as Bcc
+import BoundedContext.Canvas exposing (BoundedContextCanvas, BusinessDecisions, ModelTraits, UbiquitousLanguage)
 
 import Page.ChangeKey as ChangeKey
 import Page.Bcc.Edit.Dependencies as Dependencies
@@ -42,7 +42,7 @@ import Page.Bcc.Edit.Messages as Messages
 
 type alias CanvasModel =
   { boundedContext : BoundedContext.BoundedContext
-  , canvas : Bcc.BoundedContextCanvas
+  , canvas : BoundedContextCanvas
   }
 
 type alias EditingCanvas =
@@ -95,7 +95,7 @@ init key config contextId =
   in
     (
       model
-    , loadBCC config contextId
+    , loadCanvas config contextId
     )
 
 -- UPDATE
@@ -112,9 +112,9 @@ type StrategicClassificationMsg
 type FieldMsg
   = SetDescription String
   | ChangeStrategicClassification StrategicClassificationMsg
-  | SetBusinessDecisions Bcc.BusinessDecisions
-  | SetUbiquitousLanguage Bcc.UbiquitousLanguage
-  | SetModelTraits Bcc.ModelTraits
+  | SetBusinessDecisions BusinessDecisions
+  | SetUbiquitousLanguage UbiquitousLanguage
+  | SetModelTraits ModelTraits
 
 type EditingMsg
   = Field FieldMsg
@@ -142,7 +142,7 @@ updateClassification msg classification =
     SetEvolution evo ->
       { classification | evolution = Just evo}
 
-updateField: FieldMsg -> Bcc.BoundedContextCanvas -> Bcc.BoundedContextCanvas
+updateField : FieldMsg -> BoundedContextCanvas -> BoundedContextCanvas
 updateField msg canvas =
   case msg of
 
@@ -222,7 +222,7 @@ update msg model =
               , messages = editable.addingMessage |> Messages.asMessages
               }
           in
-            (model, saveBCC model.self context canvas)
+            (model, saveCanvas model.self context canvas)
         Err err ->
           let
             _ = Debug.log "error" err
@@ -441,7 +441,7 @@ viewStrategicClassification model =
       ]
     ]
 
-viewModelTraits : Bcc.BoundedContextCanvas -> Html FieldMsg
+viewModelTraits : BoundedContextCanvas -> Html FieldMsg
 viewModelTraits model =
   let
     traits =
@@ -548,20 +548,20 @@ viewDescriptionList model sourceReference =
 
 -- HTTP
 
-loadBCC: Api.Configuration -> BoundedContextId -> Cmd Msg
-loadBCC config contextId =
+loadCanvas: Api.Configuration -> BoundedContextId -> Cmd Msg
+loadCanvas config contextId =
   let
     decoder =
       Decode.succeed CanvasModel
       |> JP.custom BoundedContext.modelDecoder
-      |> JP.custom Bcc.modelDecoder
+      |> JP.custom BoundedContext.Canvas.modelDecoder
   in Http.get
     { url = Api.boundedContext contextId |> Api.url config |> Url.toString
     , expect = Http.expectJson Loaded decoder
     }
 
-saveBCC: Api.Configuration -> BoundedContext.BoundedContext -> Bcc.BoundedContextCanvas -> Cmd Msg
-saveBCC config context canvas =
+saveCanvas : Api.Configuration -> BoundedContext.BoundedContext -> BoundedContextCanvas -> Cmd Msg
+saveCanvas config context canvas =
   Http.request
     { method = "PATCH"
     , headers = []
@@ -571,7 +571,7 @@ saveBCC config context canvas =
       |> Api.boundedContext
       |> Api.url config
       |> Url.toString
-    , body = Http.jsonBody <| Bcc.modelEncoder context canvas
+    , body = Http.jsonBody <| BoundedContext.Canvas.modelEncoder context canvas
     , expect = Http.expectWhatever Saved
     , timeout = Nothing
     , tracker = Nothing
