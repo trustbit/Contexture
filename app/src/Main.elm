@@ -18,6 +18,7 @@ import Api
 import Page.Domain.Index
 import Page.Domain.Edit
 import Page.Bcc.Edit
+import Page.Bcc.Technical
 
 -- MAIN
 
@@ -49,6 +50,7 @@ type Page
   | Domains Page.Domain.Index.Model
   | DomainsEdit Page.Domain.Edit.Model
   | BoundedContextCanvas Page.Bcc.Edit.Model
+  | Technical Page.Bcc.Technical.Model
 
 type alias Model =
   { key : Nav.Key
@@ -80,6 +82,12 @@ initCurrentPage ( model, existingCmds ) =
               ( pageModel, pageCmds ) = Page.Bcc.Edit.init model.key (Api.config model.baseUrl) id
             in
               ( BoundedContextCanvas pageModel, Cmd.map BccMsg pageCmds )
+          Route.TechnicalDescription id ->
+            let
+              ( pageModel, pageCmds ) = Page.Bcc.Technical.init model.key (Api.config model.baseUrl) id
+            in
+              ( Technical pageModel, Cmd.map TechnicalMsg pageCmds )
+
 
     in
     ( { model | page = currentPage }
@@ -126,6 +134,7 @@ type Msg
   | DomainMsg Page.Domain.Index.Msg
   | DomainEditMsg Page.Domain.Edit.Msg
   | BccMsg Page.Bcc.Edit.Msg
+  | TechnicalMsg Page.Bcc.Technical.Msg
 
 update : Msg -> Model -> (Model, Cmd Msg)
 update msg model =
@@ -166,6 +175,11 @@ update msg model =
         (mo, msg2) = Page.Bcc.Edit.update m bccModel
       in
         ({ model | page = BoundedContextCanvas mo}, Cmd.map BccMsg msg2)
+    (TechnicalMsg m, Technical technicalModel) ->
+      let
+        (updatedModel, technicalMsg) = Page.Bcc.Technical.update m technicalModel
+      in
+        ({ model | page = Technical updatedModel}, Cmd.map TechnicalMsg technicalMsg)
 
     (_, _) ->
       Debug.log ("Main: " ++ Debug.toString msg ++ " " ++ Debug.toString model)
@@ -200,6 +214,8 @@ view model =
           Page.Domain.Index.view o |> Html.map DomainMsg
         DomainsEdit o ->
           Page.Domain.Edit.view o |> Html.map DomainEditMsg
+        Technical t ->
+          Page.Bcc.Technical.view t |> Html.map TechnicalMsg
         NotFoundPage ->
           text "Not Found"
   in

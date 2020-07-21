@@ -17,6 +17,7 @@ import Bootstrap.Form.Fieldset as Fieldset
 import Bootstrap.Form.Input as Input
 import Bootstrap.Form.InputGroup as InputGroup
 import Bootstrap.Button as Button
+import Bootstrap.ButtonGroup as ButtonGroup
 import Bootstrap.Utilities.Border as Border
 import Bootstrap.Card as Card
 import Bootstrap.Card.Block as Block
@@ -42,6 +43,7 @@ import Domain.DomainId exposing (DomainId)
 import BoundedContext exposing (BoundedContext)
 import BoundedContext.BoundedContextId exposing (BoundedContextId)
 import BoundedContext.Canvas exposing (BoundedContextCanvas)
+import BoundedContext.Technical exposing (TechnicalDescription)
 import BoundedContext.Dependency as Dependency
 import BoundedContext.StrategicClassification as StrategicClassification
 
@@ -50,6 +52,7 @@ import BoundedContext.StrategicClassification as StrategicClassification
 type alias Item =
   { context : BoundedContext
   , canvas : BoundedContextCanvas
+  , technical : TechnicalDescription
   }
 
 type alias MoveContextModel =
@@ -244,8 +247,12 @@ viewPillMessage caption value =
   ]
   else []
 
+urlAsLinkItem caption canBeLink =
+  canBeLink
+  |> Maybe.map (\value -> Html.a [ href <| Url.toString value, target "_blank" ] [ text caption] )
+
 viewItem : Item -> Card.Config Msg
-viewItem { context, canvas} =
+viewItem { context, canvas, technical } =
   let
     domainBadge =
       case canvas.classification.domain |> Maybe.map StrategicClassification.domainDescription of
@@ -287,6 +294,21 @@ viewItem { context, canvas} =
           |> Dependency.dependencyCount
           |> viewPillMessage "Suppliers"
         )
+
+    technicalLinks =
+      Html.ul [ class "list-inline"]
+        ( [ urlAsLinkItem "Issue Tracker" technical.tools.issueTracker
+          , urlAsLinkItem "Wiki" technical.tools.wiki
+          , urlAsLinkItem "Repository" technical.tools.repository
+          ]
+          |> List.map (\li -> li |> Maybe.map (\item -> Html.li [ class "list-inline-item", class "pr-4" ] [ item ] ) )
+          |> List.concatMap (\val ->
+              case val of
+                Just e -> [ e ]
+                Nothing -> [ ]
+            )
+        )
+
   in
   Card.config [ Card.attrs [ class "mb-3", class "shadow" ] ]
     |> Card.block []
@@ -304,33 +326,51 @@ viewItem { context, canvas} =
       [ Block.custom (div [] dependencies)
       , Block.custom (div [] messages)
       ]
+    |> Card.block []
+      [ Block.custom technicalLinks ]
     |> Card.footer []
       [ Grid.simpleRow
-        [ Grid.col [ Col.md6]
-          [ Button.linkButton
-            [ Button.roleLink
-            , Button.attrs
-              [ href
-                ( context
-                  |> BoundedContext.id
-                  |> Route.BoundedContextCanvas
-                  |> Route.routeToString
-                )
+        [ Grid.col [ Col.md7 ]
+          [ ButtonGroup.linkButtonGroup []
+            [ ButtonGroup.linkButton
+              [ Button.roleLink
+              , Button.attrs
+                [ href
+                  ( context
+                    |> BoundedContext.id
+                    |> Route.BoundedContextCanvas
+                    |> Route.routeToString
+                  )
+                ]
               ]
+              [ text "Canvas" ]
+            , ButtonGroup.linkButton
+              [ Button.roleLink
+              , Button.attrs
+                [ href
+                  ( context
+                    |> BoundedContext.id
+                    |> Route.TechnicalDescription
+                    |> Route.routeToString
+                  )
+                ]
+              ]
+              [ text "Technical Description" ]
             ]
-            [ text "Bounded Context Canvas" ]
           ]
         , Grid.col [ Col.textAlign Text.alignLgRight ]
-          [ Button.button
-            [ Button.secondary
-            , Button.onClick (StartToMoveContext context) ]
-            [ text "Move Context"]
-          , Button.button
-            [ Button.secondary
-            , Button.onClick (ShouldDelete context)
-            , Button.attrs [ Spacing.ml2 ]
+          [ ButtonGroup.buttonGroup [ ButtonGroup.small, ButtonGroup.attrs [ class "mt-auto", class "mb-auto" ] ]
+            [ ButtonGroup.button
+              [ Button.secondary
+              , Button.onClick (StartToMoveContext context) ]
+              [ text "Move Context"]
+            , ButtonGroup.button
+              [ Button.secondary
+              , Button.onClick (ShouldDelete context)
+              -- , Button.attrs [ Spacing.ml2 ]
+              ]
+              [ text "Delete" ]
             ]
-            [ text "Delete" ]
           ]
         ]
       ]
@@ -473,6 +513,7 @@ loadAll config domain =
       Decode.succeed Item
       |> JP.custom BoundedContext.modelDecoder
       |> JP.custom BoundedContext.Canvas.modelDecoder
+      |> JP.custom BoundedContext.Technical.modelDecoder
   in Http.get
     { url = Api.boundedContexts domain |> Api.url config |> Url.toString
     , expect = Http.expectJson Loaded (Decode.list decoder)
