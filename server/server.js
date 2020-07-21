@@ -1,8 +1,16 @@
 const jsonServer = require("json-server");
 const path = require("path");
 const fs = require("fs");
+const mkdirp = require("mkdirp");
 
-const dbPath = process.env.NODE_ENV == "production" ? "/data/db.json" : "db.json";
+const basePath = process.env.NODE_ENV == "production" ? "/data": "./";
+const dbPath = path.join(basePath, "db.json");
+
+if (!fs.existsSync(basePath)) {
+  mkdirp.sync(basePath);
+
+  console.log(`Created db directory ${basePath}. In case you're running this container in docker you should map a docker volume to ${basePath} to persist data.`);
+}
 
 if (!fs.existsSync(dbPath)) {
   try {
