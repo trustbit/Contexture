@@ -6,7 +6,7 @@ This prohibits further data processing and visualization of the information.
 
 Therefor we propose to design a small application which:
 
-- stores information about a BCC in a structured way instead of just using free text on (virtual) Post-ITs,
+- stores information about a BoundedContextCanvas in a structured way instead of just using free text on (virtual) Post-ITs,
 - allows explicit connections between different bounded contexts,
 - supports updating and versioning of the information over time,
 - allows to export and visualize the information from the application,
