@@ -1,30 +1,18 @@
-module Page.Bcc.Edit.UbiquitousLanguage exposing (..)
+module Page.Bcc.Edit.UbiquitousLanguage exposing (Model, Msg, init, update, view)
 
 import Html exposing (Html, div, text)
 import Html.Attributes exposing (..)
 import Html.Events exposing (onClick, onSubmit)
 
-import Bootstrap.Grid as Grid
-import Bootstrap.Grid.Row as Row
-import Bootstrap.Grid.Col as Col
 import Bootstrap.Form as Form
 import Bootstrap.Form.Input as Input
 import Bootstrap.Form.Textarea as Textarea
-import Bootstrap.Form.Radio as Radio
-import Bootstrap.Form.Checkbox as Checkbox
 import Bootstrap.Card as Card
 import Bootstrap.Card.Block as Block
 import Bootstrap.Button as Button
 import Bootstrap.Text as Text
-import Bootstrap.Utilities.Spacing as Spacing
-import Bootstrap.Utilities.Display as Display
 
 import BoundedContext.UbiquitousLanguage as UbiquitousLanguage exposing (UbiquitousLanguage, LanguageTerm, DomainTermId)
-
-type alias NewTerm =
-  { domainTerm : String
-  , description : String
-  }
 
 type ChangingModel
   = AddingNewTerm String String (Result UbiquitousLanguage.Problem LanguageTerm)
@@ -80,6 +68,7 @@ update msg model =
     _ ->
       model
 
+view : Model -> Html Msg
 view = viewAsDl
 
 viewCard : Model -> Html Msg

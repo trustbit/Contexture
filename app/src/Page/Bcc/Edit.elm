@@ -32,7 +32,7 @@ import Route
 import BoundedContext
 import BoundedContext.BoundedContextId exposing (BoundedContextId)
 import BoundedContext.StrategicClassification as StrategicClassification
-import BoundedContext.UbiquitousLanguage as UbiquitousLanguage exposing (UbiquitousLanguage)
+import BoundedContext.UbiquitousLanguage as UbiquitousLanguage
 import BoundedContext.Canvas exposing (BoundedContextCanvas, BusinessDecisions, ModelTraits)
 
 import Page.ChangeKey as ChangeKey
@@ -119,7 +119,6 @@ type FieldMsg
   = SetDescription String
   | ChangeStrategicClassification StrategicClassificationMsg
   | SetBusinessDecisions BusinessDecisions
-  -- | SetUbiquitousLanguage UbiquitousLanguage
   | SetModelTraits ModelTraits
 
 type EditingMsg
@@ -142,10 +141,13 @@ updateClassification msg classification =
   case msg of
     SetDomainType class ->
       { classification | domain = Just class}
+
     ChangeBusinessModel (Add business) ->
       { classification | business = business :: classification.business}
+
     ChangeBusinessModel (Remove business) ->
       { classification | business = classification.business |> List.filter (\bm -> bm /= business )}
+
     SetEvolution evo ->
       { classification | evolution = Just evo}
 
@@ -161,8 +163,6 @@ updateField msg canvas =
 
     SetBusinessDecisions decisions ->
       { canvas | businessDecisions = decisions}
-    -- SetUbiquitousLanguage language ->
-    --   { canvas | ubiquitousLanguage = language}
 
     SetModelTraits traits ->
       { canvas | modelTraits = traits}
@@ -328,59 +328,50 @@ viewLeftside canvas =
   let
     model = canvas.edit.canvas
   in
-  List.concat
-    [ [ Form.group []
-        [ viewCaption "name" "Name"
-        , Input.text
-          [ Input.id "name", Input.value canvas.name, Input.onInput SetName
-          , if canvas.name |> BoundedContext.isNameValid
-            then Input.success
-            else Input.danger
-          ]
-        , Form.help [] [ text "Naming is hard. Writing down the name of your context and gaining agreement as a team will frame how you design the context." ]
-        , Form.invalidFeedback [] [ text "A name for a Bounded Context is required!" ]
+    [ Form.group []
+      [ viewCaption "name" "Name"
+      , Input.text
+        [ Input.id "name", Input.value canvas.name, Input.onInput SetName
+        , if canvas.name |> BoundedContext.isNameValid
+          then Input.success
+          else Input.danger
         ]
-      , Form.group []
-        [ viewCaption "key" "Key"
-        , ChangeKey.view canvas.key |> Html.map ChangeKeyMsg
+      , Form.help [] [ text "Naming is hard. Writing down the name of your context and gaining agreement as a team will frame how you design the context." ]
+      , Form.invalidFeedback [] [ text "A name for a Bounded Context is required!" ]
+      ]
+    , Form.group []
+      [ viewCaption "key" "Key"
+      , ChangeKey.view canvas.key |> Html.map ChangeKeyMsg
+      ]
+    , Form.group []
+      [ viewCaption "description" "Description"
+      , Textarea.textarea
+        [ Textarea.id "description"
+        , Textarea.value model.description
+        , Textarea.onInput (SetDescription >> Field)
         ]
-      , Form.group []
-        [ viewCaption "description" "Description"
+      , Form.help [] [ text "A few sentences describing the why and what of the context in business language. No technical details here."] ]
+    , model.classification
+      |> viewStrategicClassification
+      |> Html.map (ChangeStrategicClassification >> Field)
+    , Form.group []
+      [ viewCaption "businessDecisions" "Business Decisions"
         , Textarea.textarea
-          [ Textarea.id "description"
-          , Textarea.value model.description
-          , Textarea.onInput (SetDescription >> Field)
+          [ Textarea.id "businessDecisions"
+          , Textarea.rows 10
+          , Textarea.value model.businessDecisions
+          , Textarea.onInput (SetBusinessDecisions >> Field)
           ]
-        , Form.help [] [ text "A few sentences describing the why and what of the context in business language. No technical details here."] ]
+        , Form.help [] [ text "What are the key business rules and policies within this context?"]
       ]
-    , [ model.classification
-        |> viewStrategicClassification
-        |> Html.map (ChangeStrategicClassification >> Field)
-      ]
-    , [ Form.group []
-        [ viewCaption "businessDecisions" "Business Decisions"
-          , Textarea.textarea
-            [ Textarea.id "businessDecisions"
-            , Textarea.rows 10
-            , Textarea.value model.businessDecisions
-            , Textarea.onInput (SetBusinessDecisions >> Field)
-            ]
-          , Form.help [] [ text "What are the key business rules and policies within this context?"]
+    , Form.group []
+        [ viewCaption "ubiquitousLanguage" "Ubiquitous Language"
+        , Form.help [] [ text "What are the key domain terms that exist within this context, and what do they mean?" ]
+        , UbiquitousLanguage.view canvas.ubiquitousLanguage |> Html.map UbiquitousLanguageField
         ]
-      , Form.group []
-          [ viewCaption "ubiquitousLanguage" "Ubiquitous Language"
-          , UbiquitousLanguage.view canvas.ubiquitousLanguage |> Html.map UbiquitousLanguageField
-            -- , Textarea.textarea
-            --   [ Textarea.id "ubiquitousLanguage"
-            --   , Textarea.rows 10
-            --   , Textarea.value model.ubiquitousLanguage
-            --   , Textarea.onInput SetUbiquitousLanguage
-            --   ]
-            , Form.help [] [ text "What are the key domain terms that exist within this context, and what do they mean?"]
-          ]
-      ]
-      -- |> List.map (Html.map Field)
     ]
+    -- |> List.map (Html.map Field)
+
 
 viewRightside : EditingCanvas -> List (Html EditingMsg)
 viewRightside model =
