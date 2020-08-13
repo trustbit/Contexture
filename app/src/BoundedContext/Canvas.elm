@@ -9,11 +9,12 @@ import BoundedContext exposing (BoundedContext)
 import BoundedContext.Dependency as Dependency
 import BoundedContext.StrategicClassification as StrategicClassification exposing(StrategicClassification)
 import BoundedContext.Message as Message exposing (Messages)
+import BoundedContext.UbiquitousLanguage as UbiquitousLanguage exposing (UbiquitousLanguage)
 
 -- MODEL
 
 type alias BusinessDecisions = String
-type alias UbiquitousLanguage = String
+
 type alias ModelTraits = String
 
 type alias BoundedContextCanvas =
@@ -43,7 +44,7 @@ init context =
   { description = ""
   , classification = StrategicClassification.noClassification
   , businessDecisions = ""
-  , ubiquitousLanguage = ""
+  , ubiquitousLanguage = UbiquitousLanguage.noLanguageTerms
   , modelTraits = ""
   , messages = Message.noMessages
   , dependencies = initDependencies
@@ -70,7 +71,7 @@ modelEncoder context canvas =
     , ("description", Encode.string canvas.description)
     , ("classification", StrategicClassification.encoder canvas.classification)
     , ("businessDecisions", Encode.string canvas.businessDecisions)
-    , ("ubiquitousLanguage", Encode.string canvas.ubiquitousLanguage)
+    , ("ubiquitousLanguage", UbiquitousLanguage.modelEncoder canvas.ubiquitousLanguage)
     , ("modelTraits", Encode.string canvas.modelTraits)
     , ("messages", Message.messagesEncoder canvas.messages)
     , ("dependencies", dependenciesEncoder canvas.dependencies)
@@ -97,7 +98,7 @@ modelDecoder =
     |> JP.optional "description" Decode.string ""
     |> JP.optional "classification" StrategicClassification.decoder StrategicClassification.noClassification
     |> JP.optional "businessDecisions" Decode.string ""
-    |> JP.optional "ubiquitousLanguage" Decode.string ""
+    |> JP.optional "ubiquitousLanguage" UbiquitousLanguage.modelDecoder UbiquitousLanguage.noLanguageTerms
     |> JP.optional "modelTraits" Decode.string ""
     |> JP.optional "messages" Message.messagesDecoder Message.noMessages
     |> JP.optional "dependencies" dependenciesDecoder initDependencies

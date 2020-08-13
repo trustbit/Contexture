@@ -197,8 +197,9 @@ update msg model =
       ( { model | moveContext = Nothing }, Cmd.none)
 
     _ ->
-        Debug.log ("Overview: " ++ Debug.toString msg ++ " " ++ Debug.toString model)
-        (model, Cmd.none)
+      let
+        _ = Debug.log "BCC index msg" msg
+      in (Debug.log "Bcc index model" model, Cmd.none)
 
 -- VIEW
 
@@ -500,6 +501,8 @@ view model =
             |> Maybe.map viewMove
           ] |> List.map (Maybe.withDefault (text ""))
         )
+    RemoteData.Failure e ->
+      [ text ("Error on loading: " ++ (Debug.toString e))]
 
     _ -> [ text "Loading your contexts"]
 

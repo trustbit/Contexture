@@ -154,14 +154,14 @@ update msg model =
       case model.edit of
         RemoteData.Success editable ->
           let
-            (changeModel, changeCmd) = 
+            (changeModel, changeCmd) =
               editable.domain
               |> Domain.key
               |> ChangeKey.init model.config
           in
             ( model |> changeEdit (\e -> { e | editDomain = Just (ChangingKey changeModel) } )
             , Cmd.batch
-              [ Task.attempt (\_ -> NoOp) (Dom.focus "key") 
+              [ Task.attempt (\_ -> NoOp) (Dom.focus "key")
               , changeCmd |> Cmd.map ChangeKeyMsg
               ]
             )
@@ -181,7 +181,7 @@ update msg model =
                 )
             _ -> (model, Cmd.none)
         _ -> (model, Cmd.none)
-      
+
     AssignKey newKey ->
       case model.edit of
         RemoteData.Success { domain } ->
@@ -222,8 +222,10 @@ update msg model =
       ( model |> changeEdit (\e -> { e | editDomain = Nothing }), Cmd.none)
 
     _ ->
-      Debug.log ("BCC: " ++ Debug.toString msg ++ " " ++ Debug.toString model)
-      (model, Cmd.none)
+      let
+        _ = Debug.log "BCC MSG" msg
+      in
+        (Debug.log "BCC Model" model, Cmd.none)
 
 -- VIEW
 

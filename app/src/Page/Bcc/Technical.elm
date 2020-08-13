@@ -33,7 +33,6 @@ import Key
 import BoundedContext exposing (BoundedContext)
 import BoundedContext.BoundedContextId exposing (BoundedContextId)
 import BoundedContext.Technical as Technical exposing(TechnicalDescription)
-import BoundedContext.StrategicClassification exposing (Description)
 
 type alias LifecycleModel =
   { issueTracker : String
