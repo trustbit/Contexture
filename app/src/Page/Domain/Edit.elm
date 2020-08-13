@@ -222,8 +222,10 @@ update msg model =
       ( model |> changeEdit (\e -> { e | editDomain = Nothing }), Cmd.none)
 
     _ ->
-      Debug.log ("BCC: " ++ Debug.toString msg ++ " " ++ Debug.toString model)
-      (model, Cmd.none)
+      let 
+        _ = Debug.log "BCC MSG" msg
+      in
+        (Debug.log "BCC Model" model, Cmd.none)
 
 -- VIEW
 

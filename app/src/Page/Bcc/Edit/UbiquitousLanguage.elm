@@ -19,15 +19,15 @@ import Bootstrap.Text as Text
 import Bootstrap.Utilities.Spacing as Spacing
 import Bootstrap.Utilities.Display as Display
 
-import BoundedContext.UbiquitousLanguage as UbiquitousLanguage exposing (UbiquitousLanguage,LanguageTerm)
-import BoundedContext.UbiquitousLanguage exposing (description)
+import BoundedContext.UbiquitousLanguage as UbiquitousLanguage exposing (UbiquitousLanguage, LanguageTerm, DomainTermId)
 
-type alias NewTerm = 
+type alias NewTerm =
   { domainTerm : String
-  , description : String  
+  , description : String
   }
+
 type ChangingModel
-  = AddingNewTerm String String
+  = AddingNewTerm String String (Result UbiquitousLanguage.Problem LanguageTerm)
 
 type alias Model =
   { language : UbiquitousLanguage
@@ -45,37 +45,37 @@ type Msg
   = StartToDefineNewTerm
   | ChangeDomainTerm String
   | ChangeDescription String
-  | Save
-  | DeleteTerm String
+  | Save LanguageTerm
+  | DeleteTerm DomainTermId
 
 
 update : Msg -> Model -> Model
 update msg model =
   case (msg, model.changeModel) of
     (StartToDefineNewTerm, _) ->
-      { model | changeModel = Just <| AddingNewTerm "" "" }
-    
-    (ChangeDomainTerm term, Just (AddingNewTerm _ description)) ->
-      { model | changeModel = Just <| AddingNewTerm term description }
+      { model | changeModel = Just <| AddingNewTerm "" "" (UbiquitousLanguage.defineLanguageTerm model.language "" "") }
 
-    (ChangeDescription description, Just (AddingNewTerm term _)) ->
-      { model | changeModel = Just <| AddingNewTerm term description }
+    (ChangeDomainTerm term, Just (AddingNewTerm _ description _)) ->
+      { model | changeModel = Just <| AddingNewTerm term description (UbiquitousLanguage.defineLanguageTerm model.language term description) }
 
-    (Save, Just (AddingNewTerm term description)) ->
+    (ChangeDescription description, Just (AddingNewTerm term _ _)) ->
+      { model | changeModel = Just <| AddingNewTerm term description (UbiquitousLanguage.defineLanguageTerm model.language term description) }
+
+    (Save term, Just (AddingNewTerm _ _ _)) ->
       let
-        newLanguage = UbiquitousLanguage.addLanguageTerm model.language term description
+        newLanguage = UbiquitousLanguage.addLanguageTerm model.language term
 
       in
         case newLanguage of
           Ok terms ->
-            { model 
+            { model
             | language = terms
             , changeModel = Nothing
             }
           Err _ ->
             model
     (DeleteTerm term, Nothing) ->
-      { model | language = UbiquitousLanguage.removeLanguageTerm model.language  term }
+      { model | language = UbiquitousLanguage.removeLanguageTerm model.language term }
 
     _ ->
       model
@@ -95,37 +95,57 @@ viewCard model =
 viewDefineTerm : Maybe ChangingModel -> Card.Config Msg
 viewDefineTerm model =
   case model of
-     Just (AddingNewTerm term description) ->
-      Card.config [ Card.attrs [ class "mb-3", class "shadow" ] ]
-      |> Card.block []
-        [ Block.custom <|
-          Form.form [ onSubmit Save ]
-          [ Form.group []
-            [ Form.label [ for "term" ] [ text "Term" ]
-            , Input.text 
-              [ Input.id "term"
-              , Input.value term
-              , Input.placeholder "Domain-Term"
-              , Input.onInput ChangeDomainTerm
+     Just (AddingNewTerm term description definition) ->
+      let
+        (termIsValid, anEvent, feedbackText) =
+          case definition of
+            Ok d ->
+              (True, [ onSubmit (Save d) ], "")
+            Err p ->
+              let
+                errorText =
+                  case p of
+                    UbiquitousLanguage.TermDefinitionEmpty ->
+                      "No domain term is specified"
+                    UbiquitousLanguage.TermAlreadyAdded ->
+                      "The term '" ++ term ++ "' was already added. Please use a distinct, case insensitive name."
+              in
+                (False, [], errorText)
+      in
+        Card.config [ Card.attrs [ class "mb-3", class "shadow" ] ]
+        |> Card.block []
+          [ Block.custom <|
+            Form.form anEvent
+            [ Form.group []
+              [ Form.label [ for "term" ] [ text "Term" ]
+              , Input.text
+                [ Input.id "term"
+                , Input.value term
+                , Input.placeholder "Domain-Term"
+                , Input.onInput ChangeDomainTerm
+                , if termIsValid
+                  then Input.success
+                  else Input.danger
+                ]
+              , Form.invalidFeedback [] [ text feedbackText]
               ]
-            ]
-          , Form.group []
-            [ Form.label [ for "description" ] [ text "Description" ]
-            , Textarea.textarea 
-              [ Textarea.id "description"
-              , Textarea.value description
-              -- , Textarea.placeholder "Description"
-              , Textarea.onInput ChangeDescription
+            , Form.group []
+              [ Form.label [ for "description" ] [ text "Description" ]
+              , Textarea.textarea
+                [ Textarea.id "description"
+                , Textarea.value description
+                -- , Textarea.placeholder "Description"
+                , Textarea.onInput ChangeDescription
+                ]
               ]
+            , Button.submitButton [ Button.primary, Button.disabled (not termIsValid) ] [ text "Define new Term" ]
             ]
-          , Button.submitButton [ Button.primary] [ text "Define new Term" ]
           ]
-        ]
      _ ->
       Card.config [ Card.attrs [ class "mb-3", class "shadow" ], Card.align Text.alignXsCenter ]
       |> Card.block []
-        [ Block.custom 
-          <| Button.button [ Button.primary, Button.onClick StartToDefineNewTerm ] [ text "Define new term" ] 
+        [ Block.custom
+          <| Button.button [ Button.primary, Button.onClick StartToDefineNewTerm ] [ text "Define new term" ]
         ]
 
 
@@ -135,9 +155,9 @@ viewLanguageTerm model =
     |> Card.block []
       [ Block.titleH6 []
         [ text (model |> UbiquitousLanguage.domainTerm)]
-      , Block.text [ class "text-muted"] 
+      , Block.text [ class "text-muted"]
         [ model
-        |> UbiquitousLanguage.description
+        |> UbiquitousLanguage.domainDescription
         |> Maybe.map text
         |> Maybe.withDefault (Html.i [] [ text "No description :-(" ])
         ]
@@ -146,20 +166,20 @@ viewLanguageTerm model =
 
 viewDlTerm : LanguageTerm -> List (Html Msg)
 viewDlTerm model =
-  [ Html.dt [] 
+  [ Html.dt []
     [ text (model |> UbiquitousLanguage.domainTerm)
     , Button.button
       [ Button.secondary
       , Button.small
-      , Button.onClick (DeleteTerm (model |> UbiquitousLanguage.domainTerm))
+      , Button.onClick (DeleteTerm (model |> UbiquitousLanguage.id))
       , Button.attrs [class "float-right"]
       ]
       [ text "X" ]
     ]
-  , Html.dd 
-    [] 
+  , Html.dd
+    []
     [ model
-      |> UbiquitousLanguage.description
+      |> UbiquitousLanguage.domainDescription
       |> Maybe.map text
       |> Maybe.withDefault (Html.i [] [ text "No description :-(" ])
     ]
@@ -169,10 +189,10 @@ viewAsDl: Model -> Html Msg
 viewAsDl model =
   Html.div []
   [ viewDefineTerm model.changeModel  |> Card.view
-  , Html.dl [] 
+  , Html.dl []
     ( model.language
     |> UbiquitousLanguage.languageTerms
     |> List.concatMap viewDlTerm
-    )    
+    )
   ]
-  
+
