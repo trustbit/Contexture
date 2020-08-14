@@ -33,7 +33,8 @@ type Msg
   = StartToDefineNewTerm
   | ChangeDomainTerm String
   | ChangeDescription String
-  | Save LanguageTerm
+  | DefineTerm LanguageTerm
+  | CancelDefine
   | DeleteTerm DomainTermId
 
 
@@ -49,7 +50,7 @@ update msg model =
     (ChangeDescription description, Just (AddingNewTerm term _ _)) ->
       { model | changeModel = Just <| AddingNewTerm term description (UbiquitousLanguage.defineLanguageTerm model.language term description) }
 
-    (Save term, Just (AddingNewTerm _ _ _)) ->
+    (DefineTerm term, Just (AddingNewTerm _ _ _)) ->
       let
         newLanguage = UbiquitousLanguage.addLanguageTerm model.language term
 
@@ -64,6 +65,9 @@ update msg model =
             model
     (DeleteTerm term, Nothing) ->
       { model | language = UbiquitousLanguage.removeLanguageTerm model.language term }
+
+    (CancelDefine, _) ->
+      { model | changeModel = Nothing}
 
     _ ->
       model
@@ -89,7 +93,7 @@ viewDefineTerm model =
         (termIsValid, anEvent, feedbackText) =
           case definition of
             Ok d ->
-              (True, [ onSubmit (Save d) ], "")
+              (True, [ onSubmit (DefineTerm d) ], "")
             Err p ->
               let
                 errorText =
@@ -106,16 +110,16 @@ viewDefineTerm model =
           [ Block.custom <|
             Form.form anEvent
             [ Form.group []
-              [ Form.label [ for "term" ] [ text "Term" ]
+              [ Form.label [ for "term" ] [ text "Domain term" ]
               , Input.text
                 [ Input.id "term"
                 , Input.value term
-                , Input.placeholder "Domain-Term"
                 , Input.onInput ChangeDomainTerm
                 , if termIsValid
                   then Input.success
                   else Input.danger
                 ]
+              , Form.help [] [ text "The language term that is used inside this bounded context." ]
               , Form.invalidFeedback [] [ text feedbackText]
               ]
             , Form.group []
@@ -123,10 +127,11 @@ viewDefineTerm model =
               , Textarea.textarea
                 [ Textarea.id "description"
                 , Textarea.value description
-                -- , Textarea.placeholder "Description"
                 , Textarea.onInput ChangeDescription
                 ]
+              , Form.help [] [ text "Define the meaning of the term inside this bounded context." ]
               ]
+            , Button.button [ Button.outlineSecondary, Button.onClick CancelDefine, Button.attrs [ class "mr-2"] ] [ text "Cancel"]
             , Button.submitButton [ Button.primary, Button.disabled (not termIsValid) ] [ text "Define new Term" ]
             ]
           ]
