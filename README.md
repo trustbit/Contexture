@@ -50,7 +50,7 @@ Make sure [Elm](https://guide.elm-lang.org/install/elm.html) is installed and pa
 During development use `elm-live` for handling routes correctly.
 
 ```bash
-npm install elm-live -g
+npm install elm elm-live -g
 cd app
 elm-live src/Main.elm --pushstate
 ```
