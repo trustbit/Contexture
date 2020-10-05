@@ -41,7 +41,9 @@ defineBusinessDecision decisions name description =
         Err DefinitionEmpty
     else
         if isDecisionNameUnique name decisions then
-            Ok <| BusinessDecision <| BusinessDecisionInternal (name |> String.toLower) (if String.isEmpty description then Nothing else Just description)
+            BusinessDecisionInternal name (if String.isEmpty description then Nothing else Just description)
+            |> BusinessDecision
+            |> Ok
         else Err AlreadyExists
 
 addBusinessDecision : BusinessDecisions -> BusinessDecision -> Result Problem BusinessDecisions
