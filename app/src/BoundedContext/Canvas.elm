@@ -10,6 +10,7 @@ import BoundedContext.Dependency as Dependency
 import BoundedContext.StrategicClassification as StrategicClassification exposing(StrategicClassification)
 import BoundedContext.Message as Message exposing (Messages)
 import BoundedContext.UbiquitousLanguage as UbiquitousLanguage exposing (UbiquitousLanguage)
+import BoundedContext.BusinessDecision exposing (BusinessDecision)
 
 -- MODEL
 
@@ -20,7 +21,7 @@ type alias ModelTraits = String
 type alias BoundedContextCanvas =
   { description : String
   , classification : StrategicClassification
-  , businessDecisions : BusinessDecisions
+  , businessDecisions : List BusinessDecision
   , ubiquitousLanguage : UbiquitousLanguage
   , modelTraits : ModelTraits
   , messages : Messages
@@ -43,7 +44,7 @@ init: BoundedContext -> BoundedContextCanvas
 init context =
   { description = ""
   , classification = StrategicClassification.noClassification
-  , businessDecisions = ""
+  , businessDecisions = []
   , ubiquitousLanguage = UbiquitousLanguage.noLanguageTerms
   , modelTraits = ""
   , messages = Message.noMessages
@@ -70,7 +71,7 @@ modelEncoder context canvas =
       )
     , ("description", Encode.string canvas.description)
     , ("classification", StrategicClassification.encoder canvas.classification)
-    , ("businessDecisions", Encode.string canvas.businessDecisions)
+    , ("businessDecisions", BoundedContext.BusinessDecision.modelsEncoder canvas.businessDecisions)
     , ("ubiquitousLanguage", UbiquitousLanguage.modelEncoder canvas.ubiquitousLanguage)
     , ("modelTraits", Encode.string canvas.modelTraits)
     , ("messages", Message.messagesEncoder canvas.messages)
@@ -97,7 +98,7 @@ modelDecoder =
   Decode.succeed BoundedContextCanvas
     |> JP.optional "description" Decode.string ""
     |> JP.optional "classification" StrategicClassification.decoder StrategicClassification.noClassification
-    |> JP.optional "businessDecisions" Decode.string ""
+    |> JP.optional "businessDecisions" BoundedContext.BusinessDecision.modelsDecoder []
     |> JP.optional "ubiquitousLanguage" UbiquitousLanguage.modelDecoder UbiquitousLanguage.noLanguageTerms
     |> JP.optional "modelTraits" Decode.string ""
     |> JP.optional "messages" Message.messagesDecoder Message.noMessages

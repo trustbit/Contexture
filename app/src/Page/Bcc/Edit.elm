@@ -33,13 +33,15 @@ import BoundedContext
 import BoundedContext.BoundedContextId exposing (BoundedContextId)
 import BoundedContext.StrategicClassification as StrategicClassification
 import BoundedContext.UbiquitousLanguage as UbiquitousLanguage
-import BoundedContext.Canvas exposing (BoundedContextCanvas, BusinessDecisions, ModelTraits)
+import BoundedContext.Canvas exposing (BoundedContextCanvas, ModelTraits)
 
 import Page.ChangeKey as ChangeKey
 import Page.Bcc.Edit.Dependencies as Dependencies
 import Page.Bcc.Edit.Messages as Messages
 import Page.Bcc.Edit.UbiquitousLanguage as UbiquitousLanguage
 import BoundedContext.UbiquitousLanguage exposing (UbiquitousLanguage(..))
+import BoundedContext.BusinessDecision exposing (BusinessDecision(..))
+import Page.Bcc.Edit.BusinessDecision as BusinessDecisionView exposing (view, Msg, Model, init)
 
 -- MODEL
 
@@ -57,6 +59,7 @@ type alias EditingCanvas =
   , addingDependencies : Dependencies.Model
   , ubiquitousLanguage : UbiquitousLanguage.Model
   , problem : Maybe Problem
+  , businessDecisions: BusinessDecisionView.Model
   }
 
 type Problem
@@ -75,6 +78,7 @@ initWithCanvas config model =
     (addingDependency, addingDependencyCmd) = Dependencies.init config model.boundedContext model.canvas.dependencies
     (changeKeyModel, changeKeyCmd) = ChangeKey.init config (model.boundedContext |> BoundedContext.key)
     ubiquitousLanguageModel = UbiquitousLanguage.init model.canvas.ubiquitousLanguage
+    businessDecisionsModel = BusinessDecisionView.init model.canvas.businessDecisions
   in
     ( { addingMessage = Messages.init model.canvas.messages
       , addingDependencies = addingDependency
@@ -83,6 +87,7 @@ initWithCanvas config model =
       , key = changeKeyModel
       , edit = model
       , problem = Nothing
+      , businessDecisions = businessDecisionsModel
       }
     , Cmd.batch
       [ addingDependencyCmd |> Cmd.map DependencyField
@@ -118,7 +123,6 @@ type StrategicClassificationMsg
 type FieldMsg
   = SetDescription String
   | ChangeStrategicClassification StrategicClassificationMsg
-  | SetBusinessDecisions BusinessDecisions
   | SetModelTraits ModelTraits
 
 type EditingMsg
@@ -129,6 +133,7 @@ type EditingMsg
   | DependencyField Dependencies.Msg
   | MessageField Messages.Msg
   | UbiquitousLanguageField UbiquitousLanguage.Msg
+  | BusinessDecisionField BusinessDecisionView.Msg
 
 type Msg
   = Loaded (Result Http.Error CanvasModel)
@@ -161,9 +166,6 @@ updateField msg canvas =
     ChangeStrategicClassification m ->
       { canvas | classification = updateClassification m canvas.classification }
 
-    SetBusinessDecisions decisions ->
-      { canvas | businessDecisions = decisions}
-
     SetModelTraits traits ->
       { canvas | modelTraits = traits}
 
@@ -187,6 +189,9 @@ updateEdit msg model =
 
     UbiquitousLanguageField languageMsg ->
       ({ model | ubiquitousLanguage = UbiquitousLanguage.update languageMsg model.ubiquitousLanguage}, Cmd.none)
+
+    BusinessDecisionField businessDecisionMsg -> 
+      ({ model | businessDecisions = BusinessDecisionView.update businessDecisionMsg model.businessDecisions}, Cmd.none)
 
     ChangeKeyMsg changeMsg ->
       let
@@ -231,6 +236,7 @@ update msg model =
               | dependencies = editable.addingDependencies |> Dependencies.asDependencies
               , messages = editable.addingMessage |> Messages.asMessages
               , ubiquitousLanguage = editable.ubiquitousLanguage.language
+              , businessDecisions = editable.businessDecisions.decisions
               }
           in
             (model, saveCanvas model.self context canvas)
@@ -356,13 +362,8 @@ viewLeftside canvas =
       |> Html.map (ChangeStrategicClassification >> Field)
     , Form.group []
       [ viewCaption "businessDecisions" "Business Decisions"
-        , Textarea.textarea
-          [ Textarea.id "businessDecisions"
-          , Textarea.rows 10
-          , Textarea.value model.businessDecisions
-          , Textarea.onInput (SetBusinessDecisions >> Field)
-          ]
         , Form.help [] [ text "What are the key business rules and policies within this context?"]
+        , BusinessDecisionView.view canvas.businessDecisions |> Html.map BusinessDecisionField
       ]
     , Form.group []
         [ viewCaption "ubiquitousLanguage" "Ubiquitous Language"
