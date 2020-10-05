@@ -15,6 +15,7 @@ import Bootstrap.Form.Input as Input
 import Bootstrap.Form.Textarea as Textarea
 import BoundedContext.BusinessDecision exposing (BusinessDecision(..))
 import BoundedContext.BusinessDecision exposing (Problem(..))
+import BoundedContext.BusinessDecision exposing (getId)
 
 type Msg
     = Show 
@@ -91,7 +92,7 @@ viewDecision decision =
     , Button.button
       [ Button.secondary
       , Button.small
-      , Button.onClick (Delete (decision |> getName))
+      , Button.onClick (Delete (decision |> getId))
       , Button.attrs [class "float-right"]
       ]
       [ text "X" ]

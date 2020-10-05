@@ -18,6 +18,10 @@ type Problem
   = DefinitionEmpty
   | AlreadyExists
 
+getId : BusinessDecision -> String
+getId (BusinessDecision decision) = 
+    String.toLower decision.name
+
 getName : BusinessDecision -> String 
 getName (BusinessDecision decision) =
     decision.name
@@ -26,11 +30,10 @@ getDescription: BusinessDecision -> Maybe String
 getDescription (BusinessDecision decision) =
     decision.description
 
-isDecisionNameUnique : String -> BusinessDecisions -> Bool
-isDecisionNameUnique name decisions =
+isDecisionUnique : String -> BusinessDecisions -> Bool
+isDecisionUnique name decisions =
   decisions
-  |> List.map getName
-  |> List.map String.toLower
+  |> List.map getId
   |> List.member (name |> String.toLower)
   |> not
 
@@ -39,7 +42,7 @@ defineBusinessDecision decisions name description =
     if String.isEmpty name then
         Err DefinitionEmpty
     else
-        if isDecisionNameUnique name decisions then
+        if isDecisionUnique name decisions then
             BusinessDecisionInternal name (if String.isEmpty description then Nothing else Just description)
             |> BusinessDecision
             |> Ok
@@ -47,7 +50,7 @@ defineBusinessDecision decisions name description =
 
 addBusinessDecision : BusinessDecisions -> BusinessDecision -> Result Problem BusinessDecisions
 addBusinessDecision decisions decision =
-    if decisions |> isDecisionNameUnique (getName decision) then
+    if decisions |> isDecisionUnique (getId decision) then
         List.singleton decision
         |> List.append decisions
         |> Ok
@@ -55,8 +58,8 @@ addBusinessDecision decisions decision =
         Err AlreadyExists
 
 deleteBusinessDecision : BusinessDecisions -> String -> BusinessDecisions
-deleteBusinessDecision desicions name =
-    List.filter (\item -> getName item /= name) desicions
+deleteBusinessDecision desicions id =
+    List.filter (\item -> getId item /= id) desicions
 
 modelEncoder : BusinessDecision -> Encode.Value
 modelEncoder (BusinessDecision decision) = 
