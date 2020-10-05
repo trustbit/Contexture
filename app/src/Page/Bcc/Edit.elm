@@ -33,17 +33,15 @@ import BoundedContext
 import BoundedContext.BoundedContextId exposing (BoundedContextId)
 import BoundedContext.StrategicClassification as StrategicClassification
 import BoundedContext.UbiquitousLanguage as UbiquitousLanguage
-import BoundedContext.Canvas exposing (BoundedContextCanvas, BusinessDecisions, ModelTraits)
+import BoundedContext.Canvas exposing (BoundedContextCanvas, ModelTraits)
 
 import Page.ChangeKey as ChangeKey
 import Page.Bcc.Edit.Dependencies as Dependencies
 import Page.Bcc.Edit.Messages as Messages
 import Page.Bcc.Edit.UbiquitousLanguage as UbiquitousLanguage
 import BoundedContext.UbiquitousLanguage exposing (UbiquitousLanguage(..))
-import Array
-import BoundedContext.BusinessDecision exposing (BusinessDecision, BusinessDecisions)
-import Page.Bcc.Edit.BusinessDecision as BusinessDecisionView exposing (viewDecision, view, Msg, Model, init)
 import BoundedContext.BusinessDecision exposing (BusinessDecision(..))
+import Page.Bcc.Edit.BusinessDecision as BusinessDecisionView exposing (view, Msg, Model, init)
 
 -- MODEL
 
