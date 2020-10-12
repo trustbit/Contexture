@@ -10,6 +10,7 @@ import Bootstrap.Grid as Grid
 import Bootstrap.Grid.Row as Row
 import Bootstrap.Grid.Col as Col
 import Bootstrap.Form as Form
+import Bootstrap.Form.Select as Select
 import Bootstrap.Form.Input as Input
 import Bootstrap.Form.Textarea as Textarea
 import Bootstrap.Form.Radio as Radio
@@ -33,7 +34,7 @@ import BoundedContext
 import BoundedContext.BoundedContextId exposing (BoundedContextId)
 import BoundedContext.StrategicClassification as StrategicClassification
 import BoundedContext.UbiquitousLanguage as UbiquitousLanguage
-import BoundedContext.Canvas exposing (BoundedContextCanvas, ModelTraits)
+import BoundedContext.Canvas exposing (BoundedContextCanvas)
 
 import Page.ChangeKey as ChangeKey
 import Page.Bcc.Edit.Dependencies as Dependencies
@@ -42,6 +43,8 @@ import Page.Bcc.Edit.UbiquitousLanguage as UbiquitousLanguage
 import BoundedContext.UbiquitousLanguage exposing (UbiquitousLanguage(..))
 import BoundedContext.BusinessDecision exposing (BusinessDecision(..))
 import Page.Bcc.Edit.BusinessDecision as BusinessDecisionView exposing (view, Msg, Model, init)
+import Page.Bcc.Edit.DomainRoles as DomainRolesView exposing (view, Msg, Model, init)
+import BoundedContext.DomainRoles exposing (getName)
 
 -- MODEL
 
@@ -60,6 +63,7 @@ type alias EditingCanvas =
   , ubiquitousLanguage : UbiquitousLanguage.Model
   , problem : Maybe Problem
   , businessDecisions: BusinessDecisionView.Model
+  , domainRoles: DomainRolesView.Model
   }
 
 type Problem
@@ -79,6 +83,7 @@ initWithCanvas config model =
     (changeKeyModel, changeKeyCmd) = ChangeKey.init config (model.boundedContext |> BoundedContext.key)
     ubiquitousLanguageModel = UbiquitousLanguage.init model.canvas.ubiquitousLanguage
     businessDecisionsModel = BusinessDecisionView.init model.canvas.businessDecisions
+    domainRolesModel = DomainRolesView.init model.canvas.domainRoles
   in
     ( { addingMessage = Messages.init model.canvas.messages
       , addingDependencies = addingDependency
@@ -88,6 +93,7 @@ initWithCanvas config model =
       , edit = model
       , problem = Nothing
       , businessDecisions = businessDecisionsModel
+      , domainRoles = domainRolesModel
       }
     , Cmd.batch
       [ addingDependencyCmd |> Cmd.map DependencyField
@@ -123,7 +129,6 @@ type StrategicClassificationMsg
 type FieldMsg
   = SetDescription String
   | ChangeStrategicClassification StrategicClassificationMsg
-  | SetModelTraits ModelTraits
 
 type EditingMsg
   = Field FieldMsg
@@ -134,6 +139,7 @@ type EditingMsg
   | MessageField Messages.Msg
   | UbiquitousLanguageField UbiquitousLanguage.Msg
   | BusinessDecisionField BusinessDecisionView.Msg
+  | DomainRolesField DomainRolesView.Msg
 
 type Msg
   = Loaded (Result Http.Error CanvasModel)
@@ -166,9 +172,6 @@ updateField msg canvas =
     ChangeStrategicClassification m ->
       { canvas | classification = updateClassification m canvas.classification }
 
-    SetModelTraits traits ->
-      { canvas | modelTraits = traits}
-
 updateEdit : EditingMsg -> EditingCanvas -> (EditingCanvas, Cmd EditingMsg)
 updateEdit msg model =
   case msg of
@@ -192,6 +195,9 @@ updateEdit msg model =
 
     BusinessDecisionField businessDecisionMsg -> 
       ({ model | businessDecisions = BusinessDecisionView.update businessDecisionMsg model.businessDecisions}, Cmd.none)
+
+    DomainRolesField domainRolesMsg ->
+      ({ model | domainRoles = DomainRolesView.update domainRolesMsg model.domainRoles}, Cmd.none)
 
     ChangeKeyMsg changeMsg ->
       let
@@ -237,6 +243,7 @@ update msg model =
               , messages = editable.addingMessage |> Messages.asMessages
               , ubiquitousLanguage = editable.ubiquitousLanguage.language
               , businessDecisions = editable.businessDecisions.decisions
+              , domainRoles = editable.domainRoles.roles
               }
           in
             (model, saveCanvas model.self context canvas)
@@ -376,7 +383,11 @@ viewLeftside canvas =
 
 viewRightside : EditingCanvas -> List (Html EditingMsg)
 viewRightside model =
-  [ viewModelTraits model.edit.canvas |> Html.map Field
+  [ Form.group []
+      [ viewCaption "domainRoles" "Domain Roles"
+        , Form.help [] [ text "How can you characterise the behaviour of this bounded context?"]
+        , DomainRolesView.view model.domainRoles |> Html.map DomainRolesField
+      ]
   , model.addingMessage |> Messages.view |> Html.map MessageField
   , model.addingDependencies |> Dependencies.view |> Html.map DependencyField
   ]
@@ -443,38 +454,6 @@ viewStrategicClassification model =
             |> viewInfoTooltip "How evolved is the concept (see Wardley Maps)"
           ]
       ]
-    ]
-
-viewModelTraits : BoundedContextCanvas -> Html FieldMsg
-viewModelTraits model =
-  let
-    traits =
-      [ ("Specification Model", "Produces a document describing a job/request that needs to be performed. Example: Advertising Campaign Builder")
-      , ("Execution Model", "Performs or tracks a job. Example: Advertising Campaign Engine")
-      , ("Audit Model", "Monitors the execution. Example: Advertising Campaign Analyser")
-      , ("Approver", "Receives requests and determines if they should progress to the next step of the process. Example: Fraud Check")
-      , ("Enforcer", "Ensures that other contexts carry out certain operations. Example: GDPR Context (ensures other contexts delete all of a user’s data)")
-      , ("Octopus Enforcer", "Ensures that multiple/all contexts in the system all comply with a standard rule. Example: GDPR Context (as above)")
-      , ("Interchanger", "Translates between multiple ubiquitous languages.")
-      , ("Gateway", "Sits at the edge of a system and manages inbound and/or outbound communication. Example: IoT Message Gateway")
-      , ("Gateway Interchange", "The combination of a gateway and an interchange.")
-      , ("Dogfood Context", "Simulates the customer experience of using the core bounded contexts. Example: Whitelabel music store")
-      , ("Bubble Context", "Sits in-front of legacy contexts providing a new, cleaner model while legacy contexts are being replaced.")
-      , ("Autonomous Bubble", "Bubble context which has its own data store and synchronises data asynchronously with the legacy contexts.")
-      , ("Brain Context (likely anti-pattern)", "Contains a large number of important rules and many other contexts depend on it. Example: rules engine containing all the domain rules")
-      , ("Funnel Context", "Receives documents from multiple upstream contexts and passes them to a single downstream context in a standard format (after applying its own rules).")
-      , ("Engagement Context", "Provides key features which attract users to keep using the product. Example: Free Financial Advice Context")
-      ]
-  in
-    Form.group []
-      [ viewCaption "modelTraits" "Model traits"
-      , Input.text
-        [ Input.id "modelTraits"
-        , Input.value model.modelTraits
-        , Input.onInput SetModelTraits
-        ]
-    , viewDescriptionList traits (Just "https://github.com/ddd-crew/bounded-context-canvas/blob/master/resources/model-traits-worksheet.md")
-      |> viewInfoTooltip "How can you characterise the behaviour of this bounded context?"
     ]
 
 -- view utilities
