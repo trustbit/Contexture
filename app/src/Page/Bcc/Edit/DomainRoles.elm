@@ -208,7 +208,7 @@ viewCreateRole model =
             [ Block.custom <| 
                 Button.button [ Button.primary, Button.onClick ShowCreateNew ] [ text "Add new domain role" ]
             , Block.custom <| 
-                div [] [ text "" ]
+                div [] [ Html.br [] [] ]
             , Block.custom <| 
                 Button.button [ Button.primary, Button.onClick ShowChooseFrom ] [ text "Choose from pre-defined list" ]
             ]
