@@ -2,6 +2,7 @@ module Api exposing (
   Endpoint, Configuration, ApiResponse, ApiResult, Include(..), Expand(..),
   domains, domain, subDomains,
   allBoundedContexts, boundedContexts, boundedContext,
+  communication,
   url, config)
 
 import Http
@@ -68,6 +69,11 @@ allBoundedContexts expand =
 boundedContext : BoundedContextId -> Endpoint
 boundedContext context =
   withoutQuery [ "boundedContexts", BoundedContext.idToString context ]
+
+communication : Endpoint
+communication =
+  withoutQuery [ "communication"]
+
 
 includeInRequest : List Include -> List QueryParameter
 includeInRequest include =

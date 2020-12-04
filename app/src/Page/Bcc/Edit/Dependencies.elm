@@ -32,10 +32,12 @@ import Api
 
 import BoundedContext.Canvas exposing (Dependencies)
 import BoundedContext
-import BoundedContext.BoundedContextId as BoundedContext
+import BoundedContext.BoundedContextId as BoundedContext exposing(BoundedContextId)
 import BoundedContext.Dependency as Dependency
 import Domain
 import Domain.DomainId as Domain
+
+import Connection exposing (..)
 
 type alias DomainDependency =
   { id : Domain.DomainId
@@ -56,9 +58,19 @@ type alias DependencyEdit =
   , relationship : Maybe Dependency.RelationshipPattern
   , existingDependencies : Dependency.DependencyMap }
 
+type alias CollaborationEdit =
+  { selectedCollaborator : Maybe CollaboratorReference
+  , dependencySelectState : Autocomplete.State
+  , relationship : Maybe Dependency.RelationshipPattern
+  , existingCollaboration : List Connection.Collaboration }
+
 type alias Model =
-  { consumer: DependencyEdit
-  , supplier: DependencyEdit
+  { boundedContextId : BoundedContextId
+  , config : Api.Configuration
+  , consumer : DependencyEdit
+  , supplier : DependencyEdit
+  , inbound : CollaborationEdit
+  , outbound : CollaborationEdit
   , availableDependencies : List CollaboratorReference
   }
 
@@ -69,18 +81,29 @@ initDependency existing id =
   , relationship = Nothing
   , existingDependencies = existing }
 
-initDependencies : Dependencies -> Model
-initDependencies dependencies =
-  { consumer = initDependency dependencies.consumers "consumer-select"
+initCollaboration : List Connection.Collaboration -> String -> CollaborationEdit
+initCollaboration existing id =
+  { selectedCollaborator = Nothing
+  , dependencySelectState = Autocomplete.newState id
+  , relationship = Nothing
+  , existingCollaboration = existing }
+
+initDependencies : Api.Configuration -> BoundedContextId -> Dependencies -> Model
+initDependencies config contextId dependencies =
+  { config = config
+  , boundedContextId = contextId
+  , consumer = initDependency dependencies.consumers "consumer-select"
   , supplier = initDependency dependencies.suppliers "supplier-select"
   , availableDependencies = []
+  , inbound = initCollaboration [] "inbound-select"
+  , outbound = initCollaboration [] "outbound-select"
   }
 
 init : Api.Configuration -> BoundedContext.BoundedContext -> Dependencies -> (Model, Cmd Msg)
-init config _ dependencies =
+init config context dependencies =
   (
-    initDependencies dependencies
-  , Cmd.batch [ loadBoundedContexts config, loadDomains config])
+    initDependencies config (context |> BoundedContext.id) dependencies
+  , Cmd.batch [ loadBoundedContexts config, loadDomains config, loadConnections config (context |> BoundedContext.id)])
 
 asDependencies : Model -> Dependencies
 asDependencies model =
@@ -88,7 +111,6 @@ asDependencies model =
   , consumers = model.consumer.existingDependencies }
 
 -- UPDATE
-
 
 type Action t
   = Add t
@@ -101,13 +123,16 @@ type ChangeTypeMsg
   | OnSelect (Maybe CollaboratorReference)
   | SetRelationship String
   | DepdendencyChanged DependencyAction
+  | DependencyAdded (Api.ApiResponse Connection.Collaboration)
 
 type Msg
   = Consumer ChangeTypeMsg
   | Supplier ChangeTypeMsg
   | BoundedContextsLoaded (Result Http.Error (List BoundedContextDependency))
   | DomainsLoaded (Result Http.Error (List DomainDependency))
+  | ConnectionsLoaded (Result Http.Error (List CollaborationType))
 
+type alias ModifyDependency = Dependency.Dependency -> String -> Api.ApiResult Connection.Collaboration ChangeTypeMsg
 
 updateDependencyAction : DependencyAction -> Dependency.DependencyMap -> Dependency.DependencyMap
 updateDependencyAction action depenencies =
@@ -131,19 +156,35 @@ updateDependency msg model =
     OnSelect item ->
       ({ model | selectedCollaborator = item }, Cmd.none)
     DepdendencyChanged change ->
+      let
+        m = updateDependencyAction change model.existingDependencies
+      in
       ( { model
         | selectedCollaborator = Nothing
         , relationship = Nothing
-        , existingDependencies = updateDependencyAction change model.existingDependencies
+        , existingDependencies = m
         }
       , Cmd.none
       )
+    DependencyAdded _ ->
+      (model, Cmd.none)
 
 update : Msg -> Model -> (Model, Cmd Msg)
 update msg model =
   case msg of
     Consumer conMsg ->
       let
+        -- modify (collaborator, pattern) description = 
+        --   Connection.defineInboundCollaboration model.config model.boundedContextId (
+        --     pattern |> Maybe.map Dependency.relationshipToString |> Maybe.andThen Connection.relationshipParser
+        --     )
+        --     (
+        --     case collaborator of
+        --       Dependency.BoundedContext c -> Connection.BoundedContext c
+        --       Dependency.Domain d -> Connection.Domain d
+        --     )
+        --     description
+
         (consumerModel, dependencyCmd) = updateDependency conMsg model.consumer
       in
         ( { model | consumer = consumerModel }
@@ -151,6 +192,16 @@ update msg model =
         )
     Supplier supMsg ->
       let
+        -- modify (collaborator, pattern) description = 
+        --   Connection.defineInboundCollaboration model.config model.boundedContextId (
+        --     pattern |> Maybe.map Dependency.relationshipToString |> Maybe.andThen Connection.relationshipParser
+        --     )
+        --     (
+        --     case collaborator of
+        --       Dependency.BoundedContext c -> Connection.BoundedContext c
+        --       Dependency.Domain d -> Connection.Domain d
+        --     )
+        --     description
         (supplierModel,dependencyCmd) = updateDependency supMsg model.supplier
       in
         ( { model | supplier = supplierModel }
@@ -164,6 +215,34 @@ update msg model =
       ( { model | availableDependencies = List.append model.availableDependencies (domains |> List.map Domain) }
       , Cmd.none
       )
+    ConnectionsLoaded (Ok connections) ->
+      let
+        isInbound c =
+          case c of
+            Inbound _ -> True
+            Outbound _ -> False
+
+        (inbound, outbound) = 
+          connections
+          |> List.partition isInbound
+
+        extractCollaboration colType =
+          case colType of
+            Inbound col ->
+              col
+            Outbound col ->
+              col
+
+        updateCollaboration colEdit items =
+          { colEdit | existingCollaboration = items}
+
+      in 
+        ( { model
+          | inbound = inbound |> List.map extractCollaboration |> updateCollaboration model.inbound
+          , outbound = outbound |> List.map extractCollaboration |> updateCollaboration model.outbound
+          }
+        , Cmd.none
+        )
     _ ->
       let
         _ = Debug.log "Dependencies msg" msg
@@ -379,6 +458,134 @@ viewDependency items title model =
     , viewAddDependency items model
     ]
 
+translateSymmetricRelationship relationship =
+  case relationship of
+    SharedKernel -> "SK"
+    Partnership -> "PS"
+    SeparateWays -> "SW"
+    BigBallOfMud -> "BBoM"
+
+
+translateUpstreamRelationship relationship =
+  case relationship of
+    Upstream -> "US"
+    PublishedLanguage -> "PL"
+    OpenHost -> "OHS"
+    Connection.Supplier -> "SUP"
+
+translateDownstreamRelationship relationship =
+  case relationship of
+    Downstream -> "DS"
+    AntiCorruptionLayer -> "ACL"
+    Conformist -> "CF"
+    Customer -> "CUS"
+
+viewInboundCollaboration : List CollaboratorReference -> Collaboration -> Html ChangeTypeMsg
+viewInboundCollaboration items collaboration =
+  let
+    relationship = Connection.relationship collaboration
+    description = Connection.description collaboration
+
+    collaboratorReferenceName collaborator =
+      items
+      |> List.filter (\r -> toCollaborator r == collaborator )
+      |> List.head
+      |> Maybe.map renderItem
+      |> Maybe.withDefault (text "Unknown name")
+
+    collaboratorCaption collaborator =
+      case collaborator of
+        Connection.BoundedContext bc ->
+          collaboratorReferenceName <| Dependency.BoundedContext bc
+        Connection.Domain d ->
+          collaboratorReferenceName <| Dependency.Domain d
+        ExternalSystem s ->
+          Html.span
+             []
+             [ Html.h6 [ class "text-muted" ] [ text "External System" ]
+             , Html.span [] [ text s] 
+             ]
+        Frontend s ->
+          Html.span
+             []
+             [ Html.h6 [ class "text-muted" ] [ text "Frontend" ]
+             , Html.span [] [ text s] 
+             ]
+        UserInteraction s ->
+          Html.span
+             []
+             [ Html.h6 [ class "text-muted" ] [ text "User Interaction" ]
+             , Html.span [] [ text s] 
+             ]
+      
+
+    cols =
+      case relationship of
+        Symmetric t p1 _ ->
+          [ Grid.col [] [ collaboratorCaption p1]
+          , Grid.col [] 
+            [ Html.h6 [] [ text <| translateSymmetricRelationship t ]
+            , Html.span [] [ text <| Maybe.withDefault "" description ]
+            ]
+          ]
+        UpstreamDownstream (collaborator,upstreamType) (_,downstreamType) ->
+          [ Grid.col [] [ collaboratorCaption collaborator ]
+          , Grid.col [] 
+            [ Html.h6[] [ text <| translateUpstreamRelationship upstreamType ] ]
+          , Grid.col [] 
+            [ Html.span [] [ text <| Maybe.withDefault "" description ] ]
+          , Grid.col [] 
+            [ Html.h6[] [ text <| translateDownstreamRelationship downstreamType ] ]
+          ]
+        Octopus _ _ ->
+          []
+        Unknown p1 _ ->
+          [ Grid.col [] [ collaboratorCaption p1 ]
+          , Grid.col [] 
+            [ Html.h6[] [ text "Unknown" ]
+            , Html.span [] [ text <| Maybe.withDefault "" description ]
+            ]
+          ]
+    
+  in
+    Grid.row 
+      [ Row.attrs [ Border.top, Spacing.mb2, Spacing.pt1 ] ]
+      ( cols 
+        |> List.append 
+          [ Grid.col [ Col.xs2 ]
+            [ Button.button
+              [ Button.secondary
+              -- , Button.onClick (
+              --     (collaborator, relationship)
+              --     |> Remove |> DepdendencyChanged
+              --   )
+              ]
+              [ text "x" ]
+            ]
+          ]
+      )
+
+viewConnection : List CollaboratorReference -> String -> CollaborationEdit -> Html ChangeTypeMsg
+viewConnection items title model =
+  div []
+    [ Html.h6
+      [ class "text-center", Spacing.p2 ]
+      [ Html.strong [] [ text title ] ]
+    , Grid.row []
+      [ Grid.col [] [ Html.h6 [] [ text "Name"] ]
+      , Grid.col [] [ Html.h6 [] [ text "Initiator-Type"] ]
+      , Grid.col [] [ Html.h6 [] [ text "Description"] ]
+      , Grid.col [] [ Html.h6 [] [ text "Recipient-Type"] ]
+      , Grid.col [Col.xs2] []
+      ]
+    , div []
+      (model.existingCollaboration
+      |> List.map (viewInboundCollaboration items))
+    -- , viewAddDependency items model
+    ]
+
+
+
 view : Model -> Html Msg
 view model =
   div []
@@ -395,6 +602,12 @@ view model =
         [ viewDependency model.availableDependencies "Message Suppliers" model.supplier |> Html.map Supplier ]
       , Grid.col []
         [ viewDependency model.availableDependencies "Message Consumers" model.consumer |> Html.map Consumer ]
+      ]
+     , Grid.row []
+      [ Grid.col []
+        [ viewConnection model.availableDependencies "Inbound Connection" model.inbound |> Html.map Supplier ]
+      , Grid.col []
+        [ viewConnection model.availableDependencies "Outbound Connection" model.outbound |> Html.map Consumer ]
       ]
     ]
 
@@ -423,4 +636,15 @@ loadDomains config =
   Http.get
     { url = Api.domains [] |> Api.url config |> Url.toString
     , expect = Http.expectJson DomainsLoaded (Decode.list domainDecoder)
+    }
+
+loadConnections : Api.Configuration -> BoundedContextId -> Cmd Msg
+loadConnections config context =
+  let
+    filterConnections connections =
+      connections
+      |> List.filterMap (Connection.isCollaborator (Connection.BoundedContext context))
+  in Http.get
+    { url = Api.communication |> Api.url config |> Url.toString
+    , expect = Http.expectJson ConnectionsLoaded (Decode.map filterConnections (Decode.list Connection.modelDecoder))
     }

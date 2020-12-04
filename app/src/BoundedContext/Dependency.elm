@@ -12,6 +12,10 @@ import Json.Decode as Decode exposing (Decoder)
 import BoundedContext.BoundedContextId exposing (BoundedContextId, idFromString, idToString)
 import Domain
 import Domain.DomainId as Domain
+import Api exposing(ApiResult)
+
+import Url
+import Http
 
 type RelationshipPattern
   = AntiCorruptionLayer
@@ -24,11 +28,10 @@ type RelationshipPattern
   | Partnership
   | CustomerSupplier
 
-
 type Collaborator
   = BoundedContext BoundedContextId
   | Domain Domain.DomainId
-
+  
 type alias Dependency = (Collaborator, Maybe RelationshipPattern)
 
 type DependencyMap
