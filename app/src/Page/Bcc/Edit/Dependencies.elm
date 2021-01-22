@@ -1,7 +1,6 @@
 module Page.Bcc.Edit.Dependencies exposing (
   Msg(..), Model,
-  update, init, view,
-  asDependencies)
+  update, init, view)
 
 import Html exposing (Html, button, div, text)
 import Html.Attributes exposing (..)
@@ -48,6 +47,7 @@ import Debug
 import Debug
 import Maybe
 import Html.Attributes
+import Bootstrap.Navbar exposing (items)
 
 type alias DomainDependency =
   { id : Domain.DomainId
@@ -70,12 +70,6 @@ type CollaboratorReferenceType
   | ExternalSystemType (Maybe String)
   | FrontendType (Maybe String)
 
-type alias DependencyEdit =
-  { selectedCollaborator : Maybe CollaboratorReference
-  , dependencySelectState : Autocomplete.State
-  , relationship : Maybe Dependency.RelationshipPattern
-  , existingDependencies : Dependency.DependencyMap }
-
 type CustomerSupplierType
   = IsSupplier
   | IsCustomer
@@ -93,70 +87,43 @@ type alias CollaborationEdit =
   , description : String
   , relationship : Maybe RelationshipEdit
   , collaboration : Maybe CollaborationDefinition
-  , existingCollaboration : List Connection.Collaboration }
+  }
 
 type alias Model =
   { boundedContextId : BoundedContextId
   , config : Api.Configuration
-  , consumer : DependencyEdit
-  , supplier : DependencyEdit
-  , inbound : CollaborationEdit
-  , outbound : CollaborationEdit
+  , newCollaborations : CollaborationEdit
   , availableDependencies : List CollaboratorReference
+  , inboundCollaboration : List Connection.Collaboration
+  , outboundCollaboration : List Connection.Collaboration
   }
 
-initDependency : Dependency.DependencyMap -> String -> DependencyEdit
-initDependency existing id =
-  { selectedCollaborator = Nothing
-  , dependencySelectState = Autocomplete.newState id
-  , relationship = Nothing
-  , existingDependencies = existing }
-
-initCollaboration : List Connection.Collaboration -> String -> CollaborationEdit
-initCollaboration existing id =
+initCollaboration : String -> CollaborationEdit
+initCollaboration id =
   { selectedCollaborator = Nothing
   , dependencySelectState = Autocomplete.newState id
   , relationship = Nothing
   , description = ""
-  , collaboration = Nothing
-  , existingCollaboration = existing }
+  , collaboration = Nothing 
+  }
 
-initDependencies : Api.Configuration -> BoundedContextId -> Dependencies -> Model
-initDependencies config contextId dependencies =
+initDependencies : Api.Configuration -> BoundedContextId -> Model
+initDependencies config contextId =
   { config = config
   , boundedContextId = contextId
-  , consumer = initDependency dependencies.consumers "consumer-select"
-  , supplier = initDependency dependencies.suppliers "supplier-select"
   , availableDependencies = []
-  , inbound = initCollaboration [] "inbound-select"
-  , outbound = initCollaboration [] "outbound-select"
+  , inboundCollaboration = []
+  , outboundCollaboration = []
+  , newCollaborations = initCollaboration "collaboration-select"
   }
 
 init : Api.Configuration -> BoundedContext.BoundedContext -> Dependencies -> (Model, Cmd Msg)
 init config context dependencies =
   (
-    initDependencies config (context |> BoundedContext.id) dependencies
+    initDependencies config (context |> BoundedContext.id)
   , Cmd.batch [ loadBoundedContexts config, loadDomains config, loadConnections config (context |> BoundedContext.id)])
 
-asDependencies : Model -> Dependencies
-asDependencies model =
-  { suppliers = model.supplier.existingDependencies
-  , consumers = model.consumer.existingDependencies }
-
 -- UPDATE
-
-type Action t
-  = Add t
-  | Remove t
-
-type alias DependencyAction = Action Dependency.Dependency
-
-type ChangeTypeMsg
-  = SelectMsg (Autocomplete.Msg CollaboratorReference)
-  | OnSelect (Maybe CollaboratorReference)
-  | SetRelationship String
-  | DepdendencyChanged DependencyAction
-  -- | DependencyAdded (Api.ApiResponse Connection.Collaboration)
 
 type CollaboratorReferenceMsg
   = SelectCollaborationType CollaboratorReferenceType
@@ -169,56 +136,18 @@ type CollaboratorReferenceMsg
 
 type CollaborationTypeMsg
   = CollaboratorSelection CollaboratorReferenceMsg
-  | SetRelationship2 (Maybe RelationshipEdit)
-  | SetDescription String
+  | SetRelationship (Maybe RelationshipEdit)
+  | SetDescription String 
+
+type Msg
+  = CollaborationMsg CollaborationTypeMsg
+  | BoundedContextsLoaded (Result Http.Error (List BoundedContextDependency))
+  | DomainsLoaded (Result Http.Error (List DomainDependency))
+  | ConnectionsLoaded (Result Http.Error (List CollaborationType))
   | AddInboundConnection CollaborationDefinition String
   | AddOutboundConnection CollaborationDefinition String
   | InboundConnectionAdded (Api.ApiResponse Collaboration)
   | OutboundConnectionAdded (Api.ApiResponse Collaboration)
-  | DependencyAdded (Api.ApiResponse Connection.Collaboration)
-
-type Msg
-  = Consumer ChangeTypeMsg
-  | Supplier ChangeTypeMsg
-  | CollaborationMsg CollaborationTypeMsg
-  | BoundedContextsLoaded (Result Http.Error (List BoundedContextDependency))
-  | DomainsLoaded (Result Http.Error (List DomainDependency))
-  | ConnectionsLoaded (Result Http.Error (List CollaborationType))
-
-type alias ModifyDependency = Dependency.Dependency -> String -> Api.ApiResult Connection.Collaboration ChangeTypeMsg
-
-updateDependencyAction : DependencyAction -> Dependency.DependencyMap -> Dependency.DependencyMap
-updateDependencyAction action depenencies =
-  case action of
-    Add dependency ->
-      Dependency.registerDependency dependency depenencies
-    Remove dependency  ->
-      Dependency.removeDependency dependency depenencies
-
-updateDependency : ChangeTypeMsg -> DependencyEdit -> (DependencyEdit, Cmd ChangeTypeMsg)
-updateDependency msg model =
-  case msg of
-    SetRelationship relationship ->
-      ({ model | relationship = Dependency.relationshipParser relationship }, Cmd.none)
-    SelectMsg selMsg ->
-      let
-        ( updated, cmd ) =
-          Autocomplete.update selectConfig selMsg model.dependencySelectState
-      in
-        ( { model | dependencySelectState = updated }, cmd )
-    OnSelect item ->
-      ({ model | selectedCollaborator = item }, Cmd.none)
-    DepdendencyChanged change ->
-      let
-        m = updateDependencyAction change model.existingDependencies
-      in
-      ( { model
-        | selectedCollaborator = Nothing
-        , relationship = Nothing
-        , existingDependencies = m
-        }
-      , Cmd.none
-      )
 
 updateCollaboratorSelection : CollaboratorReferenceMsg -> Maybe CollaboratorReferenceType -> (Maybe CollaboratorReferenceType, Cmd CollaboratorReferenceMsg)
 updateCollaboratorSelection msg model =
@@ -261,8 +190,8 @@ updateCollaboratorSelection msg model =
       (model, Cmd.none)
 
 
-updateInboundCollaboration : CollaborationEdit ->  CollaborationEdit
-updateInboundCollaboration model =
+updateCollaborationDefinition : CollaborationEdit ->  CollaborationEdit
+updateCollaborationDefinition model =
   case (model.selectedCollaborator, model.relationship) of
     (Just collaboratorType, Just relationshipType) ->
       let
@@ -278,7 +207,7 @@ updateInboundCollaboration model =
               Just <| Connection.Frontend f
             _ ->
               Nothing
-        inboundCollaboration =
+        collaborationDefinition =
           case relationshipType of
             UnknownCollaboration ->
               Maybe.map Connection.UnknownCollaboration collaborator
@@ -307,55 +236,31 @@ updateInboundCollaboration model =
             _ -> 
               Nothing
       in
-        { model | collaboration = inboundCollaboration }
+        { model | collaboration = collaborationDefinition }
     _ ->
       { model | collaboration = Nothing }
 
 
-updateCollaboration : Api.Configuration -> BoundedContextId -> CollaborationTypeMsg -> CollaborationEdit -> (CollaborationEdit, Cmd CollaborationTypeMsg)
-updateCollaboration config bcId msg model =
+updateCollaboration : CollaborationTypeMsg -> CollaborationEdit -> (CollaborationEdit, Cmd CollaborationTypeMsg)
+updateCollaboration msg model =
   case msg of
-    SetRelationship2 relationship ->
-      (updateInboundCollaboration { model | relationship = relationship }, Cmd.none)
+    SetRelationship relationship ->
+      (updateCollaborationDefinition { model | relationship = relationship }, Cmd.none)
     
     CollaboratorSelection bcMsg ->
       let
         (updated, cmd) =
           updateCollaboratorSelection bcMsg model.selectedCollaborator
         in
-          ( updateInboundCollaboration { model | selectedCollaborator = updated}
+          ( updateCollaborationDefinition { model | selectedCollaborator = updated}
           , cmd |> Cmd.map CollaboratorSelection
           )
-    AddInboundConnection coll desc ->
-      ( model, Connection.defineInboundCollaboration config bcId coll desc InboundConnectionAdded )
-    AddOutboundConnection coll desc ->
-      ( model, Connection.defineOutboundCollaboration config bcId coll desc OutboundConnectionAdded )
     SetDescription d ->
       ( { model | description = d}, Cmd.none)
-    InboundConnectionAdded (Ok result) ->
-      ( { model | existingCollaboration = result :: model.existingCollaboration }, Cmd.none)
-    OutboundConnectionAdded (Ok result) ->
-      ( { model | existingCollaboration = result :: model.existingCollaboration }, Cmd.none)
-    _ ->
-      Debug.todo "Error handling"
       
 update : Msg -> Model -> (Model, Cmd Msg)
 update msg model =
   case msg of
-    Consumer conMsg ->
-      let
-        (consumerModel, dependencyCmd) = updateDependency conMsg model.consumer
-      in
-        ( { model | consumer = consumerModel }
-        , dependencyCmd |> Cmd.map Consumer
-        )
-    Supplier supMsg ->
-      let
-        (supplierModel,dependencyCmd) = updateDependency supMsg model.supplier
-      in
-        ( { model | supplier = supplierModel }
-        , dependencyCmd |> Cmd.map Supplier
-        )
     BoundedContextsLoaded (Ok contexts) ->
       ( { model | availableDependencies = List.append model.availableDependencies (contexts |> List.map BoundedContext) }
       , Cmd.none
@@ -366,37 +271,39 @@ update msg model =
       )
     ConnectionsLoaded (Ok connections) ->
       let
-        isInbound c =
-          case c of
-            Inbound _ -> True
-            Outbound _ -> False
-
         (inbound, outbound) = 
           connections
-          |> List.partition isInbound
-
-        extractCollaboration colType =
-          case colType of
-            Inbound col ->
-              col
-            Outbound col ->
-              col
-
-        updateCollaborationModel colEdit items =
-          { colEdit | existingCollaboration = items}
+          |> List.foldl(\c (inbounds,outbounds) -> 
+              case c of
+                Inbound inboundColl ->
+                  (inboundColl :: inbounds,outbounds)
+                Outbound outboundColl ->
+                  (inbounds,outboundColl :: outbounds)
+            ) ([],[])
 
       in 
         ( { model
-          | inbound = inbound |> List.map extractCollaboration |> updateCollaborationModel model.inbound
-          , outbound = outbound |> List.map extractCollaboration |> updateCollaborationModel model.outbound
+          | inboundCollaboration = List.append model.inboundCollaboration inbound
+          , outboundCollaboration = List.append model.outboundCollaboration outbound
           }
         , Cmd.none
         )
     CollaborationMsg col ->
       let
-        (m, cmd) = updateCollaboration model.config model.boundedContextId col model.inbound
+        (m, cmd) = updateCollaboration col model.newCollaborations
       in
-        ( { model | inbound = m}, cmd |> Cmd.map CollaborationMsg)
+        ( { model | newCollaborations = m}, cmd |> Cmd.map CollaborationMsg)
+   
+    AddInboundConnection coll desc ->
+      ( model, Connection.defineInboundCollaboration model.config model.boundedContextId coll desc InboundConnectionAdded )
+    AddOutboundConnection coll desc ->
+      ( model, Connection.defineOutboundCollaboration model.config model.boundedContextId coll desc OutboundConnectionAdded )
+    
+    InboundConnectionAdded (Ok result) ->
+      ( { model | inboundCollaboration = result :: model.inboundCollaboration }, Cmd.none)
+    OutboundConnectionAdded (Ok result) ->
+      ( { model | outboundCollaboration = result :: model.outboundCollaboration }, Cmd.none)
+
     _ ->
       let
         _ = Debug.log "Dependencies msg" msg
@@ -405,16 +312,6 @@ update msg model =
         (model, Cmd.none)
 
 -- VIEW
-
-toCollaborator : CollaboratorReference -> Dependency.Collaborator
-toCollaborator dependency =
-  case dependency of
-    BoundedContext bc ->
-      Dependency.BoundedContext bc.id
-    Domain d ->
-      Dependency.Domain d.id
-    _ ->
-      Debug.todo "handle later"
 
 toCollaborator2 : CollaboratorReference -> Connection.Collaborator
 toCollaborator2 dependency =
@@ -487,41 +384,6 @@ oneLineLabel item =
     Frontend f ->
       f
 
-renderItem : CollaboratorReference -> Html msg
-renderItem item =
-  let
-    content =
-      case item of
-      BoundedContext bc ->
-        [ Html.h6 [ class "text-muted" ] [ text bc.domain.name ]
-        , Html.span [] [ text bc.name ] ]
-      Domain d ->
-        [ Html.span [] [ text d.name ] ]
-      ExternalSystem s ->
-        [ Html.span [] [ text s ] ]
-      Frontend f ->
-        [ Html.span [] [ text f ] ]
-  in
-    Html.span [] content
-
-selectConfig : Autocomplete.Config ChangeTypeMsg CollaboratorReference
-selectConfig =
-    Autocomplete.newConfig
-        { onSelect = OnSelect
-        , toLabel = oneLineLabel
-        , filter = filter 2
-        }
-        |> Autocomplete.withCutoff 12
-        |> Autocomplete.withInputClass "text-control border rounded form-control-lg"
-        |> Autocomplete.withInputWrapperClass ""
-        |> Autocomplete.withItemClass " border p-2 "
-        |> Autocomplete.withMenuClass "bg-light"
-        |> Autocomplete.withNotFound "No matches"
-        |> Autocomplete.withNotFoundClass "text-danger"
-        |> Autocomplete.withHighlightedItemClass "bg-white"
-        |> Autocomplete.withPrompt "Search for a Dependency"
-        |> Autocomplete.withItemHtml renderItem
-
 selectBoundedContextConfig : Autocomplete.Config CollaboratorReferenceMsg BoundedContextDependency
 selectBoundedContextConfig =
     Autocomplete.newConfig
@@ -578,31 +440,6 @@ translateRelationship relationship =
     Dependency.Partnership -> "Partnership"
     Dependency.CustomerSupplier -> "Customer/Supplier"
 
-viewAddedDepencency : List CollaboratorReference -> Dependency.Dependency -> Html ChangeTypeMsg
-viewAddedDepencency items (collaborator, relationship) =
-  let
-    collaboratorCaption =
-      items
-      |> List.filter (\r -> toCollaborator r == collaborator )
-      |> List.head
-      |> Maybe.map renderItem
-      |> Maybe.withDefault (text "Unknown name")
-  in
-  Grid.row [Row.attrs [ Border.top, Spacing.mb2, Spacing.pt1 ] ]
-    [ Grid.col [] [ collaboratorCaption ]
-    , Grid.col [] [text (Maybe.withDefault "not specified" (relationship |> Maybe.map translateRelationship))]
-    , Grid.col [ Col.xs2 ]
-      [ Button.button
-        [ Button.secondary
-        , Button.onClick (
-            (collaborator, relationship)
-            |> Remove |> DepdendencyChanged
-          )
-        ]
-        [ text "x" ]
-      ]
-    ]
-
 onSubmitMaybe : Maybe msg -> Html.Attribute msg
 onSubmitMaybe maybeMsg =
   -- https://thoughtbot.com/blog/advanced-dom-event-handlers-in-elm
@@ -615,92 +452,6 @@ onSubmitMaybe maybeMsg =
     Nothing ->
       Html.Events.preventDefaultOn "submit" (Decode.map preventDefault (Decode.fail "No message to submit"))
 
-
-viewAddDependency : List CollaboratorReference -> DependencyEdit -> Html ChangeTypeMsg
-viewAddDependency dependencies model =
-  let
-    items =
-      [ Dependency.AntiCorruptionLayer
-      , Dependency.OpenHostService
-      , Dependency.PublishedLanguage
-      , Dependency.SharedKernel
-      , Dependency.UpstreamDownstream
-      , Dependency.Conformist
-      , Dependency.Octopus
-      , Dependency.Partnership
-      , Dependency.CustomerSupplier
-      ]
-        |> List.map (\r -> (r, translateRelationship r))
-        |> List.map (\(v,t) -> Select.item [value (Dependency.relationshipToString v)] [ text t])
-
-    selectedItem =
-      case model.selectedCollaborator of
-        Just s -> [ s ]
-        Nothing -> []
-
-    -- TODO: this is probably very unefficient
-    existingDependencies =
-      model.existingDependencies
-      |> Dependency.dependencyList
-      |> List.map Tuple.first
-
-    relevantDependencies =
-      dependencies
-      |> List.filter (\d -> existingDependencies |> List.any (\existing -> (d |> toCollaborator)  == existing ) |> not )
-
-    autocompleteSelect =
-      Autocomplete.view
-        selectConfig
-        model.dependencySelectState
-        relevantDependencies
-        selectedItem
-  in
-  Form.form
-    [ onSubmitMaybe
-      ( model.selectedCollaborator
-        |> Maybe.map toCollaborator
-        |> Maybe.map (\s -> (s, model.relationship))
-        |> Maybe.map (Add >> DepdendencyChanged)
-      )
-    ]
-    [ Grid.row []
-      [ Grid.col []
-        [ autocompleteSelect |> Html.map SelectMsg ]
-      , Grid.col []
-        [ Select.select [ Select.onChange SetRelationship ]
-            (List.append [ Select.item [ selected (model.relationship == Nothing), value "" ] [text "unknown"] ] items)
-        ]
-      , Grid.col [ Col.xs2 ]
-        [ Button.submitButton
-          [ Button.secondary
-          , Button.disabled
-            ( model.selectedCollaborator
-              |> Maybe.map (\_ -> False)
-              |> Maybe.withDefault True
-            )
-          ]
-          [ text "+" ]
-        ]
-      ]
-    ]
-
-viewDependency : List CollaboratorReference -> String -> DependencyEdit -> Html ChangeTypeMsg
-viewDependency items title model =
-  div []
-    [ Html.h6
-      [ class "text-center", Spacing.p2 ]
-      [ Html.strong [] [ text title ] ]
-    , Grid.row []
-      [ Grid.col [] [ Html.h6 [] [ text "Name"] ]
-      , Grid.col [] [ Html.h6 [] [ text "Relationship Pattern"] ]
-      , Grid.col [Col.xs2] []
-      ]
-    , div []
-      (model.existingDependencies
-      |> Dependency.dependencyList
-      |> List.map (viewAddedDepencency items))
-    , viewAddDependency items model
-    ]
 
 translateSymmetricRelationship relationship =
   case relationship of
@@ -728,25 +479,45 @@ translateUpstreamDownstreamRelationship relationship =
     UpstreamDownstreamRole (_,ut) (_,dt) -> 
       ( translateDownstreamRelationship dt ) ++ "/" ++ ( translateUpstreamRelationship ut)
 
-viewCollaboration : List CollaboratorReference -> Collaboration -> Html CollaborationTypeMsg
+viewCollaboration : List CollaboratorReference -> Collaboration -> Html Msg
 viewCollaboration items collaboration =
   let
     relationship = Connection.relationship collaboration
     description = Connection.description collaboration
 
-    collaboratorReferenceName collaborator =
-      items
-      |> List.filter (\r -> toCollaborator r == collaborator )
-      |> List.head
-      |> Maybe.map renderItem
-      |> Maybe.withDefault (text "Unknown name")
-
     collaboratorCaption collaborator =
       case collaborator of
         Connection.BoundedContext bc ->
-          collaboratorReferenceName <| Dependency.BoundedContext bc
+          items
+          |> List.filterMap (\r ->
+            case r of 
+              BoundedContext bcr ->
+                if bcr.id == bc then
+                  Just <|
+                    Html.div [] 
+                      [ Html.h6 [ class "text-muted" ] [ text bcr.domain.name ]
+                      , Html.span [] [ text bcr.name ] 
+                      ]
+                else
+                  Nothing
+              _ ->
+                Nothing
+          )
+          |> List.head
+          |> Maybe.withDefault (text "Unknown Bounded Context")
         Connection.Domain d ->
-          collaboratorReferenceName <| Dependency.Domain d
+          items
+          |> List.filterMap (\r ->
+            case r of 
+              Domain dr ->
+                if dr.id == d
+                then Just (Html.span [] [ text dr.name ])
+                else Nothing
+              _ ->
+                Nothing
+          )
+          |> List.head
+          |> Maybe.withDefault (text "Unknown Domain" )
         Connection.ExternalSystem s ->
           Html.span
              []
@@ -823,8 +594,8 @@ viewCollaboration items collaboration =
           ]
       )
 
-viewAddConnection : List CollaboratorReference -> CollaborationEdit -> Html CollaborationTypeMsg
-viewAddConnection dependencies model =
+buildFields  : List CollaboratorReference -> CollaborationEdit -> List (Html CollaborationTypeMsg)
+buildFields dependencies model =
   let
     captionAndDescription caption description =
       Html.span [] 
@@ -960,7 +731,7 @@ viewAddConnection dependencies model =
         renderOption idValue label abbreviation descriptionText value =
           Radio.createAdvanced
             [ Radio.id idValue
-            , Radio.onClick (SetRelationship2 (Just <| SymmetricCollaboration <| Just value))
+            , Radio.onClick (SetRelationship (Just <| SymmetricCollaboration <| Just value))
             , Radio.checked (
                 case model.relationship of
                   Just (SymmetricCollaboration (Just x)) ->
@@ -986,7 +757,7 @@ viewAddConnection dependencies model =
       in
         Radio.createAdvanced
           [ Radio.id "symmetricType"
-          , Radio.onClick (SetRelationship2 (Just <| SymmetricCollaboration Nothing))
+          , Radio.onClick (SetRelationship (Just <| SymmetricCollaboration Nothing))
           , Radio.checked (
               case model.relationship of
                 Just (SymmetricCollaboration _) ->
@@ -1000,7 +771,7 @@ viewAddConnection dependencies model =
     customerSupplierConfiguration =
       Radio.createAdvanced
         [ Radio.id "customerType"
-        , Radio.onClick (SetRelationship2 (Just <| CustomerSupplierCollaboration Nothing))
+        , Radio.onClick (SetRelationship (Just <| CustomerSupplierCollaboration Nothing))
         , Radio.checked (
             case model.relationship of
               Just (CustomerSupplierCollaboration _) ->
@@ -1016,14 +787,14 @@ viewAddConnection dependencies model =
               [ Radio.createAdvanced
                 [ Radio.id "isCustomerOption"
                 , Radio.checked (model.relationship == (Just <| CustomerSupplierCollaboration <| Just IsCustomer))
-                , Radio.onClick (SetRelationship2 (Just <| CustomerSupplierCollaboration <| Just IsCustomer))
+                , Radio.onClick (SetRelationship (Just <| CustomerSupplierCollaboration <| Just IsCustomer))
                 , Radio.inline
                 ]
                 ( labelAndDescription "Customer" "CUS" "The collaborator is in the customer role" )
               , Radio.createAdvanced
                 [ Radio.id "isSupplierOption"
                 , Radio.checked (model.relationship == (Just <| CustomerSupplierCollaboration <| Just IsSupplier))
-                , Radio.onClick (SetRelationship2 (Just <| CustomerSupplierCollaboration <| Just IsSupplier))
+                , Radio.onClick (SetRelationship (Just <| CustomerSupplierCollaboration <| Just IsSupplier))
                 , Radio.inline
                 ]
                 ( labelAndDescription "Supplier" "SUP" "The collaborator is in the supplier role" )
@@ -1043,9 +814,9 @@ viewAddConnection dependencies model =
         setUpstream upstreamConfig =
           case model.relationship of
             (Just (UpstreamCollaboration _ down)) ->
-              SetRelationship2 (Just <| UpstreamCollaboration (Just upstreamConfig) down)
+              SetRelationship (Just <| UpstreamCollaboration (Just upstreamConfig) down)
             _ ->
-              SetRelationship2 (Just <| UpstreamCollaboration (Just upstreamConfig) Nothing)
+              SetRelationship (Just <| UpstreamCollaboration (Just upstreamConfig) Nothing)
 
         isDownstream downstreamConfig =
           case model.relationship of
@@ -1056,9 +827,9 @@ viewAddConnection dependencies model =
         setDownstream downstreamConfig =
           case model.relationship of
             (Just (UpstreamCollaboration up _)) ->
-              SetRelationship2 (Just <| UpstreamCollaboration up (Just downstreamConfig))
+              SetRelationship (Just <| UpstreamCollaboration up (Just downstreamConfig))
             _ ->
-              SetRelationship2 (Just <| UpstreamCollaboration Nothing (Just downstreamConfig))
+              SetRelationship (Just <| UpstreamCollaboration Nothing (Just downstreamConfig))
 
         options = 
           Radio.label [] 
@@ -1066,21 +837,21 @@ viewAddConnection dependencies model =
             , Html.div [ class "row" ]
               [ Form.group [ Form.attrs [ class "col"]  ]
                 ( Html.span[] [ text "Describe the collaborator:" ]
-                :: Radio.radioList "upstreamOptions"
+                :: Radio.radioList "upstream-upstreamOptions"
                   [ Radio.createAdvanced
-                    [ Radio.id "upstreamOption"
+                    [ Radio.id "upstream-upstreamOption"
                     , Radio.checked (isUpstream Upstream)
                     , Radio.onClick (setUpstream Upstream)
                     ]
                     ( labelAndDescription "Upstream" "US" "The collaborator is just Upstream" )
                   , Radio.createAdvanced
-                    [ Radio.id "publishedLanguageOption"
+                    [ Radio.id "upstream-publishedLanguageOption"
                     , Radio.checked (isUpstream PublishedLanguage)
                     , Radio.onClick (setUpstream PublishedLanguage)
                     ]
                     ( labelAndDescription "Published Language" "PL" "The collaborator is using a Published Language" )
                   , Radio.createAdvanced
-                    [ Radio.id "openHostOption"
+                    [ Radio.id "upstream-openHostOption"
                     , Radio.checked (isUpstream OpenHost)
                     , Radio.onClick (setUpstream OpenHost)
                     ]
@@ -1089,21 +860,21 @@ viewAddConnection dependencies model =
                 )
               , Form.group [ Form.attrs [ class "col"]  ]
                 ( Html.span[] [ text "Describe your relationship with the collaborator:" ]
-                :: Radio.radioList "downstreamOptions"
+                :: Radio.radioList "upstream-downstreamOptions"
                   [ Radio.createAdvanced
-                    [ Radio.id "downstreamOption"
+                    [ Radio.id "upstream-downstreamOption"
                     , Radio.checked (isDownstream Downstream)
                     , Radio.onClick (setDownstream Downstream)
                     ]
                     ( labelAndDescription "Downstream" "DS" "I'm just Downstream" )
                   , Radio.createAdvanced
-                    [ Radio.id "aclOption"
+                    [ Radio.id "upstream-aclOption"
                     , Radio.checked (isDownstream AntiCorruptionLayer)
                     , Radio.onClick (setDownstream AntiCorruptionLayer)
                     ]
                     ( labelAndDescription "Anti-Corruption-Layer" "ACL" "I'm using an Anti-Corruption-Layer to shield me from changes" )
                   , Radio.createAdvanced
-                    [ Radio.id "cfOption"
+                    [ Radio.id "upstream-cfOption"
                     , Radio.checked (isDownstream Conformist)
                     , Radio.onClick (setDownstream Conformist)
                     ]
@@ -1114,8 +885,8 @@ viewAddConnection dependencies model =
             ]
         in
         Radio.createAdvanced
-          [ Radio.id "upstreamType"
-          , Radio.onClick (SetRelationship2 (Just <| UpstreamCollaboration Nothing Nothing))
+          [ Radio.id "upstream-upstreamType"
+          , Radio.onClick (SetRelationship (Just <| UpstreamCollaboration Nothing Nothing))
           , Radio.checked (
               case model.relationship of
                 Just (UpstreamCollaboration _ _) ->
@@ -1137,9 +908,9 @@ viewAddConnection dependencies model =
         setUpstream upstreamConfig =
           case model.relationship of
             (Just (DownstreamCollaboration down _ )) ->
-              SetRelationship2 (Just <| DownstreamCollaboration down (Just upstreamConfig))
+              SetRelationship (Just <| DownstreamCollaboration down (Just upstreamConfig))
             _ ->
-              SetRelationship2 (Just <| DownstreamCollaboration Nothing (Just upstreamConfig) )
+              SetRelationship (Just <| DownstreamCollaboration Nothing (Just upstreamConfig) )
 
         isDownstream downstreamConfig =
           case model.relationship of
@@ -1150,9 +921,9 @@ viewAddConnection dependencies model =
         setDownstream downstreamConfig =
           case model.relationship of
             (Just (DownstreamCollaboration _ up)) ->
-              SetRelationship2 (Just <| DownstreamCollaboration (Just downstreamConfig) up)
+              SetRelationship (Just <| DownstreamCollaboration (Just downstreamConfig) up)
             _ ->
-              SetRelationship2 (Just <| DownstreamCollaboration (Just downstreamConfig) Nothing)
+              SetRelationship (Just <| DownstreamCollaboration (Just downstreamConfig) Nothing)
 
         options = 
           Radio.label [] 
@@ -1160,21 +931,21 @@ viewAddConnection dependencies model =
             , Html.div [ class "row" ]
               [ Form.group [ Form.attrs [ class "col"] ]
                 ( Html.span[] [ text "Describe the collaborator:" ]
-                :: Radio.radioList "downstreamOptions"
+                :: Radio.radioList "downstream-downstreamOptions"
                   [ Radio.createAdvanced
-                    [ Radio.id "downstreamOption"
+                    [ Radio.id "downstream-downstreamOption"
                     , Radio.checked (isDownstream Downstream)
                     , Radio.onClick (setDownstream Downstream)
                     ]
                     ( labelAndDescription "Downstream" "DS" "The collaborator is just Downstream" )
                   , Radio.createAdvanced
-                    [ Radio.id "aclOption"
+                    [ Radio.id "downstream-aclOption"
                     , Radio.checked (isDownstream AntiCorruptionLayer)
                     , Radio.onClick (setDownstream AntiCorruptionLayer)
                     ]
                     ( labelAndDescription "Anti-Corruption-Layer" "ACL" "The collaborator is using an Anti-Corruption-Layer to shield from my changes" )
                   , Radio.createAdvanced
-                    [ Radio.id "cfOption"
+                    [ Radio.id "downstream-cfOption"
                     , Radio.checked (isDownstream Conformist)
                     , Radio.onClick (setDownstream Conformist)
                     ]
@@ -1183,21 +954,21 @@ viewAddConnection dependencies model =
                 )
               , Form.group [ Form.attrs [ class "col"] ]
                 ( Html.span[] [ text "Describe your relationship with the collaborator:" ]
-                :: Radio.radioList "upstreamOptions"
+                :: Radio.radioList "downstream-upstreamOptions"
                   [ Radio.createAdvanced
-                    [ Radio.id "upstreamOption"
+                    [ Radio.id "downstream-upstreamOption"
                     , Radio.checked (isUpstream Upstream)
                     , Radio.onClick (setUpstream Upstream)
                     ]
                     ( labelAndDescription "Upstream" "US" "I'm just Upstream" )
                   , Radio.createAdvanced
-                    [ Radio.id "publishedLanguageOption"
+                    [ Radio.id "downstream-publishedLanguageOption"
                     , Radio.checked (isUpstream PublishedLanguage)
                     , Radio.onClick (setUpstream PublishedLanguage)
                     ]
                     ( labelAndDescription "Published Language" "PL" "I'm using a Published Language" )
                   , Radio.createAdvanced
-                    [ Radio.id "openHostOption"
+                    [ Radio.id "downstream-openHostOption"
                     , Radio.checked (isUpstream OpenHost)
                     , Radio.onClick (setUpstream OpenHost)
                     ]
@@ -1209,11 +980,11 @@ viewAddConnection dependencies model =
             ]
         in
         Radio.createAdvanced
-          [ Radio.id "upstreamType"
-          , Radio.onClick (SetRelationship2 (Just <| UpstreamCollaboration Nothing Nothing))
+          [ Radio.id "downstream-upstreamType"
+          , Radio.onClick (SetRelationship (Just <| DownstreamCollaboration Nothing Nothing))
           , Radio.checked (
               case model.relationship of
-                Just (UpstreamCollaboration _ _) ->
+                Just (DownstreamCollaboration _ _) ->
                   True
                 _ ->
                   False
@@ -1224,13 +995,12 @@ viewAddConnection dependencies model =
     unknownConfiguration =
       Radio.createAdvanced
         [ Radio.id "uknownType"
-        , Radio.onClick (SetRelationship2 (Just UnknownCollaboration))
+        , Radio.onClick (SetRelationship (Just UnknownCollaboration))
         , Radio.checked (model.relationship == Just UnknownCollaboration)
         ]
         ( labelAndDescription  "Unkown" "?" "Is the exact description of the relationship unknown or you are not sure how to describe it."
         )
   in
-  Form.form []
     [ Fieldset.config
       |> Fieldset.legend [] [ text "Collaborator"]
       |> Fieldset.children
@@ -1256,32 +1026,47 @@ viewAddConnection dependencies model =
       |> Fieldset.legend [] [ text "Description" ]
       |> Fieldset.children
         [ text "An optional description of the relationship and collaboration."
-        , Textarea.textarea [ Textarea.id "description", Textarea.rows 3, Textarea.value model.description]
+        , Textarea.textarea 
+          [ Textarea.id "description"
+          , Textarea.rows 3
+          , Textarea.value model.description
+          , Textarea.onInput SetDescription
+          ]
         ]
       |> Fieldset.view
-    
-    , Button.submitButton
-      [ Button.primary
-      , Button.disabled (model.collaboration == Nothing)
-      , model.collaboration 
-        |> Maybe.map (\c -> AddInboundConnection c model.description)
-        |> Maybe.map Button.onClick
-        |> Maybe.withDefault (Button.attrs [])
-      ]
-      [ text "Add inbound connection" ]
-    , Button.submitButton
-      [ Button.primary
-      , Button.disabled (model.collaboration == Nothing)
-      , model.collaboration 
-        |> Maybe.map (\c -> AddOutboundConnection c model.description)
-        |> Maybe.map Button.onClick
-        |> Maybe.withDefault (Button.attrs [])
-      ]
-      [ text "Add outbound connection" ]
     ]
+    
 
-viewConnection : List CollaboratorReference -> String -> CollaborationEdit -> Html CollaborationTypeMsg
-viewConnection items title model =
+viewAddConnection : List CollaboratorReference -> CollaborationEdit -> Html Msg
+viewAddConnection dependencies model =
+  Html.form []
+    ( List.append
+      ( buildFields dependencies model
+        |> List.map (Html.map CollaborationMsg)
+      ) 
+      [ Button.submitButton
+        [ Button.primary
+        , Button.disabled (model.collaboration == Nothing)
+        , model.collaboration 
+          |> Maybe.map (\c -> AddInboundConnection c model.description)
+          |> Maybe.map Button.onClick
+          |> Maybe.withDefault (Button.attrs [])
+        ]
+        [ text "Add inbound connection" ]
+      , Button.submitButton
+        [ Button.primary
+        , Button.disabled (model.collaboration == Nothing)
+        , model.collaboration 
+          |> Maybe.map (\c -> AddOutboundConnection c model.description)
+          |> Maybe.map Button.onClick
+          |> Maybe.withDefault (Button.attrs [])
+        ]
+        [ text "Add outbound connection" ]
+      ]
+    )
+
+viewConnection : List CollaboratorReference -> String -> List Collaboration -> Html Msg
+viewConnection items title collaborations =
   div []
     [ Html.h6
       [ class "text-center", Spacing.p2 ]
@@ -1294,11 +1079,9 @@ viewConnection items title model =
       , Grid.col [Col.xs2] []
       ]
     , div []
-      (model.existingCollaboration
+      (collaborations
       |> List.map (viewCollaboration items))
-     , viewAddConnection items model
     ]
-
 
 
 view : Model -> Html Msg
@@ -1314,21 +1097,15 @@ view model =
     , Form.help [] [ text "To create loosely coupled systems it's essential to be wary of dependencies. In this section you should write the name of each dependency and a short explanation of why the dependency exists." ]
     , Grid.row []
       [ Grid.col []
-        [ viewDependency model.availableDependencies "Message Suppliers" model.supplier |> Html.map Supplier ]
+        [ viewConnection model.availableDependencies "Inbound Connection" model.inboundCollaboration ]
       , Grid.col []
-        [ viewDependency model.availableDependencies "Message Consumers" model.consumer |> Html.map Consumer ]
+        [ viewConnection model.availableDependencies "Outbound Connection" model.outboundCollaboration ]
       ]
-     , Grid.row []
+    , Grid.simpleRow
       [ Grid.col []
-        [ viewConnection model.availableDependencies "Inbound Connection" model.inbound |> Html.map CollaborationMsg ]
-      , Grid.col []
-        [ viewConnection model.availableDependencies "Outbound Connection" model.outbound |> Html.map CollaborationMsg ]
-      ]
-    -- , Grid.simpleRow
-    --   [ Grid.col []
-    --       [ viewAddConnection model.availableDependencies model]
+          [ viewAddConnection model.availableDependencies model.newCollaborations]
 
-    --   ]
+      ]
     ]
 
 domainDecoder : Decoder DomainDependency

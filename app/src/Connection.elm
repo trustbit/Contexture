@@ -6,7 +6,7 @@ module Connection exposing (
     isCollaborator,
     relationship, description,
     symmetricRelationshipFromString, symmetricRelationshipToString, downstreamRelationshipFromString, downstreamRelationshipToString,
-    modelEncoder, modelDecoder)
+    modelDecoder)
 
 import Json.Encode as Encode
 import Json.Decode as Decode exposing (Decoder)
@@ -51,7 +51,6 @@ type alias CustomerSupplierInformation = { customer: Collaborator, supplier: Col
 type alias UpstreamCollaborator =  (Collaborator, UpstreamRelationship)
 type alias DownstreamCollaborator =  (Collaborator, DownstreamRelationship)
 
-
 type RelationshipType
   = Symmetric SymmetricRelationship Collaborator Collaborator
   | UpstreamDownstream UpstreamDownstreamRelationship
@@ -71,7 +70,8 @@ type Collaboration =
 type alias CollaborationInternal =
     { id : CollaborationId
     , relationship : RelationshipType
-    , description : Maybe String 
+    , description : Maybe String
+    , communicationInitiator : Collaborator
     }
 
 type alias Collaborations = List Collaboration
@@ -92,36 +92,33 @@ type CollaborationDefinition
 noCollaborations : Collaborations
 noCollaborations = []
 
-defineInboundCollaboration : Api.Configuration -> BoundedContextId -> CollaborationDefinition -> String -> ApiResult Collaboration msg
+defineInboundCollaboration : Api.Configuration -> BoundedContextId ->  CollaborationDefinition -> String -> ApiResult Collaboration msg
 defineInboundCollaboration url context collaboration descriptionText =
   let
     api =
       Api.communication
 
     recipient = BoundedContext context
-    relationshipType =
+    (relationshipType,communicationInitator) =
       case collaboration of
-        SymmetricCollaboration t c ->
-          Symmetric t c recipient
-        UpstreamCollaboration t d ->
-          UpstreamDownstream <| UpstreamDownstreamRole (recipient,t) d
-        DownstreamCollaboration t u ->
-          UpstreamDownstream <| UpstreamDownstreamRole u (recipient,t)
+        SymmetricCollaboration symmetricType collaborator ->
+          (Symmetric symmetricType collaborator recipient,collaborator)
+        UpstreamCollaboration upstreamType downstreamCollaborator ->
+          (UpstreamDownstream <| UpstreamDownstreamRole (recipient,upstreamType) downstreamCollaborator,Tuple.first downstreamCollaborator)
+        DownstreamCollaboration downstreamType upstreamCollaborator ->
+          (UpstreamDownstream <| UpstreamDownstreamRole upstreamCollaborator (recipient,downstreamType),Tuple.first upstreamCollaborator)
         ACustomerOfCollaboration sup ->
-          UpstreamDownstream <| CustomerSupplierRole { customer = recipient, supplier = sup }
+          (UpstreamDownstream <| CustomerSupplierRole { customer = recipient, supplier = sup }, sup)
         ASupplierForCollaboration cus ->
-          UpstreamDownstream <| CustomerSupplierRole { customer = cus, supplier = recipient }
-        UnknownCollaboration c ->
-          Unknown c recipient
+          (UpstreamDownstream <| CustomerSupplierRole { customer = cus, supplier = recipient }, cus)
+        UnknownCollaboration collaborator ->
+          (Unknown collaborator recipient,collaborator)
 
     request toMsg =
       Http.post
       { url = api |> Api.url url |> Url.toString
       , body = Http.jsonBody <|
-              Encode.object 
-                  [ ("relationship", relationshipCollaboratorEncoder relationshipType )
-                  , ("description", Encode.string descriptionText)
-                  ]
+              modelEncoder relationshipType (if String.isEmpty descriptionText then Nothing else Just descriptionText) communicationInitator
       , expect = Http.expectJson toMsg modelDecoder
       }
     in
@@ -153,10 +150,7 @@ defineOutboundCollaboration url context collaboration descriptionText =
       Http.post
       { url = api |> Api.url url |> Url.toString
       , body = Http.jsonBody <|
-              Encode.object 
-                  [ ("relationship", relationshipCollaboratorEncoder relationshipType )
-                  , ("description", Encode.string descriptionText)
-                  ]
+            modelEncoder relationshipType (if String.isEmpty descriptionText then Nothing else Just descriptionText) recipient
       , expect = Http.expectJson toMsg modelDecoder
       }
     in
@@ -165,41 +159,30 @@ defineOutboundCollaboration url context collaboration descriptionText =
 
 isInboundCollaboratoration : Collaborator -> Collaboration -> Bool
 isInboundCollaboratoration collaborator (Collaboration collaboration) =
-  case collaboration.relationship of
-    Symmetric _ _ p ->
-      p == collaborator
-    UpstreamDownstream (CustomerSupplierRole { customer, supplier }) ->
-      customer == collaborator
-    UpstreamDownstream (UpstreamDownstreamRole (up,_) _) ->
-      up == collaborator
-    Octopus (up,_) _ ->
-      up == collaborator
-    Unknown _ p ->
-      p == collaborator
+  collaboration.communicationInitiator == collaborator
+    
 
-
-isOutboundCollaboratoration : Collaborator -> Collaboration -> Bool
-isOutboundCollaboratoration collaborator (Collaboration collaboration) =
+areCollaborating : Collaborator -> Collaboration -> Bool
+areCollaborating collaborator (Collaboration collaboration) =
   case collaboration.relationship of
-    Symmetric _ p _ ->
-      p == collaborator
+    Symmetric _ p1 p2 ->
+      p1 == collaborator || p2 == collaborator
     UpstreamDownstream (CustomerSupplierRole { customer, supplier }) ->
-      supplier == collaborator
-    UpstreamDownstream (UpstreamDownstreamRole _ (down,_)) ->
-      down == collaborator
-    Octopus _ downs ->
-      downs
-      |> List.any (\(down,_) -> down == collaborator)
-    Unknown p _ ->
-      p == collaborator
+      supplier == collaborator || customer == collaborator
+    UpstreamDownstream (UpstreamDownstreamRole (up,_) (down,_)) ->
+      down == collaborator || up == collaborator
+    Octopus (up,_) downs ->
+      up == collaborator || (downs |> List.any (\(down,_) -> down == collaborator))
+    Unknown p1 p2 ->
+      p1 == collaborator || p2 == collaborator
 
 
 isCollaborator : Collaborator -> Collaboration -> Maybe CollaborationType
 isCollaborator collaborator collaboration =
-  case (isInboundCollaboratoration collaborator collaboration, isOutboundCollaboratoration collaborator collaboration) of
-    (True, False) -> 
+  case (areCollaborating collaborator collaboration, isInboundCollaboratoration collaborator collaboration) of
+    (True, True) -> 
       Just <| Inbound collaboration
-    (False, True) ->
+    (True, False) ->
       Just <| Outbound collaboration
     _ ->
       Nothing
@@ -236,7 +219,17 @@ modelDecoder =
     |> JP.custom idFieldDecoder
     |> JP.required "relationship" relationshipCollaboratorDecoder
     |> JP.required "description" (Decode.nullable Decode.string)
+    |> JP.required "communicationInitiator" collaboratorDecoder
   ) |> Decode.map Collaboration
+
+modelEncoder : RelationshipType -> Maybe String -> Collaborator -> Encode.Value
+modelEncoder relationshipType descriptionValue communicationInitiator =
+  Encode.object
+    [ ("relationship", relationshipCollaboratorEncoder relationshipType)
+    , ("description", maybeEncoder Encode.string descriptionValue)
+    , ("communicationInitiator", collaboratorEncoder communicationInitiator)
+    ]
+
 
 collaboratorEncoder : Collaborator -> Encode.Value
 collaboratorEncoder collaborator =
@@ -415,13 +408,6 @@ relationshipCollaboratorDecoder =
       ( collaboratorFieldDecoder "participant2" )
     ]
 
-
-modelEncoder : Collaboration -> Encode.Value
-modelEncoder (Collaboration collaboration) =
-  Encode.object
-    [ ("relationship", relationshipCollaboratorEncoder collaboration.relationship)
-    , ("description", maybeEncoder Encode.string collaboration.description)
-    ]
 
 maybeEncoder : (t -> Encode.Value) -> Maybe t -> Encode.Value
 maybeEncoder encoder value =

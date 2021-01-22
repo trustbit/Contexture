@@ -233,8 +233,7 @@ update msg model =
             c = editable.edit.canvas
             canvas =
               { c
-              | dependencies = editable.addingDependencies |> Dependencies.asDependencies
-              , messages = editable.addingMessage |> Messages.asMessages
+              | messages = editable.addingMessage |> Messages.asMessages
               , ubiquitousLanguage = editable.ubiquitousLanguage.language
               , businessDecisions = editable.businessDecisions.decisions
               }
