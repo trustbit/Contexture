@@ -1,12 +1,10 @@
 module ContextMapping.RelationshipType exposing (
     RelationshipType(..), SymmetricRelationship(..), UpstreamRelationship(..), DownstreamRelationship(..),UpstreamDownstreamRelationship(..),
-    UpstreamCollaborator, DownstreamCollaborator,
+    InitiatorUpstreamDownstreamRole(..), InitiatorCustomerSupplierRole(..),
     encoder, decoder)
 
 import Json.Encode as Encode
 import Json.Decode as Decode exposing (Decoder)
-
-import ContextMapping.Collaborator as Collaborator exposing (Collaborator)
 
 type SymmetricRelationship
   = SharedKernel
@@ -25,53 +23,46 @@ type DownstreamRelationship
   | Conformist
 
 type UpstreamDownstreamRelationship
-  = CustomerSupplierRole CustomerSupplierInformation
-  | UpstreamDownstreamRole UpstreamCollaborator DownstreamCollaborator
+  = CustomerSupplierRelationship InitiatorCustomerSupplierRole
+  | UpstreamDownstreamRelationship InitiatorUpstreamDownstreamRole UpstreamRelationship DownstreamRelationship
 
-type alias CustomerSupplierInformation = { customer: Collaborator, supplier: Collaborator }
+type InitiatorUpstreamDownstreamRole
+  = UpstreamRole
+  | DownstreamRole
 
-type alias UpstreamCollaborator =  (Collaborator, UpstreamRelationship)
-type alias DownstreamCollaborator =  (Collaborator, DownstreamRelationship)
+type InitiatorCustomerSupplierRole
+  = SupplierRole
+  | CustomerRole
+
 
 type RelationshipType
-  = Symmetric SymmetricRelationship Collaborator Collaborator
+  = Symmetric SymmetricRelationship
   | UpstreamDownstream UpstreamDownstreamRelationship
-  | Octopus UpstreamCollaborator (List DownstreamCollaborator)
-  | Unknown Collaborator Collaborator
+  | Unknown 
 
 
-upstreamCollaboratorEncoder : UpstreamCollaborator -> Encode.Value
-upstreamCollaboratorEncoder (collaborator, upstreamType) =
-  Encode.object
-    [ ( "collaborator", Collaborator.encoder collaborator)
-    , ( "type"
-      , Encode.string <|
-          case upstreamType of
-            Upstream -> "Upstream"
-            PublishedLanguage -> "PublishedLanguage"
-            OpenHost -> "OpenHost"       
-      )
-    ]
+upstreamCollaboratorEncoder : UpstreamRelationship -> Encode.Value
+upstreamCollaboratorEncoder upstreamType =
+  Encode.string <|
+    case upstreamType of
+      Upstream -> "Upstream"
+      PublishedLanguage -> "PublishedLanguage"
+      OpenHost -> "OpenHost"       
 
-upstreamCollaboratorDecoder : Decoder UpstreamCollaborator
+upstreamCollaboratorDecoder : Decoder UpstreamRelationship
 upstreamCollaboratorDecoder =
-  Decode.map2 Tuple.pair
-    ( Decode.field "collaborator" Collaborator.decoder)
-    ( Decode.field "type" Decode.string |> Decode.andThen (\upstreamType ->
-        case upstreamType of
-          "Upstream" -> Decode.succeed Upstream
-          "PublishedLanguage" -> Decode.succeed PublishedLanguage
-          "OpenHost" -> Decode.succeed OpenHost
-          x  -> Decode.fail <| "could not decode pattern: " ++ x
-      )
-    )
-
-downstreamCollaboratorEncoder : DownstreamCollaborator -> Encode.Value
-downstreamCollaboratorEncoder (collaborator, downstreamType) =
-  Encode.object
-    [ ( "collaborator", Collaborator.encoder collaborator )
-    , ( "type", Encode.string <| downstreamRelationshipToString downstreamType )
-    ]
+  Decode.string 
+  |> Decode.andThen (\upstreamType ->
+    case upstreamType of
+      "Upstream" -> Decode.succeed Upstream
+      "PublishedLanguage" -> Decode.succeed PublishedLanguage
+      "OpenHost" -> Decode.succeed OpenHost
+      x  -> Decode.fail <| "could not decode pattern: " ++ x
+  )
+  
+downstreamCollaboratorEncoder : DownstreamRelationship -> Encode.Value
+downstreamCollaboratorEncoder downstreamType =
+  Encode.string <| downstreamRelationshipToString downstreamType  
 
 downstreamRelationshipToString : DownstreamRelationship -> String
 downstreamRelationshipToString downstreamType =
@@ -88,47 +79,57 @@ downstreamRelationshipFromString downstreamType =
     "Conformist" -> Ok Conformist
     x  -> Err x
 
-downstreamCollaboratorDecoder : Decoder DownstreamCollaborator
+downstreamCollaboratorDecoder : Decoder DownstreamRelationship
 downstreamCollaboratorDecoder =
-  Decode.map2 Tuple.pair
-    ( Decode.field "collaborator" Collaborator.decoder )
-    ( Decode.field "type" Decode.string |> Decode.andThen ( resultToDecoder downstreamRelationshipFromString ) )
+  Decode.string |> Decode.andThen ( resultToDecoder downstreamRelationshipFromString ) 
 
 upstreamDownstreamEncoder : UpstreamDownstreamRelationship -> Encode.Value
 upstreamDownstreamEncoder upstreamDownstreamRealtionship =
   case upstreamDownstreamRealtionship of
-    CustomerSupplierRole { customer, supplier} ->
+    CustomerSupplierRelationship CustomerRole ->
       Encode.object
-        [ ( "customer",  Collaborator.encoder customer )
-        , ( "supplier", Collaborator.encoder supplier )
+        [ ( "initiatorRole",  Encode.string "customer" )
         ]
-    UpstreamDownstreamRole upstream downstream ->
+    CustomerSupplierRelationship SupplierRole ->
       Encode.object
-        [ ( "upstream", upstreamCollaboratorEncoder upstream )
-        , ( "downstream", downstreamCollaboratorEncoder downstream )
+        [ ( "initiatorRole",  Encode.string "supplier" )
+        ]
+    UpstreamDownstreamRelationship initiatorRole upstreamType downstreamType ->
+      Encode.object
+        [ ( "initiatorRole",  Encode.string <|
+            case initiatorRole of
+              UpstreamRole -> 
+                "upstream"
+              DownstreamRole ->
+                "downstream"
+          )
+        , ( "upstreamType", upstreamCollaboratorEncoder upstreamType )
+        , ( "downstreamType", downstreamCollaboratorEncoder downstreamType )
         ] 
 
-encoder : RelationshipType -> Encode.Value
-encoder relationshipType =
-  case relationshipType of
-    Symmetric symmetricType participant1 participant2 ->
-      Encode.object
-        [ ( "symmetric", Encode.string <| symmetricRelationshipToString symmetricType )
-        , ( "participant1", Collaborator.encoder participant1 )
-        , ( "participant2", Collaborator.encoder participant2 )
-        ]
-    UpstreamDownstream upstreamDownstreamType ->
-      upstreamDownstreamEncoder upstreamDownstreamType
-    Octopus upstream downstreams ->
-      Encode.object
-        [ ( "upstream", upstreamCollaboratorEncoder upstream )
-        , ( "downstreams", downstreams |> Encode.list downstreamCollaboratorEncoder )
-        ]
-    Unknown participant1 participant2 ->
-      Encode.object
-        [ ( "participant1", Collaborator.encoder participant1 )
-        , ( "participant2", Collaborator.encoder participant2 )
-        ]
+
+upstreamDownstreamDecoder : Decoder UpstreamDownstreamRelationship
+upstreamDownstreamDecoder =
+  Decode.oneOf
+    [ Decode.map CustomerSupplierRelationship 
+      ( Decode.field "initiatorRole" Decode.string |> Decode.andThen (\upstreamType ->
+          case upstreamType of
+            "customer" -> Decode.succeed CustomerRole
+            "supplier" -> Decode.succeed SupplierRole
+            x  -> Decode.fail <| "could not decode pattern: " ++ x
+        )
+      )
+    , Decode.map3 UpstreamDownstreamRelationship
+      ( Decode.field "initiatorRole" Decode.string |> Decode.andThen (\upstreamType ->
+          case upstreamType of
+            "upstream" -> Decode.succeed UpstreamRole
+            "downstream" -> Decode.succeed DownstreamRole
+            x  -> Decode.fail <| "could not decode pattern: " ++ x
+        )
+      )
+      ( Decode.field "upstreamType" upstreamCollaboratorDecoder )
+      ( Decode.field "downstreamType" downstreamCollaboratorDecoder )
+    ]
 
 symmetricRelationshipFromString : String -> Result String SymmetricRelationship
 symmetricRelationshipFromString symmetricType =
@@ -149,48 +150,34 @@ symmetricRelationshipToString symmetricType =
 
 
 
-upstreamDownstreamDecoder : Decoder UpstreamDownstreamRelationship
-upstreamDownstreamDecoder =
-  let
-    customerSupplierDecode =
-      Decode.map2 CustomerSupplierInformation
-        ( collaboratorFieldDecoder "customer" )
-        ( collaboratorFieldDecoder "supplier" )
-  in
-    Decode.oneOf
-      [ Decode.map CustomerSupplierRole
-          customerSupplierDecode
-      , Decode.map2 UpstreamDownstreamRole
-        ( Decode.field "upstream" upstreamCollaboratorDecoder )
-        ( Decode.field "downstream" downstreamCollaboratorDecoder )
-      ]
+
+encoder : RelationshipType -> Encode.Value
+encoder relationshipType =
+  case relationshipType of
+    Symmetric symmetricType ->
+      Encode.object
+        [ ( "symmetric", Encode.string <| symmetricRelationshipToString symmetricType )
+        ]
+    UpstreamDownstream upstreamDownstreamType ->
+      upstreamDownstreamEncoder upstreamDownstreamType
+    Unknown ->
+      Encode.object
+        [ ]
 
 
 decoder : Decoder RelationshipType
 decoder =
   Decode.oneOf 
-    [ Decode.map3 Symmetric
+    [ Decode.map Symmetric
       ( Decode.field 
           "symmetric" 
           Decode.string 
           |> Decode.andThen (resultToDecoder symmetricRelationshipFromString)
       )      
-      ( collaboratorFieldDecoder "participant1" )
-      ( collaboratorFieldDecoder "participant2" )
     , Decode.map UpstreamDownstream
         upstreamDownstreamDecoder
-    , Decode.map2 Octopus
-      ( Decode.field "upstream" upstreamCollaboratorDecoder )
-      ( Decode.field "downstreams" ( Decode.list downstreamCollaboratorDecoder ) )
-    , Decode.map2 Unknown
-      ( collaboratorFieldDecoder "participant1" )
-      ( collaboratorFieldDecoder "participant2" )
+    , Decode.succeed Unknown
     ]
-
-
-collaboratorFieldDecoder fieldName =
-   Decode.field fieldName Collaborator.decoder 
-
 
 resultToDecoder : (a -> Result String b) -> (a -> Decoder b)
 resultToDecoder convert =
