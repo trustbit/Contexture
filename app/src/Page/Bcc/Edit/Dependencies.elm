@@ -19,6 +19,7 @@ import Bootstrap.ButtonGroup as ButtonGroup
 import Bootstrap.Accordion as Accordion
 import Bootstrap.Card.Block as Block
 import Bootstrap.Card as Card
+import Bootstrap.Modal as Modal
 import Bootstrap.Form.Fieldset as Fieldset
 import Bootstrap.Utilities.Spacing as Spacing
 import Bootstrap.Utilities.Display as Display
@@ -89,7 +90,9 @@ type RelationshipEdit
   | UnknownCollaboration
 
 type alias DefineRelationshipType = 
-  { relationshipEdit : Maybe RelationshipEdit
+  { collaboration : Collaboration2
+  , modalVisibility : Modal.Visibility
+  , relationshipEdit : Maybe RelationshipEdit
   , relationship : Maybe RelationshipType
   }
 
@@ -104,19 +107,46 @@ type alias Model =
   { boundedContextId : BoundedContextId
   , config : Api.Configuration
   , newCollaborations : Maybe AddCollaboration
-  , editRelationship : Maybe DefineRelationshipType
+  , defineRelationship : Maybe DefineRelationshipType
   , availableDependencies : List CollaboratorReference
   , inboundCollaboration : List Connection.Collaboration2
   , outboundCollaboration : List Connection.Collaboration2
   }
 
-initCollaboration : AddCollaboration
-initCollaboration =
+initAddCollaboration : AddCollaboration
+initAddCollaboration =
   { selectedCollaborator = Nothing
   , dependencySelectState = Autocomplete.newState "collaboration-select"
   , description = ""
   , collaborator = Nothing
   }
+
+
+initRelationshipEdit : RelationshipType -> RelationshipEdit 
+initRelationshipEdit relationshipType =
+  case relationshipType of
+    Symmetric s ->
+      s |> Just |> SymmetricCollaboration
+    (UpstreamDownstream (CustomerSupplierRelationship SupplierRole)) ->
+      IsSupplier |> Just |> CustomerSupplierCollaboration
+    (UpstreamDownstream (CustomerSupplierRelationship CustomerRole)) ->
+      IsCustomer |> Just |> CustomerSupplierCollaboration
+    (UpstreamDownstream (UpstreamDownstreamRelationship UpstreamRole upstream downstream)) ->
+      UpstreamCollaboration (Just upstream) (Just downstream)
+    (UpstreamDownstream (UpstreamDownstreamRelationship DownstreamRole upstream downstream)) ->
+      DownstreamCollaboration (Just downstream) (Just upstream)
+    Unknown ->
+      UnknownCollaboration
+
+
+initDefineRelationshipType : Collaboration2 -> DefineRelationshipType
+initDefineRelationshipType collaboration =
+  { collaboration = collaboration
+  , modalVisibility = Modal.shown
+  , relationshipEdit = collaboration |> Connection.relationship |> Maybe.map initRelationshipEdit
+  , relationship = Nothing
+  }
+  |> updateRelationshipEdit
 
 initDependencies : Api.Configuration -> BoundedContextId -> Model
 initDependencies config contextId =
@@ -126,7 +156,7 @@ initDependencies config contextId =
   , inboundCollaboration = []
   , outboundCollaboration = []
   , newCollaborations = Nothing
-  , editRelationship = Nothing 
+  , defineRelationship = Nothing 
   }
 
 init : Api.Configuration -> BoundedContext.BoundedContext -> Dependencies -> (Model, Cmd Msg)
@@ -161,7 +191,11 @@ type Msg
   | InboundConnectionAdded (Api.ApiResponse Collaboration2)
   | OutboundConnectionAdded (Api.ApiResponse Collaboration2)
   | CancelAddingConnection
+  | StartToDefineRelationship Collaboration2
   | SetRelationship (Maybe RelationshipEdit)
+  | DefineRelationship CollaborationId RelationshipType
+  | RelationshipTypeDefined (Api.ApiResponse Collaboration2)
+  | CancelRelationshipDefinition
   | RemoveInboundConnection Collaboration2
   | RemoveOutboundConnection Collaboration2
   | InboundConnectionRemoved (Api.ApiResponse CollaborationId)
@@ -317,7 +351,7 @@ update msg model =
         )
 
     StartAddingConnection ->
-      ( { model | newCollaborations = Just initCollaboration }, Cmd.none)
+      ( { model | newCollaborations = Just initAddCollaboration }, Cmd.none)
     AddCollaborationMsg col ->
       case model.newCollaborations of
         Just adding ->
@@ -368,6 +402,46 @@ update msg model =
           model.outboundCollaboration
           |> List.filter (\i -> (i |> Connection.id) /= result)
         }
+      , Cmd.none
+      )
+
+    StartToDefineRelationship collaboration ->
+      ( { model | defineRelationship = collaboration |> initDefineRelationshipType |> Just }
+      , Cmd.none
+      )
+    
+    SetRelationship relationship ->
+      case model.defineRelationship of
+        Just defining ->
+          ( { model 
+            | defineRelationship = 
+                { defining | relationshipEdit = relationship} |> updateRelationshipEdit |> Just
+            }
+          , Cmd.none
+          )
+        Nothing ->
+          (model, Cmd.none)
+
+    DefineRelationship collaborationId relationship ->
+      (model, Connection.defineRelationshipType model.config collaborationId relationship RelationshipTypeDefined) 
+
+    RelationshipTypeDefined (Ok collaboration) ->
+      let
+        updateCollaborationType c =
+          if (c |> Connection.id) == (collaboration |> Connection.id)
+          then collaboration
+          else c
+      in 
+        ( { model
+          | defineRelationship = Nothing
+          , inboundCollaboration = model.inboundCollaboration |> List.map updateCollaborationType
+          , outboundCollaboration = model.outboundCollaboration |> List.map updateCollaborationType
+          }
+        , Cmd.none
+        )
+
+    CancelRelationshipDefinition ->
+      ( { model | defineRelationship = Nothing }
       , Cmd.none
       )
 
@@ -547,11 +621,15 @@ translateUpstreamDownstreamRelationship relationship =
       ( translateDownstreamRelationship dt ) ++ "/" ++ ( translateUpstreamRelationship ut)
 
 
-type alias ResolveCollaboratorCaption = Collaborator -> Html Msg
+type alias ResolveCollaboratorCaption = Collaboration2 -> Html Msg
 
-collaboratorCaption : List CollaboratorReference -> Collaborator -> Html Msg
-collaboratorCaption items collaborator =
-  case collaborator of
+collaboratorCaption : List CollaboratorReference ->  (Collaboration2 -> Collaborator) -> Collaboration2 -> Html Msg
+collaboratorCaption items collaboratorSelection collaboration =
+  let
+    additionalDescription description =
+      Html.small [ class "text-muted" ] [ text ("[" ++ description ++ "]") ]
+
+  in case collaboratorSelection collaboration of
     Collaborator.BoundedContext bc ->
       items
       |> List.filterMap (\r ->
@@ -559,9 +637,9 @@ collaboratorCaption items collaborator =
           BoundedContext bcr ->
             if bcr.id == bc then
               Just <|
-                Html.div [] 
-                  [ Html.h6 [ class "text-muted" ] [ text bcr.domain.name ]
-                  , Html.span [] [ text bcr.name ] 
+                Html.h6 [] 
+                  [ text bcr.name
+                  , additionalDescription <| "in Domain '" ++ bcr.domain.name  ++ "'"
                   ]
             else
               Nothing
@@ -576,7 +654,7 @@ collaboratorCaption items collaborator =
         case r of 
           Domain dr ->
             if dr.id == d
-            then Just (Html.span [] [ text dr.name ])
+            then Just (Html.h6 [] [ text dr.name ])
             else Nothing
           _ ->
             Nothing
@@ -584,22 +662,22 @@ collaboratorCaption items collaborator =
       |> List.head
       |> Maybe.withDefault (text "Unknown Domain" )
     Collaborator.ExternalSystem s ->
-      Html.span
+      Html.h6
           []
-          [ Html.h6 [ class "text-muted" ] [ text "External System" ]
-          , Html.span [] [ text s] 
+          [ text s
+          , additionalDescription "External System"
           ]
     Collaborator.Frontend s ->
-      Html.span
+      Html.h6
           []
-          [ Html.h6 [ class "text-muted" ] [ text "Frontend" ]
-          , Html.span [] [ text s] 
+          [ text s
+          , additionalDescription "Frontend"
           ]
     Collaborator.UserInteraction s ->
-      Html.span
+      Html.h6
           []
-          [ Html.h6 [ class "text-muted" ] [ text "User Interaction" ]
-          , Html.span [] [ text s] 
+          [ text s
+          , additionalDescription "User Interaction"
           ]
 
 
@@ -670,9 +748,9 @@ specifyRelationshipType relationshipType =
                 False
           )
         ]
-        ( Radio.label [] 
+        ( Radio.label [Spacing.pt1] 
           [ captionAndDescription "Customer/Supplier" "There is a cooperation with the collaborator that can be described as a customer/supplier relationship."
-          , Html.div [] 
+          , Html.div [ ] 
             ( Radio.radioList "customerSupplierOptions"
               [ Radio.createAdvanced
                 [ Radio.id "isCustomerOption"
@@ -888,7 +966,7 @@ specifyRelationshipType relationshipType =
         , Radio.onClick (SetRelationship (Just UnknownCollaboration))
         , Radio.checked (relationshipType == Just UnknownCollaboration)
         ]
-        ( labelAndDescription  "Unkown" "?" "Is the exact description of the relationship unknown or you are not sure how to describe it."
+        ( labelAndDescription  "Unkown" "?" "The exact description of the relationship unknown or you are not sure how to describe it."
         )
 
   in
@@ -1097,20 +1175,25 @@ viewInboundConnection resolveCaption collaborations =
     inboundCollaborator collaboration = 
       let
         description = Connection.description collaboration
-        initiator = Connection.initiator collaboration
-        
       in
         Grid.row 
           [ Row.attrs [ Border.top, Spacing.mb2, Spacing.pt1 ] ]
-          [ Grid.col [] [ resolveCaption initiator ]
+          [ Grid.col [] [ resolveCaption collaboration ]
           , Grid.col [] [ text <| Maybe.withDefault "" description ]
-          , Grid.col [ Col.xs2 ]
-              [ Button.button
+          , Grid.col [] 
+            [ Button.button
                 [ Button.secondary
-                , Button.onClick (RemoveInboundConnection collaboration)
+                , Button.onClick (StartToDefineRelationship collaboration)
                 ]
-                [ text "x" ]
+                [ text "Define Relationship"]
+            ]
+          , Grid.col [ Col.xs2 ]
+            [ Button.button
+              [ Button.secondary
+              , Button.onClick (RemoveInboundConnection collaboration)
               ]
+              [ text "x" ]
+            ]
             ]
   in div []
     [ Html.h6
@@ -1136,7 +1219,7 @@ viewOutboundConnection resolveCaption collaborations =
       Grid.row 
         [ Row.attrs [ Border.top, Spacing.mb2, Spacing.pt1 ] ]
         [ Grid.col [] [ text <| Maybe.withDefault "" (Connection.description collaboration) ]
-        , Grid.col [] [ collaboration |> Connection.recipient |> resolveCaption ]
+        , Grid.col [] [ collaboration |> resolveCaption ]
         , Grid.col [ Col.xs2 ]
             [ Button.button
               [ Button.secondary
@@ -1163,6 +1246,42 @@ viewOutboundConnection resolveCaption collaborations =
     ]
 
 
+viewDefineRelationship : ResolveCollaboratorCaption -> Maybe DefineRelationshipType -> Html Msg
+viewDefineRelationship resolveCaption defineRelationship =
+  case defineRelationship of
+    Just model ->
+      Modal.config CancelRelationshipDefinition
+        |> Modal.large
+        |> Modal.scrollableBody True
+        |> Modal.hideOnBackdropClick True
+        |> Modal.h3 [] [ text "Relationship between collaborators" ]
+        |> Modal.body [] 
+          [ text "How would you describe the relationship between the bounded context and the collaborator "
+          , resolveCaption model.collaboration
+          , div [] (specifyRelationshipType model.relationshipEdit)
+          ]
+        |> Modal.footer []
+            [ Button.button
+              [ Button.primary
+              , model.relationship
+              |> Maybe.map (DefineRelationship (Connection.id model.collaboration))
+              |> Maybe.map Button.onClick
+              |> Maybe.withDefault (Button.attrs [])
+              , Button.disabled (model.relationship == Nothing)
+              ]
+              [ text "Define Relationship" ]
+            , Button.button
+                [ Button.outlinePrimary
+                , Button.attrs [ onClick CancelRelationshipDefinition ]
+                ]
+                [ text "Close" ]
+            ]
+        |> Modal.view model.modalVisibility
+    Nothing ->
+      text ""
+  
+
+
 view : Model -> Html Msg
 view model =
   div []
@@ -1176,15 +1295,17 @@ view model =
     , Form.help [] [ text "To create loosely coupled systems it's essential to be wary of dependencies. In this section you should write the name of each dependency and a short explanation of why the dependency exists." ]
     , Grid.row []
       [ Grid.col []
-        [ viewInboundConnection (collaboratorCaption model.availableDependencies) model.inboundCollaboration ]
+        [ viewInboundConnection (collaboratorCaption model.availableDependencies Connection.initiator) model.inboundCollaboration ]
       , Grid.col []
-        [ viewOutboundConnection (collaboratorCaption model.availableDependencies) model.outboundCollaboration ]
+        [ viewOutboundConnection (collaboratorCaption model.availableDependencies Connection.recipient) model.outboundCollaboration ]
       ]
     , Grid.simpleRow
       [ Grid.col []
           [ viewAddConnection model.availableDependencies model.newCollaborations]
-
       ]
+    , viewDefineRelationship 
+        (collaboratorCaption model.availableDependencies (model.boundedContextId |> Collaborator.BoundedContext |> Connection.otherCollaborator)) 
+        model.defineRelationship
     ]
 
 domainDecoder : Decoder DomainDependency

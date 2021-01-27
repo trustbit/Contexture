@@ -1,9 +1,9 @@
 module Connection exposing (
     Collaboration,Collaboration2, Collaborations, CollaborationType(..), 
-    noCollaborations, defineInboundCollaboration, defineOutboundCollaboration,
+    noCollaborations, defineInboundCollaboration, defineOutboundCollaboration, defineRelationshipType,
     endCollaboration,
     isCollaborator,
-    relationship, description, initiator, recipient, id,
+    relationship, description, initiator, recipient, id, otherCollaborator,
     modelDecoder)
 
 import Json.Encode as Encode
@@ -21,6 +21,7 @@ import ContextMapping.RelationshipType as RelationshipType exposing (Relationshi
 import Domain
 import Domain.DomainId as Domain
 import BoundedContext.BoundedContextId exposing (BoundedContextId)
+import Api exposing (collaboration)
 
 
 type Collaboration
@@ -127,11 +128,11 @@ defineOutboundCollaboration url context connectionRecipient descriptionText =
     in
       request
 
-defineRelationshipType : Api.Configuration -> Collaboration2 ->  RelationshipType -> ApiResult Collaboration2 msg
+defineRelationshipType : Api.Configuration -> CollaborationId ->  RelationshipType -> ApiResult Collaboration2 msg
 defineRelationshipType url collaboration relationshipType =
   let
     api =
-      collaboration |> id |> Api.collaboration 
+      collaboration |> Api.collaboration 
 
     request toMsg =
       Http.request
@@ -184,8 +185,8 @@ id : Collaboration2 -> CollaborationId
 id (Collaboration2 collaboration) =
   collaboration.id
 
-relationship : Collaboration -> RelationshipType
-relationship (Collaboration collaboration) =
+relationship : Collaboration2 -> Maybe RelationshipType
+relationship (Collaboration2 collaboration) =
   collaboration.relationship
 
 initiator : Collaboration2 -> Collaborator
@@ -196,7 +197,13 @@ initiator (Collaboration2 collaboration) =
 recipient : Collaboration2 -> Collaborator
 recipient (Collaboration2 collaboration) =
   collaboration.recipient
-  
+
+
+otherCollaborator : Collaborator -> Collaboration2 -> Collaborator
+otherCollaborator knownCollaborator (Collaboration2 collaboration) =
+  if collaboration.recipient == knownCollaborator
+  then collaboration.initiator
+  else collaboration.recipient
 
 description : Collaboration2 -> Maybe String
 description (Collaboration2 collaboration) =
