@@ -1,5 +1,5 @@
 module Connection exposing (
-    Collaboration,Collaboration2, Collaborations, CollaborationType(..), 
+    Collaboration, Collaborations, CollaborationType(..),
     noCollaborations, defineInboundCollaboration, defineOutboundCollaboration, defineRelationshipType,
     endCollaboration,
     isCollaborator,
@@ -23,22 +23,11 @@ import Domain.DomainId as Domain
 import BoundedContext.BoundedContextId exposing (BoundedContextId)
 import Api exposing (collaboration)
 
-
 type Collaboration
   = Collaboration CollaborationInternal
-type Collaboration2 
-  -- = Collaboration CollaborationInternal
-  = Collaboration2 CollaborationInternal2
-  
+
 
 type alias CollaborationInternal =
-    { id : CollaborationId
-    , relationship : RelationshipType
-    , description : Maybe String
-    , communicationInitiator : Collaborator
-    }
-
-type alias CollaborationInternal2 =
     { id : CollaborationId
     , description : Maybe String
     , initiator : Collaborator
@@ -50,15 +39,8 @@ type alias CollaborationInternal2 =
 type alias Collaborations = List Collaboration
 
 type CollaborationType
-  = Inbound Collaboration2
-  | Outbound Collaboration2
-
--- type CollaborationDefinition
---   = SymmetricCollaboration RelationshipType.SymmetricRelationship
---   | UpstreamCollaboration RelationshipType.UpstreamRelationship RelationshipType.DownstreamRelationship
---   | CustomerSupplierCollaboration RelationshipType.InitiatorCustomerSupplierRole
---   | DownstreamCollaboration RelationshipType.DownstreamRelationship RelationshipType.UpstreamCollaborator
---   | UnknownCollaboration Collaborator
+  = Inbound Collaboration
+  | Outbound Collaboration
 
 
 noCollaborations : Collaborations
@@ -84,7 +66,7 @@ endCollaboration url collaborationId =
     request
 
 
-defineInboundCollaboration : Api.Configuration -> BoundedContextId -> Collaborator -> String -> ApiResult Collaboration2 msg
+defineInboundCollaboration : Api.Configuration -> BoundedContextId -> Collaborator -> String -> ApiResult Collaboration msg
 defineInboundCollaboration url context connectionInitiator descriptionText =
   let
     api =
@@ -96,7 +78,7 @@ defineInboundCollaboration url context connectionInitiator descriptionText =
       Http.post
       { url = api |> Api.url url |> Url.toString
       , body = Http.jsonBody <|
-              modelEncoder2 
+              modelEncoder
                 connectionInitiator
                 connectionRecipient
                 (if String.isEmpty descriptionText then Nothing else Just descriptionText)
@@ -106,7 +88,7 @@ defineInboundCollaboration url context connectionInitiator descriptionText =
     in
       request
 
-defineOutboundCollaboration : Api.Configuration -> BoundedContextId -> Collaborator -> String -> ApiResult Collaboration2 msg
+defineOutboundCollaboration : Api.Configuration -> BoundedContextId -> Collaborator -> String -> ApiResult Collaboration msg
 defineOutboundCollaboration url context connectionRecipient descriptionText =
   let
     api =
@@ -118,21 +100,21 @@ defineOutboundCollaboration url context connectionRecipient descriptionText =
       Http.post
       { url = api |> Api.url url |> Url.toString
       , body = Http.jsonBody <|
-              modelEncoder2 
+              modelEncoder
                 connectionInitiator
-                connectionRecipient 
-                (if String.isEmpty descriptionText then Nothing else Just descriptionText) 
+                connectionRecipient
+                (if String.isEmpty descriptionText then Nothing else Just descriptionText)
                 Nothing
       , expect = Http.expectJson toMsg modelDecoder
       }
     in
       request
 
-defineRelationshipType : Api.Configuration -> CollaborationId ->  RelationshipType -> ApiResult Collaboration2 msg
+defineRelationshipType : Api.Configuration -> CollaborationId ->  RelationshipType -> ApiResult Collaboration msg
 defineRelationshipType url collaboration relationshipType =
   let
     api =
-      collaboration |> Api.collaboration 
+      collaboration |> Api.collaboration
 
     request toMsg =
       Http.request
@@ -150,82 +132,71 @@ defineRelationshipType url collaboration relationshipType =
 
 
 
-isInboundCollaboratoration : Collaborator -> Collaboration2 -> Bool
-isInboundCollaboratoration collaborator (Collaboration2 collaboration) =
+isInboundCollaboratoration : Collaborator -> Collaboration -> Bool
+isInboundCollaboratoration collaborator (Collaboration collaboration) =
   collaboration.recipient == collaborator
-    
 
-areCollaborating : Collaborator -> Collaboration2 -> Bool
-areCollaborating collaborator (Collaboration2 collaboration) =
-  -- case collaboration.relationship of
-  --   Symmetric _ p1 p2 ->
-  --     p1 == collaborator || p2 == collaborator
-  --   UpstreamDownstream (CustomerSupplierRole { customer, supplier }) ->
-  --     supplier == collaborator || customer == collaborator
-  --   UpstreamDownstream (UpstreamDownstreamRole (up,_) (down,_)) ->
-  --     down == collaborator || up == collaborator
-  --   Octopus (up,_) downs ->
-  --     up == collaborator || (downs |> List.any (\(down,_) -> down == collaborator))
-  --   Unknown p1 p2 ->
-  --     p1 == collaborator || p2 == collaborator
+
+areCollaborating : Collaborator -> Collaboration -> Bool
+areCollaborating collaborator (Collaboration collaboration) =
   collaboration.initiator == collaborator || collaboration.recipient == collaborator
 
 
-isCollaborator : Collaborator -> Collaboration2 -> Maybe CollaborationType
+isCollaborator : Collaborator -> Collaboration -> Maybe CollaborationType
 isCollaborator collaborator collaboration =
   case (areCollaborating collaborator collaboration, isInboundCollaboratoration collaborator collaboration) of
-    (True, True) -> 
+    (True, True) ->
       Just <| Inbound collaboration
     (True, False) ->
       Just <| Outbound collaboration
     _ ->
       Nothing
 
-id : Collaboration2 -> CollaborationId
-id (Collaboration2 collaboration) =
+id : Collaboration -> CollaborationId
+id (Collaboration collaboration) =
   collaboration.id
 
-relationship : Collaboration2 -> Maybe RelationshipType
-relationship (Collaboration2 collaboration) =
+relationship : Collaboration -> Maybe RelationshipType
+relationship (Collaboration collaboration) =
   collaboration.relationship
 
-initiator : Collaboration2 -> Collaborator
-initiator (Collaboration2 collaboration) =
+initiator : Collaboration -> Collaborator
+initiator (Collaboration collaboration) =
   collaboration.initiator
 
 
-recipient : Collaboration2 -> Collaborator
-recipient (Collaboration2 collaboration) =
+recipient : Collaboration -> Collaborator
+recipient (Collaboration collaboration) =
   collaboration.recipient
 
 
-otherCollaborator : Collaborator -> Collaboration2 -> Collaborator
-otherCollaborator knownCollaborator (Collaboration2 collaboration) =
+otherCollaborator : Collaborator -> Collaboration -> Collaborator
+otherCollaborator knownCollaborator (Collaboration collaboration) =
   if collaboration.recipient == knownCollaborator
   then collaboration.initiator
   else collaboration.recipient
 
-description : Collaboration2 -> Maybe String
-description (Collaboration2 collaboration) =
+description : Collaboration -> Maybe String
+description (Collaboration collaboration) =
   collaboration.description
 
 idFieldDecoder : Decoder CollaborationId
 idFieldDecoder =
   Decode.field "id" ContextMapping.idDecoder
 
-modelDecoder : Decoder Collaboration2
+modelDecoder : Decoder Collaboration
 modelDecoder =
-  ( Decode.succeed CollaborationInternal2
+  ( Decode.succeed CollaborationInternal
     |> JP.custom idFieldDecoder
     |> JP.required "description" (Decode.nullable Decode.string)
     |> JP.required "initiator" Collaborator.decoder
     |> JP.required "recipient" Collaborator.decoder
     |> JP.required "relationship" (Decode.nullable RelationshipType.decoder)
-  ) |> Decode.map Collaboration2
+  ) |> Decode.map Collaboration
 
 
-modelEncoder2 : Collaborator -> Collaborator -> Maybe String -> Maybe RelationshipType -> Encode.Value
-modelEncoder2 connectionInitiator connectionRecipient descriptionValue relationshipType =
+modelEncoder : Collaborator -> Collaborator -> Maybe String -> Maybe RelationshipType -> Encode.Value
+modelEncoder connectionInitiator connectionRecipient descriptionValue relationshipType =
   Encode.object
     [ ("description", maybeEncoder Encode.string descriptionValue)
     , ("initiator", Collaborator.encoder connectionInitiator)

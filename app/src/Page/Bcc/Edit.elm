@@ -75,7 +75,7 @@ type alias Model =
 initWithCanvas : Api.Configuration -> CanvasModel -> (EditingCanvas, Cmd EditingMsg)
 initWithCanvas config model =
   let
-    (addingDependency, addingDependencyCmd) = Dependencies.init config model.boundedContext model.canvas.dependencies
+    (addingDependency, addingDependencyCmd) = Dependencies.init config model.boundedContext
     (changeKeyModel, changeKeyCmd) = ChangeKey.init config (model.boundedContext |> BoundedContext.key)
     ubiquitousLanguageModel = UbiquitousLanguage.init model.canvas.ubiquitousLanguage
     businessDecisionsModel = BusinessDecisionView.init model.canvas.businessDecisions

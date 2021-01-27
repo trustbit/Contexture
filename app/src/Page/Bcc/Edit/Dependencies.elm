@@ -24,6 +24,7 @@ import Bootstrap.Form.Fieldset as Fieldset
 import Bootstrap.Utilities.Spacing as Spacing
 import Bootstrap.Utilities.Display as Display
 import Bootstrap.Utilities.Border as Border
+import Bootstrap.Utilities.Flex as Flex
 import Bootstrap.Text as Text
 
 import Select as Autocomplete
@@ -33,13 +34,11 @@ import Json.Decode.Pipeline as JP
 
 
 import List
-import Set
 import Url
 import Http
 
 import Api
 
-import BoundedContext.Canvas exposing (Dependencies)
 import ContextMapping.CollaborationId as ContextMapping exposing(CollaborationId)
 import ContextMapping.Collaborator as Collaborator exposing(Collaborator)
 import ContextMapping.RelationshipType as RelationshipType exposing(..)
@@ -55,7 +54,7 @@ import Debug
 import Maybe
 import Html.Attributes
 import Bootstrap.Navbar exposing (items)
-import Bootstrap.Utilities.Flex
+
 
 type alias DomainDependency =
   { id : Domain.DomainId
@@ -90,7 +89,7 @@ type RelationshipEdit
   | UnknownCollaboration
 
 type alias DefineRelationshipType = 
-  { collaboration : Collaboration2
+  { collaboration : Collaboration
   , modalVisibility : Modal.Visibility
   , relationshipEdit : Maybe RelationshipEdit
   , relationship : Maybe RelationshipType
@@ -109,8 +108,8 @@ type alias Model =
   , newCollaborations : Maybe AddCollaboration
   , defineRelationship : Maybe DefineRelationshipType
   , availableDependencies : List CollaboratorReference
-  , inboundCollaboration : List Connection.Collaboration2
-  , outboundCollaboration : List Connection.Collaboration2
+  , inboundCollaboration : List Connection.Collaboration
+  , outboundCollaboration : List Connection.Collaboration
   }
 
 initAddCollaboration : AddCollaboration
@@ -139,7 +138,7 @@ initRelationshipEdit relationshipType =
       UnknownCollaboration
 
 
-initDefineRelationshipType : Collaboration2 -> DefineRelationshipType
+initDefineRelationshipType : Collaboration -> DefineRelationshipType
 initDefineRelationshipType collaboration =
   { collaboration = collaboration
   , modalVisibility = Modal.shown
@@ -148,22 +147,24 @@ initDefineRelationshipType collaboration =
   }
   |> updateRelationshipEdit
 
-initDependencies : Api.Configuration -> BoundedContextId -> Model
-initDependencies config contextId =
-  { config = config
-  , boundedContextId = contextId
-  , availableDependencies = []
-  , inboundCollaboration = []
-  , outboundCollaboration = []
-  , newCollaborations = Nothing
-  , defineRelationship = Nothing 
-  }
 
-init : Api.Configuration -> BoundedContext.BoundedContext -> Dependencies -> (Model, Cmd Msg)
-init config context dependencies =
+init : Api.Configuration -> BoundedContext.BoundedContext ->  (Model, Cmd Msg)
+init config context =
   (
-    initDependencies config (context |> BoundedContext.id)
-  , Cmd.batch [ loadBoundedContexts config, loadDomains config, loadConnections config (context |> BoundedContext.id)])
+    { config = config
+    , boundedContextId = context |> BoundedContext.id
+    , availableDependencies = []
+    , inboundCollaboration = []
+    , outboundCollaboration = []
+    , newCollaborations = Nothing
+    , defineRelationship = Nothing 
+    } 
+  , Cmd.batch 
+    [ loadBoundedContexts config
+    , loadDomains config
+    , loadConnections config (context |> BoundedContext.id)
+    ]
+  )
 
 -- UPDATE
 
@@ -185,19 +186,22 @@ type Msg
   | BoundedContextsLoaded (Result Http.Error (List BoundedContextDependency))
   | DomainsLoaded (Result Http.Error (List DomainDependency))
   | ConnectionsLoaded (Result Http.Error (List CollaborationType))
+
   | StartAddingConnection
   | AddInboundConnection Collaborator String
   | AddOutboundConnection Collaborator String
-  | InboundConnectionAdded (Api.ApiResponse Collaboration2)
-  | OutboundConnectionAdded (Api.ApiResponse Collaboration2)
+  | InboundConnectionAdded (Api.ApiResponse Collaboration)
+  | OutboundConnectionAdded (Api.ApiResponse Collaboration)
   | CancelAddingConnection
-  | StartToDefineRelationship Collaboration2
+  
+  | StartToDefineRelationship Collaboration
   | SetRelationship (Maybe RelationshipEdit)
   | DefineRelationship CollaborationId RelationshipType
-  | RelationshipTypeDefined (Api.ApiResponse Collaboration2)
+  | RelationshipTypeDefined (Api.ApiResponse Collaboration)
   | CancelRelationshipDefinition
-  | RemoveInboundConnection Collaboration2
-  | RemoveOutboundConnection Collaboration2
+  
+  | RemoveInboundConnection Collaboration
+  | RemoveOutboundConnection Collaboration
   | InboundConnectionRemoved (Api.ApiResponse CollaborationId)
   | OutboundConnectionRemoved (Api.ApiResponse CollaborationId)
 
@@ -305,9 +309,6 @@ updateCollaborationDefinition model =
 updateCollaboration : AddCollaborationMsg -> AddCollaboration -> (AddCollaboration, Cmd AddCollaborationMsg)
 updateCollaboration msg model =
   case msg of
-    -- SetRelationship relationship ->
-    --   (updateCollaborationDefinition { model | relationship = relationship }, Cmd.none)
-    
     CollaboratorSelection bcMsg ->
       let
         (updated, cmd) =
@@ -454,18 +455,6 @@ update msg model =
 
 -- VIEW
 
-toCollaborator2 : CollaboratorReference -> Collaborator
-toCollaborator2 dependency =
-  case dependency of
-    BoundedContext bc ->
-      Collaborator.BoundedContext bc.id
-    Domain d ->
-      Collaborator.Domain d.id
-    ExternalSystem s ->
-      Collaborator.ExternalSystem s
-    Frontend f ->
-      Collaborator.Frontend f
-
 
 filterLowerCase : Int -> (item -> List String) -> String -> List item -> Maybe (List item)
 filterLowerCase minChars stringsToCompare query items =
@@ -487,43 +476,6 @@ filterLowerCase minChars stringsToCompare query items =
         |> List.filter searchable
         |> Just
 
-filter : Int -> String -> List CollaboratorReference -> Maybe (List CollaboratorReference)
-filter minChars query items =
-  if String.length query < minChars then
-      Nothing
-  else
-    let
-      lowerQuery = query |> String.toLower
-      containsLowerString text =
-        text
-        |> String.toLower
-        |> String.contains lowerQuery
-      searchable i =
-        case i of
-          BoundedContext bc ->
-            containsLowerString bc.name || containsLowerString bc.domain.name
-          Domain d ->
-            containsLowerString d.name
-          ExternalSystem s ->
-            containsLowerString s
-          Frontend f ->
-            containsLowerString f
-      in
-        items
-        |> List.filter searchable
-        |> Just
-
-oneLineLabel : CollaboratorReference -> String
-oneLineLabel item =
-  case item of
-    BoundedContext bc ->
-      bc.domain.name ++ " - " ++ bc.name
-    Domain d ->
-      d.name
-    ExternalSystem s ->
-      s
-    Frontend f ->
-      f
 
 selectBoundedContextConfig : Autocomplete.Config CollaboratorReferenceMsg BoundedContextDependency
 selectBoundedContextConfig =
@@ -621,9 +573,9 @@ translateUpstreamDownstreamRelationship relationship =
       ( translateDownstreamRelationship dt ) ++ "/" ++ ( translateUpstreamRelationship ut)
 
 
-type alias ResolveCollaboratorCaption = Collaboration2 -> Html Msg
+type alias ResolveCollaboratorCaption = Collaboration -> Html Msg
 
-collaboratorCaption : List CollaboratorReference ->  (Collaboration2 -> Collaborator) -> Collaboration2 -> Html Msg
+collaboratorCaption : List CollaboratorReference ->  (Collaboration -> Collaborator) -> Collaboration -> Html Msg
 collaboratorCaption items collaboratorSelection collaboration =
   let
     additionalDescription description =
@@ -1127,7 +1079,7 @@ viewAddConnection dependencies adding =
             |> List.map Block.custom 
           )         
         |> Card.footer []
-          [ ButtonGroup.toolbar [Bootstrap.Utilities.Flex.justifyBetween]
+          [ ButtonGroup.toolbar [Flex.justifyBetween]
             [ ButtonGroup.buttonGroupItem []
               [ ButtonGroup.button
                 [ Button.primary
@@ -1168,7 +1120,7 @@ viewAddConnection dependencies adding =
       |> Card.view
      
 
-viewInboundConnection : ResolveCollaboratorCaption -> List Collaboration2 -> Html Msg
+viewInboundConnection : ResolveCollaboratorCaption -> List Collaboration -> Html Msg
 viewInboundConnection resolveCaption collaborations =
   let
  
@@ -1211,7 +1163,7 @@ viewInboundConnection resolveCaption collaborations =
       |> List.map (inboundCollaborator))
     ]
 
-viewOutboundConnection : ResolveCollaboratorCaption -> List Collaboration2 -> Html Msg
+viewOutboundConnection : ResolveCollaboratorCaption -> List Collaboration -> Html Msg
 viewOutboundConnection resolveCaption collaborations =
   let
  
