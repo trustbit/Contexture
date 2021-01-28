@@ -23,6 +23,7 @@ import Bootstrap.Utilities.Spacing as Spacing
 import Bootstrap.Utilities.Display as Display
 import Bootstrap.Utilities.Border as Border
 import Bootstrap.Utilities.Flex as Flex
+import Bootstrap.ListGroup as ListGroup
 import Bootstrap.Text as Text
 
 import Select as Autocomplete
@@ -45,6 +46,7 @@ import BoundedContext.BoundedContextId as BoundedContext exposing(BoundedContext
 import BoundedContext as BoundedContext
 import Domain
 import Domain.DomainId as Domain
+import String
 
 
 type alias DomainDependency =
@@ -528,36 +530,62 @@ onSubmitMaybe maybeMsg =
 
 translateSymmetricRelationship relationship =
   case relationship of
-    SharedKernel -> "SK"
-    Partnership -> "PS"
-    SeparateWays -> "SW"
-    BigBallOfMud -> "BBoM"
+    SharedKernel -> ("Shared Kernel", "SK")
+    Partnership -> ("Partnership","PS")
+    SeparateWays -> ("Separate Ways","SW")
+    BigBallOfMud -> ("Big Ball of Mud","BBoM")
 
 
 translateUpstreamRelationship relationship =
   case relationship of
-    Upstream -> "US"
-    PublishedLanguage -> "PL"
-    OpenHost -> "OHS"
+    Upstream -> ("Upstream","US")
+    PublishedLanguage -> ("Published Language","PL")
+    OpenHost -> ("Open Host Service","OHS")
 
 translateDownstreamRelationship relationship =
   case relationship of
-    Downstream -> "DS"
-    AntiCorruptionLayer -> "ACL"
-    Conformist -> "CF"
+    Downstream -> ("Downstream","DS")
+    AntiCorruptionLayer -> ("Anti Corruption Layer","ACL")
+    Conformist -> ("Conformist","CF")
+
+concatTuple operation (x1,y1) (x2,y2) =
+  ( operation x1 x2
+  , operation y1 y2
+  )
+
 
 translateUpstreamDownstreamRelationship relationship =
   case relationship of
-    CustomerSupplierRelationship _ -> "CUS/SUP"
-    UpstreamDownstreamRelationship _ ut dt ->
-      ( translateDownstreamRelationship dt ) ++ "/" ++ ( translateUpstreamRelationship ut)
+    CustomerSupplierRelationship role ->
+      case role of
+        CustomerRole ->
+          (("Customer","Supplier"),("CUS","SUP"))
+        SupplierRole ->
+          (("Supplier","Customer"), ("SUP","CUS"))
+    UpstreamDownstreamRelationship role ut dt ->
+      concatTuple
+        (\upstream downstream ->
+          case role of
+            UpstreamRole ->
+              (upstream,downstream)
+            DownstreamRole ->
+              (downstream,upstream)
+        )
+        (translateUpstreamRelationship ut)
+        ( translateDownstreamRelationship dt )
 
+type alias LabelAndDescription = (String, String)
 
-type alias ResolveCollaboratorCaption = Collaboration -> (String, String)
+type alias ResolveCollaboratorCaption = Collaborator -> LabelAndDescription
+type alias ResolveCollaboratorCaptionFromCollaboration = Collaboration -> LabelAndDescription
 
-collaboratorCaption : List CollaboratorReference ->  (Collaboration -> Collaborator) -> Collaboration -> (String, String)
-collaboratorCaption items collaboratorSelection collaboration =
-  case collaboratorSelection collaboration of
+collaboratorCaptionFromCollaboration : List CollaboratorReference -> (Collaboration -> Collaborator) -> Collaboration -> LabelAndDescription
+collaboratorCaptionFromCollaboration items collaboratorSelection collaboration =
+  collaboratorCaption items (collaboratorSelection collaboration)
+
+collaboratorCaption : List CollaboratorReference -> Collaborator -> LabelAndDescription
+collaboratorCaption items collaborator=
+  case collaborator of
     Collaborator.BoundedContext bc ->
       items
       |> List.filterMap (\r ->
@@ -566,7 +594,7 @@ collaboratorCaption items collaboratorSelection collaboration =
             if bcr.id == bc then
               Just <|
                 ( bcr.name
-                , "in Domain '" ++ bcr.domain.name  ++ "'"
+                , "[in Domain '" ++ bcr.domain.name  ++ "']"
                 )
             else
               Nothing
@@ -581,7 +609,7 @@ collaboratorCaption items collaboratorSelection collaboration =
         case r of
           Domain dr ->
             if dr.id == d
-            then Just (dr.name, "Domain")
+            then Just (dr.name, "[Domain]")
             else Nothing
           _ ->
             Nothing
@@ -590,15 +618,15 @@ collaboratorCaption items collaboratorSelection collaboration =
       |> Maybe.withDefault ("Unknown Domain", "")
     Collaborator.ExternalSystem s ->
       ( s
-      , "External System"
+      , "[External System]"
       )
     Collaborator.Frontend s ->
       ( s
-      , "Frontend"
+      , "[Frontend]"
       )
     Collaborator.UserInteraction s ->
       ( s
-      , "User Interaction"
+      , "[User Interaction]"
       )
 
 
@@ -608,17 +636,23 @@ captionAndDescription caption description =
     , Form.help [] [ text description ]
     ]
 
+captionAndInlineDescriptionView (caption, description) =
+  Html.span []
+    [ text <| caption
+    , Form.helpInline [ Spacing.ml1 ] [ text description ]
+    ]
 
-labelAndDescription caption abbreviation description =
+labelAbbreviationAndDescription caption abbreviation description =
     Radio.label [] [ captionAndDescription (caption ++ " (" ++ abbreviation ++ ")") description ]
 
 specifyRelationshipType relationshipType =
   let
-
     symmetricConfiguration =
       let
-        renderOption idValue label abbreviation descriptionText value =
-          Radio.createAdvanced
+        renderOption idValue descriptionText value =
+          let
+            (label, abbreviation) = translateSymmetricRelationship value
+          in Radio.createAdvanced
             [ Radio.id idValue
             , Radio.onClick (SetRelationship (Just <| SymmetricCollaboration <| Just value))
             , Radio.checked (
@@ -629,16 +663,16 @@ specifyRelationshipType relationshipType =
                     False
                 )
             ]
-            ( labelAndDescription label abbreviation descriptionText )
+            ( labelAbbreviationAndDescription label abbreviation descriptionText )
         options =
           Radio.label []
             ( ( captionAndDescription "Symmetric" "The relationship between the collaborators is equal or symmetric." )
               :: [ Html.div []
                 (  Radio.radioList "symmetricOptions"
-                  [ renderOption "sharedKernel" "Shared Kernel" "SK" "Technical artefacts are shared between the collaborators" SharedKernel
-                  , renderOption "PartnershipOption" "Partnership" "PS ""The collaborators work together to reach a common goal" Partnership
-                  , renderOption "separateWaysOption" "Separate Ways" "SW" "The collaborators decided to NOT use information, but rather work in seperate ways" SeparateWays
-                  , renderOption "bigBallOfMudOption" "Big Ball of Mud" "BBoM" "It's complicated..."  BigBallOfMud
+                  [ renderOption "sharedKernelOption" "Technical artefacts are shared between the collaborators" SharedKernel
+                  , renderOption "PartnershipOption" "The collaborators work together to reach a common goal" Partnership
+                  , renderOption "separateWaysOption" "The collaborators decided to NOT use information, but rather work in seperate ways" SeparateWays
+                  , renderOption "bigBallOfMudOption" "It's complicated..."  BigBallOfMud
                   ]
                 )
               ]
@@ -679,14 +713,14 @@ specifyRelationshipType relationshipType =
                 , Radio.onClick (SetRelationship (Just <| CustomerSupplierCollaboration <| Just CustomerRole))
                 , Radio.inline
                 ]
-                ( labelAndDescription "Customer" "CUS" "The collaborator is in the customer role" )
+                ( labelAbbreviationAndDescription "Customer" "CUS" "The collaborator is in the customer role" )
               , Radio.createAdvanced
                 [ Radio.id "isSupplierOption"
                 , Radio.checked (relationshipType == (Just <| CustomerSupplierCollaboration <| Just SupplierRole))
                 , Radio.onClick (SetRelationship (Just <| CustomerSupplierCollaboration <| Just SupplierRole))
                 , Radio.inline
                 ]
-                ( labelAndDescription "Supplier" "SUP" "The collaborator is in the supplier role" )
+                ( labelAbbreviationAndDescription "Supplier" "SUP" "The collaborator is in the supplier role" )
               ]
             )
           ]
@@ -732,19 +766,19 @@ specifyRelationshipType relationshipType =
                     , Radio.checked (isUpstream Upstream)
                     , Radio.onClick (setUpstream Upstream)
                     ]
-                    ( labelAndDescription "Upstream" "US" "The collaborator is just Upstream" )
+                    ( labelAbbreviationAndDescription "Upstream" "US" "The collaborator is just Upstream" )
                   , Radio.createAdvanced
                     [ Radio.id "upstream-publishedLanguageOption"
                     , Radio.checked (isUpstream PublishedLanguage)
                     , Radio.onClick (setUpstream PublishedLanguage)
                     ]
-                    ( labelAndDescription "Published Language" "PL" "The collaborator is using a Published Language" )
+                    ( labelAbbreviationAndDescription "Published Language" "PL" "The collaborator is using a Published Language" )
                   , Radio.createAdvanced
                     [ Radio.id "upstream-openHostOption"
                     , Radio.checked (isUpstream OpenHost)
                     , Radio.onClick (setUpstream OpenHost)
                     ]
-                    ( labelAndDescription "Open Host Service" "OHS" "The collaborator is providing an Open Host Service" )
+                    ( labelAbbreviationAndDescription "Open Host Service" "OHS" "The collaborator is providing an Open Host Service" )
                   ]
                 )
               , Form.group [ Form.attrs [ class "col"]  ]
@@ -755,19 +789,19 @@ specifyRelationshipType relationshipType =
                     , Radio.checked (isDownstream Downstream)
                     , Radio.onClick (setDownstream Downstream)
                     ]
-                    ( labelAndDescription "Downstream" "DS" "I'm just Downstream" )
+                    ( labelAbbreviationAndDescription "Downstream" "DS" "I'm just Downstream" )
                   , Radio.createAdvanced
                     [ Radio.id "upstream-aclOption"
                     , Radio.checked (isDownstream AntiCorruptionLayer)
                     , Radio.onClick (setDownstream AntiCorruptionLayer)
                     ]
-                    ( labelAndDescription "Anti-Corruption-Layer" "ACL" "I'm using an Anti-Corruption-Layer to shield me from changes" )
+                    ( labelAbbreviationAndDescription "Anti-Corruption-Layer" "ACL" "I'm using an Anti-Corruption-Layer to shield me from changes" )
                   , Radio.createAdvanced
                     [ Radio.id "upstream-cfOption"
                     , Radio.checked (isDownstream Conformist)
                     , Radio.onClick (setDownstream Conformist)
                     ]
-                    ( labelAndDescription "Conformist" "CF" "I'm Conformist to upstream changes" )
+                    ( labelAbbreviationAndDescription "Conformist" "CF" "I'm Conformist to upstream changes" )
                   ]
                 )
               ]
@@ -826,19 +860,19 @@ specifyRelationshipType relationshipType =
                     , Radio.checked (isDownstream Downstream)
                     , Radio.onClick (setDownstream Downstream)
                     ]
-                    ( labelAndDescription "Downstream" "DS" "The collaborator is just Downstream" )
+                    ( labelAbbreviationAndDescription "Downstream" "DS" "The collaborator is just Downstream" )
                   , Radio.createAdvanced
                     [ Radio.id "downstream-aclOption"
                     , Radio.checked (isDownstream AntiCorruptionLayer)
                     , Radio.onClick (setDownstream AntiCorruptionLayer)
                     ]
-                    ( labelAndDescription "Anti-Corruption-Layer" "ACL" "The collaborator is using an Anti-Corruption-Layer to shield from my changes" )
+                    ( labelAbbreviationAndDescription "Anti-Corruption-Layer" "ACL" "The collaborator is using an Anti-Corruption-Layer to shield from my changes" )
                   , Radio.createAdvanced
                     [ Radio.id "downstream-cfOption"
                     , Radio.checked (isDownstream Conformist)
                     , Radio.onClick (setDownstream Conformist)
                     ]
-                    ( labelAndDescription "Conformist" "CF" "The collaborator is Conformist to my upstream changes" )
+                    ( labelAbbreviationAndDescription "Conformist" "CF" "The collaborator is Conformist to my upstream changes" )
                   ]
                 )
               , Form.group [ Form.attrs [ class "col"] ]
@@ -849,19 +883,19 @@ specifyRelationshipType relationshipType =
                     , Radio.checked (isUpstream Upstream)
                     , Radio.onClick (setUpstream Upstream)
                     ]
-                    ( labelAndDescription "Upstream" "US" "I'm just Upstream" )
+                    ( labelAbbreviationAndDescription "Upstream" "US" "I'm just Upstream" )
                   , Radio.createAdvanced
                     [ Radio.id "downstream-publishedLanguageOption"
                     , Radio.checked (isUpstream PublishedLanguage)
                     , Radio.onClick (setUpstream PublishedLanguage)
                     ]
-                    ( labelAndDescription "Published Language" "PL" "I'm using a Published Language" )
+                    ( labelAbbreviationAndDescription "Published Language" "PL" "I'm using a Published Language" )
                   , Radio.createAdvanced
                     [ Radio.id "downstream-openHostOption"
                     , Radio.checked (isUpstream OpenHost)
                     , Radio.onClick (setUpstream OpenHost)
                     ]
-                    ( labelAndDescription "Open Host Service" "OHS" "I'm providing an Open Host Service" )
+                    ( labelAbbreviationAndDescription "Open Host Service" "OHS" "I'm providing an Open Host Service" )
                   ]
                 )
 
@@ -887,7 +921,7 @@ specifyRelationshipType relationshipType =
         , Radio.onClick (SetRelationship (Just UnknownCollaboration))
         , Radio.checked (relationshipType == Just UnknownCollaboration)
         ]
-        ( labelAndDescription  "Unkown" "?" "The exact description of the relationship unknown or you are not sure how to describe it."
+        ( labelAbbreviationAndDescription  "Unkown" "?" "The exact description of the relationship unknown or you are not sure how to describe it."
         )
 
   in
@@ -1088,107 +1122,88 @@ viewAddConnection dependencies adding =
         ]
       |> Card.view
 
-asH6Caption : (String, String) -> Html x
-asH6Caption (name, description) =
-  Html.h6 []
-    [ text name
-    , Html.small [ class "text-muted" , Spacing.ml1] [ text ("[" ++ description ++ "]") ]]
 
-
-viewInboundConnection : ResolveCollaboratorCaption -> List Collaboration -> Html Msg
-viewInboundConnection resolveCaption collaborations =
+viewConnection : ResolveCollaboratorCaption -> Bool -> List Collaboration -> Html Msg
+viewConnection resolveCaption isInbound collaborations =
   let
-    inboundCollaborator collaboration =
+    resolveCollaborator =
+      if isInbound
+      then ContextMapping.initiator
+      else ContextMapping.recipient
+    inboundCollaborator collaboration config =
       let
         description = ContextMapping.description collaboration
-      in
-        Grid.row
-          [ Row.attrs [ Border.top, Spacing.mb2, Spacing.pt1 ] ]
-          [ Grid.col [] [ collaboration |> resolveCaption |> asH6Caption ]
-          , Grid.col [] [ text <| Maybe.withDefault "" description ]
-          , Grid.col []
-            [ collaboration 
-              |> ContextMapping.relationship
-              |> Maybe.map (\r ->
-                case r of
-                  Symmetric s ->
-                    s |> translateSymmetricRelationship |> text
-                  UpstreamDownstream (CustomerSupplierRelationship _) ->
-                    text "Customer/Supplier"
-                  UpstreamDownstream (UpstreamDownstreamRelationship _ _ _) ->
-                    text "upstream/downstream"
-                  Unknown ->
-                    text "Unknown"
-              )
-              |> Maybe.withDefault (text "")
-            ]
-          , Grid.col []
-            [ Button.button
-                [ Button.secondary
-                , Button.onClick (StartToDefineRelationship collaboration)
+        relationship =
+          case collaboration |> ContextMapping.relationship of
+            Just r ->
+              div [ Flex.block, Flex.justifyBetween ]
+                [ case r of
+                    Symmetric s ->
+                      captionAndDescription
+                        (s |> translateSymmetricRelationship |> Tuple.first)
+                        "Symmetric"
+                    UpstreamDownstream upstreamDownstreamType ->
+                      captionAndDescription
+                        ( upstreamDownstreamType
+                         |> translateUpstreamDownstreamRelationship
+                         |> Tuple.first
+                         |> ( \(inboundType, outboundType) ->
+                            if isInbound
+                            then (inboundType ++ "/" ++ outboundType)
+                            else (outboundType ++ "/" ++ inboundType)
+                          )
+                        )
+                        "Upstream/Downstream"
+                    Unknown ->
+                      text "Unknown"
+                , Button.button
+                  [ Button.outlineSecondary
+                  , Button.small
+                  , Button.onClick (StartToDefineRelationship collaboration)
+                  ]
+                  [ text "Redefine Relationship"]
                 ]
-                [ text "Define Relationship"]
-            ]
-          , Grid.col [ Col.xs2 ]
-            [ Button.button
-              [ Button.secondary
-              , Button.onClick (RemoveInboundConnection collaboration)
+            Nothing ->
+              div [ Flex.block, Flex.justifyCenter]
+                [ Button.button
+                  [ Button.outlinePrimary
+                  , Button.small
+                  , Button.onClick (StartToDefineRelationship collaboration)
+                  ]
+                  [ text "Define Relationship"]
+                ]
+      in
+        config
+          |> Card.block [ Block.attrs [ Border.bottom ] ]
+            [ Block.titleH6 [ Flex.block, Flex.justifyBetween ]
+              [ collaboration
+                |> resolveCollaborator
+                |> resolveCaption
+                |> captionAndInlineDescriptionView
+              , Button.button
+                [ Button.outlineSecondary
+                , Button.small
+                , Button.onClick (RemoveInboundConnection collaboration)
+                ]
+                [ text "x" ]
               ]
-              [ text "x" ]
-            ]
-            ]
-  in div []
-    [ Html.h6
-      [ class "text-center", Spacing.p2 ]
-      [ Html.strong [] [ text "Inbound Connection" ] ]
-    , Grid.row []
-      [ Grid.col [] [ Html.h6 [] [ text "Name"] ]
-      -- , Grid.col [] [ Html.h6 [] [ text "Initiator-Type"] ]
-      , Grid.col [] [ Html.h6 [] [ text "Description"] ]
-      -- , Grid.col [] [ Html.h6 [] [ text "Recipient-Type"] ]
-      , Grid.col [Col.xs2] []
-      ]
-    , div []
-      (collaborations
-      |> List.map (inboundCollaborator))
-    ]
-
-viewOutboundConnection : ResolveCollaboratorCaption -> List Collaboration -> Html Msg
-viewOutboundConnection resolveCaption collaborations =
-  let
-
-    outboundCollaborator collaboration =
-      Grid.row
-        [ Row.attrs [ Border.top, Spacing.mb2, Spacing.pt1 ] ]
-        [ Grid.col [] [ text <| Maybe.withDefault "" (ContextMapping.description collaboration) ]
-        , Grid.col [] [collaboration |> resolveCaption |> asH6Caption ]
-        , Grid.col [ Col.xs2 ]
-            [ Button.button
-              [ Button.secondary
-              , Button.onClick (RemoveOutboundConnection collaboration)
-              ]
-              [ text "x" ]
-            ]
+            , Block.text [ class "text-muted" ] [ text <| Maybe.withDefault "" description ]
+            , Block.custom <| relationship
           ]
-  in div []
-    [ Html.h6
-      [ class "text-center", Spacing.p2 ]
-      [ Html.strong [] [ text "Outbound Connection" ] ]
-    , Grid.row []
-      [
-      -- , Grid.col [] [ Html.h6 [] [ text "Initiator-Type"] ]
-        Grid.col [] [ Html.h6 [] [ text "Description"] ]
-      , Grid.col [] [ Html.h6 [] [ text "Name"] ]
-      -- , Grid.col [] [ Html.h6 [] [ text "Recipient-Type"] ]
-      , Grid.col [Col.xs2] []
+    cardConfig =
+      Card.config[]
+  in
+    div []
+      [  Html.h6
+        [ class "text-center", Spacing.p2 ]
+        [ Html.strong [] [ text (if isInbound then "Inbound Connection" else "Outbound Connection") ] ]
+      , collaborations
+        |> List.foldl inboundCollaborator cardConfig
+        |> Card.view
       ]
-    , div []
-      (collaborations
-      |> List.map (outboundCollaborator))
-    ]
 
 
-viewDefineRelationship : ResolveCollaboratorCaption -> Maybe DefineRelationshipType -> Html Msg
+viewDefineRelationship : ResolveCollaboratorCaptionFromCollaboration -> Maybe DefineRelationshipType -> Html Msg
 viewDefineRelationship resolveCaption defineRelationship =
   case defineRelationship of
     Just model ->
@@ -1198,15 +1213,10 @@ viewDefineRelationship resolveCaption defineRelationship =
         |> Modal.hideOnBackdropClick True
         |> Modal.h3 [] [ text "Relationship between collaborators" ]
         |> Modal.body []
-          [ text "How would you describe the relationship between the bounded context and the collaborator "
+          [ text "How would you describe the relationship with the collaborator "
           , model.collaboration
             |> resolveCaption
-            |> (\(name,description) -> 
-              Html.span [] 
-                [ Html.b [] [ text name ]
-                , Html.span [ class "text-muted", Spacing.ml1 ] [ text description ] 
-                ]
-            )
+            |> captionAndInlineDescriptionView
           , div [] (specifyRelationshipType model.relationshipEdit)
           ]
         |> Modal.footer []
@@ -1229,6 +1239,13 @@ viewDefineRelationship resolveCaption defineRelationship =
     Nothing ->
       text ""
 
+viewConnections getCollaboratorCaption model =
+  Grid.row []
+    [ Grid.col []
+      [ viewConnection getCollaboratorCaption True model.inboundCollaboration ]
+    , Grid.col []
+      [ viewConnection getCollaboratorCaption False model.outboundCollaboration ]
+    ]
 
 
 view : Model -> Html Msg
@@ -1242,18 +1259,16 @@ view model =
       ]
       [ text "Dependencies and Relationships" ]
     , Form.help [] [ text "To create loosely coupled systems it's essential to be wary of dependencies. In this section you should write the name of each dependency and a short explanation of why the dependency exists." ]
-    , Grid.row []
-      [ Grid.col []
-        [ viewInboundConnection (collaboratorCaption model.availableDependencies ContextMapping.initiator) model.inboundCollaboration ]
-      , Grid.col []
-        [ viewOutboundConnection (collaboratorCaption model.availableDependencies ContextMapping.recipient) model.outboundCollaboration ]
-      ]
+    , viewConnections (collaboratorCaption model.availableDependencies) model
     , Grid.simpleRow
       [ Grid.col []
           [ viewAddConnection model.availableDependencies model.newCollaborations]
       ]
     , viewDefineRelationship
-        (collaboratorCaption model.availableDependencies (model.boundedContextId |> Collaborator.BoundedContext |> ContextMapping.otherCollaborator))
+        ( collaboratorCaptionFromCollaboration
+          model.availableDependencies
+          (model.boundedContextId |> Collaborator.BoundedContext |> ContextMapping.otherCollaborator)
+        )
         model.defineRelationship
     ]
 
