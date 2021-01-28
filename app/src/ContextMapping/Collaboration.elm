@@ -1,4 +1,4 @@
-module Connection exposing (
+module ContextMapping.Collaboration exposing (
     Collaboration, Collaborations, CollaborationType(..),
     noCollaborations, defineInboundCollaboration, defineOutboundCollaboration, defineRelationshipType,
     endCollaboration,

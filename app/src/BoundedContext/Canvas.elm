@@ -6,7 +6,6 @@ import Json.Decode.Pipeline as JP
 
 import Key as Key
 import BoundedContext exposing (BoundedContext)
-import BoundedContext.Dependency as Dependency
 import BoundedContext.StrategicClassification as StrategicClassification exposing(StrategicClassification)
 import BoundedContext.Message as Message exposing (Messages)
 import BoundedContext.UbiquitousLanguage as UbiquitousLanguage exposing (UbiquitousLanguage)
@@ -25,20 +24,8 @@ type alias BoundedContextCanvas =
   , ubiquitousLanguage : UbiquitousLanguage
   , modelTraits : ModelTraits
   , messages : Messages
-  , dependencies : Dependencies
   }
 
--- TODO: should this be part of the BCC or part of message?
-type alias Dependencies =
-  { suppliers : Dependency.DependencyMap
-  , consumers : Dependency.DependencyMap
-  }
-
-initDependencies : Dependencies
-initDependencies =
-  { suppliers = Dependency.emptyDependencies
-  , consumers = Dependency.emptyDependencies
-  }
 
 init: BoundedContext -> BoundedContextCanvas
 init context =
@@ -48,17 +35,10 @@ init context =
   , ubiquitousLanguage = UbiquitousLanguage.noLanguageTerms
   , modelTraits = ""
   , messages = Message.noMessages
-  , dependencies = initDependencies
   }
 
 -- encoders
 
-dependenciesEncoder : Dependencies -> Encode.Value
-dependenciesEncoder dependencies =
-  Encode.object
-    [ ("suppliers", Dependency.dependencyEncoder dependencies.suppliers)
-    , ("consumers", Dependency.dependencyEncoder dependencies.consumers)
-    ]
 
 modelEncoder : BoundedContext -> BoundedContextCanvas -> Encode.Value
 modelEncoder context canvas =
@@ -75,7 +55,6 @@ modelEncoder context canvas =
     , ("ubiquitousLanguage", UbiquitousLanguage.modelEncoder canvas.ubiquitousLanguage)
     , ("modelTraits", Encode.string canvas.modelTraits)
     , ("messages", Message.messagesEncoder canvas.messages)
-    , ("dependencies", dependenciesEncoder canvas.dependencies)
     ]
 
 maybeStringDecoder : (String -> Maybe v) -> Decoder (Maybe v)
@@ -84,13 +63,6 @@ maybeStringDecoder parser =
     [ Decode.null Nothing
     , Decode.map parser Decode.string
     ]
-
-dependenciesDecoder : Decoder Dependencies
-dependenciesDecoder =
-  Decode.succeed Dependencies
-    |> JP.optional "suppliers" Dependency.dependencyDecoder Dependency.emptyDependencies
-    |> JP.optional "consumers" Dependency.dependencyDecoder Dependency.emptyDependencies
-
 
 
 modelDecoder : Decoder BoundedContextCanvas
@@ -102,4 +74,3 @@ modelDecoder =
     |> JP.optional "ubiquitousLanguage" UbiquitousLanguage.modelDecoder UbiquitousLanguage.noLanguageTerms
     |> JP.optional "modelTraits" Decode.string ""
     |> JP.optional "messages" Message.messagesDecoder Message.noMessages
-    |> JP.optional "dependencies" dependenciesDecoder initDependencies

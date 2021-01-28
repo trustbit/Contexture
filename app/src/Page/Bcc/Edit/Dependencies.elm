@@ -42,13 +42,13 @@ import Api
 import ContextMapping.CollaborationId as ContextMapping exposing(CollaborationId)
 import ContextMapping.Collaborator as Collaborator exposing(Collaborator)
 import ContextMapping.RelationshipType as RelationshipType exposing(..)
+import ContextMapping.Collaboration as ContextMapping exposing (..)
 import BoundedContext.BoundedContextId as BoundedContext exposing(BoundedContextId)
 import BoundedContext as BoundedContext
-import BoundedContext.Dependency as Dependency
 import Domain
 import Domain.DomainId as Domain
 
-import Connection exposing (..)
+
 import Debug
 import Debug
 import Maybe
@@ -108,8 +108,8 @@ type alias Model =
   , newCollaborations : Maybe AddCollaboration
   , defineRelationship : Maybe DefineRelationshipType
   , availableDependencies : List CollaboratorReference
-  , inboundCollaboration : List Connection.Collaboration
-  , outboundCollaboration : List Connection.Collaboration
+  , inboundCollaboration : List ContextMapping.Collaboration
+  , outboundCollaboration : List ContextMapping.Collaboration
   }
 
 initAddCollaboration : AddCollaboration
@@ -142,7 +142,7 @@ initDefineRelationshipType : Collaboration -> DefineRelationshipType
 initDefineRelationshipType collaboration =
   { collaboration = collaboration
   , modalVisibility = Modal.shown
-  , relationshipEdit = collaboration |> Connection.relationship |> Maybe.map initRelationshipEdit
+  , relationshipEdit = collaboration |> ContextMapping.relationship |> Maybe.map initRelationshipEdit
   , relationship = Nothing
   }
   |> updateRelationshipEdit
@@ -364,9 +364,9 @@ update msg model =
           (model, Cmd.none)
    
     AddInboundConnection coll desc ->
-      ( model, Connection.defineInboundCollaboration model.config model.boundedContextId coll desc InboundConnectionAdded )
+      ( model, ContextMapping.defineInboundCollaboration model.config model.boundedContextId coll desc InboundConnectionAdded )
     AddOutboundConnection coll desc ->
-      ( model, Connection.defineOutboundCollaboration model.config model.boundedContextId coll desc OutboundConnectionAdded )
+      ( model, ContextMapping.defineOutboundCollaboration model.config model.boundedContextId coll desc OutboundConnectionAdded )
 
     InboundConnectionAdded (Ok result) ->
       ( { model 
@@ -387,21 +387,21 @@ update msg model =
       ( {model | newCollaborations = Nothing }, Cmd.none)
 
     RemoveInboundConnection coll ->
-      ( model, Connection.endCollaboration model.config (Connection.id coll) InboundConnectionRemoved )    
+      ( model, ContextMapping.endCollaboration model.config (ContextMapping.id coll) InboundConnectionRemoved )    
     RemoveOutboundConnection coll ->
-      ( model, Connection.endCollaboration model.config (Connection.id coll) OutboundConnectionRemoved )    
+      ( model, ContextMapping.endCollaboration model.config (ContextMapping.id coll) OutboundConnectionRemoved )    
     
     InboundConnectionRemoved (Ok result) ->
       ( { model | inboundCollaboration =
           model.inboundCollaboration
-          |> List.filter (\i -> (i |> Connection.id) /= result)
+          |> List.filter (\i -> (i |> ContextMapping.id) /= result)
         }
       , Cmd.none
       )
     OutboundConnectionRemoved (Ok result) ->
       ( { model | outboundCollaboration =
           model.outboundCollaboration
-          |> List.filter (\i -> (i |> Connection.id) /= result)
+          |> List.filter (\i -> (i |> ContextMapping.id) /= result)
         }
       , Cmd.none
       )
@@ -424,12 +424,12 @@ update msg model =
           (model, Cmd.none)
 
     DefineRelationship collaborationId relationship ->
-      (model, Connection.defineRelationshipType model.config collaborationId relationship RelationshipTypeDefined) 
+      (model, ContextMapping.defineRelationshipType model.config collaborationId relationship RelationshipTypeDefined) 
 
     RelationshipTypeDefined (Ok collaboration) ->
       let
         updateCollaborationType c =
-          if (c |> Connection.id) == (collaboration |> Connection.id)
+          if (c |> ContextMapping.id) == (collaboration |> ContextMapping.id)
           then collaboration
           else c
       in 
@@ -500,6 +500,7 @@ selectBoundedContextConfig =
               ]
         )
 
+
 selectDomainConfig : Autocomplete.Config CollaboratorReferenceMsg DomainDependency
 selectDomainConfig =
     Autocomplete.newConfig
@@ -520,18 +521,6 @@ selectDomainConfig =
           Html.span [] [ text domain.name ] 
         )
 
-translateRelationship : Dependency.RelationshipPattern -> String
-translateRelationship relationship =
-  case relationship of
-    Dependency.AntiCorruptionLayer -> "Anti Corruption Layer"
-    Dependency.OpenHostService -> "Open Host Service"
-    Dependency.PublishedLanguage -> "Published Language"
-    Dependency.SharedKernel ->"Shared Kernel"
-    Dependency.UpstreamDownstream -> "Upstream/Downstream"
-    Dependency.Conformist -> "Conformist"
-    Dependency.Octopus -> "Octopus"
-    Dependency.Partnership -> "Partnership"
-    Dependency.CustomerSupplier -> "Customer/Supplier"
 
 onSubmitMaybe : Maybe msg -> Html.Attribute msg
 onSubmitMaybe maybeMsg =
@@ -1126,7 +1115,7 @@ viewInboundConnection resolveCaption collaborations =
  
     inboundCollaborator collaboration = 
       let
-        description = Connection.description collaboration
+        description = ContextMapping.description collaboration
       in
         Grid.row 
           [ Row.attrs [ Border.top, Spacing.mb2, Spacing.pt1 ] ]
@@ -1170,7 +1159,7 @@ viewOutboundConnection resolveCaption collaborations =
     outboundCollaborator collaboration = 
       Grid.row 
         [ Row.attrs [ Border.top, Spacing.mb2, Spacing.pt1 ] ]
-        [ Grid.col [] [ text <| Maybe.withDefault "" (Connection.description collaboration) ]
+        [ Grid.col [] [ text <| Maybe.withDefault "" (ContextMapping.description collaboration) ]
         , Grid.col [] [ collaboration |> resolveCaption ]
         , Grid.col [ Col.xs2 ]
             [ Button.button
@@ -1216,7 +1205,7 @@ viewDefineRelationship resolveCaption defineRelationship =
             [ Button.button
               [ Button.primary
               , model.relationship
-              |> Maybe.map (DefineRelationship (Connection.id model.collaboration))
+              |> Maybe.map (DefineRelationship (ContextMapping.id model.collaboration))
               |> Maybe.map Button.onClick
               |> Maybe.withDefault (Button.attrs [])
               , Button.disabled (model.relationship == Nothing)
@@ -1247,16 +1236,16 @@ view model =
     , Form.help [] [ text "To create loosely coupled systems it's essential to be wary of dependencies. In this section you should write the name of each dependency and a short explanation of why the dependency exists." ]
     , Grid.row []
       [ Grid.col []
-        [ viewInboundConnection (collaboratorCaption model.availableDependencies Connection.initiator) model.inboundCollaboration ]
+        [ viewInboundConnection (collaboratorCaption model.availableDependencies ContextMapping.initiator) model.inboundCollaboration ]
       , Grid.col []
-        [ viewOutboundConnection (collaboratorCaption model.availableDependencies Connection.recipient) model.outboundCollaboration ]
+        [ viewOutboundConnection (collaboratorCaption model.availableDependencies ContextMapping.recipient) model.outboundCollaboration ]
       ]
     , Grid.simpleRow
       [ Grid.col []
           [ viewAddConnection model.availableDependencies model.newCollaborations]
       ]
     , viewDefineRelationship 
-        (collaboratorCaption model.availableDependencies (model.boundedContextId |> Collaborator.BoundedContext |> Connection.otherCollaborator)) 
+        (collaboratorCaption model.availableDependencies (model.boundedContextId |> Collaborator.BoundedContext |> ContextMapping.otherCollaborator)) 
         model.defineRelationship
     ]
 
@@ -1292,8 +1281,8 @@ loadConnections config context =
   let
     filterConnections connections =
       connections
-      |> List.filterMap (Connection.isCollaborator (Collaborator.BoundedContext context))
+      |> List.filterMap (ContextMapping.isCollaborator (Collaborator.BoundedContext context))
   in Http.get
     { url = Api.collaborations |> Api.url config |> Url.toString
-    , expect = Http.expectJson ConnectionsLoaded (Decode.map filterConnections (Decode.list Connection.modelDecoder))
+    , expect = Http.expectJson ConnectionsLoaded (Decode.map filterConnections (Decode.list ContextMapping.modelDecoder))
     }

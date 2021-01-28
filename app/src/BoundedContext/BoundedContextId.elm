@@ -1,7 +1,8 @@
 module BoundedContext.BoundedContextId exposing (
   BoundedContextId,
   idToString, idEncoder,
-  idFromString, idParser, idDecoder)
+  idFromString, idParser, idDecoder,
+  value)
 
 import Url.Parser exposing (Parser, custom)
 
@@ -10,6 +11,11 @@ import Json.Encode as Encode
 
 type BoundedContextId
   = BoundedContextId Int
+
+
+value : BoundedContextId -> Int
+value (BoundedContextId id) =
+  id
 
 
 idToString : BoundedContextId -> String
@@ -24,8 +30,8 @@ idParser =
 
 
 idFromString : String -> Maybe BoundedContextId
-idFromString value =
-  value
+idFromString id =
+  id
   |> String.toInt
   |> Maybe.map BoundedContextId
 
@@ -34,5 +40,5 @@ idDecoder =
   Decode.map BoundedContextId Decode.int
 
 idEncoder : BoundedContextId -> Encode.Value
-idEncoder (BoundedContextId value) =
-  Encode.int value
+idEncoder (BoundedContextId id) =
+  Encode.int id
