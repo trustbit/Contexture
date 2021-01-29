@@ -25,6 +25,7 @@ import Bootstrap.Utilities.Border as Border
 import Bootstrap.Utilities.Flex as Flex
 import Bootstrap.ListGroup as ListGroup
 import Bootstrap.Text as Text
+import Bootstrap.Alert as Alert
 
 
 import Json.Decode as Decode exposing (Decoder)
@@ -63,11 +64,16 @@ type alias DefineRelationshipType =
   , relationship : Maybe RelationshipType
   }
 
+type CollaboratorSelectionError
+  = NothingSelected
+  | IsAlreadyAddedOnInbound
+  | IsAlreadyAddedOnOutbound
+  | IsAlreadyAddedOnBoth
 
 type alias AddCollaboration =
   { selectedCollaborator : CollaboratorSelection.Model
+  , collaboratorError : Maybe CollaboratorSelectionError
   , description : String
-
   }
 
 
@@ -84,6 +90,7 @@ type alias Model =
 initAddCollaboration : List CollaboratorSelection.CollaboratorReference -> AddCollaboration
 initAddCollaboration dependencies =
   { selectedCollaborator = CollaboratorSelection.init dependencies
+  , collaboratorError = Just NothingSelected
   , description = ""
   }
 
@@ -196,14 +203,30 @@ updateRelationshipEdit model =
       { model | relationship = Nothing }
 
 
-updateCollaboration : AddCollaborationMsg -> AddCollaboration -> (AddCollaboration, Cmd AddCollaborationMsg)
-updateCollaboration msg model =
+updateCollaboration : Communication -> AddCollaborationMsg -> AddCollaboration -> (AddCollaboration, Cmd AddCollaborationMsg)
+updateCollaboration communication msg model =
   case msg of
     CollaboratorSelection bcMsg ->
       let
         (updated, cmd) = CollaboratorSelection.update bcMsg model.selectedCollaborator
+        isInboundCollaborator collaborator = communication.inbound |> List.map ContextMapping.initiator |> List.member collaborator
+        isOutboundCollaborator collaborator = communication.outbound |> List.map ContextMapping.recipient |> List.member collaborator
+        collaboratorError =
+          case updated.collaborator of
+            Just collaborator ->
+              case ( isInboundCollaborator collaborator, isOutboundCollaborator collaborator ) of
+                (True, True) ->
+                  Just IsAlreadyAddedOnBoth
+                (True, False) ->
+                  Just IsAlreadyAddedOnInbound
+                (False, True) ->
+                  Just IsAlreadyAddedOnOutbound
+                (False, False) ->
+                  Nothing
+            Nothing ->
+              Just NothingSelected
       in
-          ( { model | selectedCollaborator = updated}
+          ( { model | selectedCollaborator = updated, collaboratorError = collaboratorError}
           , cmd |> Cmd.map CollaboratorSelection
           )
     SetDescription d ->
@@ -241,7 +264,7 @@ update msg model =
       case model.newCollaborations of
         Just adding ->
           let
-            (m, cmd) = updateCollaboration col adding
+            (m, cmd) = updateCollaboration model.communication col adding
           in
             ( {model | newCollaborations = Just m }, cmd |> Cmd.map AddCollaborationMsg)
         _ ->
@@ -740,6 +763,20 @@ buildFields model =
         , Textarea.onInput SetDescription
         ]
     ]
+  , Alert.simpleInfo []
+    [ text <|
+        case model.collaboratorError of
+          Nothing ->
+            "Add this collaborator as inbound or outbound connection"
+          Just NothingSelected ->
+            "Please select a collaborator"
+          Just IsAlreadyAddedOnInbound ->
+            "The collaborator can only be added on an outbound connection"
+          Just IsAlreadyAddedOnOutbound ->
+            "The collaborator can only be added on an inbound connection"
+          Just IsAlreadyAddedOnBoth ->
+            "The collaborator was already added on both connections"
+    ]
   ]
 
 
@@ -748,7 +785,7 @@ viewAddConnection adding =
   case adding of
     Just model ->
       Html.form []
-      [ Card.config [ Card.attrs [ Spacing.mb3, class "shadow" ] ]
+      [ Card.config [ Card.attrs [ Spacing.mb3, Spacing.mt3, class "shadow" ] ]
         |> Card.headerH4 [] [ text "Add a new collaborator"]
         |> Card.block []
           ( buildFields model
@@ -760,7 +797,15 @@ viewAddConnection adding =
             [ ButtonGroup.buttonGroupItem []
               [ ButtonGroup.button
                 [ Button.primary
-                , Button.disabled (model.selectedCollaborator.collaborator == Nothing)
+                , Button.disabled (
+                    case model.collaboratorError of
+                      Nothing ->
+                        False
+                      Just IsAlreadyAddedOnOutbound ->
+                        False
+                      _ ->
+                        True
+                  )
                 , model.selectedCollaborator.collaborator
                   |> Maybe.map (\c -> AddInboundConnection c model.description)
                   |> Maybe.map Button.onClick
@@ -769,7 +814,15 @@ viewAddConnection adding =
                 [ text "Add as inbound connection" ]
               , ButtonGroup.button
                 [ Button.primary
-                , Button.disabled (model.selectedCollaborator.collaborator == Nothing)
+                , Button.disabled (
+                    case model.collaboratorError of
+                      Nothing ->
+                        False
+                      Just IsAlreadyAddedOnInbound ->
+                        False
+                      _ ->
+                        True
+                  )
                 , model.selectedCollaborator.collaborator
                   |> Maybe.map (\c -> AddOutboundConnection c model.description)
                   |> Maybe.map Button.onClick
