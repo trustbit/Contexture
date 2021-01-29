@@ -23,6 +23,6 @@ jobs:
 
 
     - name: Setup Elm
-      uses: justgook/setup-elm
+      uses: jorelali/setup-elm@v2
     - run: elm make src/Main.elm
       working-directory: ./app
