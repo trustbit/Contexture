@@ -27,7 +27,6 @@ import Bootstrap.ListGroup as ListGroup
 import Bootstrap.Text as Text
 
 
-
 import Json.Decode as Decode exposing (Decoder)
 import Json.Decode.Pipeline as JP
 
@@ -47,7 +46,6 @@ import BoundedContext.BoundedContextId as BoundedContext exposing(BoundedContext
 import BoundedContext as BoundedContext
 import Domain
 import Domain.DomainId as Domain
-import String
 
 
 type RelationshipEdit
@@ -69,7 +67,7 @@ type alias DefineRelationshipType =
 type alias AddCollaboration =
   { selectedCollaborator : CollaboratorSelection.Model
   , description : String
-  , collaborator : Maybe Collaborator
+
   }
 
 
@@ -88,7 +86,6 @@ initAddCollaboration : List CollaboratorSelection.CollaboratorReference -> AddCo
 initAddCollaboration dependencies =
   { selectedCollaborator = CollaboratorSelection.init dependencies
   , description = ""
-  , collaborator = Nothing
   }
 
 
@@ -142,12 +139,12 @@ type AddCollaborationMsg
   | SetDescription String
 
 type Msg
-  = AddCollaborationMsg AddCollaborationMsg
-  | BoundedContextsLoaded (Result Http.Error (List CollaboratorSelection.BoundedContextDependency))
+  = BoundedContextsLoaded (Result Http.Error (List CollaboratorSelection.BoundedContextDependency))
   | DomainsLoaded (Result Http.Error (List CollaboratorSelection.DomainDependency))
   | ConnectionsLoaded (Result Http.Error (List CollaborationType))
 
   | StartAddingConnection
+  | AddCollaborationMsg AddCollaborationMsg
   | AddInboundConnection Collaborator String
   | AddOutboundConnection Collaborator String
   | InboundConnectionAdded (Api.ApiResponse Collaboration)
@@ -164,7 +161,6 @@ type Msg
   | RemoveOutboundConnection Collaboration
   | InboundConnectionRemoved (Api.ApiResponse CollaborationId)
   | OutboundConnectionRemoved (Api.ApiResponse CollaborationId)
-
 
 
 updateRelationshipEdit : DefineRelationshipType -> DefineRelationshipType
@@ -202,37 +198,14 @@ updateRelationshipEdit model =
       { model | relationship = Nothing }
 
 
-updateCollaborationDefinition : AddCollaboration ->  AddCollaboration
-updateCollaborationDefinition model =
-  let
-    getCollaborator collaboratorType =
-      case collaboratorType of
-        CollaboratorSelection.BoundedContextType (Just bc) _ ->
-          Just <| Collaborator.BoundedContext bc.id
-        CollaboratorSelection.DomainType (Just d) _ ->
-          Just <| Collaborator.Domain d.id
-        CollaboratorSelection.ExternalSystemType (Just e) ->
-          Just <| Collaborator.ExternalSystem e
-        CollaboratorSelection.FrontendType (Just f) ->
-          Just <| Collaborator.Frontend f
-        _ ->
-          Nothing
-  in case model.selectedCollaborator.selectedCollaborator of
-    Just collaboratorType ->
-        { model | collaborator = getCollaborator collaboratorType }
-    _ ->
-      { model | collaborator = Nothing }
-
-
 updateCollaboration : AddCollaborationMsg -> AddCollaboration -> (AddCollaboration, Cmd AddCollaborationMsg)
 updateCollaboration msg model =
   case msg of
     CollaboratorSelection bcMsg ->
       let
-        (updated, cmd) =
-          CollaboratorSelection.update bcMsg model.selectedCollaborator
-        in
-          ( updateCollaborationDefinition { model | selectedCollaborator = updated}
+        (updated, cmd) = CollaboratorSelection.update bcMsg model.selectedCollaborator
+      in
+          ( { model | selectedCollaborator = updated}
           , cmd |> Cmd.map CollaboratorSelection
           )
     SetDescription d ->
@@ -374,9 +347,8 @@ update msg model =
       in
         (model, Cmd.none)
 
+
 -- VIEW
-
-
 
 
 onSubmitMaybe : Maybe msg -> Html.Attribute msg
@@ -821,7 +793,7 @@ viewAddConnection adding =
   case adding of
     Just model ->
       Html.form []
-      [ Card.config [ Card.attrs [ class "mb-3", class "shadow" ] ]
+      [ Card.config [ Card.attrs [ Spacing.mb3, class "shadow" ] ]
         |> Card.headerH4 [] [ text "Add a new collaborator"]
         |> Card.block []
           ( buildFields model
@@ -833,8 +805,8 @@ viewAddConnection adding =
             [ ButtonGroup.buttonGroupItem []
               [ ButtonGroup.button
                 [ Button.primary
-                , Button.disabled (model.collaborator == Nothing)
-                , model.collaborator
+                , Button.disabled (model.selectedCollaborator.collaborator == Nothing)
+                , model.selectedCollaborator.collaborator
                   |> Maybe.map (\c -> AddInboundConnection c model.description)
                   |> Maybe.map Button.onClick
                   |> Maybe.withDefault (Button.attrs [])
@@ -842,8 +814,8 @@ viewAddConnection adding =
                 [ text "Add as inbound connection" ]
               , ButtonGroup.button
                 [ Button.primary
-                , Button.disabled (model.collaborator == Nothing)
-                , model.collaborator
+                , Button.disabled (model.selectedCollaborator.collaborator == Nothing)
+                , model.selectedCollaborator.collaborator
                   |> Maybe.map (\c -> AddOutboundConnection c model.description)
                   |> Maybe.map Button.onClick
                   |> Maybe.withDefault (Button.attrs [])
@@ -862,7 +834,7 @@ viewAddConnection adding =
         |> Card.view
       ]
     Nothing ->
-      Card.config [ Card.attrs [ class "mb-3", class "shadow" ], Card.align Text.alignXsCenter ]
+      Card.config [ Card.attrs [ Spacing.mb3, Spacing.mt3, class "shadow" ], Card.align Text.alignXsCenter ]
       |> Card.block []
         [ Block.custom
           <| Button.button [ Button.primary, Button.onClick StartAddingConnection ] [ text "Add new Collaborator" ]

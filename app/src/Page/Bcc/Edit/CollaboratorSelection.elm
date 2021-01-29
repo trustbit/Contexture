@@ -33,6 +33,8 @@ import BoundedContext.BoundedContextId as BoundedContext exposing(BoundedContext
 import BoundedContext as BoundedContext
 import Domain
 import Domain.DomainId as Domain
+import ContextMapping.Collaboration as ContextMapping exposing (..)
+import ContextMapping.Collaborator as Collaborator exposing(Collaborator)
 
 
 type alias DomainDependency =
@@ -55,6 +57,7 @@ type CollaboratorReference
 type alias Model =
   { selectedCollaborator : Maybe CollaboratorReferenceType
   , availableDependencies : List CollaboratorReference
+  , collaborator : Maybe Collaborator
   }
 
 
@@ -79,11 +82,29 @@ init : List CollaboratorReference -> Model
 init dependencies =
   { selectedCollaborator = Nothing
   , availableDependencies = dependencies
+  , collaborator = Nothing
   }
 
 
-updateSelectedCollaborator model collaborator =
-    { model | selectedCollaborator = Just <| collaborator }
+updateSelectedCollaborator model collaboratorType =
+  let
+    collaborator =
+      case collaboratorType of
+        BoundedContextType (Just bc) _ ->
+          Just <| Collaborator.BoundedContext bc.id
+        DomainType (Just d) _ ->
+          Just <| Collaborator.Domain d.id
+        ExternalSystemType (Just e) ->
+          Just <| Collaborator.ExternalSystem e
+        FrontendType (Just f) ->
+          Just <| Collaborator.Frontend f
+        _ ->
+          Nothing
+  in
+    { model
+    | selectedCollaborator = Just <| collaboratorType
+    , collaborator = collaborator
+    }
 
 
 update : Msg -> Model -> (Model, Cmd Msg)
