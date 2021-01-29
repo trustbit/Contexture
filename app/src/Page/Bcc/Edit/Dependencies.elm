@@ -364,6 +364,7 @@ onSubmitMaybe maybeMsg =
       Html.Events.preventDefaultOn "submit" (Decode.map preventDefault (Decode.fail "No message to submit"))
 
 
+translateSymmetricRelationship : SymmetricRelationship -> LabelAndDescription
 translateSymmetricRelationship relationship =
   case relationship of
     SharedKernel -> ("Shared Kernel", "SK")
@@ -372,99 +373,61 @@ translateSymmetricRelationship relationship =
     BigBallOfMud -> ("Big Ball of Mud","BBoM")
 
 
+translateUpstreamRelationship : UpstreamRelationship -> LabelAndDescription
 translateUpstreamRelationship relationship =
   case relationship of
-    Upstream -> ("Upstream","US")
-    PublishedLanguage -> ("Published Language","PL")
-    OpenHost -> ("Open Host Service","OHS")
+    Upstream -> ("Upstream", "US")
+    PublishedLanguage -> ("Published Language", "PL")
+    OpenHost -> ("Open Host Service", "OHS")
 
+
+translateDownstreamRelationship : DownstreamRelationship -> LabelAndDescription
 translateDownstreamRelationship relationship =
   case relationship of
-    Downstream -> ("Downstream","DS")
-    AntiCorruptionLayer -> ("Anti Corruption Layer","ACL")
-    Conformist -> ("Conformist","CF")
-
-concatTuple operation (x1,y1) (x2,y2) =
-  ( operation x1 x2
-  , operation y1 y2
-  )
+    Downstream -> ("Downstream", "DS")
+    AntiCorruptionLayer -> ("Anti Corruption Layer", "ACL")
+    Conformist -> ("Conformist", "CF")
 
 
+initiatorRecipientDescription initiator recipient =
+  { initiatorDescription = initiator
+  , recipientDescription = recipient
+  }
+
+translateUpstreamDownstreamRelationship : UpstreamDownstreamRelationship -> { initiatorDescription: LabelAndDescription, recipientDescription: LabelAndDescription }
 translateUpstreamDownstreamRelationship relationship =
   case relationship of
     CustomerSupplierRelationship role ->
-      case role of
+      let
+         customer = toLabelAndDescription "Customer" "CUS"
+         supplier = toLabelAndDescription "Supplier" "SUP"
+      in case role of
         CustomerRole ->
-          (("Customer","Supplier"),("CUS","SUP"))
+          initiatorRecipientDescription customer supplier
         SupplierRole ->
-          (("Supplier","Customer"), ("SUP","CUS"))
+          initiatorRecipientDescription supplier customer
     UpstreamDownstreamRelationship role ut dt ->
-      concatTuple
-        (\upstream downstream ->
-          case role of
-            UpstreamRole ->
-              (upstream,downstream)
-            DownstreamRole ->
-              (downstream,upstream)
-        )
-        (translateUpstreamRelationship ut)
-        ( translateDownstreamRelationship dt )
+      let
+          upstream = translateUpstreamRelationship ut
+          downstream = translateDownstreamRelationship dt
+      in case role of
+          UpstreamRole ->
+            initiatorRecipientDescription upstream downstream
+          DownstreamRole ->
+            initiatorRecipientDescription downstream upstream
+
 
 type alias LabelAndDescription = (String, String)
 
-type alias ResolveCollaboratorCaption = Collaborator -> LabelAndDescription
-type alias ResolveCollaboratorCaptionFromCollaboration = Collaboration -> LabelAndDescription
+toLabelAndDescription label description = Tuple.pair label description
+
 
 collaboratorCaptionFromCollaboration : List CollaboratorSelection.CollaboratorReference -> (Collaboration -> Collaborator) -> Collaboration -> LabelAndDescription
 collaboratorCaptionFromCollaboration items collaboratorSelection collaboration =
-  collaboratorCaption items (collaboratorSelection collaboration)
+  CollaboratorSelection.collaboratorCaption items (collaboratorSelection collaboration)
 
-collaboratorCaption : List CollaboratorSelection.CollaboratorReference -> Collaborator -> LabelAndDescription
-collaboratorCaption items collaborator=
-  case collaborator of
-    Collaborator.BoundedContext bc ->
-      items
-      |> List.filterMap (\r ->
-        case r of
-          CollaboratorSelection.BoundedContext bcr ->
-            if bcr.id == bc then
-              Just <|
-                ( bcr.name
-                , "[in Domain '" ++ bcr.domain.name  ++ "']"
-                )
-            else
-              Nothing
-          _ ->
-            Nothing
-      )
-      |> List.head
-      |> Maybe.withDefault ("Unknown Bounded Context", "")
-    Collaborator.Domain d ->
-      items
-      |> List.filterMap (\r ->
-        case r of
-          CollaboratorSelection.Domain dr ->
-            if dr.id == d
-            then Just (dr.name, "[Domain]")
-            else Nothing
-          _ ->
-            Nothing
-      )
-      |> List.head
-      |> Maybe.withDefault ("Unknown Domain", "")
-    Collaborator.ExternalSystem s ->
-      ( s
-      , "[External System]"
-      )
-    Collaborator.Frontend s ->
-      ( s
-      , "[Frontend]"
-      )
-    Collaborator.UserInteraction s ->
-      ( s
-      , "[User Interaction]"
-      )
-
+type alias ResolveCollaboratorCaption = Collaborator -> LabelAndDescription
+type alias ResolveCollaboratorCaptionFromCollaboration = Collaboration -> LabelAndDescription
 
 captionAndDescription caption description =
   Html.span []
@@ -842,56 +805,53 @@ viewAddConnection adding =
       |> Card.view
 
 
-viewConnection : ResolveCollaboratorCaption -> Bool -> List Collaboration -> Html Msg
-viewConnection resolveCaption isInbound collaborations =
+viewCollaborations : ResolveCollaboratorCaption -> Bool -> List Collaboration -> Html Msg
+viewCollaborations resolveCaption isInbound collaborations =
   let
     resolveCollaborator =
       if isInbound
       then ContextMapping.initiator
       else ContextMapping.recipient
-    inboundCollaborator collaboration config =
-      let
-        description = ContextMapping.description collaboration
-        relationship =
-          case collaboration |> ContextMapping.relationship of
-            Just r ->
-              div [ Flex.block, Flex.justifyBetween ]
-                [ case r of
-                    Symmetric s ->
-                      captionAndDescription
-                        (s |> translateSymmetricRelationship |> Tuple.first)
-                        "Symmetric"
-                    UpstreamDownstream upstreamDownstreamType ->
-                      captionAndDescription
-                        ( upstreamDownstreamType
-                         |> translateUpstreamDownstreamRelationship
-                         |> Tuple.first
-                         |> ( \(inboundType, outboundType) ->
-                            if isInbound
-                            then (inboundType ++ "/" ++ outboundType)
-                            else (outboundType ++ "/" ++ inboundType)
-                          )
-                        )
-                        "Upstream/Downstream"
-                    Unknown ->
-                      text "Unknown"
-                , Button.button
-                  [ Button.outlineSecondary
-                  , Button.small
-                  , Button.onClick (StartToDefineRelationship collaboration)
-                  ]
-                  [ text "Redefine Relationship"]
-                ]
-            Nothing ->
-              div [ Flex.block, Flex.justifyCenter]
-                [ Button.button
-                  [ Button.outlinePrimary
-                  , Button.small
-                  , Button.onClick (StartToDefineRelationship collaboration)
-                  ]
-                  [ text "Define Relationship"]
-                ]
-      in
+    relationshipView collaboration =
+      case collaboration |> ContextMapping.relationship of
+        Just r ->
+          div [ Flex.block, Flex.justifyBetween ]
+            [ case r of
+                Symmetric s ->
+                  captionAndDescription
+                    (s |> translateSymmetricRelationship |> Tuple.first)
+                    "Symmetric"
+                UpstreamDownstream upstreamDownstreamType ->
+                  captionAndDescription
+                    ( upstreamDownstreamType
+                      |> translateUpstreamDownstreamRelationship
+                      |> ( \{ initiatorDescription, recipientDescription } ->
+                        if isInbound
+                        then (Tuple.first initiatorDescription ++ "/" ++ Tuple.first recipientDescription)
+                        else (Tuple.first recipientDescription ++ "/" ++ Tuple.first initiatorDescription)
+                      )
+                    )
+                    "Upstream/Downstream"
+                Unknown ->
+                  text "Unknown"
+            , Button.button
+              [ Button.outlineSecondary
+              , Button.small
+              , Button.onClick (StartToDefineRelationship collaboration)
+              ]
+              [ text "Redefine Relationship"]
+            ]
+        Nothing ->
+          div [ Flex.block, Flex.justifyCenter]
+            [ Button.button
+              [ Button.outlinePrimary
+              , Button.small
+              , Button.onClick (StartToDefineRelationship collaboration)
+              ]
+              [ text "Define Relationship"]
+            ]
+
+    viewCollaboration collaboration config =
         config
           |> Card.block [ Block.attrs [ Border.bottom ] ]
             [ Block.titleH6 [ Flex.block, Flex.justifyBetween ]
@@ -906,18 +866,18 @@ viewConnection resolveCaption isInbound collaborations =
                 ]
                 [ text "x" ]
               ]
-            , Block.text [ class "text-muted" ] [ text <| Maybe.withDefault "" description ]
-            , Block.custom <| relationship
+            , Block.text [ class "text-muted" ] [ text <| Maybe.withDefault "" (ContextMapping.description collaboration) ]
+            , Block.custom <| relationshipView collaboration
           ]
     cardConfig =
       Card.config[]
   in
     div []
-      [  Html.h6
+      [ Html.h6
         [ class "text-center", Spacing.p2 ]
         [ Html.strong [] [ text (if isInbound then "Inbound Connection" else "Outbound Connection") ] ]
       , collaborations
-        |> List.foldl inboundCollaborator cardConfig
+        |> List.foldl viewCollaboration cardConfig
         |> Card.view
       ]
 
@@ -961,9 +921,9 @@ viewDefineRelationship resolveCaption defineRelationship =
 viewConnections getCollaboratorCaption model =
   Grid.row []
     [ Grid.col []
-      [ viewConnection getCollaboratorCaption True model.inboundCollaboration ]
+      [ viewCollaborations getCollaboratorCaption True model.inboundCollaboration ]
     , Grid.col []
-      [ viewConnection getCollaboratorCaption False model.outboundCollaboration ]
+      [ viewCollaborations getCollaboratorCaption False model.outboundCollaboration ]
     ]
 
 
@@ -978,7 +938,7 @@ view model =
       ]
       [ text "Dependencies and Relationships" ]
     , Form.help [] [ text "To create loosely coupled systems it's essential to be wary of dependencies. In this section you should write the name of each dependency and a short explanation of why the dependency exists." ]
-    , viewConnections (collaboratorCaption model.availableDependencies) model
+    , viewConnections (CollaboratorSelection.collaboratorCaption model.availableDependencies) model
     , Grid.simpleRow
       [ Grid.col []
           [ viewAddConnection model.newCollaborations]
@@ -1026,5 +986,5 @@ loadConnections config context =
       |> List.filterMap (ContextMapping.isCollaborator (Collaborator.BoundedContext context))
   in Http.get
     { url = Api.collaborations |> Api.url config |> Url.toString
-    , expect = Http.expectJson ConnectionsLoaded (Decode.map filterConnections (Decode.list ContextMapping.modelDecoder))
+    , expect = Http.expectJson ConnectionsLoaded (Decode.map filterConnections (Decode.list ContextMapping.decoder))
     }

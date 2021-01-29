@@ -1,7 +1,8 @@
 module Page.Bcc.Edit.CollaboratorSelection exposing (
   init, Model, CollaboratorReference(..),BoundedContextDependency,DomainDependency,CollaboratorReferenceType(..),
   update, Msg,
-  view)
+  view,
+  collaboratorCaption)
 
 import Html exposing (Html, button, div, text)
 import Html.Attributes exposing (..)
@@ -333,3 +334,54 @@ view model =
             [ Input.disabled True
             , Input.placeholder "Select an option"]
     ]
+
+
+-- helpers
+
+type alias LabelAndDescription = (String, String)
+
+collaboratorCaption : List CollaboratorReference -> Collaborator -> LabelAndDescription
+collaboratorCaption items collaborator=
+  case collaborator of
+    Collaborator.BoundedContext bc ->
+      items
+      |> List.filterMap (\r ->
+        case r of
+          BoundedContext bcr ->
+            if bcr.id == bc then
+              Just <|
+                ( bcr.name
+                , "[in Domain '" ++ bcr.domain.name  ++ "']"
+                )
+            else
+              Nothing
+          _ ->
+            Nothing
+      )
+      |> List.head
+      |> Maybe.withDefault ("Unknown Bounded Context", "")
+    Collaborator.Domain d ->
+      items
+      |> List.filterMap (\r ->
+        case r of
+          Domain dr ->
+            if dr.id == d
+            then Just (dr.name, "[Domain]")
+            else Nothing
+          _ ->
+            Nothing
+      )
+      |> List.head
+      |> Maybe.withDefault ("Unknown Domain", "")
+    Collaborator.ExternalSystem s ->
+      ( s
+      , "[External System]"
+      )
+    Collaborator.Frontend s ->
+      ( s
+      , "[Frontend]"
+      )
+    Collaborator.UserInteraction s ->
+      ( s
+      , "[User Interaction]"
+      )

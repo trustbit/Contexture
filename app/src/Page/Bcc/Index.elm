@@ -46,8 +46,8 @@ import BoundedContext.BoundedContextId as BoundedContextId exposing (BoundedCont
 import BoundedContext.Canvas exposing (BoundedContextCanvas)
 import BoundedContext.Technical exposing (TechnicalDescription)
 import BoundedContext.StrategicClassification as StrategicClassification
-import ContextMapping.Collaboration as ContextMapping
-import ContextMapping.Collaborator as ContextMapping
+import ContextMapping.Collaboration as Collaboration
+import ContextMapping.Collaborator as Collaborator
 import List
 
 -- MODEL
@@ -72,8 +72,8 @@ type alias DeleteBoundedContextModel =
   }
 
 type alias Communication = 
-  { initiators : Dict Int ContextMapping.Collaborations
-  , recipients : Dict Int ContextMapping.Collaborations 
+  { initiators : Dict Int Collaboration.Collaborations
+  , recipients : Dict Int Collaboration.Collaborations 
   }
 
 type alias Model =
@@ -120,7 +120,7 @@ dictBcInsert id = Dict.insert (BoundedContextId.value id)
 
 type Msg
   = Loaded (Result Http.Error (List Item))
-  | CommunicationLoaded (ApiResponse ContextMapping.Collaborations)
+  | CommunicationLoaded (ApiResponse Collaboration.Collaborations)
   | SetName String
   | CreateBoundedContext
   | Created (Result Http.Error BoundedContext.BoundedContext)
@@ -156,7 +156,7 @@ update msg model =
       let
         updateCollaborationLookup selectCollaborator dictionary collaboration =
           case selectCollaborator collaboration of
-            ContextMapping.BoundedContext bcId ->
+            Collaborator.BoundedContext bcId ->
               let 
                 items = 
                   dictionary
@@ -171,8 +171,8 @@ update msg model =
         (bcInitiators, bcRecipients) = 
           connections
           |> List.foldl(\collaboration (initiators, recipients) -> 
-              ( updateCollaborationLookup ContextMapping.initiator initiators collaboration
-              , updateCollaborationLookup ContextMapping.recipient recipients collaboration
+              ( updateCollaborationLookup Collaboration.initiator initiators collaboration
+              , updateCollaborationLookup Collaboration.recipient recipients collaboration
               )
             ) (Dict.empty, Dict.empty)
       in
@@ -588,7 +588,7 @@ loadAllConnections : Api.Configuration -> Cmd Msg
 loadAllConnections config =
   Http.get
     { url = Api.collaborations |> Api.url config |> Url.toString
-    , expect = Http.expectJson CommunicationLoaded (Decode.list ContextMapping.modelDecoder)
+    , expect = Http.expectJson CommunicationLoaded (Decode.list Collaboration.decoder)
     }
 
 findAllDomains : Api.Configuration -> ApiResult (List Domain.Domain) msg

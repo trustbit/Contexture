@@ -4,7 +4,7 @@ module ContextMapping.Collaboration exposing (
     endCollaboration,
     isCollaborator,
     relationship, description, initiator, recipient, id, otherCollaborator,
-    modelDecoder)
+    decoder)
 
 import Json.Encode as Encode
 import Json.Decode as Decode exposing (Decoder)
@@ -21,7 +21,6 @@ import ContextMapping.RelationshipType as RelationshipType exposing (Relationshi
 import Domain
 import Domain.DomainId as Domain
 import BoundedContext.BoundedContextId exposing (BoundedContextId)
-import Api exposing (collaboration)
 
 type Collaboration
   = Collaboration CollaborationInternal
@@ -83,10 +82,11 @@ defineInboundCollaboration url context connectionInitiator descriptionText =
                 connectionRecipient
                 (if String.isEmpty descriptionText then Nothing else Just descriptionText)
                 Nothing
-      , expect = Http.expectJson toMsg modelDecoder
+      , expect = Http.expectJson toMsg decoder
       }
     in
       request
+
 
 defineOutboundCollaboration : Api.Configuration -> BoundedContextId -> Collaborator -> String -> ApiResult Collaboration msg
 defineOutboundCollaboration url context connectionRecipient descriptionText =
@@ -105,10 +105,11 @@ defineOutboundCollaboration url context connectionRecipient descriptionText =
                 connectionRecipient
                 (if String.isEmpty descriptionText then Nothing else Just descriptionText)
                 Nothing
-      , expect = Http.expectJson toMsg modelDecoder
+      , expect = Http.expectJson toMsg decoder
       }
     in
       request
+
 
 defineRelationshipType : Api.Configuration -> CollaborationId ->  RelationshipType -> ApiResult Collaboration msg
 defineRelationshipType url collaboration relationshipType =
@@ -122,14 +123,13 @@ defineRelationshipType url collaboration relationshipType =
       , url = api |> Api.url url |> Url.toString
       , body = Http.jsonBody <|
           Encode.object [ ("relationship", RelationshipType.encoder relationshipType) ]
-      , expect = Http.expectJson toMsg modelDecoder
+      , expect = Http.expectJson toMsg decoder
       , timeout = Nothing
       , tracker = Nothing
       , headers = []
       }
   in
     request
-
 
 
 isInboundCollaboratoration : Collaborator -> Collaboration -> Bool
@@ -152,13 +152,16 @@ isCollaborator collaborator collaboration =
     _ ->
       Nothing
 
+
 id : Collaboration -> CollaborationId
 id (Collaboration collaboration) =
   collaboration.id
 
+
 relationship : Collaboration -> Maybe RelationshipType
 relationship (Collaboration collaboration) =
   collaboration.relationship
+
 
 initiator : Collaboration -> Collaborator
 initiator (Collaboration collaboration) =
@@ -176,16 +179,19 @@ otherCollaborator knownCollaborator (Collaboration collaboration) =
   then collaboration.initiator
   else collaboration.recipient
 
+
 description : Collaboration -> Maybe String
 description (Collaboration collaboration) =
   collaboration.description
+
 
 idFieldDecoder : Decoder CollaborationId
 idFieldDecoder =
   Decode.field "id" ContextMapping.idDecoder
 
-modelDecoder : Decoder Collaboration
-modelDecoder =
+
+decoder : Decoder Collaboration
+decoder =
   ( Decode.succeed CollaborationInternal
     |> JP.custom idFieldDecoder
     |> JP.required "description" (Decode.nullable Decode.string)
