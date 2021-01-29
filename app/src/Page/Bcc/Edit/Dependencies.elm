@@ -77,8 +77,7 @@ type alias Model =
   , newCollaborations : Maybe AddCollaboration
   , defineRelationship : Maybe DefineRelationshipType
   , availableDependencies : List CollaboratorSelection.CollaboratorReference
-  , inboundCollaboration : List ContextMapping.Collaboration
-  , outboundCollaboration : List ContextMapping.Collaboration
+  , communication : ContextMapping.Communication
   }
 
 
@@ -120,8 +119,7 @@ init config context =
     { config = config
     , boundedContextId = context |> BoundedContext.id
     , availableDependencies = []
-    , inboundCollaboration = []
-    , outboundCollaboration = []
+    , communication = ContextMapping.noCommunication
     , newCollaborations = Nothing
     , defineRelationship = Nothing
     }
@@ -139,9 +137,9 @@ type AddCollaborationMsg
   | SetDescription String
 
 type Msg
-  = BoundedContextsLoaded (Result Http.Error (List CollaboratorSelection.BoundedContextDependency))
-  | DomainsLoaded (Result Http.Error (List CollaboratorSelection.DomainDependency))
-  | ConnectionsLoaded (Result Http.Error (List CollaborationType))
+  = BoundedContextsLoaded (Api.ApiResponse (List CollaboratorSelection.BoundedContextDependency))
+  | DomainsLoaded (Api.ApiResponse (List CollaboratorSelection.DomainDependency))
+  | ConnectionsLoaded (Api.ApiResponse Communication)
 
   | StartAddingConnection
   | AddCollaborationMsg AddCollaborationMsg
@@ -211,6 +209,8 @@ updateCollaboration msg model =
     SetDescription d ->
       ( { model | description = d}, Cmd.none)
 
+updateCommunication updater model =
+  { model | communication = updater model.communication }
 
 update : Msg -> Model -> (Model, Cmd Msg)
 update msg model =
@@ -223,25 +223,15 @@ update msg model =
       ( { model | availableDependencies = List.append model.availableDependencies (domains |> List.map CollaboratorSelection.Domain) }
       , Cmd.none
       )
-    ConnectionsLoaded (Ok connections) ->
-      let
-        (inbound, outbound) =
-          connections
-          |> List.foldl(\c (inbounds,outbounds) ->
-              case c of
-                Inbound inboundColl ->
-                  (inboundColl :: inbounds,outbounds)
-                Outbound outboundColl ->
-                  (inbounds,outboundColl :: outbounds)
-            ) ([],[])
-
-      in
-        ( { model
-          | inboundCollaboration = List.append model.inboundCollaboration inbound
-          , outboundCollaboration = List.append model.outboundCollaboration outbound
+    ConnectionsLoaded (Ok communication) ->
+      ( { model
+        | communication =
+          { inbound = List.append model.communication.inbound communication.inbound
+          , outbound = List.append model.communication.outbound communication.outbound
           }
-        , Cmd.none
-        )
+        }
+      , Cmd.none
+      )
 
     StartAddingConnection ->
       ( { model | newCollaborations = Just <| initAddCollaboration model.availableDependencies }
@@ -263,17 +253,11 @@ update msg model =
       ( model, ContextMapping.defineOutboundCollaboration model.config model.boundedContextId coll desc OutboundConnectionAdded )
 
     InboundConnectionAdded (Ok result) ->
-      ( { model
-        | inboundCollaboration = result :: model.inboundCollaboration
-        , newCollaborations = Nothing
-        }
+      ( model |> updateCommunication (\c -> { c | inbound = result :: c.inbound })
       , Cmd.none
       )
     OutboundConnectionAdded (Ok result) ->
-      ( { model
-        | outboundCollaboration = result :: model.outboundCollaboration
-        , newCollaborations = Nothing
-        }
+      ( model |> updateCommunication (\c -> { c | outbound = result :: c.outbound })
       , Cmd.none
       )
 
@@ -286,17 +270,23 @@ update msg model =
       ( model, ContextMapping.endCollaboration model.config (ContextMapping.id coll) OutboundConnectionRemoved )
 
     InboundConnectionRemoved (Ok result) ->
-      ( { model | inboundCollaboration =
-          model.inboundCollaboration
-          |> List.filter (\i -> (i |> ContextMapping.id) /= result)
-        }
+      ( model |> updateCommunication
+          (\c ->
+            { c | inbound =
+              c.inbound
+              |> List.filter (\i -> (i |> ContextMapping.id) /= result)
+            }
+          )
       , Cmd.none
       )
     OutboundConnectionRemoved (Ok result) ->
-      ( { model | outboundCollaboration =
-          model.outboundCollaboration
-          |> List.filter (\i -> (i |> ContextMapping.id) /= result)
-        }
+      ( model |> updateCommunication
+          (\c ->
+            { c | outbound =
+              c.outbound
+              |> List.filter (\i -> (i |> ContextMapping.id) /= result)
+            }
+          )
       , Cmd.none
       )
 
@@ -327,11 +317,13 @@ update msg model =
           then collaboration
           else c
       in
-        ( { model
-          | defineRelationship = Nothing
-          , inboundCollaboration = model.inboundCollaboration |> List.map updateCollaborationType
-          , outboundCollaboration = model.outboundCollaboration |> List.map updateCollaborationType
-          }
+        ( { model | defineRelationship = Nothing }
+          |> updateCommunication (\c ->
+            { c
+            | inbound = c.inbound |> List.map updateCollaborationType
+            , outbound = c.outbound |> List.map updateCollaborationType
+            }
+          )
         , Cmd.none
         )
 
@@ -918,12 +910,12 @@ viewDefineRelationship resolveCaption defineRelationship =
     Nothing ->
       text ""
 
-viewConnections getCollaboratorCaption model =
+viewConnections getCollaboratorCaption { inbound, outbound} =
   Grid.row []
     [ Grid.col []
-      [ viewCollaborations getCollaboratorCaption True model.inboundCollaboration ]
+      [ viewCollaborations getCollaboratorCaption True inbound ]
     , Grid.col []
-      [ viewCollaborations getCollaboratorCaption False model.outboundCollaboration ]
+      [ viewCollaborations getCollaboratorCaption False outbound ]
     ]
 
 
@@ -938,7 +930,7 @@ view model =
       ]
       [ text "Dependencies and Relationships" ]
     , Form.help [] [ text "To create loosely coupled systems it's essential to be wary of dependencies. In this section you should write the name of each dependency and a short explanation of why the dependency exists." ]
-    , viewConnections (CollaboratorSelection.collaboratorCaption model.availableDependencies) model
+    , viewConnections (CollaboratorSelection.collaboratorCaption model.availableDependencies) model.communication
     , Grid.simpleRow
       [ Grid.col []
           [ viewAddConnection model.newCollaborations]
@@ -980,11 +972,7 @@ loadDomains config =
 
 loadConnections : Api.Configuration -> BoundedContextId -> Cmd Msg
 loadConnections config context =
-  let
-    filterConnections connections =
-      connections
-      |> List.filterMap (ContextMapping.isCollaborator (Collaborator.BoundedContext context))
-  in Http.get
+  Http.get
     { url = Api.collaborations |> Api.url config |> Url.toString
-    , expect = Http.expectJson ConnectionsLoaded (Decode.map filterConnections (Decode.list ContextMapping.decoder))
+    , expect = Http.expectJson ConnectionsLoaded (ContextMapping.communicationDecoder (Collaborator.BoundedContext context))
     }

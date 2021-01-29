@@ -1,10 +1,11 @@
 module ContextMapping.Collaboration exposing (
-    Collaboration, Collaborations, CollaborationType(..),
-    noCollaborations, defineInboundCollaboration, defineOutboundCollaboration, defineRelationshipType,
+    Collaboration, Collaborations, CollaborationType(..), Communication,
+    noCollaborations, noCommunication,
+    defineInboundCollaboration, defineOutboundCollaboration, defineRelationshipType,
     endCollaboration,
     isCollaborator,
     relationship, description, initiator, recipient, id, otherCollaborator,
-    decoder)
+    decoder, communicationDecoder)
 
 import Json.Encode as Encode
 import Json.Decode as Decode exposing (Decoder)
@@ -33,17 +34,25 @@ type alias CollaborationInternal =
     , recipient : Collaborator
     , relationship : Maybe RelationshipType
     }
-
-
 type alias Collaborations = List Collaboration
+
+type alias Communication =
+  { inbound : List Collaboration
+  , outbound : List Collaboration
+  }
 
 type CollaborationType
   = Inbound Collaboration
   | Outbound Collaboration
 
-
 noCollaborations : Collaborations
 noCollaborations = []
+
+noCommunication : Communication
+noCommunication =
+  { inbound = []
+  , outbound = []
+  }
 
 endCollaboration : Api.Configuration -> CollaborationId -> ApiResult CollaborationId msg
 endCollaboration url collaborationId =
@@ -199,6 +208,27 @@ decoder =
     |> JP.required "recipient" Collaborator.decoder
     |> JP.required "relationship" (Decode.nullable RelationshipType.decoder)
   ) |> Decode.map Collaboration
+
+communicationDecoder : Collaborator -> Decoder Communication
+communicationDecoder collaborator =
+  ( Decode.list decoder )
+  |> Decode.map(\collaborations ->
+      let
+          (inbound, outbound) =
+            collaborations
+            |> List.filterMap (isCollaborator collaborator)
+            |> List.foldl(\c (inbounds,outbounds) ->
+                case c of
+                  Inbound inboundColl ->
+                    (inboundColl :: inbounds,outbounds)
+                  Outbound outboundColl ->
+                    (inbounds,outboundColl :: outbounds)
+              ) ([],[])
+      in
+         { inbound = inbound
+          , outbound = outbound
+          }
+    )
 
 
 modelEncoder : Collaborator -> Collaborator -> Maybe String -> Maybe RelationshipType -> Encode.Value
