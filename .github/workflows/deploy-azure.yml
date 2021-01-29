@@ -24,7 +24,7 @@ jobs:
     steps:
     - uses: actions/checkout@master
     - name: Setup Elm
-      uses: justgook/setup-elm@v1
+      uses: justgook/setup-elm
     - run: elm make src/Main.elm --output=../server/public/index.html
       working-directory: ./app
     - name: Use Node.js ${{ env.NODE_VERSION }}
