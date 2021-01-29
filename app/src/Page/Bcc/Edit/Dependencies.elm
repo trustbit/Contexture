@@ -26,7 +26,7 @@ import Bootstrap.Utilities.Flex as Flex
 import Bootstrap.ListGroup as ListGroup
 import Bootstrap.Text as Text
 
-import Select as Autocomplete
+
 
 import Json.Decode as Decode exposing (Decoder)
 import Json.Decode.Pipeline as JP
@@ -38,6 +38,7 @@ import Api
 import Debug
 import Maybe
 
+import Page.Bcc.Edit.CollaboratorSelection as CollaboratorSelection
 import ContextMapping.CollaborationId as ContextMapping exposing(CollaborationId)
 import ContextMapping.Collaborator as Collaborator exposing(Collaborator)
 import ContextMapping.RelationshipType as RelationshipType exposing(..)
@@ -47,31 +48,6 @@ import BoundedContext as BoundedContext
 import Domain
 import Domain.DomainId as Domain
 import String
-
-
-type alias DomainDependency =
-  { id : Domain.DomainId
-  , name : String }
-
-
-type alias BoundedContextDependency =
-  { id : BoundedContextId
-  , name: String
-  , domain: DomainDependency }
-
-
-type CollaboratorReference
-  = BoundedContext BoundedContextDependency
-  | Domain DomainDependency
-  | ExternalSystem String
-  | Frontend String
-
-
-type CollaboratorReferenceType
-  = BoundedContextType (Maybe BoundedContextDependency) Autocomplete.State
-  | DomainType (Maybe DomainDependency) Autocomplete.State
-  | ExternalSystemType (Maybe String)
-  | FrontendType (Maybe String)
 
 
 type RelationshipEdit
@@ -91,8 +67,7 @@ type alias DefineRelationshipType =
 
 
 type alias AddCollaboration =
-  { selectedCollaborator : Maybe CollaboratorReferenceType
-  , dependencySelectState : Autocomplete.State
+  { selectedCollaborator : CollaboratorSelection.Model
   , description : String
   , collaborator : Maybe Collaborator
   }
@@ -103,16 +78,15 @@ type alias Model =
   , config : Api.Configuration
   , newCollaborations : Maybe AddCollaboration
   , defineRelationship : Maybe DefineRelationshipType
-  , availableDependencies : List CollaboratorReference
+  , availableDependencies : List CollaboratorSelection.CollaboratorReference
   , inboundCollaboration : List ContextMapping.Collaboration
   , outboundCollaboration : List ContextMapping.Collaboration
   }
 
 
-initAddCollaboration : AddCollaboration
-initAddCollaboration =
-  { selectedCollaborator = Nothing
-  , dependencySelectState = Autocomplete.newState "collaboration-select"
+initAddCollaboration : List CollaboratorSelection.CollaboratorReference -> AddCollaboration
+initAddCollaboration dependencies =
+  { selectedCollaborator = CollaboratorSelection.init dependencies
   , description = ""
   , collaborator = Nothing
   }
@@ -163,23 +137,14 @@ init config context =
 
 -- UPDATE
 
-type CollaboratorReferenceMsg
-  = SelectCollaborationType CollaboratorReferenceType
-  | SelectBoundedContextMsg (Autocomplete.Msg BoundedContextDependency)
-  | OnBoundedContextSelect (Maybe BoundedContextDependency)
-  | SelectDomainMsg (Autocomplete.Msg DomainDependency)
-  | OnDomainSelect (Maybe DomainDependency)
-  | ExternalSystemCaption String
-  | FrontendCaption String
-
 type AddCollaborationMsg
-  = CollaboratorSelection CollaboratorReferenceMsg
+  = CollaboratorSelection CollaboratorSelection.Msg
   | SetDescription String
 
 type Msg
   = AddCollaborationMsg AddCollaborationMsg
-  | BoundedContextsLoaded (Result Http.Error (List BoundedContextDependency))
-  | DomainsLoaded (Result Http.Error (List DomainDependency))
+  | BoundedContextsLoaded (Result Http.Error (List CollaboratorSelection.BoundedContextDependency))
+  | DomainsLoaded (Result Http.Error (List CollaboratorSelection.DomainDependency))
   | ConnectionsLoaded (Result Http.Error (List CollaborationType))
 
   | StartAddingConnection
@@ -200,45 +165,6 @@ type Msg
   | InboundConnectionRemoved (Api.ApiResponse CollaborationId)
   | OutboundConnectionRemoved (Api.ApiResponse CollaborationId)
 
-updateCollaboratorSelection : CollaboratorReferenceMsg -> Maybe CollaboratorReferenceType -> (Maybe CollaboratorReferenceType, Cmd CollaboratorReferenceMsg)
-updateCollaboratorSelection msg model =
-  case (msg, model) of
-    (SelectCollaborationType t, _) ->
-      (Just t, Cmd.none)
-    (SelectBoundedContextMsg selMsg, Just (BoundedContextType sel state)) ->
-      let
-        ( updated, cmd ) =
-          Autocomplete.update selectBoundedContextConfig selMsg state
-      in
-        ( Just <| BoundedContextType sel updated, cmd )
-    (OnBoundedContextSelect context, Just (BoundedContextType _ state)) ->
-      ( Just <| BoundedContextType context state, Cmd.none)
-    (SelectDomainMsg selMsg, Just (DomainType sel state)) ->
-      let
-        ( updated, cmd ) =
-          Autocomplete.update selectDomainConfig selMsg state
-      in
-        ( Just <| DomainType sel updated, cmd )
-    (OnDomainSelect domain, Just (DomainType _ state)) ->
-      ( Just <| DomainType domain state, Cmd.none)
-    (ExternalSystemCaption caption, Just (ExternalSystemType _)) ->
-      ( if caption |> String.isEmpty
-        then Nothing
-        else Just caption
-        |> ExternalSystemType
-        |> Just
-      , Cmd.none
-      )
-    (FrontendCaption caption, Just (FrontendType _)) ->
-      ( if caption |> String.isEmpty
-        then Nothing
-        else Just caption
-        |> FrontendType
-        |> Just
-      , Cmd.none
-      )
-    _ ->
-      (model, Cmd.none)
 
 
 updateRelationshipEdit : DefineRelationshipType -> DefineRelationshipType
@@ -281,17 +207,17 @@ updateCollaborationDefinition model =
   let
     getCollaborator collaboratorType =
       case collaboratorType of
-        BoundedContextType (Just bc) _ ->
+        CollaboratorSelection.BoundedContextType (Just bc) _ ->
           Just <| Collaborator.BoundedContext bc.id
-        DomainType (Just d) _ ->
+        CollaboratorSelection.DomainType (Just d) _ ->
           Just <| Collaborator.Domain d.id
-        ExternalSystemType (Just e) ->
+        CollaboratorSelection.ExternalSystemType (Just e) ->
           Just <| Collaborator.ExternalSystem e
-        FrontendType (Just f) ->
+        CollaboratorSelection.FrontendType (Just f) ->
           Just <| Collaborator.Frontend f
         _ ->
           Nothing
-  in case model.selectedCollaborator of
+  in case model.selectedCollaborator.selectedCollaborator of
     Just collaboratorType ->
         { model | collaborator = getCollaborator collaboratorType }
     _ ->
@@ -304,7 +230,7 @@ updateCollaboration msg model =
     CollaboratorSelection bcMsg ->
       let
         (updated, cmd) =
-          updateCollaboratorSelection bcMsg model.selectedCollaborator
+          CollaboratorSelection.update bcMsg model.selectedCollaborator
         in
           ( updateCollaborationDefinition { model | selectedCollaborator = updated}
           , cmd |> Cmd.map CollaboratorSelection
@@ -317,11 +243,11 @@ update : Msg -> Model -> (Model, Cmd Msg)
 update msg model =
   case msg of
     BoundedContextsLoaded (Ok contexts) ->
-      ( { model | availableDependencies = List.append model.availableDependencies (contexts |> List.map BoundedContext) }
+      ( { model | availableDependencies = List.append model.availableDependencies (contexts |> List.map CollaboratorSelection.BoundedContext) }
       , Cmd.none
       )
     DomainsLoaded (Ok domains) ->
-      ( { model | availableDependencies = List.append model.availableDependencies (domains |> List.map Domain) }
+      ( { model | availableDependencies = List.append model.availableDependencies (domains |> List.map CollaboratorSelection.Domain) }
       , Cmd.none
       )
     ConnectionsLoaded (Ok connections) ->
@@ -345,7 +271,9 @@ update msg model =
         )
 
     StartAddingConnection ->
-      ( { model | newCollaborations = Just initAddCollaboration }, Cmd.none)
+      ( { model | newCollaborations = Just <| initAddCollaboration model.availableDependencies }
+      , Cmd.none
+      )
     AddCollaborationMsg col ->
       case model.newCollaborations of
         Just adding ->
@@ -449,70 +377,6 @@ update msg model =
 -- VIEW
 
 
-filterLowerCase : Int -> (item -> List String) -> String -> List item -> Maybe (List item)
-filterLowerCase minChars stringsToCompare query items =
-  if String.length query < minChars then
-      Nothing
-  else
-    let
-      lowerQuery = query |> String.toLower
-      containsLowerString text =
-        text
-        |> String.toLower
-        |> String.contains lowerQuery
-      searchable i =
-        i
-        |> stringsToCompare
-        |> List.any containsLowerString
-      in
-        items
-        |> List.filter searchable
-        |> Just
-
-
-selectBoundedContextConfig : Autocomplete.Config CollaboratorReferenceMsg BoundedContextDependency
-selectBoundedContextConfig =
-    Autocomplete.newConfig
-        { onSelect = OnBoundedContextSelect
-        , toLabel = (\bc -> bc.domain.name ++ " - " ++ bc.name)
-        , filter = filterLowerCase 2 (\bc -> [ bc.name, bc.domain.name ])
-        }
-        |> Autocomplete.withCutoff 12
-        |> Autocomplete.withInputClass "text-control border rounded form-control-lg"
-        |> Autocomplete.withInputWrapperClass ""
-        |> Autocomplete.withItemClass " border p-2 "
-        |> Autocomplete.withMenuClass "bg-light"
-        |> Autocomplete.withNotFound "No matches"
-        |> Autocomplete.withNotFoundClass "text-danger"
-        |> Autocomplete.withHighlightedItemClass "bg-white"
-        |> Autocomplete.withPrompt "Search for a Bounded Context"
-        |> Autocomplete.withItemHtml (\bc ->
-            Html.span []
-              [ Html.h6 [ class "text-muted" ] [ text bc.domain.name ]
-              , Html.span [] [ text bc.name ]
-              ]
-        )
-
-
-selectDomainConfig : Autocomplete.Config CollaboratorReferenceMsg DomainDependency
-selectDomainConfig =
-    Autocomplete.newConfig
-        { onSelect = OnDomainSelect
-        , toLabel = (\domain -> domain.name )
-        , filter = filterLowerCase 2 (\domain -> [ domain.name ])
-        }
-        |> Autocomplete.withCutoff 12
-        |> Autocomplete.withInputClass "text-control border rounded form-control-lg"
-        |> Autocomplete.withInputWrapperClass ""
-        |> Autocomplete.withItemClass " border p-2 "
-        |> Autocomplete.withMenuClass "bg-light"
-        |> Autocomplete.withNotFound "No matches"
-        |> Autocomplete.withNotFoundClass "text-danger"
-        |> Autocomplete.withHighlightedItemClass "bg-white"
-        |> Autocomplete.withPrompt "Search for a Domain"
-        |> Autocomplete.withItemHtml (\domain ->
-          Html.span [] [ text domain.name ]
-        )
 
 
 onSubmitMaybe : Maybe msg -> Html.Attribute msg
@@ -579,18 +443,18 @@ type alias LabelAndDescription = (String, String)
 type alias ResolveCollaboratorCaption = Collaborator -> LabelAndDescription
 type alias ResolveCollaboratorCaptionFromCollaboration = Collaboration -> LabelAndDescription
 
-collaboratorCaptionFromCollaboration : List CollaboratorReference -> (Collaboration -> Collaborator) -> Collaboration -> LabelAndDescription
+collaboratorCaptionFromCollaboration : List CollaboratorSelection.CollaboratorReference -> (Collaboration -> Collaborator) -> Collaboration -> LabelAndDescription
 collaboratorCaptionFromCollaboration items collaboratorSelection collaboration =
   collaboratorCaption items (collaboratorSelection collaboration)
 
-collaboratorCaption : List CollaboratorReference -> Collaborator -> LabelAndDescription
+collaboratorCaption : List CollaboratorSelection.CollaboratorReference -> Collaborator -> LabelAndDescription
 collaboratorCaption items collaborator=
   case collaborator of
     Collaborator.BoundedContext bc ->
       items
       |> List.filterMap (\r ->
         case r of
-          BoundedContext bcr ->
+          CollaboratorSelection.BoundedContext bcr ->
             if bcr.id == bc then
               Just <|
                 ( bcr.name
@@ -607,7 +471,7 @@ collaboratorCaption items collaborator=
       items
       |> List.filterMap (\r ->
         case r of
-          Domain dr ->
+          CollaboratorSelection.Domain dr ->
             if dr.id == d
             then Just (dr.name, "[Domain]")
             else Nothing
@@ -933,151 +797,34 @@ specifyRelationshipType relationshipType =
       , downstreamConfiguration
       ]
 
-buildFields  : List CollaboratorReference -> AddCollaboration -> List (Html AddCollaborationMsg)
-buildFields dependencies model =
-  let
-
-    -- selectedItem =
-    --   case model.selectedCollaborator of
-    --     Just (Just (BoundedContextType s)) -> [ s ]
-    --     Nothing -> []
-
-    -- TODO: this is probably very unefficient
-    -- existingDependencies =
-    --   model.existingCollaboration
-    --   |> List.map Tuple.first
-
-    -- relevantDependencies =
-    --   dependencies
-    --   |> List.filter (\d -> existingDependencies |> List.any (\existing -> (d |> toCollaborator)  == existing ) |> not )
-
-    radioList =
-      Radio.radioList "collaboratorSelection"
-        [ Radio.create
-          [ Radio.id "boundedContextOption"
-          , Radio.onClick (SelectCollaborationType (BoundedContextType Nothing (Autocomplete.newState "boundedContext")))
-          , Radio.checked (
-              case model.selectedCollaborator of
-                Just (BoundedContextType _ _) -> True
-                _ -> False
-            )
-          ]
-          "Bounded Context"
-        , Radio.create
-          [ Radio.id "domainOption"
-          , Radio.onClick (SelectCollaborationType (DomainType Nothing (Autocomplete.newState "domain")))
-          , Radio.checked (
-              case model.selectedCollaborator of
-                Just (DomainType _ _) -> True
-                _ -> False
-            )
-          ]
-          "Domain"
-        , Radio.create
-          [ Radio.id "externalSystemOption"
-          , Radio.onClick (SelectCollaborationType (ExternalSystemType Nothing))
-          , Radio.checked (
-              case model.selectedCollaborator of
-                Just (ExternalSystemType _) -> True
-                _ -> False
-            )
-          ]
-          "External System"
-         , Radio.create
-          [ Radio.id "frontendOption"
-          , Radio.onClick (SelectCollaborationType (FrontendType Nothing))
-          , Radio.checked (
-              case model.selectedCollaborator of
-                Just (FrontendType _) -> True
-                _ -> False
-            )
-          ]
-          "Frontend"
-        ]
-
-    asList maybe =
-      case maybe of
-        Just value -> [ value ]
-        Nothing -> []
-
-    collaboratorInputbox =
-      case model.selectedCollaborator of
-        Just selectedType ->
-          case selectedType of
-            BoundedContextType selected state ->
-                Autocomplete.view
-                selectBoundedContextConfig
-                state
-                ( dependencies
-                  |> List.filterMap (\item ->
-                      case item of
-                        BoundedContext bc ->
-                          Just bc
-                        _ ->
-                          Nothing
-                    )
-                )
-                (asList selected)
-              |> Html.map SelectBoundedContextMsg
-            DomainType selected state ->
-              Autocomplete.view
-                selectDomainConfig
-                state
-                ( dependencies
-                  |> List.filterMap (\item ->
-                      case item of
-                        Domain bc ->
-                          Just bc
-                        _ ->
-                          Nothing
-                    )
-                )
-                (asList selected)
-              |> Html.map SelectDomainMsg
-            ExternalSystemType value ->
-              Input.text
-                [ Input.value (value |> Maybe.withDefault "")
-                , Input.placeholder "External System name"
-                , Input.onInput ExternalSystemCaption
-                ]
-            FrontendType value ->
-              Input.text
-                [ Input.value (value |> Maybe.withDefault "")
-                , Input.placeholder "Frontend name"
-                , Input.onInput FrontendCaption
-                ]
-        Nothing ->
-          Input.text
-            [ Input.disabled True
-            , Input.placeholder "Select an option"]
-  in
-    [ Form.group []
-      [ Form.label [ for "collaboratorSelection"] [ text "Select the collaborator of the connection" ]
-      , Html.div [] radioList
-      , collaboratorInputbox
-      ]
-      |> Html.map CollaboratorSelection
-    , Form.group []
-      [ Form.label [ for "description" ] [ text "An optional description of the collaboration" ]
-      , Textarea.textarea
-          [ Textarea.id "description"
-          , Textarea.rows 3
-          , Textarea.value model.description
-          , Textarea.onInput SetDescription
-          ]
-      ]
+buildFields : AddCollaboration -> List (Html AddCollaborationMsg)
+buildFields model =
+  [ Form.group []
+    [ Form.label [ for "collaboratorSelection"] [ text "Select the collaborator of the connection" ]
+    , CollaboratorSelection.view model.selectedCollaborator
     ]
+    |> Html.map CollaboratorSelection
+  , Form.group []
+    [ Form.label [ for "description" ] [ text "An optional description of the collaboration" ]
+    , Textarea.textarea
+        [ Textarea.id "description"
+        , Textarea.rows 3
+        , Textarea.value model.description
+        , Textarea.onInput SetDescription
+        ]
+    ]
+  ]
 
 
-viewAddConnection : List CollaboratorReference -> Maybe AddCollaboration -> Html Msg
-viewAddConnection dependencies adding =
+viewAddConnection : Maybe AddCollaboration -> Html Msg
+viewAddConnection adding =
   case adding of
     Just model ->
       Html.form []
       [ Card.config [ Card.attrs [ class "mb-3", class "shadow" ] ]
         |> Card.headerH4 [] [ text "Add a new collaborator"]
         |> Card.block []
-          ( buildFields dependencies model
+          ( buildFields model
             |> List.map (Html.map AddCollaborationMsg)
             |> List.map Block.custom
           )
@@ -1262,7 +1009,7 @@ view model =
     , viewConnections (collaboratorCaption model.availableDependencies) model
     , Grid.simpleRow
       [ Grid.col []
-          [ viewAddConnection model.availableDependencies model.newCollaborations]
+          [ viewAddConnection model.newCollaborations]
       ]
     , viewDefineRelationship
         ( collaboratorCaptionFromCollaboration
@@ -1272,15 +1019,15 @@ view model =
         model.defineRelationship
     ]
 
-domainDecoder : Decoder DomainDependency
+domainDecoder : Decoder CollaboratorSelection.DomainDependency
 domainDecoder =
   Domain.domainDecoder
   |> Decode.map (\d -> { id = d |> Domain.id, name = d |> Domain.name})
 
-boundedContextDecoder : Decoder BoundedContextDependency
+boundedContextDecoder : Decoder CollaboratorSelection.BoundedContextDependency
 boundedContextDecoder =
   -- TODO: can we reuse BoundedContext.modelDecoder?
-  Decode.succeed BoundedContextDependency
+  Decode.succeed CollaboratorSelection.BoundedContextDependency
     |> JP.custom BoundedContext.idFieldDecoder
     |> JP.custom BoundedContext.nameFieldDecoder
     |> JP.required "domain" domainDecoder
