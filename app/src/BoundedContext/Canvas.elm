@@ -11,19 +11,18 @@ import BoundedContext.StrategicClassification as StrategicClassification exposin
 import BoundedContext.Message as Message exposing (Messages)
 import BoundedContext.UbiquitousLanguage as UbiquitousLanguage exposing (UbiquitousLanguage)
 import BoundedContext.BusinessDecision exposing (BusinessDecision)
+import BoundedContext.DomainRoles exposing (DomainRole)
 
 -- MODEL
 
 type alias BusinessDecisions = String
-
-type alias ModelTraits = String
 
 type alias BoundedContextCanvas =
   { description : String
   , classification : StrategicClassification
   , businessDecisions : List BusinessDecision
   , ubiquitousLanguage : UbiquitousLanguage
-  , modelTraits : ModelTraits
+  , domainRoles : List DomainRole
   , messages : Messages
   , dependencies : Dependencies
   }
@@ -46,7 +45,7 @@ init context =
   , classification = StrategicClassification.noClassification
   , businessDecisions = []
   , ubiquitousLanguage = UbiquitousLanguage.noLanguageTerms
-  , modelTraits = ""
+  , domainRoles = []
   , messages = Message.noMessages
   , dependencies = initDependencies
   }
@@ -73,7 +72,7 @@ modelEncoder context canvas =
     , ("classification", StrategicClassification.encoder canvas.classification)
     , ("businessDecisions", BoundedContext.BusinessDecision.modelsEncoder canvas.businessDecisions)
     , ("ubiquitousLanguage", UbiquitousLanguage.modelEncoder canvas.ubiquitousLanguage)
-    , ("modelTraits", Encode.string canvas.modelTraits)
+    , ("domainRoles", BoundedContext.DomainRoles.modelsEncoder canvas.domainRoles)
     , ("messages", Message.messagesEncoder canvas.messages)
     , ("dependencies", dependenciesEncoder canvas.dependencies)
     ]
@@ -100,6 +99,6 @@ modelDecoder =
     |> JP.optional "classification" StrategicClassification.decoder StrategicClassification.noClassification
     |> JP.optional "businessDecisions" BoundedContext.BusinessDecision.modelsDecoder []
     |> JP.optional "ubiquitousLanguage" UbiquitousLanguage.modelDecoder UbiquitousLanguage.noLanguageTerms
-    |> JP.optional "modelTraits" Decode.string ""
+    |> JP.optional "domainRoles" BoundedContext.DomainRoles.modelsDecoder []
     |> JP.optional "messages" Message.messagesDecoder Message.noMessages
     |> JP.optional "dependencies" dependenciesDecoder initDependencies
