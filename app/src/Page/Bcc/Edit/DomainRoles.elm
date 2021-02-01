@@ -1,35 +1,34 @@
 module Page.Bcc.Edit.DomainRoles exposing (..)
 
-import BoundedContext.DomainRoles exposing (..)
+import BoundedContext.DomainRoles as DomainRoles exposing (..)
 
 import Html exposing (Html, div, text)
 import Html.Attributes exposing (..)
 import Html.Events exposing (onClick, onSubmit)
 
 import Bootstrap.Button as Button
+import Bootstrap.ButtonGroup as ButtonGroup
 import Bootstrap.Card as Card
 import Bootstrap.Card.Block as Block
-import Bootstrap.Text as Text   
+import Bootstrap.Text as Text
 import Bootstrap.Form as Form
 import Bootstrap.Form.Input as Input
 import Bootstrap.Form.Textarea as Textarea
-import Bootstrap.Form.Select as Select
-import Array
+import Bootstrap.ListGroup as ListGroup
 
 type Msg
-    = Default 
-    | ShowCreateNew
+    = ShowCreateNew
     | ShowChooseFrom
     | CreateNew DomainRole
     | ChangeName String
     | ChangeDescription String
     | CancelCreating
-    | Delete String 
+    | Delete String
     | SelectRole String String
 
 type ChangingModel
-  = AddingNewDomainRole String String (Result BoundedContext.DomainRoles.Problem DomainRole)
-  | SelectingDomainRole String String (Result BoundedContext.DomainRoles.Problem DomainRole)
+  = AddingNewDomainRole String String (Result DomainRoles.Problem DomainRole)
+  | SelectingDomainRole String String (Result DomainRoles.Problem DomainRole)
 
 type alias Model =
   { roles : DomainRoles
@@ -41,6 +40,7 @@ init roles =
   { roles = roles
   , changingModel = Nothing
   }
+
 
 update : Msg -> Model -> Model
 update msg model =
@@ -71,7 +71,7 @@ update msg model =
                         | roles = roles
                         , changingModel = Nothing
                         }
-                    Err _ -> 
+                    Err _ ->
                         model
 
         (CreateNew role, Just (SelectingDomainRole _ _ _)) ->
@@ -85,7 +85,7 @@ update msg model =
                         | roles = roles
                         , changingModel = Nothing
                         }
-                    Err _ -> 
+                    Err _ ->
                         model
 
         (Delete name, Nothing) ->
@@ -93,18 +93,19 @@ update msg model =
 
         (ShowChooseFrom, _) ->
             { model | changingModel = Just <| SelectingDomainRole "" "" (createDomainRole model.roles "" "") }
-        
+
         _ -> model
 
 view : Model -> Html Msg
 view model =
     Html.div []
-    [   viewCreateRole model.changingModel |> Card.view
+    [   viewCreateRole model.roles model.changingModel |> Card.view
     ,   Html.dl []
         (
             List.map viewRole model.roles |> List.concat
         )
     ]
+
 
 viewRole : DomainRole -> List (Html Msg)
 viewRole role =
@@ -126,8 +127,9 @@ viewRole role =
     ]
   ]
 
-viewCreateRole : Maybe ChangingModel -> Card.Config Msg
-viewCreateRole model =
+
+viewCreateRole : List DomainRole -> Maybe ChangingModel -> Card.Config Msg
+viewCreateRole domainRoles model =
     case model of
         Just (SelectingDomainRole name description result) ->
             let
@@ -150,13 +152,13 @@ viewCreateRole model =
                     Form.form anEvent [
                         Form.group []
                         [ Form.label [ for "role_select" ] [ text "Select role from the list:" ]
-                        , viewSelectDomainRole
+                        , viewSelectDomainRole domainRoles name
                         , Button.button [ Button.outlineSecondary, Button.onClick CancelCreating, Button.attrs [ class "mr-2"] ] [ text "Cancel"]
                         , Button.submitButton [ Button.primary, Button.disabled (not nameIsValid) ] [ text "Add this domain role" ]
                         ]
                     ]
                 ]
-    
+
         Just (AddingNewDomainRole name description result) ->
             let
                 (nameIsValid, anEvent, feedbackText) =
@@ -205,16 +207,16 @@ viewCreateRole model =
         _ ->
             Card.config [ Card.attrs [ class "mb-3", class "shadow" ], Card.align Text.alignXsCenter ]
                 |> Card.block []
-            [ Block.custom <| 
-                Button.button [ Button.primary, Button.onClick ShowCreateNew ] [ text "Add new domain role" ]
-            , Block.custom <| 
-                div [] [ Html.br [] [] ]
-            , Block.custom <| 
-                Button.button [ Button.primary, Button.onClick ShowChooseFrom ] [ text "Choose from pre-defined list" ]
+            [ Block.custom <|
+                ButtonGroup.buttonGroup []
+                    [ ButtonGroup.button [ Button.primary, Button.onClick ShowChooseFrom ] [ text "Choose Role from pre-defined list" ]
+                    , ButtonGroup.button [ Button.secondary, Button.onClick ShowCreateNew ] [ text "Add new domain role" ]
+                    ]
             ]
 
-viewSelectDomainRole : Html Msg
-viewSelectDomainRole =
+
+viewSelectDomainRole : List DomainRole -> String -> Html Msg
+viewSelectDomainRole added selected =
   let
     roles =
       [ ("Specification Model", "Produces a document describing a job/request that needs to be performed. Example: Advertising Campaign Builder")
@@ -233,20 +235,28 @@ viewSelectDomainRole =
       , ("Funnel Context", "Receives documents from multiple upstream contexts and passes them to a single downstream context in a standard format (after applying its own rules).")
       , ("Engagement Context", "Provides key features which attract users to keep using the product. Example: Free Financial Advice Context")
       ]
+    addedIds = List.map DomainRoles.getName added
   in
-    Form.group []
-      [ Select.select [ Select.id "role_select", Select.onChange (\name -> SelectRole name (getRoleDescriptionWithName name roles)) ]
-          (List.map (\(name, description) -> Select.item [ value name ] [ text (name ++ " (" ++ description ++ ")")]) roles)
+    div [ class "pb-2"]
+      [ div [ style "max-height" "300px", class "overflow-auto", class "pb-2" ]
+        [ ListGroup.custom
+            ( roles
+                |> List.map(\(key, description) ->
+                ListGroup.button
+                    [ if List.member key addedIds
+                      then ListGroup.disabled
+                      else
+                        if key == selected
+                        then ListGroup.active
+                        else ListGroup.attrs []
+                    , ListGroup.attrs [ onClick(SelectRole key description) ]
+                    ]
+                    [ div []
+                        [ Html.h6 [] [ text key]
+                        , Html.small [] [text description]
+                        ]
+                    ]
+                )
+            )
+        ]
       ]
-
-getRoleDescriptionWithName : String -> List (String, String) -> String
-getRoleDescriptionWithName lookupName list = 
-    List.filter (\(name, desc) -> lookupName == name) list 
-    |>
-    Array.fromList
-    |> 
-    Array.get 0
-    |>
-    Maybe.withDefault ("", "")
-    |>
-    Tuple.second
