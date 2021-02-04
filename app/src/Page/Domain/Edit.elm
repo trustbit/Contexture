@@ -252,12 +252,14 @@ view model =
                     , viewDomain domain
                     ]
                 ]
-              , Grid.simpleRow
+              , Grid.row [ Row.attrs [ Spacing.mb4 ]]
                 [ Grid.col [ Col.attrs [ Spacing.mt3 ] ]
                   [ Index.view model.subDomains |> Html.map SubDomainMsg ]
                 ]
               ]
-            , viewBccCard model.contexts
+            , model.contexts
+              |> Page.Bcc.Index.view
+              |> List.map (Html.map BccMsg)
             ]
           )
         _ ->
@@ -268,11 +270,6 @@ view model =
           ]
   in
     Grid.container [] detail
-
-viewBccCard : Page.Bcc.Index.Model -> List(Html Msg)
-viewBccCard model =
-  Page.Bcc.Index.view model
-  |> List.map (Html.map BccMsg)
 
 viewEditName : String -> Html Msg
 viewEditName name =

@@ -461,14 +461,14 @@ viewLoaded communication name items =
         |> List.map Card.deck
         |> div []
     in
-      [ Grid.row [ Row.attrs [ Spacing.pt3 ] ]
-        [ Grid.col []
-          [ Html.h5 [ Spacing.mt3 ] [ text "Bounded Context of the Domain" ]
-          , cards ]
-        ]
-        , Grid.row [ Row.attrs [Spacing.mt3]]
-        [ Grid.col [] [ createWithName name ] ]
+      [ Card.config []
+        |> Card.headerH5 [] [ text "Bounded Context of the Domain" ]
+        |> Card.block []
+          [ Block.custom cards ]
+        |> Card.footer [] [ createWithName name ]
+        |> Card.view
       ]
+
 
 filterAutocomplete : Int -> String -> List Domain.Domain -> Maybe (List Domain.Domain)
 filterAutocomplete minChars query items =

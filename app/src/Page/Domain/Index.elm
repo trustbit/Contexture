@@ -328,27 +328,31 @@ viewLoaded create items =
     ]
   else
     let
-      header =
-        case create.relation of
-          Domain.Root -> text ""
-          Domain.Subdomain _ -> Html.h5 [ Spacing.mt3 ] [ text "Subdomains" ]
+      domainCards =
+        items
+        |> List.map viewDomain
+        |> chunksOfLeft 2
+        |> List.map Card.deck
+      createDomainAction =
+        create |> Page.Domain.Create.view |> Html.map CreateMsg
     in
-      [ Grid.row [ Row.attrs [ Spacing.pt3 ] ]
-        [ Grid.col
-          []
-          ( header :: (
-              items
-              |> List.map viewDomain
-              |> chunksOfLeft 2
-              |> List.map Card.deck
-            )
-          )
-        ]
-      , Grid.row [ Row.attrs [ Spacing.mt3 ] ]
-          [ Grid.col []
-            [ create |> Page.Domain.Create.view |> Html.map CreateMsg ]
+      case create.relation of 
+        Domain.Root ->
+          [ Grid.simpleRow
+            [ Grid.col[] domainCards ]
+          , Grid.row [ Row.attrs [ Spacing.mt3 ] ]
+            [ Grid.col [] [ createDomainAction ] ]
           ]
-      ]
+        Domain.Subdomain _ ->
+          [ Card.config []
+            |> Card.headerH5 [] [ text "Subdomains"]
+            |>Card.block []
+                ( domainCards |> List.map Block.custom )
+            |> Card.footer []
+              [ createDomainAction ]
+            |> Card.view
+          ]
+
 
 filterAutocomplete : Int -> String -> List Domain.Domain -> Maybe (List Domain.Domain)
 filterAutocomplete minChars query items =
