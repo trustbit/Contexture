@@ -1,0 +1,503 @@
+{
+  "domains": [
+    {
+      "name": "Restaurant Experience",
+      "id": 1,
+      "vision": "Serving guests with the best meals in our restaurants",
+      "key": "RES"
+    },
+    {
+      "name": "Inventory",
+      "id": 2,
+      "vision": "Manage inventory of our restaurants"
+    }
+  ],
+  "boundedContexts": [
+    {
+      "name": "Food Preparation",
+      "domainId": "1",
+      "id": 1,
+      "key": "FOP",
+      "description": "Preparing delicious meals from ingredients",
+      "classification": {
+        "domainType": "Core",
+        "businessModel": [
+          "Compliance"
+        ],
+        "evolution": "CustomBuilt"
+      },
+      "businessDecisions": [
+        {
+          "name": "Derive Nutrition Information from ingredients",
+          "description": null
+        }
+      ],
+      "ubiquitousLanguage": {
+        "ingredient": {
+          "term": "Ingredient",
+          "description": null
+        },
+        "meal": {
+          "term": "Meal",
+          "description": null
+        }
+      },
+      "modelTraits": "",
+      "messages": {
+        "commandsHandled": [
+          "Cook Meal"
+        ],
+        "commandsSent": [],
+        "eventsHandled": [],
+        "eventsPublished": [
+          "Meal prepared"
+        ],
+        "queriesHandled": [
+          "Nutrition information"
+        ],
+        "queriesInvoked": []
+      },
+      "domainRoles": [],
+      "tools": {
+        "issueTracker": "http://issues.com/",
+        "wiki": "http://wiki.com/",
+        "repository": "http://git.com/"
+      },
+      "deployment": {
+        "healthCheck": null,
+        "artifacts": null
+      }
+    },
+    {
+      "name": "Table Service",
+      "domainId": "1",
+      "id": 2,
+      "key": "TS",
+      "description": "Make sure our guest is serviced in a good way and orders can be placed.",
+      "classification": {
+        "domainType": "Supporting",
+        "businessModel": [
+          "Engagement"
+        ],
+        "evolution": "Product"
+      },
+      "businessDecisions": [
+        {
+          "name": "Preparation Estimation",
+          "description": "How long will the oder take to be delivered?"
+        }
+      ],
+      "ubiquitousLanguage": {
+        "order": {
+          "term": "Order",
+          "description": null
+        }
+      },
+      "domainRoles": [],
+      "messages": {
+        "commandsHandled": [],
+        "commandsSent": [
+          "Order Meal"
+        ],
+        "eventsHandled": [],
+        "eventsPublished": [],
+        "queriesHandled": [],
+        "queriesInvoked": []
+      }
+    },
+    {
+      "name": "Delivery",
+      "domainId": "1",
+      "id": 3,
+      "key": "DEL",
+      "description": "In charge of delivering cooked food & drinks to the guests table",
+      "classification": {
+        "domainType": "Generic",
+        "businessModel": [
+          "CostReduction"
+        ],
+        "evolution": "Commodity"
+      },
+      "businessDecisions": [],
+      "ubiquitousLanguage": {},
+      "domainRoles": [],
+      "messages": {
+        "commandsHandled": [],
+        "commandsSent": [],
+        "eventsHandled": [],
+        "eventsPublished": [],
+        "queriesHandled": [],
+        "queriesInvoked": []
+      }
+    },
+    {
+      "name": "Billing",
+      "domainId": "1",
+      "id": 4,
+      "key": "BIL",
+      "description": "Prepares bills for customers order and offers payment possibilities",
+      "classification": {
+        "domainType": "Supporting",
+        "businessModel": [
+          "Compliance",
+          "CostReduction"
+        ],
+        "evolution": "Product"
+      },
+      "businessDecisions": [
+        {
+          "name": "Payment method",
+          "description": "Depending on the bills amount a different payment method is selected (e.g. Cash, Debit or Credit Card)"
+        },
+        {
+          "name": "Tax calculation",
+          "description": null
+        }
+      ],
+      "ubiquitousLanguage": {
+        "bill": {
+          "term": "Bill",
+          "description": null
+        },
+        "payment method": {
+          "term": "Payment Method",
+          "description": null
+        },
+        "tax": {
+          "term": "Tax",
+          "description": null
+        }
+      },
+      "domainRoles": [
+        {
+          "name": "Audit Model",
+          "description": "Monitors the execution. Example: Advertising Campaign Analyser"
+        }
+      ],
+      "messages": {
+        "commandsHandled": [
+          "Request Bill"
+        ],
+        "commandsSent": [],
+        "eventsHandled": [
+          "Order Delivered"
+        ],
+        "eventsPublished": [],
+        "queriesHandled": [],
+        "queriesInvoked": []
+      }
+    },
+    {
+      "name": "Guest Experience",
+      "domainId": "1",
+      "id": 5,
+      "key": "GUE",
+      "description": "Ensures that guests feel welcome in the restaurant and keeps an eye on the financial situation.",
+      "classification": {
+        "domainType": "Core",
+        "businessModel": [
+          "Revenue",
+          "Engagement"
+        ],
+        "evolution": "Genesis"
+      },
+      "businessDecisions": [
+        {
+          "name": "Price calculation",
+          "description": "Calculates prices for produces sold in the restaurant"
+        }
+      ],
+      "ubiquitousLanguage": {
+        "price": {
+          "term": "Price",
+          "description": null
+        },
+        "product": {
+          "term": "Product",
+          "description": null
+        }
+      },
+      "domainRoles": [
+        {
+          "name": "Engagement Context",
+          "description": "Provides key features which attract users to keep using the product. Example: Free Financial Advice Context"
+        }
+      ],
+      "messages": {
+        "commandsHandled": [],
+        "commandsSent": [],
+        "eventsHandled": [],
+        "eventsPublished": [],
+        "queriesHandled": [
+          "Product Price"
+        ],
+        "queriesInvoked": [
+          "Retrieve ingredients"
+        ]
+      }
+    },
+    {
+      "name": "Seating",
+      "domainId": "1",
+      "id": 6,
+      "key": "SET",
+      "description": "Offers seating for guests in our restaurant",
+      "classification": {
+        "domainType": "Supporting",
+        "businessModel": [
+          "Engagement"
+        ],
+        "evolution": "CustomBuilt"
+      },
+      "businessDecisions": [],
+      "ubiquitousLanguage": {},
+      "domainRoles": [
+        {
+          "name": "Engagement Context",
+          "description": "Provides key features which attract users to keep using the product. Example: Free Financial Advice Context"
+        }
+      ],
+      "messages": {
+        "commandsHandled": [],
+        "commandsSent": [],
+        "eventsHandled": [],
+        "eventsPublished": [],
+        "queriesHandled": [],
+        "queriesInvoked": []
+      }
+    },
+    {
+      "name": "Procurement",
+      "domainId": "2",
+      "id": 7,
+      "key": "PRO",
+      "description": "Make sure we buy the right amount of inventory",
+      "classification": {
+        "domainType": "Generic",
+        "businessModel": [
+          "CostReduction"
+        ],
+        "evolution": "Product"
+      },
+      "businessDecisions": [],
+      "ubiquitousLanguage": {},
+      "domainRoles": [],
+      "messages": {
+        "commandsHandled": [],
+        "commandsSent": [],
+        "eventsHandled": [],
+        "eventsPublished": [],
+        "queriesHandled": [],
+        "queriesInvoked": []
+      }
+    },
+    {
+      "name": "Warehousing",
+      "domainId": "2",
+      "id": 8,
+      "key": "WAR",
+      "description": "Store our Inventory in the right places, so delivery to restaurants is quick",
+      "classification": {
+        "domainType": "Generic",
+        "businessModel": [
+          "CostReduction"
+        ],
+        "evolution": "Commodity"
+      },
+      "businessDecisions": [],
+      "ubiquitousLanguage": {},
+      "domainRoles": [],
+      "messages": {
+        "commandsHandled": [],
+        "commandsSent": [],
+        "eventsHandled": [],
+        "eventsPublished": [],
+        "queriesHandled": [],
+        "queriesInvoked": []
+      }
+    },
+    {
+      "name": "Delivery",
+      "domainId": "2",
+      "id": 9,
+      "key": "IDEL",
+      "description": "Delivers inventory to our restaurants",
+      "classification": {
+        "domainType": "Core",
+        "businessModel": [
+          "CostReduction"
+        ],
+        "evolution": "Genesis"
+      },
+      "businessDecisions": [
+        {
+          "name": "Routing",
+          "description": "Best routes to deliver inventory to restaurants"
+        }
+      ],
+      "ubiquitousLanguage": {
+        "demand": {
+          "term": "Demand",
+          "description": null
+        },
+        "route": {
+          "term": "Route",
+          "description": null
+        }
+      },
+      "domainRoles": [],
+      "messages": {
+        "commandsHandled": [],
+        "commandsSent": [],
+        "eventsHandled": [],
+        "eventsPublished": [],
+        "queriesHandled": [],
+        "queriesInvoked": []
+      }
+    }
+  ],
+  "collaborations": [
+    {
+      "description": null,
+      "initiator": {
+        "boundedContext": 2
+      },
+      "recipient": {
+        "boundedContext": 1
+      },
+      "relationship": {
+        "initiatorRole": "upstream",
+        "upstreamType": "OpenHost",
+        "downstreamType": "Downstream"
+      },
+      "id": 1
+    },
+    {
+      "description": null,
+      "initiator": {
+        "boundedContext": 2
+      },
+      "recipient": {
+        "boundedContext": 3
+      },
+      "relationship": null,
+      "id": 2
+    },
+    {
+      "description": null,
+      "initiator": {
+        "boundedContext": 1
+      },
+      "recipient": {
+        "boundedContext": 3
+      },
+      "relationship": null,
+      "id": 3
+    },
+    {
+      "description": null,
+      "initiator": {
+        "boundedContext": 3
+      },
+      "recipient": {
+        "boundedContext": 4
+      },
+      "relationship": null,
+      "id": 4
+    },
+    {
+      "description": null,
+      "initiator": {
+        "boundedContext": 4
+      },
+      "recipient": {
+        "boundedContext": 5
+      },
+      "relationship": {
+        "initiatorRole": "downstream",
+        "upstreamType": "OpenHost",
+        "downstreamType": "AntiCorruptionLayer"
+      },
+      "id": 5
+    },
+    {
+      "description": null,
+      "initiator": {
+        "boundedContext": 5
+      },
+      "recipient": {
+        "boundedContext": 1
+      },
+      "relationship": {
+        "symmetric": "Partnership"
+      },
+      "id": 6
+    },
+    {
+      "description": null,
+      "initiator": {
+        "boundedContext": 6
+      },
+      "recipient": {
+        "boundedContext": 2
+      },
+      "relationship": null,
+      "id": 7
+    },
+    {
+      "description": null,
+      "initiator": {
+        "boundedContext": 3
+      },
+      "recipient": {
+        "boundedContext": 6
+      },
+      "relationship": null,
+      "id": 8
+    },
+    {
+      "description": null,
+      "initiator": {
+        "boundedContext": 6
+      },
+      "recipient": {
+        "boundedContext": 4
+      },
+      "relationship": null,
+      "id": 9
+    },
+    {
+      "description": "Notify about empty inventory",
+      "initiator": {
+        "boundedContext": 8
+      },
+      "recipient": {
+        "boundedContext": 7
+      },
+      "relationship": null,
+      "id": 10
+    },
+    {
+      "description": null,
+      "initiator": {
+        "boundedContext": 9
+      },
+      "recipient": {
+        "boundedContext": 1
+      },
+      "relationship": null,
+      "id": 11
+    },
+    {
+      "description": null,
+      "initiator": {
+        "boundedContext": 8
+      },
+      "recipient": {
+        "boundedContext": 9
+      },
+      "relationship": null,
+      "id": 12
+    }
+  ]
+}
