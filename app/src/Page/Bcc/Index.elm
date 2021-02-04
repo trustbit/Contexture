@@ -33,6 +33,7 @@ import Url
 import Http
 import RemoteData
 import Set
+import Dict as Dict exposing (Dict)
 
 import Route
 import Api exposing (ApiResponse, ApiResult)
@@ -40,12 +41,14 @@ import Api exposing (ApiResponse, ApiResult)
 import Key
 import Domain exposing (Domain)
 import Domain.DomainId exposing (DomainId)
-import BoundedContext exposing (BoundedContext)
-import BoundedContext.BoundedContextId exposing (BoundedContextId)
+import BoundedContext as BoundedContext exposing (BoundedContext)
+import BoundedContext.BoundedContextId as BoundedContextId exposing (BoundedContextId)
 import BoundedContext.Canvas exposing (BoundedContextCanvas)
 import BoundedContext.Technical exposing (TechnicalDescription)
-import BoundedContext.Dependency as Dependency
 import BoundedContext.StrategicClassification as StrategicClassification
+import ContextMapping.Collaboration as Collaboration
+import ContextMapping.Collaborator as Collaborator
+import List
 
 -- MODEL
 
@@ -68,6 +71,11 @@ type alias DeleteBoundedContextModel =
   , modalVisibility : Modal.Visibility
   }
 
+type alias Communication = 
+  { initiators : Dict Int Collaboration.Collaborations
+  , recipients : Dict Int Collaboration.Collaborations 
+  }
+
 type alias Model =
   { navKey : Nav.Key
   , boundedContextName : String
@@ -75,7 +83,9 @@ type alias Model =
   , domain : DomainId
   , deleteContext : Maybe DeleteBoundedContextModel
   , moveContext : Maybe MoveContextModel
-  , contextItems : RemoteData.WebData (List Item) }
+  , contextItems : RemoteData.WebData (List Item)
+  , communication : RemoteData.WebData Communication
+  }
 
 initMoveContext : BoundedContext -> MoveContextModel
 initMoveContext context =
@@ -94,13 +104,23 @@ init config key domain =
     , domain = domain
     , deleteContext = Nothing
     , moveContext = Nothing
-    , boundedContextName = "" }
-  , loadAll config domain )
+    , boundedContextName = ""
+    , communication = RemoteData.Loading
+    }
+  , Cmd.batch
+    [ loadAll config domain
+    , loadAllConnections config
+    ] 
+  )
 
 -- UPDATE
 
+dictBcGet id = Dict.get (BoundedContextId.value id)
+dictBcInsert id = Dict.insert (BoundedContextId.value id)
+
 type Msg
   = Loaded (Result Http.Error (List Item))
+  | CommunicationLoaded (ApiResponse Collaboration.Collaborations)
   | SetName String
   | CreateBoundedContext
   | Created (Result Http.Error BoundedContext.BoundedContext)
@@ -131,6 +151,37 @@ update msg model =
 
     Loaded (Err e) ->
       ({ model | contextItems = RemoteData.Failure e }, Cmd.none)
+
+    CommunicationLoaded (Ok connections) ->
+      let
+        updateCollaborationLookup selectCollaborator dictionary collaboration =
+          case selectCollaborator collaboration of
+            Collaborator.BoundedContext bcId ->
+              let 
+                items = 
+                  dictionary
+                  |> dictBcGet bcId
+                  |> Maybe.withDefault []
+                  |> List.append (List.singleton collaboration)
+              in
+                dictionary |> dictBcInsert bcId items
+            _ ->
+              dictionary
+
+        (bcInitiators, bcRecipients) = 
+          connections
+          |> List.foldl(\collaboration (initiators, recipients) -> 
+              ( updateCollaborationLookup Collaboration.initiator initiators collaboration
+              , updateCollaborationLookup Collaboration.recipient recipients collaboration
+              )
+            ) (Dict.empty, Dict.empty)
+      in
+        ( { model | communication = RemoteData.Success { initiators = bcInitiators, recipients = bcRecipients }}
+        , Cmd.none
+        )
+    
+    CommunicationLoaded (Err e) ->
+      ({ model |  communication = RemoteData.Failure e }, Cmd.none)
 
     SetName name ->
       ({ model | boundedContextName = name}, Cmd.none)
@@ -252,8 +303,8 @@ urlAsLinkItem caption canBeLink =
   canBeLink
   |> Maybe.map (\value -> Html.a [ href <| Url.toString value, target "_blank" ] [ text caption] )
 
-viewItem : Item -> Card.Config Msg
-viewItem { context, canvas, technical } =
+viewItem : RemoteData.WebData Communication -> Item -> Card.Config Msg
+viewItem communication { context, canvas, technical } =
   let
     domainBadge =
       case canvas.classification.domain |> Maybe.map StrategicClassification.domainDescription of
@@ -287,14 +338,24 @@ viewItem { context, canvas, technical } =
         )
 
     dependencies =
-      canvas.dependencies.consumers
-      |> Dependency.dependencyCount
-      |> viewPillMessage "Consumers"
-      |> List.append
-        ( canvas.dependencies.suppliers
-          |> Dependency.dependencyCount
-          |> viewPillMessage "Suppliers"
-        )
+      case communication of
+        RemoteData.Success { initiators, recipients } ->
+          initiators 
+          |> dictBcGet (context |> BoundedContext.id)
+          |> Maybe.map (List.length)
+          |> Maybe.withDefault 0
+          |> viewPillMessage "Inbound Communication"
+          |> List.append
+            ( recipients 
+              |> dictBcGet (context |> BoundedContext.id)
+              |> Maybe.map (List.length)
+              |> Maybe.withDefault 0
+              |> viewPillMessage "Outbound Communication"
+            )
+        RemoteData.Failure e ->
+          [ text "Could not load communication"]
+        _ ->
+          [ text "Loading communication information"]
 
     technicalLinks =
       Html.ul [ class "list-inline"]
@@ -376,8 +437,8 @@ viewItem { context, canvas, technical } =
         ]
       ]
 
-viewLoaded : String -> List Item  -> List(Html Msg)
-viewLoaded name items =
+viewLoaded : RemoteData.WebData Communication -> String -> List Item  -> List(Html Msg)
+viewLoaded communication name items =
   if List.isEmpty items then
     [ Grid.row [ Row.attrs [ Spacing.pt3 ] ]
       [ Grid.col [ ]
@@ -395,7 +456,7 @@ viewLoaded name items =
       cards =
         items
         |> List.sortBy (\{ context } -> context |> BoundedContext.name)
-        |> List.map viewItem
+        |> List.map (viewItem communication)
         |> chunksOfLeft 2
         |> List.map Card.deck
         |> div []
@@ -493,7 +554,7 @@ view model =
   case model.contextItems of
     RemoteData.Success contexts ->
       contexts
-      |> viewLoaded model.boundedContextName
+      |> viewLoaded model.communication model.boundedContextName
       |> List.append
         ( [ model.deleteContext
             |> Maybe.map viewDelete
@@ -502,7 +563,7 @@ view model =
           ] |> List.map (Maybe.withDefault (text ""))
         )
     RemoteData.Failure e ->
-      [ text ("Error on loading: " ++ (Debug.toString e))]
+      [ text ("Error on loading contexts: " ++ (Debug.toString e))]
 
     _ -> [ text "Loading your contexts"]
 
@@ -520,6 +581,14 @@ loadAll config domain =
   in Http.get
     { url = Api.boundedContexts domain |> Api.url config |> Url.toString
     , expect = Http.expectJson Loaded (Decode.list decoder)
+    }
+
+
+loadAllConnections : Api.Configuration -> Cmd Msg
+loadAllConnections config =
+  Http.get
+    { url = Api.collaborations |> Api.url config |> Url.toString
+    , expect = Http.expectJson CommunicationLoaded (Decode.list Collaboration.decoder)
     }
 
 findAllDomains : Api.Configuration -> ApiResult (List Domain.Domain) msg

@@ -16,10 +16,22 @@ if (!fs.existsSync(dbPath)) {
   try {
     fs.writeFileSync(dbPath, JSON.stringify({
       "domains": [],
-      "boundedContexts": []
+      "boundedContexts": [],
+      "collaborations": []
     }), { encoding: 'utf-8'});
   } catch(e) {
     console.log(`${dbPath} already exists`);
+  }
+} else {
+  const fileContent = fs.readFileSync(dbPath, { encoding: 'utf-8'});
+  if(fileContent){
+    // this is the current way to do/execute 'DB' migrations
+    const jsonFileContent = JSON.parse(fileContent);
+    if(!jsonFileContent.collaborations) {
+      console.log(`Creating empty collaborations`);
+      jsonFileContent.collaborations = [];
+    }
+    fs.writeFileSync(dbPath, JSON.stringify (jsonFileContent));
   }
 }
 

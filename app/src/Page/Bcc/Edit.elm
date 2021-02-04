@@ -79,7 +79,7 @@ type alias Model =
 initWithCanvas : Api.Configuration -> CanvasModel -> (EditingCanvas, Cmd EditingMsg)
 initWithCanvas config model =
   let
-    (addingDependency, addingDependencyCmd) = Dependencies.init config model.boundedContext model.canvas.dependencies
+    (addingDependency, addingDependencyCmd) = Dependencies.init config model.boundedContext
     (changeKeyModel, changeKeyCmd) = ChangeKey.init config (model.boundedContext |> BoundedContext.key)
     ubiquitousLanguageModel = UbiquitousLanguage.init model.canvas.ubiquitousLanguage
     businessDecisionsModel = BusinessDecisionView.init model.canvas.businessDecisions
@@ -239,8 +239,7 @@ update msg model =
             c = editable.edit.canvas
             canvas =
               { c
-              | dependencies = editable.addingDependencies |> Dependencies.asDependencies
-              , messages = editable.addingMessage |> Messages.asMessages
+              | messages = editable.addingMessage |> Messages.asMessages
               , ubiquitousLanguage = editable.ubiquitousLanguage.language
               , businessDecisions = editable.businessDecisions.decisions
               , domainRoles = editable.domainRoles.roles

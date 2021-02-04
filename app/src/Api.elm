@@ -2,6 +2,7 @@ module Api exposing (
   Endpoint, Configuration, ApiResponse, ApiResult, Include(..), Expand(..),
   domains, domain, subDomains,
   allBoundedContexts, boundedContexts, boundedContext,
+  collaborations, collaboration,
   url, config)
 
 import Http
@@ -10,6 +11,7 @@ import Url.Builder exposing (QueryParameter)
 
 import Domain.DomainId as Domain exposing (DomainId)
 import BoundedContext.BoundedContextId as BoundedContext exposing (BoundedContextId)
+import ContextMapping.CollaborationId as ContextMapping exposing(CollaborationId)
 
 type Configuration
   = Configuration Url.Url
@@ -68,6 +70,16 @@ allBoundedContexts expand =
 boundedContext : BoundedContextId -> Endpoint
 boundedContext context =
   withoutQuery [ "boundedContexts", BoundedContext.idToString context ]
+
+collaborations : Endpoint
+collaborations =
+  withoutQuery [ "collaborations"]
+
+
+collaboration : CollaborationId -> Endpoint
+collaboration id =
+  withoutQuery [ "collaborations", ContextMapping.idToString id]
+
 
 includeInRequest : List Include -> List QueryParameter
 includeInRequest include =
