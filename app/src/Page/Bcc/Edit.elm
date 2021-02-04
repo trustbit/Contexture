@@ -83,7 +83,7 @@ initWithCanvas config model =
     (changeKeyModel, changeKeyCmd) = ChangeKey.init config (model.boundedContext |> BoundedContext.key)
     ubiquitousLanguageModel = UbiquitousLanguage.init model.canvas.ubiquitousLanguage
     businessDecisionsModel = BusinessDecisionView.init model.canvas.businessDecisions
-    domainRolesModel = DomainRolesView.init model.canvas.domainRoles
+    (domainRolesModel, domainRolesCmd) = DomainRolesView.init config (model.boundedContext |> BoundedContext.id)
   in
     ( { addingMessage = Messages.init model.canvas.messages
       , addingDependencies = addingDependency
@@ -98,6 +98,7 @@ initWithCanvas config model =
     , Cmd.batch
       [ addingDependencyCmd |> Cmd.map DependencyField
       , changeKeyCmd |> Cmd.map ChangeKeyMsg
+      , domainRolesCmd |> Cmd.map DomainRolesField
       ]
     )
 
@@ -197,7 +198,10 @@ updateEdit msg model =
       ({ model | businessDecisions = BusinessDecisionView.update businessDecisionMsg model.businessDecisions}, Cmd.none)
 
     DomainRolesField domainRolesMsg ->
-      ({ model | domainRoles = DomainRolesView.update domainRolesMsg model.domainRoles}, Cmd.none)
+      let
+        (domainRolesModel, domainRolesCmd) = DomainRolesView.update domainRolesMsg model.domainRoles
+      in 
+        ({ model | domainRoles = domainRolesModel}, domainRolesCmd |> Cmd.map DomainRolesField )
 
     ChangeKeyMsg changeMsg ->
       let

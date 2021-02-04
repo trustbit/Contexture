@@ -1,14 +1,25 @@
-module BoundedContext.DomainRoles exposing (..)
+module BoundedContext.DomainRoles exposing (
+    DomainRole, DomainRoles, Problem(..),
+    getId, getName, getDescription,createDomainRole,
+    addDomainRole,deleteDomainRole,getDomainRoles,
+    optionalDomainRolesDecoder)
 
 import Json.Encode as Encode
 import Json.Decode as Decode
+import Json.Decode.Pipeline as JP
 
-type DomainRole = 
+import Http
+import Url
+import Api as Api
+import BoundedContext.BoundedContextId exposing (BoundedContextId)
+
+
+type DomainRole =
     DomainRole DomainRoleInternal
 
 type alias DomainRoles = List DomainRole
 
-type alias DomainRoleInternal = 
+type alias DomainRoleInternal =
     { name : String
     , description : Maybe String
     }
@@ -18,10 +29,10 @@ type Problem
   | AlreadyExists
 
 getId : DomainRole -> String
-getId (DomainRole role) = 
+getId (DomainRole role) =
     String.toLower role.name
 
-getName : DomainRole -> String 
+getName : DomainRole -> String
 getName (DomainRole role) =
     role.name
 
@@ -53,19 +64,83 @@ insertDomainRole existingRoles role =
         List.singleton role
         |> List.append existingRoles
         |> Ok
-    else 
+    else
         Err AlreadyExists
+
+addDomainRole : Api.Configuration -> BoundedContextId -> DomainRoles -> DomainRole -> Result Problem (Api.ApiResult DomainRoles msg)
+addDomainRole configuration contextId existingRoles role =
+    case insertDomainRole existingRoles role of
+        Ok updatedRoles ->
+            let
+                api = Api.boundedContext contextId
+                request toMsg =
+                    Http.request
+                        { method = "PATCH"
+                        , url = api |> Api.url configuration |> Url.toString
+                        , body = Http.jsonBody <|
+                            Encode.object [ domainRolesEncoder updatedRoles ]
+                        , expect = Http.expectJson toMsg domainRolesDecoder
+                        , timeout = Nothing
+                        , tracker = Nothing
+                        , headers = []
+                        }
+            in
+                Ok request
+        Err problem ->
+            problem |> Err
+
+
 
 removeDomainRole : DomainRoles -> String -> DomainRoles
 removeDomainRole existingRoles id =
     List.filter (\item -> getId item /= id) existingRoles
 
+deleteDomainRole : Api.Configuration -> BoundedContextId -> DomainRoles -> String -> Api.ApiResult DomainRoles msg
+deleteDomainRole configuration contextId existingRoles id =
+    let
+        api = Api.boundedContext contextId
+        removedRoles = removeDomainRole existingRoles id
+        request toMsg =
+            Http.request
+                { method = "PATCH"
+                , url = api |> Api.url configuration |> Url.toString
+                , body = Http.jsonBody <|
+                    Encode.object [ domainRolesEncoder removedRoles ]
+                , expect = Http.expectJson toMsg domainRolesDecoder
+                , timeout = Nothing
+                , tracker = Nothing
+                , headers = []
+                }
+    in
+        request
+
+getDomainRoles : Api.Configuration -> BoundedContextId -> Api.ApiResult DomainRoles msg
+getDomainRoles configuration contextId =
+    let
+        api = Api.boundedContext contextId
+        request toMsg =
+            Http.get
+                { url = api |> Api.url configuration |> Url.toString
+                , expect = Http.expectJson toMsg domainRolesDecoder
+                }
+    in
+        request
+
+domainRolesEncoder roles = ("domainRoles", modelsEncoder roles)
+
+domainRolesDecoder : Decode.Decoder DomainRoles
+domainRolesDecoder = Decode.at [ "domainRoles"] modelsDecoder
+
+optionalDomainRolesDecoder : Decode.Decoder (DomainRoles -> b) -> Decode.Decoder b
+optionalDomainRolesDecoder =
+    JP.optional "domainRoles" modelsDecoder []
+
 modelEncoder : DomainRole -> Encode.Value
-modelEncoder (DomainRole role) = 
+modelEncoder (DomainRole role) =
     Encode.object
     [
         ("name", Encode.string role.name),
-        ("description", 
+        ("description",
             case role.description of
                 Just v -> Encode.string v
                 Nothing -> Encode.null
@@ -73,11 +148,11 @@ modelEncoder (DomainRole role) =
     ]
 
 modelsEncoder : DomainRoles -> Encode.Value
-modelsEncoder items = 
+modelsEncoder items =
     Encode.list modelEncoder items
 
 modelDecoder : Decode.Decoder DomainRole
-modelDecoder = 
+modelDecoder =
     Decode.map DomainRole
         (Decode.map2 DomainRoleInternal
             (Decode.field "name" Decode.string)

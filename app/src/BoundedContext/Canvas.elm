@@ -1,4 +1,7 @@
-module BoundedContext.Canvas exposing (..)
+module BoundedContext.Canvas exposing (
+  BoundedContextCanvas,
+  init,
+  modelEncoder,modelDecoder)
 
 import Json.Encode as Encode
 import Json.Decode as Decode exposing (Decoder)
@@ -10,7 +13,10 @@ import BoundedContext.StrategicClassification as StrategicClassification exposin
 import BoundedContext.Message as Message exposing (Messages)
 import BoundedContext.UbiquitousLanguage as UbiquitousLanguage exposing (UbiquitousLanguage)
 import BoundedContext.BusinessDecision exposing (BusinessDecision)
-import BoundedContext.DomainRoles exposing (DomainRole)
+import BoundedContext.DomainRoles exposing (DomainRoles)
+import BoundedContext.BusinessDecision exposing (modelEncoder)
+import BoundedContext.BusinessDecision exposing (modelDecoder)
+import BoundedContext.DomainRoles
 
 -- MODEL
 
@@ -19,13 +25,13 @@ type alias BoundedContextCanvas =
   , classification : StrategicClassification
   , businessDecisions : List BusinessDecision
   , ubiquitousLanguage : UbiquitousLanguage
-  , domainRoles : List DomainRole
+  , domainRoles : DomainRoles
   , messages : Messages
   }
 
 
-init: BoundedContext -> BoundedContextCanvas
-init context =
+init: BoundedContextCanvas
+init =
   { description = ""
   , classification = StrategicClassification.noClassification
   , businessDecisions = []
@@ -35,7 +41,6 @@ init context =
   }
 
 -- encoders
-
 
 modelEncoder : BoundedContext -> BoundedContextCanvas -> Encode.Value
 modelEncoder context canvas =
@@ -50,7 +55,6 @@ modelEncoder context canvas =
     , ("classification", StrategicClassification.encoder canvas.classification)
     , ("businessDecisions", BoundedContext.BusinessDecision.modelsEncoder canvas.businessDecisions)
     , ("ubiquitousLanguage", UbiquitousLanguage.modelEncoder canvas.ubiquitousLanguage)
-    , ("domainRoles", BoundedContext.DomainRoles.modelsEncoder canvas.domainRoles)
     , ("messages", Message.messagesEncoder canvas.messages)
     ]
 
@@ -69,5 +73,5 @@ modelDecoder =
     |> JP.optional "classification" StrategicClassification.decoder StrategicClassification.noClassification
     |> JP.optional "businessDecisions" BoundedContext.BusinessDecision.modelsDecoder []
     |> JP.optional "ubiquitousLanguage" UbiquitousLanguage.modelDecoder UbiquitousLanguage.noLanguageTerms
-    |> JP.optional "domainRoles" BoundedContext.DomainRoles.modelsDecoder []
+    |> BoundedContext.DomainRoles.optionalDomainRolesDecoder
     |> JP.optional "messages" Message.messagesDecoder Message.noMessages
