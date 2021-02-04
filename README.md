@@ -10,9 +10,24 @@ You can read about the ideas of Contexture in the [concept](./concept.md) and yo
 
 Note:
 
-We think that most of the domain modelling should happen in a collaboritve way, by using whitepaper, Post-ITs or online collaboration tools.
-Contexture is and will not be the right tool for these interactive modelling sessions!
+We think that most of the domain modelling should happen in a collaborative way, by using whitepaper, Post-ITs or online collaboration tools.
+Contexture is and will not be the right tool or a replacement for these interactive modelling sessions!
 But Contexture might be useful to capture, document and structure some of the insights *after* a modelling session and make them accessible and shareable with other people!
+
+## Example
+
+Imagine you work with a company that owns a restaurant chain which cares about giving the guest a great experience.
+The restaurants are equipped with different IT systems, which support the staff to execute their tasks.
+The example can be seen at <https://contexture.azurewebsites.net/> and the following screenshots give a short summary / explanation
+
+Domains of the example
+![Overview on the domains of the example](example/DomainsOverview.png)
+
+An overview on the Bounded Contexts of the "Restaurant Experience" domain
+![An overview on the Bounded Contexts of a domain](example/DomainOverview.png)
+
+A detailed view of the "Billing" Bounded Context with the help of the Bounded-Context-Canvas-v3
+![A detailed view on the Bounded-Context-Canvas, v3](example/CanvasV3Overview.png)
 
 ## Contexture server backend
 

@@ -14,8 +14,6 @@ import BoundedContext.DomainRoles exposing (DomainRole)
 
 -- MODEL
 
-type alias BusinessDecisions = String
-
 type alias BoundedContextCanvas =
   { description : String
   , classification : StrategicClassification
