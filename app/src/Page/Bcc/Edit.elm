@@ -82,7 +82,7 @@ initWithCanvas config model =
     (addingDependency, addingDependencyCmd) = Dependencies.init config model.boundedContext
     (changeKeyModel, changeKeyCmd) = ChangeKey.init config (model.boundedContext |> BoundedContext.key)
     (ubiquitousLanguageModel, ubiquitousLanguageCmd) = UbiquitousLanguage.init config (model.boundedContext |> BoundedContext.id)
-    businessDecisionsModel = BusinessDecisionView.init model.canvas.businessDecisions
+    (businessDecisionsModel, businessDecisionsCmd)= BusinessDecisionView.init config (model.boundedContext |> BoundedContext.id)
     (domainRolesModel, domainRolesCmd) = DomainRolesView.init config (model.boundedContext |> BoundedContext.id)
   in
     ( { addingMessage = Messages.init model.canvas.messages
@@ -100,6 +100,7 @@ initWithCanvas config model =
       , changeKeyCmd |> Cmd.map ChangeKeyMsg
       , domainRolesCmd |> Cmd.map DomainRolesField
       , ubiquitousLanguageCmd |> Cmd.map UbiquitousLanguageField
+      , businessDecisionsCmd |> Cmd.map BusinessDecisionField
       ]
     )
 
@@ -197,15 +198,16 @@ updateEdit msg model =
       |> Tuple.mapFirst(\m -> { model | ubiquitousLanguage = m})
       |> Tuple.mapSecond(Cmd.map UbiquitousLanguageField)
 
-    BusinessDecisionField businessDecisionMsg -> 
-      ({ model | businessDecisions = BusinessDecisionView.update businessDecisionMsg model.businessDecisions}, Cmd.none)
+    BusinessDecisionField businessDecisionMsg ->
+      BusinessDecisionView.update businessDecisionMsg model.businessDecisions
+      |> Tuple.mapFirst(\d -> { model | businessDecisions = d })
+      |> Tuple.mapSecond(Cmd.map BusinessDecisionField)
 
     DomainRolesField domainRolesMsg ->
-      let
-        (domainRolesModel, domainRolesCmd) = DomainRolesView.update domainRolesMsg model.domainRoles
-      in 
-        ({ model | domainRoles = domainRolesModel}, domainRolesCmd |> Cmd.map DomainRolesField )
-
+      DomainRolesView.update domainRolesMsg model.domainRoles
+      |> Tuple.mapFirst(\d -> { model | domainRoles = d })
+      |> Tuple.mapSecond(Cmd.map DomainRolesField)
+     
     ChangeKeyMsg changeMsg ->
       let
         (changeKeyModel, changeKeyCmd) = ChangeKey.update changeMsg model.key
@@ -219,12 +221,10 @@ updateEdit msg model =
         )
 
     DependencyField dependency ->
-      let
-        (addingDependencies, addingCmd) = Dependencies.update dependency model.addingDependencies
-      in
-        ( { model | addingDependencies = addingDependencies }
-        , addingCmd |> Cmd.map DependencyField
-        )
+      Dependencies.update dependency model.addingDependencies
+      |> Tuple.mapFirst(\d -> { model | addingDependencies = d })
+      |> Tuple.mapSecond(Cmd.map DependencyField)
+     
 
 update : Msg -> Model -> (Model, Cmd Msg)
 update msg model =

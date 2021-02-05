@@ -1,6 +1,6 @@
 module Page.Bcc.Edit.BusinessDecision exposing (..)
 
-import BoundedContext.BusinessDecision exposing (BusinessDecisions, BusinessDecision, getName, getDescription, defineBusinessDecision, addBusinessDecision, deleteBusinessDecision)
+
 import Page.Bcc.Edit.Dependencies exposing (Msg)
 import Html exposing (Html, div, text)
 import Html.Attributes exposing (..)
@@ -13,9 +13,11 @@ import Bootstrap.Text as Text
 import Bootstrap.Form as Form
 import Bootstrap.Form.Input as Input
 import Bootstrap.Form.Textarea as Textarea
-import BoundedContext.BusinessDecision exposing (BusinessDecision(..))
-import BoundedContext.BusinessDecision exposing (Problem(..))
-import BoundedContext.BusinessDecision exposing (getId)
+
+import Api
+
+import BoundedContext.BusinessDecision as BusinessDecision exposing (BusinessDecisions, BusinessDecision, Problem)
+import BoundedContext.BoundedContextId exposing (BoundedContextId)
 
 type Msg
     = Show 
@@ -25,55 +27,70 @@ type Msg
     | ChangeDecisionDescription String
     | CancelAdding
     | Delete String 
+    | Loaded (Api.ApiResponse BusinessDecisions)
+    | DecisionAdded (Api.ApiResponse BusinessDecisions)
+    | DecisionRemoved (Api.ApiResponse BusinessDecisions)
+
 
 type ChangingModel
-  = AddingNewBusinessDecision String String (Result BoundedContext.BusinessDecision.Problem BusinessDecision)
+  = AddingNewBusinessDecision String String (Result Problem BusinessDecision)
 
 type alias Model =
   { decisions : BusinessDecisions
   , changingModel : Maybe ChangingModel
+  , config : Api.Configuration
+  , boundedContextId : BoundedContextId
   }
 
-init : BusinessDecisions -> Model
-init decisions =
-  { decisions = decisions
-  , changingModel = Nothing
-  }
+init : Api.Configuration -> BoundedContextId  -> (Model, Cmd Msg)
+init config id =
+    ( { decisions = []
+      , changingModel = Nothing
+      , config = config
+      , boundedContextId = id
+      }
+    , BusinessDecision.getBusinessDecisions config id Loaded
+    )
 
-update : Msg -> Model -> Model
+noCommand model = (model, Cmd.none)
+
+update : Msg -> Model -> (Model, Cmd Msg)
 update msg model =
     case (msg, model.changingModel) of
         (StartAddNew, _) ->
-            { model | changingModel = Just <| AddingNewBusinessDecision "" "" (defineBusinessDecision model.decisions "" "") }
+            noCommand { model | changingModel = Just <| AddingNewBusinessDecision "" "" (BusinessDecision.defineBusinessDecision model.decisions "" "") }
 
         (ChangeDecisionName name, Just (AddingNewBusinessDecision _ description _)) ->
-            { model | changingModel = Just <| AddingNewBusinessDecision name description (defineBusinessDecision model.decisions name description) }
+            noCommand { model | changingModel = Just <| AddingNewBusinessDecision name description (BusinessDecision.defineBusinessDecision model.decisions name description) }
 
         (ChangeDecisionDescription description, Just (AddingNewBusinessDecision name _ _)) ->
-            { model | changingModel = Just <| AddingNewBusinessDecision name description (defineBusinessDecision model.decisions name description) }
+            noCommand { model | changingModel = Just <| AddingNewBusinessDecision name description (BusinessDecision.defineBusinessDecision model.decisions name description) }
 
         (CancelAdding, _) ->
-            { model | changingModel = Nothing}
+            noCommand { model | changingModel = Nothing}
 
         (AddNew decision, Just (AddingNewBusinessDecision _ _ _)) ->
             let
-                newDecision = addBusinessDecision model.decisions decision
-
+                newDecisions = BusinessDecision.addBusinessDecision model.config model.boundedContextId model.decisions decision
             in
-                case newDecision of
-                    Ok decisions ->
-                        { model
-                        | decisions = decisions
-                        , changingModel = Nothing
-                        }
-                    Err _ -> 
-
-                        model
+                case newDecisions of
+                Ok decisions ->
+                    ({ model | changingModel = Nothing }, decisions DecisionAdded)
+                Err _ ->
+                    noCommand model
 
         (Delete name, Nothing) ->
-            { model | decisions = deleteBusinessDecision model.decisions name }
+            (model, BusinessDecision.removeBusinessDecision model.config model.boundedContextId model.decisions name DecisionRemoved)
+
+        (Loaded (Ok decisions),_) ->
+            noCommand { model | decisions = decisions}
+        (DecisionAdded (Ok decisions),_) ->
+            noCommand { model | decisions = decisions}
+        (DecisionRemoved (Ok decisions),_) ->
+            noCommand { model | decisions = decisions}
         
-        _ -> model
+        _ -> 
+            noCommand model
 
 view : Model -> Html Msg
 view model =
@@ -88,18 +105,18 @@ view model =
 viewDecision : BusinessDecision -> List (Html Msg)
 viewDecision decision =
   [ Html.dt []
-    [ text (getName decision)
+    [ text (BusinessDecision.getName decision)
     , Button.button
       [ Button.secondary
       , Button.small
-      , Button.onClick (Delete (decision |> getId))
+      , Button.onClick (Delete (decision |> BusinessDecision.getId))
       , Button.attrs [class "float-right"]
       ]
       [ text "X" ]
     ]
   , Html.dd
     []
-    [ getDescription decision
+    [ BusinessDecision.getDescription decision
       |> Maybe.map text
       |> Maybe.withDefault (Html.i [] [ text "No description :-(" ])
     ]
@@ -118,8 +135,8 @@ viewAddDecision model =
                             let
                                 errorText =
                                     case p of
-                                        DefinitionEmpty -> "No decision name is specified"
-                                        AlreadyExists -> "The business decision with name '" ++ name ++ "' has already been defined before. Please use a distinct, case insensitive name."
+                                        BusinessDecision.DefinitionEmpty -> "No decision name is specified"
+                                        BusinessDecision.AlreadyExists -> "The business decision with name '" ++ name ++ "' has already been defined before. Please use a distinct, case insensitive name."
                             in
                             (False, [], errorText)
             in
