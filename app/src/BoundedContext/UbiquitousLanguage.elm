@@ -1,12 +1,19 @@
 module BoundedContext.UbiquitousLanguage exposing (
   LanguageTerm, DomainTermId, UbiquitousLanguage, Problem(..),
-  defineLanguageTerm, addLanguageTerm, removeLanguageTerm,
+  defineLanguageTerm, removeLanguageTerm, addLanguageTerm, getUbiquitousLanguage,
   noLanguageTerms, languageTerms,
   id,domainTerm,domainDescription,
-  modelDecoder, modelEncoder)
+  optionalUbiquitousLanguageDecoder)
 
 import Json.Encode as Encode
 import Json.Decode as Decode
+import Json.Decode.Pipeline as JP
+
+import Http
+import Url
+import Api as Api
+import BoundedContext.BoundedContextId exposing (BoundedContextId)
+
 
 import Dict exposing (Dict)
 
@@ -51,8 +58,8 @@ defineLanguageTerm (UbiquitousLanguage terms) term desc =
     else Err TermAlreadyAdded
 
 
-addLanguageTerm : UbiquitousLanguage -> LanguageTerm -> Result Problem UbiquitousLanguage
-addLanguageTerm (UbiquitousLanguage terms) (LanguageTerm (DomainTermId termId) term desc) =
+addTermToLanguage : UbiquitousLanguage -> LanguageTerm -> Result Problem UbiquitousLanguage
+addTermToLanguage (UbiquitousLanguage terms) (LanguageTerm (DomainTermId termId) term desc) =
   -- recheck if term was added in the meanwhile
   if terms |> isTermUnique term then
     terms
@@ -63,12 +70,67 @@ addLanguageTerm (UbiquitousLanguage terms) (LanguageTerm (DomainTermId termId) t
       Err TermAlreadyAdded
 
 
-removeLanguageTerm : UbiquitousLanguage -> DomainTermId -> UbiquitousLanguage
-removeLanguageTerm (UbiquitousLanguage terms) (DomainTermId termId) =
+addLanguageTerm : Api.Configuration -> BoundedContextId -> UbiquitousLanguage -> LanguageTerm -> Result Problem (Api.ApiResult UbiquitousLanguage msg)
+addLanguageTerm configuration contextId language term =
+  case addTermToLanguage language term of
+    Ok updatedLanguage ->
+      let
+        api = Api.boundedContext contextId
+        request toMsg =
+          Http.request
+            { method = "PATCH"
+            , url = api |> Api.url configuration |> Url.toString
+            , body = Http.jsonBody <|
+                Encode.object [ ubiquitousLanguageEncoder updatedLanguage ]
+            , expect = Http.expectJson toMsg ubiquitousLanguageDecoder
+            , timeout = Nothing
+            , tracker = Nothing
+            , headers = []
+            }
+      in
+        Ok request
+    Err problem ->
+      problem |> Err
+
+
+getUbiquitousLanguage : Api.Configuration -> BoundedContextId -> Api.ApiResult UbiquitousLanguage msg
+getUbiquitousLanguage configuration contextId =
+  let
+    api = Api.boundedContext contextId
+    request toMsg =
+      Http.get
+        { url = api |> Api.url configuration |> Url.toString
+        , expect = Http.expectJson toMsg ubiquitousLanguageDecoder
+        }
+  in
+    request
+
+
+removeTermFromLanguage : UbiquitousLanguage -> DomainTermId -> UbiquitousLanguage
+removeTermFromLanguage (UbiquitousLanguage terms) (DomainTermId termId) =
   terms |> Dict.remove termId |> UbiquitousLanguage
 
 
-noLanguageTerms :  UbiquitousLanguage
+removeLanguageTerm : Api.Configuration -> BoundedContextId -> UbiquitousLanguage -> DomainTermId -> Api.ApiResult UbiquitousLanguage msg
+removeLanguageTerm configuration contextId language term =
+  let
+    api = Api.boundedContext contextId
+    removedRoles = removeTermFromLanguage language term
+    request toMsg =
+      Http.request
+        { method = "PATCH"
+        , url = api |> Api.url configuration |> Url.toString
+        , body = Http.jsonBody <|
+            Encode.object [ ubiquitousLanguageEncoder removedRoles ]
+        , expect = Http.expectJson toMsg ubiquitousLanguageDecoder
+        , timeout = Nothing
+        , tracker = Nothing
+        , headers = []
+        }
+  in
+    request
+
+noLanguageTerms :  UbiquitousLanguage 
 noLanguageTerms =
   UbiquitousLanguage Dict.empty
 
@@ -93,6 +155,15 @@ domainTerm (LanguageTerm _ term _) =
 domainDescription : LanguageTerm -> Maybe String
 domainDescription (LanguageTerm _ _ desc) =
   desc
+
+ubiquitousLanguageEncoder language = ("ubiquitousLanguage", modelEncoder language)
+
+ubiquitousLanguageDecoder : Decode.Decoder UbiquitousLanguage
+ubiquitousLanguageDecoder = Decode.at [ "ubiquitousLanguage"] modelDecoder
+
+optionalUbiquitousLanguageDecoder : Decode.Decoder (UbiquitousLanguage -> b) -> Decode.Decoder b
+optionalUbiquitousLanguageDecoder =
+    JP.optional "ubiquitousLanguage" modelDecoder noLanguageTerms
 
 modelEncoder : UbiquitousLanguage -> Encode.Value
 modelEncoder (UbiquitousLanguage terms) =
