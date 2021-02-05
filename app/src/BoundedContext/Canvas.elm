@@ -17,6 +17,7 @@ import BoundedContext.DomainRoles exposing (DomainRoles)
 import BoundedContext.BusinessDecision exposing (modelEncoder)
 import BoundedContext.BusinessDecision exposing (modelDecoder)
 import BoundedContext.DomainRoles
+import BoundedContext.UbiquitousLanguage
 
 -- MODEL
 
@@ -54,7 +55,6 @@ modelEncoder context canvas =
     , ("description", Encode.string canvas.description)
     , ("classification", StrategicClassification.encoder canvas.classification)
     , ("businessDecisions", BoundedContext.BusinessDecision.modelsEncoder canvas.businessDecisions)
-    , ("ubiquitousLanguage", UbiquitousLanguage.modelEncoder canvas.ubiquitousLanguage)
     , ("messages", Message.messagesEncoder canvas.messages)
     ]
 
@@ -72,6 +72,6 @@ modelDecoder =
     |> JP.optional "description" Decode.string ""
     |> JP.optional "classification" StrategicClassification.decoder StrategicClassification.noClassification
     |> JP.optional "businessDecisions" BoundedContext.BusinessDecision.modelsDecoder []
-    |> JP.optional "ubiquitousLanguage" UbiquitousLanguage.modelDecoder UbiquitousLanguage.noLanguageTerms
+    |> BoundedContext.UbiquitousLanguage.optionalUbiquitousLanguageDecoder
     |> BoundedContext.DomainRoles.optionalDomainRolesDecoder
     |> JP.optional "messages" Message.messagesDecoder Message.noMessages

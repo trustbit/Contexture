@@ -12,6 +12,9 @@ import Bootstrap.Card.Block as Block
 import Bootstrap.Button as Button
 import Bootstrap.Text as Text
 
+import Api
+import BoundedContext.BoundedContextId exposing(BoundedContextId)
+
 import BoundedContext.UbiquitousLanguage as UbiquitousLanguage exposing (UbiquitousLanguage, LanguageTerm, DomainTermId)
 
 type ChangingModel
@@ -20,13 +23,20 @@ type ChangingModel
 type alias Model =
   { language : UbiquitousLanguage
   , changeModel : Maybe ChangingModel
+  , config : Api.Configuration
+  , boundedContextId : BoundedContextId
   }
 
-init : UbiquitousLanguage -> Model
-init language =
-  { language = language
-  , changeModel = Nothing
-  }
+
+init : Api.Configuration -> BoundedContextId -> (Model, Cmd Msg)
+init config id =
+  ( { language = UbiquitousLanguage.noLanguageTerms
+    , changeModel = Nothing
+    , config = config
+    , boundedContextId = id
+    }
+  , UbiquitousLanguage.getUbiquitousLanguage config id Loaded
+  )
 
 
 type Msg
@@ -36,41 +46,48 @@ type Msg
   | DefineTerm LanguageTerm
   | CancelDefine
   | DeleteTerm DomainTermId
+  | Loaded (Api.ApiResponse UbiquitousLanguage)
+  | TermAdded (Api.ApiResponse UbiquitousLanguage)
+  | TermRemoved (Api.ApiResponse UbiquitousLanguage)
 
+noCommand model = (model, Cmd.none)
 
-update : Msg -> Model -> Model
+update : Msg -> Model -> (Model, Cmd Msg)
 update msg model =
   case (msg, model.changeModel) of
     (StartToDefineNewTerm, _) ->
-      { model | changeModel = Just <| AddingNewTerm "" "" (UbiquitousLanguage.defineLanguageTerm model.language "" "") }
+      noCommand { model | changeModel = Just <| AddingNewTerm "" "" (UbiquitousLanguage.defineLanguageTerm model.language "" "") }
 
     (ChangeDomainTerm term, Just (AddingNewTerm _ description _)) ->
-      { model | changeModel = Just <| AddingNewTerm term description (UbiquitousLanguage.defineLanguageTerm model.language term description) }
+      noCommand { model | changeModel = Just <| AddingNewTerm term description (UbiquitousLanguage.defineLanguageTerm model.language term description) }
 
     (ChangeDescription description, Just (AddingNewTerm term _ _)) ->
-      { model | changeModel = Just <| AddingNewTerm term description (UbiquitousLanguage.defineLanguageTerm model.language term description) }
+      noCommand { model | changeModel = Just <| AddingNewTerm term description (UbiquitousLanguage.defineLanguageTerm model.language term description) }
 
     (DefineTerm term, Just (AddingNewTerm _ _ _)) ->
       let
-        newLanguage = UbiquitousLanguage.addLanguageTerm model.language term
-
+        newLanguage = UbiquitousLanguage.addLanguageTerm model.config model.boundedContextId model.language term
       in
         case newLanguage of
           Ok terms ->
-            { model
-            | language = terms
-            , changeModel = Nothing
-            }
+            ({ model | changeModel = Nothing }, terms TermAdded)
           Err _ ->
-            model
+            noCommand model
     (DeleteTerm term, Nothing) ->
-      { model | language = UbiquitousLanguage.removeLanguageTerm model.language term }
+      (model, UbiquitousLanguage.removeLanguageTerm model.config model.boundedContextId model.language term TermRemoved)
 
     (CancelDefine, _) ->
-      { model | changeModel = Nothing}
+      noCommand { model | changeModel = Nothing}
+
+    (Loaded (Ok language),_) ->
+      noCommand { model | language = language}
+    (TermAdded (Ok language),_) ->
+      noCommand { model | language = language}
+    (TermRemoved (Ok language),_) ->
+      noCommand { model | language = language}
 
     _ ->
-      model
+      noCommand model
 
 view : Model -> Html Msg
 view = viewAsDl

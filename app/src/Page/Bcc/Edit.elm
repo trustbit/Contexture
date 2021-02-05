@@ -81,7 +81,7 @@ initWithCanvas config model =
   let
     (addingDependency, addingDependencyCmd) = Dependencies.init config model.boundedContext
     (changeKeyModel, changeKeyCmd) = ChangeKey.init config (model.boundedContext |> BoundedContext.key)
-    ubiquitousLanguageModel = UbiquitousLanguage.init model.canvas.ubiquitousLanguage
+    (ubiquitousLanguageModel, ubiquitousLanguageCmd) = UbiquitousLanguage.init config (model.boundedContext |> BoundedContext.id)
     businessDecisionsModel = BusinessDecisionView.init model.canvas.businessDecisions
     (domainRolesModel, domainRolesCmd) = DomainRolesView.init config (model.boundedContext |> BoundedContext.id)
   in
@@ -99,6 +99,7 @@ initWithCanvas config model =
       [ addingDependencyCmd |> Cmd.map DependencyField
       , changeKeyCmd |> Cmd.map ChangeKeyMsg
       , domainRolesCmd |> Cmd.map DomainRolesField
+      , ubiquitousLanguageCmd |> Cmd.map UbiquitousLanguageField
       ]
     )
 
@@ -192,7 +193,9 @@ updateEdit msg model =
       ({ model | name = name}, Cmd.none)
 
     UbiquitousLanguageField languageMsg ->
-      ({ model | ubiquitousLanguage = UbiquitousLanguage.update languageMsg model.ubiquitousLanguage}, Cmd.none)
+      UbiquitousLanguage.update languageMsg model.ubiquitousLanguage
+      |> Tuple.mapFirst(\m -> { model | ubiquitousLanguage = m})
+      |> Tuple.mapSecond(Cmd.map UbiquitousLanguageField)
 
     BusinessDecisionField businessDecisionMsg -> 
       ({ model | businessDecisions = BusinessDecisionView.update businessDecisionMsg model.businessDecisions}, Cmd.none)
