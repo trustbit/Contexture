@@ -15,6 +15,8 @@ import Bootstrap.Form as Form
 import Bootstrap.Form.Input as Input
 import Bootstrap.Form.Textarea as Textarea
 import Bootstrap.ListGroup as ListGroup
+import BoundedContext.BoundedContextId exposing (BoundedContextId)
+import Api
 
 type Msg
     = ShowCreateNew
@@ -25,6 +27,9 @@ type Msg
     | CancelCreating
     | Delete String
     | SelectRole String String
+    | RolesLoaded (Api.ApiResponse DomainRoles)
+    | RolesAdded (Api.ApiResponse DomainRoles)
+    | RoleRemoved (Api.ApiResponse DomainRoles)
 
 type ChangingModel
   = AddingNewDomainRole String String (Result DomainRoles.Problem DomainRole)
@@ -33,68 +38,78 @@ type ChangingModel
 type alias Model =
   { roles : DomainRoles
   , changingModel : Maybe ChangingModel
-  }
-
-init : DomainRoles -> Model
-init roles =
-  { roles = roles
-  , changingModel = Nothing
+  , config : Api.Configuration
+  , boundedContextId : BoundedContextId
   }
 
 
-update : Msg -> Model -> Model
+init : Api.Configuration -> BoundedContextId -> (Model, Cmd Msg)
+init configuration contextId =
+  ( { roles = []
+    , changingModel = Nothing
+    , config = configuration
+    , boundedContextId = contextId
+    }
+  , getDomainRoles configuration contextId RolesLoaded)
+
+
+noCommand model = (model, Cmd.none)
+
+update : Msg -> Model -> (Model, Cmd Msg)
 update msg model =
     case (msg, model.changingModel) of
         (ShowCreateNew, _) ->
-            { model | changingModel = Just <| AddingNewDomainRole "" "" (createDomainRole model.roles "" "") }
+            noCommand { model | changingModel = Just <| AddingNewDomainRole "" "" (createDomainRole model.roles "" "") }
 
         (ChangeName name, Just (AddingNewDomainRole _ description _)) ->
-            { model | changingModel = Just <| AddingNewDomainRole name description (createDomainRole model.roles name description) }
+            noCommand { model | changingModel = Just <| AddingNewDomainRole name description (createDomainRole model.roles name description) }
 
         (ChangeDescription description, Just (AddingNewDomainRole name _ _)) ->
-            { model | changingModel = Just <| AddingNewDomainRole name description (createDomainRole model.roles name description) }
+            noCommand { model | changingModel = Just <| AddingNewDomainRole name description (createDomainRole model.roles name description) }
 
         (SelectRole name description, Just (SelectingDomainRole _ _ _)) ->
-            { model | changingModel = Just <| SelectingDomainRole name description (createDomainRole model.roles name description)}
+            noCommand { model | changingModel = Just <| SelectingDomainRole name description (createDomainRole model.roles name description)}
 
         (CancelCreating, _) ->
-            { model | changingModel = Nothing}
+            noCommand { model | changingModel = Nothing}
 
         (CreateNew role, Just (AddingNewDomainRole _ _ _)) ->
             let
-                newRole = insertDomainRole model.roles role
+                newRole = addDomainRole model.config model.boundedContextId model.roles role
 
             in
                 case newRole of
                     Ok roles ->
-                        { model
-                        | roles = roles
-                        , changingModel = Nothing
-                        }
+                        ({ model | changingModel = Nothing}, roles RolesAdded)
                     Err _ ->
-                        model
+                        noCommand  model
 
         (CreateNew role, Just (SelectingDomainRole _ _ _)) ->
             let
-                newRole = insertDomainRole model.roles role
+                newRole = addDomainRole model.config model.boundedContextId model.roles role
 
             in
                 case newRole of
                     Ok roles ->
-                        { model
-                        | roles = roles
-                        , changingModel = Nothing
-                        }
+                        ({ model | changingModel = Nothing}, roles RolesAdded)
                     Err _ ->
-                        model
+                        noCommand model
 
         (Delete name, Nothing) ->
-            { model | roles = removeDomainRole model.roles name }
+            (model, deleteDomainRole model.config model.boundedContextId model.roles name RoleRemoved)
 
         (ShowChooseFrom, _) ->
-            { model | changingModel = Just <| SelectingDomainRole "" "" (createDomainRole model.roles "" "") }
+            noCommand { model | changingModel = Just <| SelectingDomainRole "" "" (createDomainRole model.roles "" "") }
 
-        _ -> model
+        (RolesAdded (Ok roles), _) ->
+            noCommand { model | roles = roles }
+        (RoleRemoved (Ok roles), _) ->
+           noCommand { model | roles = roles }
+        (RolesLoaded (Ok roles), _) ->
+           noCommand { model | roles = roles }
+
+        _ ->
+            noCommand model
 
 view : Model -> Html Msg
 view model =
