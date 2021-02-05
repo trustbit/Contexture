@@ -42,11 +42,6 @@ npm i
 
 ### Run the backend
 
-```bash
-cd server
-npm start
-```
-
 Contexture server will listen on port 3000 per default. If you want to have the server listening on any other port set the environment variable `PORT` to the desired port.
 
 ### Caveats
@@ -78,21 +73,6 @@ elm make src/Main.elm
 ```
 
 Make sure the backend part is reachable with its default url <http://localhost:3000>
-
-## Running with Docker
-
-```bash
-cd app
-elm make src/Main.elm --output=../server/public/index.html
-
-cd ../server
-docker build -t contexture .
-
-docker volume create contexture_data
-docker run -p 8081:3000 -v contexture_data:/data contexture
-```
-
-Now head to your browser and access the Contexture through http://localhost:8081
 
 ## Contributors
 
