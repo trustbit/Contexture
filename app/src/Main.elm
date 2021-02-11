@@ -97,7 +97,7 @@ initCurrentPage ( model, existingCmds ) =
 deriveBaseUrl : Url.Url -> Url.Url
 deriveBaseUrl appUrl =
   let
-    localDev = { protocol = Url.Http, host ="localhost", port_ = Just 3000, path = "/api", query = Nothing, fragment = Nothing}
+    localDev = { protocol = Url.Http, host ="localhost", port_ = Just 5000, path = "/api", query = Nothing, fragment = Nothing}
   in
   case appUrl.port_ of
     -- local dev with elm-live
