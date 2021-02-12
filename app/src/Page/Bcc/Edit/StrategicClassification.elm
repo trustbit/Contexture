@@ -19,14 +19,24 @@ import Bootstrap.Utilities.Display as Display
 
 import Api
 import BoundedContext.BoundedContextId exposing(BoundedContextId)
-import BoundedContext.StrategicClassification as StrategicClassification
+import BoundedContext.StrategicClassification as StrategicClassification exposing (StrategicClassification)
 
-type alias Model = StrategicClassification.StrategicClassification
+type alias Model =
+  { classification : StrategicClassification
+  , config : Api.Configuration
+  , boundedContextId : BoundedContextId
+  }
 
 
-init : Api.Configuration -> BoundedContextId -> Model -> (Model, Cmd Msg)
+init : Api.Configuration -> BoundedContextId -> StrategicClassification -> (Model, Cmd Msg)
 init configuration id model =
-    (model, Cmd.none)
+    ( { classification = model
+      , config = configuration
+      , boundedContextId = id
+      }
+    , Cmd.none
+    )
+
 
 type Action t
   = Add t
@@ -39,25 +49,38 @@ type Msg
   | SetEvolution StrategicClassification.Evolution
 
 
+updateClassification : (StrategicClassification -> StrategicClassification) -> Model -> Model
+updateClassification updater model =
+  { model | classification = updater model.classification }
+
 noCommand model = (model, Cmd.none)
 
 update : Msg -> Model -> (Model, Cmd Msg)
 update msg classification =
   case msg of
     SetDomainType class ->
-      noCommand { classification | domain = Just class}
+      classification
+      |> updateClassification (\c -> { c | domain = Just class })
+      |> noCommand
 
     ChangeBusinessModel (Add business) ->
-      noCommand { classification | business = business :: classification.business}
+      classification
+      |> updateClassification (\c -> { c | business = business :: c.business})
+      |> noCommand
 
     ChangeBusinessModel (Remove business) ->
-      noCommand { classification | business = classification.business |> List.filter (\bm -> bm /= business )}
+      classification
+      |> updateClassification (\c -> { c | business = c.business |> List.filter (\bm -> bm /= business )})
+      |> noCommand
 
     SetEvolution evo ->
-      noCommand { classification | evolution = Just evo}
+      classification
+      |> updateClassification (\c -> { c | evolution = Just evo })
+      |> noCommand
 
-view : StrategicClassification.StrategicClassification -> Html Msg
-view model =
+
+view : Model -> Html Msg
+view { classification } =
   let
     domainDescriptions =
       [ StrategicClassification.Core, StrategicClassification.Supporting, StrategicClassification.Generic ]
@@ -80,9 +103,9 @@ view model =
         [ viewLabel "classification" "Domain"
         , div []
             ( Radio.radioList "classification"
-              [ viewRadioButton "core" model.domain StrategicClassification.Core SetDomainType StrategicClassification.domainDescription
-              , viewRadioButton "supporting" model.domain StrategicClassification.Supporting SetDomainType StrategicClassification.domainDescription
-              , viewRadioButton "generic" model.domain StrategicClassification.Generic SetDomainType StrategicClassification.domainDescription
+              [ viewRadioButton "core" classification.domain StrategicClassification.Core SetDomainType StrategicClassification.domainDescription
+              , viewRadioButton "supporting" classification.domain StrategicClassification.Supporting SetDomainType StrategicClassification.domainDescription
+              , viewRadioButton "generic" classification.domain StrategicClassification.Generic SetDomainType StrategicClassification.domainDescription
               -- TODO: Other
               ]
             )
@@ -92,10 +115,10 @@ view model =
         , Grid.col []
           [ viewLabel "businessModel" "Business Model"
           , div []
-              [ viewCheckbox "revenue" StrategicClassification.businessDescription StrategicClassification.Revenue model.business
-              , viewCheckbox "engagement" StrategicClassification.businessDescription StrategicClassification.Engagement model.business
-              , viewCheckbox "Compliance" StrategicClassification.businessDescription StrategicClassification.Compliance model.business
-              , viewCheckbox "costReduction" StrategicClassification.businessDescription StrategicClassification.CostReduction model.business
+              [ viewCheckbox "revenue" StrategicClassification.businessDescription StrategicClassification.Revenue classification.business
+              , viewCheckbox "engagement" StrategicClassification.businessDescription StrategicClassification.Engagement classification.business
+              , viewCheckbox "Compliance" StrategicClassification.businessDescription StrategicClassification.Compliance classification.business
+              , viewCheckbox "costReduction" StrategicClassification.businessDescription StrategicClassification.CostReduction classification.business
               -- TODO: Other
               ]
               |> Html.map ChangeBusinessModel
@@ -107,10 +130,10 @@ view model =
           [ viewLabel "evolution" "Evolution"
           , div []
               ( Radio.radioList "evolution"
-                [ viewRadioButton "genesis" model.evolution StrategicClassification.Genesis SetEvolution StrategicClassification.evolutionDescription
-                , viewRadioButton "customBuilt" model.evolution StrategicClassification.CustomBuilt SetEvolution StrategicClassification.evolutionDescription
-                , viewRadioButton "product" model.evolution StrategicClassification.Product SetEvolution StrategicClassification.evolutionDescription
-                , viewRadioButton "commodity" model.evolution StrategicClassification.Commodity SetEvolution StrategicClassification.evolutionDescription
+                [ viewRadioButton "genesis" classification.evolution StrategicClassification.Genesis SetEvolution StrategicClassification.evolutionDescription
+                , viewRadioButton "customBuilt" classification.evolution StrategicClassification.CustomBuilt SetEvolution StrategicClassification.evolutionDescription
+                , viewRadioButton "product" classification.evolution StrategicClassification.Product SetEvolution StrategicClassification.evolutionDescription
+                , viewRadioButton "commodity" classification.evolution StrategicClassification.Commodity SetEvolution StrategicClassification.evolutionDescription
                 -- TODO: Other
                 ]
               )

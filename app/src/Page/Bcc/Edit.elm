@@ -236,7 +236,7 @@ update msg model =
               , ubiquitousLanguage = editable.ubiquitousLanguage.language
               , businessDecisions = editable.businessDecisions.decisions
               , domainRoles = editable.domainRoles.roles
-              , classification = editable.classification
+              , classification = editable.classification.classification
               }
           in
             (model, saveCanvas model.self context canvas)
