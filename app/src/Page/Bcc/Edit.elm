@@ -13,8 +13,6 @@ import Bootstrap.Form as Form
 import Bootstrap.Form.Select as Select
 import Bootstrap.Form.Input as Input
 import Bootstrap.Form.Textarea as Textarea
-import Bootstrap.Form.Radio as Radio
-import Bootstrap.Form.Checkbox as Checkbox
 import Bootstrap.Button as Button
 import Bootstrap.Text as Text
 import Bootstrap.Utilities.Spacing as Spacing
@@ -40,7 +38,9 @@ import Page.ChangeKey as ChangeKey
 import Page.Bcc.Edit.Dependencies as Dependencies
 import Page.Bcc.Edit.Messages as Messages
 import Page.Bcc.Edit.UbiquitousLanguage as UbiquitousLanguage
+import Page.Bcc.Edit.StrategicClassification as StrategicClassification
 import BoundedContext.UbiquitousLanguage exposing (UbiquitousLanguage(..))
+import BoundedContext.Message exposing (Messages)
 import BoundedContext.BusinessDecision exposing (BusinessDecision(..))
 import Page.Bcc.Edit.BusinessDecision as BusinessDecisionView exposing (view, Msg, Model, init)
 import Page.Bcc.Edit.DomainRoles as DomainRolesView exposing (view, Msg, Model, init)
@@ -62,8 +62,9 @@ type alias EditingCanvas =
   , addingDependencies : Dependencies.Model
   , ubiquitousLanguage : UbiquitousLanguage.Model
   , problem : Maybe Problem
-  , businessDecisions: BusinessDecisionView.Model
-  , domainRoles: DomainRolesView.Model
+  , businessDecisions : BusinessDecisionView.Model
+  , domainRoles : DomainRolesView.Model
+  , classification : StrategicClassification.Model 
   }
 
 type Problem
@@ -82,8 +83,9 @@ initWithCanvas config model =
     (addingDependency, addingDependencyCmd) = Dependencies.init config model.boundedContext
     (changeKeyModel, changeKeyCmd) = ChangeKey.init config (model.boundedContext |> BoundedContext.key)
     (ubiquitousLanguageModel, ubiquitousLanguageCmd) = UbiquitousLanguage.init config (model.boundedContext |> BoundedContext.id)
-    (businessDecisionsModel, businessDecisionsCmd)= BusinessDecisionView.init config (model.boundedContext |> BoundedContext.id)
+    (businessDecisionsModel, businessDecisionsCmd) = BusinessDecisionView.init config (model.boundedContext |> BoundedContext.id)
     (domainRolesModel, domainRolesCmd) = DomainRolesView.init config (model.boundedContext |> BoundedContext.id)
+    (classificationModel, classificationCmd) = StrategicClassification.init config (model.boundedContext |> BoundedContext.id) model.canvas.classification
   in
     ( { addingMessage = Messages.init model.canvas.messages
       , addingDependencies = addingDependency
@@ -94,6 +96,7 @@ initWithCanvas config model =
       , problem = Nothing
       , businessDecisions = businessDecisionsModel
       , domainRoles = domainRolesModel
+      , classification = classificationModel
       }
     , Cmd.batch
       [ addingDependencyCmd |> Cmd.map DependencyField
@@ -101,6 +104,7 @@ initWithCanvas config model =
       , domainRolesCmd |> Cmd.map DomainRolesField
       , ubiquitousLanguageCmd |> Cmd.map UbiquitousLanguageField
       , businessDecisionsCmd |> Cmd.map BusinessDecisionField
+      , classificationCmd |> Cmd.map StrategicClassificationField
       ]
     )
 
@@ -120,18 +124,10 @@ init key config contextId =
 
 -- UPDATE
 
-type Action t
-  = Add t
-  | Remove t
-
-type StrategicClassificationMsg
-  = SetDomainType StrategicClassification.DomainType
-  | ChangeBusinessModel (Action StrategicClassification.BusinessModel)
-  | SetEvolution StrategicClassification.Evolution
 
 type FieldMsg
   = SetDescription String
-  | ChangeStrategicClassification StrategicClassificationMsg
+  
 
 type EditingMsg
   = Field FieldMsg
@@ -143,6 +139,7 @@ type EditingMsg
   | UbiquitousLanguageField UbiquitousLanguage.Msg
   | BusinessDecisionField BusinessDecisionView.Msg
   | DomainRolesField DomainRolesView.Msg
+  | StrategicClassificationField StrategicClassification.Msg
 
 type Msg
   = Loaded (Result Http.Error CanvasModel)
@@ -150,20 +147,6 @@ type Msg
   | Save
   | Saved (Result Http.Error ())
 
-updateClassification : StrategicClassificationMsg -> StrategicClassification.StrategicClassification -> StrategicClassification.StrategicClassification
-updateClassification msg classification =
-  case msg of
-    SetDomainType class ->
-      { classification | domain = Just class}
-
-    ChangeBusinessModel (Add business) ->
-      { classification | business = business :: classification.business}
-
-    ChangeBusinessModel (Remove business) ->
-      { classification | business = classification.business |> List.filter (\bm -> bm /= business )}
-
-    SetEvolution evo ->
-      { classification | evolution = Just evo}
 
 updateField : FieldMsg -> BoundedContextCanvas -> BoundedContextCanvas
 updateField msg canvas =
@@ -172,8 +155,7 @@ updateField msg canvas =
     SetDescription description ->
       { canvas | description = description}
 
-    ChangeStrategicClassification m ->
-      { canvas | classification = updateClassification m canvas.classification }
+   
 
 updateEdit : EditingMsg -> EditingCanvas -> (EditingCanvas, Cmd EditingMsg)
 updateEdit msg model =
@@ -207,6 +189,11 @@ updateEdit msg model =
       DomainRolesView.update domainRolesMsg model.domainRoles
       |> Tuple.mapFirst(\d -> { model | domainRoles = d })
       |> Tuple.mapSecond(Cmd.map DomainRolesField)
+
+    StrategicClassificationField scMsg ->
+      StrategicClassification.update scMsg model.classification 
+      |> Tuple.mapFirst(\d -> { model | classification = d })
+      |> Tuple.mapSecond(Cmd.map StrategicClassificationField)
      
     ChangeKeyMsg changeMsg ->
       let
@@ -242,17 +229,9 @@ update msg model =
         |> Result.andThen (BoundedContext.changeName editable.name >> Result.mapError ContextProblem)
       of
         Ok context ->
-          let
-            c = editable.edit.canvas
-            canvas =
-              { c
-              | messages = editable.addingMessage |> Messages.asMessages
-              , ubiquitousLanguage = editable.ubiquitousLanguage.language
-              , businessDecisions = editable.businessDecisions.decisions
-              , domainRoles = editable.domainRoles.roles
-              }
-          in
-            (model, saveCanvas model.self context canvas)
+          ( model
+          , saveCanvas model.self context editable.edit.canvas.description (editable.addingMessage |> Messages.asMessages) 
+          )
         Err err ->
           let
             _ = Debug.log "error" err
@@ -370,9 +349,9 @@ viewLeftside canvas =
         , Textarea.onInput (SetDescription >> Field)
         ]
       , Form.help [] [ text "A few sentences describing the why and what of the context in business language. No technical details here."] ]
-    , model.classification
-      |> viewStrategicClassification
-      |> Html.map (ChangeStrategicClassification >> Field)
+    , canvas.classification
+      |> StrategicClassification.view
+      |> Html.map StrategicClassificationField
     , Form.group []
       [ viewCaption "businessDecisions" "Business Decisions"
         , Form.help [] [ text "What are the key business rules and policies within this context?"]
@@ -398,70 +377,6 @@ viewRightside model =
   , model.addingDependencies |> Dependencies.view |> Html.map DependencyField
   ]
 
-viewStrategicClassification : StrategicClassification.StrategicClassification -> Html StrategicClassificationMsg
-viewStrategicClassification model =
-  let
-    domainDescriptions =
-      [ StrategicClassification.Core, StrategicClassification.Supporting, StrategicClassification.Generic ]
-      |> List.map StrategicClassification.domainDescription
-      |> List.map (\d -> (d.name, d.description))
-    businessDescriptions =
-      [ StrategicClassification.Revenue, StrategicClassification.Engagement, StrategicClassification.Compliance, StrategicClassification.CostReduction ]
-      |> List.map StrategicClassification.businessDescription
-      |> List.map (\d -> (d.name, d.description))
-    evolutionDescriptions =
-      [ StrategicClassification.Genesis, StrategicClassification.CustomBuilt, StrategicClassification.Product, StrategicClassification.Commodity ]
-      |> List.map StrategicClassification.evolutionDescription
-      |> List.map (\d -> (d.name, d.description))
-  in
-  Form.group []
-    [ Grid.row []
-      [ Grid.col [] [ viewCaption "" "Strategic Classification"]]
-    , Grid.row []
-      [ Grid.col []
-        [ viewLabel "classification" "Domain"
-        , div []
-            ( Radio.radioList "classification"
-              [ viewRadioButton "core" model.domain StrategicClassification.Core SetDomainType StrategicClassification.domainDescription
-              , viewRadioButton "supporting" model.domain StrategicClassification.Supporting SetDomainType StrategicClassification.domainDescription
-              , viewRadioButton "generic" model.domain StrategicClassification.Generic SetDomainType StrategicClassification.domainDescription
-              -- TODO: Other
-              ]
-            )
-          , viewDescriptionList domainDescriptions Nothing
-            |> viewInfoTooltip "How important is this context to the success of your organisation?"
-          ]
-        , Grid.col []
-          [ viewLabel "businessModel" "Business Model"
-          , div []
-              [ viewCheckbox "revenue" StrategicClassification.businessDescription StrategicClassification.Revenue model.business
-              , viewCheckbox "engagement" StrategicClassification.businessDescription StrategicClassification.Engagement model.business
-              , viewCheckbox "Compliance" StrategicClassification.businessDescription StrategicClassification.Compliance model.business
-              , viewCheckbox "costReduction" StrategicClassification.businessDescription StrategicClassification.CostReduction model.business
-              -- TODO: Other
-              ]
-              |> Html.map ChangeBusinessModel
-
-          , viewDescriptionList businessDescriptions Nothing
-            |> viewInfoTooltip "What role does the context play in your business model?"
-          ]
-        , Grid.col []
-          [ viewLabel "evolution" "Evolution"
-          , div []
-              ( Radio.radioList "evolution"
-                [ viewRadioButton "genesis" model.evolution StrategicClassification.Genesis SetEvolution StrategicClassification.evolutionDescription
-                , viewRadioButton "customBuilt" model.evolution StrategicClassification.CustomBuilt SetEvolution StrategicClassification.evolutionDescription
-                , viewRadioButton "product" model.evolution StrategicClassification.Product SetEvolution StrategicClassification.evolutionDescription
-                , viewRadioButton "commodity" model.evolution StrategicClassification.Commodity SetEvolution StrategicClassification.evolutionDescription
-                -- TODO: Other
-                ]
-              )
-            , viewDescriptionList evolutionDescriptions Nothing
-            |> viewInfoTooltip "How evolved is the concept (see Wardley Maps)"
-          ]
-      ]
-    ]
-
 -- view utilities
 
 viewCaption : String -> String -> Html msg
@@ -474,26 +389,6 @@ viewCaption labelId caption =
     ]
     [ text caption ]
 
-viewLabel : String -> String -> Html msg
-viewLabel labelId caption =
-  Form.label
-    [ for labelId ]
-    [ Html.b [] [ text caption ] ]
-
-viewRadioButton : String  -> Maybe value -> value -> (value -> m) -> (value -> StrategicClassification.Description) -> Radio.Radio m
-viewRadioButton id currentValue option toMsg toTitle =
-  Radio.createAdvanced
-    [ Radio.id id, Radio.onClick (toMsg option), Radio.checked (currentValue == Just option) ]
-    (Radio.label [] [ text (toTitle option).name ])
-
-viewCheckbox : String -> (value -> StrategicClassification.Description) -> value -> List value -> Html (Action value)
-viewCheckbox id description value currentValues =
-  Checkbox.checkbox
-    [Checkbox.id id
-    , Checkbox.onCheck(\isChecked -> if isChecked then Add value else Remove value )
-    , Checkbox.checked (List.member value currentValues)
-    ]
-    (description value).name
 
 viewInfoTooltip : String -> Html msg -> Html msg
 viewInfoTooltip title description =
@@ -549,8 +444,8 @@ loadCanvas config contextId =
     , expect = Http.expectJson Loaded decoder
     }
 
-saveCanvas : Api.Configuration -> BoundedContext.BoundedContext -> BoundedContextCanvas -> Cmd Msg
-saveCanvas config context canvas =
+saveCanvas : Api.Configuration -> BoundedContext.BoundedContext -> String -> Messages -> Cmd Msg
+saveCanvas config context description messages =
   Http.request
     { method = "PATCH"
     , headers = []
@@ -560,7 +455,7 @@ saveCanvas config context canvas =
       |> Api.boundedContext
       |> Api.url config
       |> Url.toString
-    , body = Http.jsonBody <| BoundedContext.Canvas.modelEncoder context canvas
+    , body = Http.jsonBody <| BoundedContext.Canvas.modelEncoder context description messages
     , expect = Http.expectWhatever Saved
     , timeout = Nothing
     , tracker = Nothing
