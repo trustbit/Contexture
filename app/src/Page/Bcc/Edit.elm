@@ -89,8 +89,9 @@ initWithCanvas config model =
     (domainRolesModel, domainRolesCmd) = DomainRolesView.init config (model.boundedContext |> BoundedContext.id)
     (classificationModel, classificationCmd) = StrategicClassification.init config (model.boundedContext |> BoundedContext.id) model.canvas.classification
     (descriptionModel, descriptionCmd) = Description.init config (model.boundedContext |> BoundedContext.id) model.canvas.description
+    (messagesModel, messagesCmd) = Messages.init config (model.boundedContext |> BoundedContext.id) model.canvas.messages
   in
-    ( { addingMessage = Messages.init model.canvas.messages
+    ( { addingMessage = messagesModel
       , addingDependencies = addingDependency
       , ubiquitousLanguage = ubiquitousLanguageModel
       , name = model.boundedContext |> BoundedContext.name
@@ -110,6 +111,7 @@ initWithCanvas config model =
       , businessDecisionsCmd |> Cmd.map BusinessDecisionField
       , classificationCmd |> Cmd.map StrategicClassificationField
       , descriptionCmd |> Cmd.map DescriptionField
+      , messagesCmd |> Cmd.map MessageField
       ]
     )
 
@@ -152,10 +154,9 @@ updateEdit : EditingMsg -> EditingCanvas -> (EditingCanvas, Cmd EditingMsg)
 updateEdit msg model =
   case msg of
     MessageField messageMsg ->
-      let
-        updatedModel = Messages.update messageMsg model.addingMessage
-      in
-        ({ model | addingMessage = updatedModel }, Cmd.none)
+      Messages.update messageMsg model.addingMessage
+      |> Tuple.mapFirst(\m -> { model | addingMessage = m})
+      |> Tuple.mapSecond(Cmd.map MessageField)
 
     DescriptionField desMsg ->
       Description.update desMsg model.description
@@ -220,7 +221,7 @@ update msg model =
       of
         Ok context ->
           ( model
-          , saveCanvas model.self context (editable.addingMessage |> Messages.asMessages) 
+          , saveCanvas model.self context
           )
         Err err ->
           let
@@ -385,8 +386,8 @@ loadCanvas config contextId =
     , expect = Http.expectJson Loaded decoder
     }
 
-saveCanvas : Api.Configuration -> BoundedContext.BoundedContext -> Messages -> Cmd Msg
-saveCanvas config context messages =
+saveCanvas : Api.Configuration -> BoundedContext.BoundedContext -> Cmd Msg
+saveCanvas config context =
   Http.request
     { method = "PATCH"
     , headers = []
@@ -396,7 +397,7 @@ saveCanvas config context messages =
       |> Api.boundedContext
       |> Api.url config
       |> Url.toString
-    , body = Http.jsonBody <| BoundedContext.Canvas.modelEncoder context messages
+    , body = Http.jsonBody <| BoundedContext.Canvas.modelEncoder context
     , expect = Http.expectWhatever Saved
     , timeout = Nothing
     , tracker = Nothing
