@@ -10,9 +10,7 @@ import Bootstrap.Grid as Grid
 import Bootstrap.Grid.Row as Row
 import Bootstrap.Grid.Col as Col
 import Bootstrap.Form as Form
-import Bootstrap.Form.Select as Select
 import Bootstrap.Form.Input as Input
-import Bootstrap.Form.Textarea as Textarea
 import Bootstrap.Button as Button
 import Bootstrap.Text as Text
 import Bootstrap.Utilities.Spacing as Spacing
@@ -39,12 +37,15 @@ import Page.Bcc.Edit.Dependencies as Dependencies
 import Page.Bcc.Edit.Messages as Messages
 import Page.Bcc.Edit.UbiquitousLanguage as UbiquitousLanguage
 import Page.Bcc.Edit.StrategicClassification as StrategicClassification
+import Page.Bcc.Edit.Description as Description
 import BoundedContext.UbiquitousLanguage exposing (UbiquitousLanguage(..))
 import BoundedContext.Message exposing (Messages)
 import BoundedContext.BusinessDecision exposing (BusinessDecision(..))
 import Page.Bcc.Edit.BusinessDecision as BusinessDecisionView exposing (view, Msg, Model, init)
 import Page.Bcc.Edit.DomainRoles as DomainRolesView exposing (view, Msg, Model, init)
 import BoundedContext.DomainRoles exposing (getName)
+
+
 
 -- MODEL
 
@@ -65,6 +66,7 @@ type alias EditingCanvas =
   , businessDecisions : BusinessDecisionView.Model
   , domainRoles : DomainRolesView.Model
   , classification : StrategicClassification.Model 
+  , description : Description.Model
   }
 
 type Problem
@@ -86,6 +88,7 @@ initWithCanvas config model =
     (businessDecisionsModel, businessDecisionsCmd) = BusinessDecisionView.init config (model.boundedContext |> BoundedContext.id)
     (domainRolesModel, domainRolesCmd) = DomainRolesView.init config (model.boundedContext |> BoundedContext.id)
     (classificationModel, classificationCmd) = StrategicClassification.init config (model.boundedContext |> BoundedContext.id) model.canvas.classification
+    (descriptionModel, descriptionCmd) = Description.init config (model.boundedContext |> BoundedContext.id) model.canvas.description
   in
     ( { addingMessage = Messages.init model.canvas.messages
       , addingDependencies = addingDependency
@@ -97,6 +100,7 @@ initWithCanvas config model =
       , businessDecisions = businessDecisionsModel
       , domainRoles = domainRolesModel
       , classification = classificationModel
+      , description = descriptionModel
       }
     , Cmd.batch
       [ addingDependencyCmd |> Cmd.map DependencyField
@@ -105,6 +109,7 @@ initWithCanvas config model =
       , ubiquitousLanguageCmd |> Cmd.map UbiquitousLanguageField
       , businessDecisionsCmd |> Cmd.map BusinessDecisionField
       , classificationCmd |> Cmd.map StrategicClassificationField
+      , descriptionCmd |> Cmd.map DescriptionField
       ]
     )
 
@@ -124,13 +129,8 @@ init key config contextId =
 
 -- UPDATE
 
-
-type FieldMsg
-  = SetDescription String
-  
-
 type EditingMsg
-  = Field FieldMsg
+  = DescriptionField Description.Msg
   -- TODO the editing is actually part of the BoundedContext - move there or to the index page?!
   | SetName String
   | ChangeKeyMsg ChangeKey.Msg
@@ -146,15 +146,6 @@ type Msg
   | Editing EditingMsg
   | Save
   | Saved (Result Http.Error ())
-
-
-updateField : FieldMsg -> BoundedContextCanvas -> BoundedContextCanvas
-updateField msg canvas =
-  case msg of
-
-    SetDescription description ->
-      { canvas | description = description}
-
    
 
 updateEdit : EditingMsg -> EditingCanvas -> (EditingCanvas, Cmd EditingMsg)
@@ -166,11 +157,10 @@ updateEdit msg model =
       in
         ({ model | addingMessage = updatedModel }, Cmd.none)
 
-    Field fieldMsg ->
-      let
-        canvasModel = model.edit
-      in
-        ( { model | edit = { canvasModel | canvas = updateField fieldMsg model.edit.canvas } }, Cmd.none)
+    DescriptionField desMsg ->
+      Description.update desMsg model.description
+      |> Tuple.mapFirst(\m -> { model | description = m})
+      |> Tuple.mapSecond(Cmd.map DescriptionField)
 
     SetName name ->
       ({ model | name = name}, Cmd.none)
@@ -230,7 +220,7 @@ update msg model =
       of
         Ok context ->
           ( model
-          , saveCanvas model.self context editable.edit.canvas.description (editable.addingMessage |> Messages.asMessages) 
+          , saveCanvas model.self context (editable.addingMessage |> Messages.asMessages) 
           )
         Err err ->
           let
@@ -323,47 +313,38 @@ viewCanvas model =
 
 viewLeftside : EditingCanvas -> List (Html EditingMsg)
 viewLeftside canvas =
-  let
-    model = canvas.edit.canvas
-  in
-    [ Form.group []
-      [ viewCaption "name" "Name"
-      , Input.text
-        [ Input.id "name", Input.value canvas.name, Input.onInput SetName
-        , if canvas.name |> BoundedContext.isNameValid
-          then Input.success
-          else Input.danger
-        ]
-      , Form.help [] [ text "Naming is hard. Writing down the name of your context and gaining agreement as a team will frame how you design the context." ]
-      , Form.invalidFeedback [] [ text "A name for a Bounded Context is required!" ]
+  [ Form.group []
+    [ viewCaption "name" "Name"
+    , Input.text
+      [ Input.id "name", Input.value canvas.name, Input.onInput SetName
+      , if canvas.name |> BoundedContext.isNameValid
+        then Input.success
+        else Input.danger
       ]
-    , Form.group []
-      [ viewCaption "key" "Key"
-      , ChangeKey.view canvas.key |> Html.map ChangeKeyMsg
-      ]
-    , Form.group []
-      [ viewCaption "description" "Description"
-      , Textarea.textarea
-        [ Textarea.id "description"
-        , Textarea.value model.description
-        , Textarea.onInput (SetDescription >> Field)
-        ]
-      , Form.help [] [ text "A few sentences describing the why and what of the context in business language. No technical details here."] ]
-    , canvas.classification
-      |> StrategicClassification.view
-      |> Html.map StrategicClassificationField
-    , Form.group []
-      [ viewCaption "businessDecisions" "Business Decisions"
-        , Form.help [] [ text "What are the key business rules and policies within this context?"]
-        , BusinessDecisionView.view canvas.businessDecisions |> Html.map BusinessDecisionField
-      ]
-    , Form.group []
-        [ viewCaption "ubiquitousLanguage" "Ubiquitous Language"
-        , Form.help [] [ text "What are the key domain terms that exist within this context, and what do they mean?" ]
-        , UbiquitousLanguage.view canvas.ubiquitousLanguage |> Html.map UbiquitousLanguageField
-        ]
+    , Form.help [] [ text "Naming is hard. Writing down the name of your context and gaining agreement as a team will frame how you design the context." ]
+    , Form.invalidFeedback [] [ text "A name for a Bounded Context is required!" ]
     ]
-    -- |> List.map (Html.map Field)
+  , Form.group []
+    [ viewCaption "key" "Key"
+    , ChangeKey.view canvas.key |> Html.map ChangeKeyMsg
+    ]
+  , canvas.description
+    |> Description.view
+    |> Html.map DescriptionField
+  , canvas.classification
+    |> StrategicClassification.view
+    |> Html.map StrategicClassificationField
+  , Form.group []
+    [ viewCaption "businessDecisions" "Business Decisions"
+      , Form.help [] [ text "What are the key business rules and policies within this context?"]
+      , BusinessDecisionView.view canvas.businessDecisions |> Html.map BusinessDecisionField
+    ]
+  , Form.group []
+      [ viewCaption "ubiquitousLanguage" "Ubiquitous Language"
+      , Form.help [] [ text "What are the key domain terms that exist within this context, and what do they mean?" ]
+      , UbiquitousLanguage.view canvas.ubiquitousLanguage |> Html.map UbiquitousLanguageField
+      ]
+  ]
 
 
 viewRightside : EditingCanvas -> List (Html EditingMsg)
@@ -390,46 +371,6 @@ viewCaption labelId caption =
     [ text caption ]
 
 
-viewInfoTooltip : String -> Html msg -> Html msg
-viewInfoTooltip title description =
-  Form.help []
-    [ Html.details []
-      [ Html.summary []
-        [ text title ]
-      , Html.p [ ] [ description ]
-      ]
-    ]
-
-viewDescriptionList : List (String, String) -> Maybe String -> Html msg
-viewDescriptionList model sourceReference =
-  let
-    footer =
-      case sourceReference of
-        Just reference ->
-          [ Html.footer
-            [ class "blockquote-footer"]
-            [ Html.a
-              [target "_blank"
-              , href reference
-              ]
-              [ text "Source of the descriptions"]
-            ]
-          ]
-        Nothing -> []
-  in
-    Html.dl []
-      ( model
-        |> List.concatMap (
-          \(t, d) ->
-            [ Html.dt [] [ text t ]
-            , Html.dd [] [ text d ]
-            ]
-        )
-      )
-    :: footer
-    |> div []
-
-
 -- HTTP
 
 loadCanvas: Api.Configuration -> BoundedContextId -> Cmd Msg
@@ -444,8 +385,8 @@ loadCanvas config contextId =
     , expect = Http.expectJson Loaded decoder
     }
 
-saveCanvas : Api.Configuration -> BoundedContext.BoundedContext -> String -> Messages -> Cmd Msg
-saveCanvas config context description messages =
+saveCanvas : Api.Configuration -> BoundedContext.BoundedContext -> Messages -> Cmd Msg
+saveCanvas config context messages =
   Http.request
     { method = "PATCH"
     , headers = []
@@ -455,7 +396,7 @@ saveCanvas config context description messages =
       |> Api.boundedContext
       |> Api.url config
       |> Url.toString
-    , body = Http.jsonBody <| BoundedContext.Canvas.modelEncoder context description messages
+    , body = Http.jsonBody <| BoundedContext.Canvas.modelEncoder context messages
     , expect = Http.expectWhatever Saved
     , timeout = Nothing
     , tracker = Nothing

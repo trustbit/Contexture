@@ -18,6 +18,7 @@ import BoundedContext.BusinessDecision
 import BoundedContext.DomainRoles
 import BoundedContext.UbiquitousLanguage
 import BoundedContext.StrategicClassification
+import BoundedContext.Description
 
 -- MODEL
 
@@ -43,8 +44,8 @@ init =
 
 -- encoders
 
-modelEncoder : BoundedContext -> String -> Messages -> Encode.Value
-modelEncoder context description messages =
+modelEncoder : BoundedContext -> Messages -> Encode.Value
+modelEncoder context messages =
   Encode.object
     [ ("name", Encode.string (context |> BoundedContext.name))
     , ("key",
@@ -52,7 +53,6 @@ modelEncoder context description messages =
           Just v -> Key.keyEncoder v
           Nothing -> Encode.null
       )
-    , ("description", Encode.string description)
     , ("messages", Message.messagesEncoder messages)
     ]
 
@@ -67,7 +67,7 @@ maybeStringDecoder parser =
 modelDecoder : Decoder BoundedContextCanvas
 modelDecoder =
   Decode.succeed BoundedContextCanvas
-    |> JP.optional "description" Decode.string ""
+    |> BoundedContext.Description.optionalDescriptionDecoder
     |> BoundedContext.StrategicClassification.optionalStategicClassificationDecoder
     |> BoundedContext.BusinessDecision.optionalBusinessDecisionsDecoder
     |> BoundedContext.UbiquitousLanguage.optionalUbiquitousLanguageDecoder
