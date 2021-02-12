@@ -215,7 +215,7 @@ view model =
 
 viewCaption : List(Html msg) -> Html msg
 viewCaption content =
-  Form.label
+  div
     [ Flex.justifyBetween
     , Flex.block
     , style "background-color" "lightGrey"
