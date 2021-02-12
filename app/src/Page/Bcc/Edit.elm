@@ -10,9 +10,7 @@ import Bootstrap.Grid as Grid
 import Bootstrap.Grid.Row as Row
 import Bootstrap.Grid.Col as Col
 import Bootstrap.Form as Form
-import Bootstrap.Form.Select as Select
 import Bootstrap.Form.Input as Input
-import Bootstrap.Form.Textarea as Textarea
 import Bootstrap.Button as Button
 import Bootstrap.Text as Text
 import Bootstrap.Utilities.Spacing as Spacing
@@ -222,7 +220,7 @@ update msg model =
       of
         Ok context ->
           ( model
-          , saveCanvas model.self context editable.edit.canvas.description (editable.addingMessage |> Messages.asMessages) 
+          , saveCanvas model.self context (editable.addingMessage |> Messages.asMessages) 
           )
         Err err ->
           let
@@ -387,8 +385,8 @@ loadCanvas config contextId =
     , expect = Http.expectJson Loaded decoder
     }
 
-saveCanvas : Api.Configuration -> BoundedContext.BoundedContext -> String -> Messages -> Cmd Msg
-saveCanvas config context description messages =
+saveCanvas : Api.Configuration -> BoundedContext.BoundedContext -> Messages -> Cmd Msg
+saveCanvas config context messages =
   Http.request
     { method = "PATCH"
     , headers = []
@@ -398,7 +396,7 @@ saveCanvas config context description messages =
       |> Api.boundedContext
       |> Api.url config
       |> Url.toString
-    , body = Http.jsonBody <| BoundedContext.Canvas.modelEncoder context description messages
+    , body = Http.jsonBody <| BoundedContext.Canvas.modelEncoder context messages
     , expect = Http.expectWhatever Saved
     , timeout = Nothing
     , tracker = Nothing
