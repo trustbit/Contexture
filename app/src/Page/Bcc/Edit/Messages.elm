@@ -23,13 +23,16 @@ import Bootstrap.Utilities.Display as Display
 import BoundedContext.Message exposing (..)
 import Set exposing (Set)
 
+import Api
+import BoundedContext.BoundedContextId exposing (BoundedContextId)
+
 -- MODEL
 
 type alias MessageReference t =
   { addingName : String
   , existingMessages : Set t }
 
-type alias Model =
+type alias MessageModel =
   { commandsHandled : MessageReference Command
   , commandsSent : MessageReference Command
   , eventsHandled : MessageReference Event
@@ -38,7 +41,13 @@ type alias Model =
   , queriesInvoked : MessageReference Query
   }
 
-asMessages : Model -> Messages
+type alias Model =
+    { messages : MessageModel
+    , configuration : Api.Configuration
+    , boundedContextId : BoundedContextId
+    }
+
+asMessages : MessageModel -> Messages
 asMessages model =
   { commandsHandled = model.commandsHandled.existingMessages
   , commandsSent = model.commandsSent.existingMessages
@@ -54,8 +63,7 @@ initReference messages =
   { addingName = ""
   , existingMessages = messages}
 
-init : Messages -> Model
-init messages =
+initMessages messages =
   { commandsHandled = initReference messages.commandsHandled
   , commandsSent = initReference messages.commandsSent
   , eventsHandled = initReference messages.eventsHandled
@@ -63,6 +71,16 @@ init messages =
   , queriesHandled = initReference messages.queriesHandled
   , queriesInvoked = initReference messages.queriesInvoked
   }
+
+init : Api.Configuration -> BoundedContextId -> Messages -> (Model, Cmd Msg)
+init config contextId messages =
+  ( { messages = initMessages messages      
+    , configuration = config
+    , boundedContextId = contextId
+    }
+  , Cmd.none
+  )
+
 -- UPDATE
 
 type Action t
@@ -102,22 +120,34 @@ updateAction msg model =
       , addingName = ""
       }
 
+noCommand model = 
+  (model, Cmd.none)
 
-update : Msg -> Model -> Model
+noCommandMessages updater model =
+  noCommand { model | messages = updater model.messages }
+
+
+update : Msg -> Model -> (Model, Cmd Msg)
 update msg model =
   case msg of
     CommandsHandled cmd ->
-      { model | commandsHandled = updateAction cmd model.commandsHandled }
+      model
+      |> noCommandMessages (\m -> { m | commandsHandled = updateAction cmd m.commandsHandled })
     CommandsSent cmd ->
-      { model | commandsSent = updateAction cmd model.commandsSent }
+      model
+      |> noCommandMessages (\m ->{ m | commandsSent = updateAction cmd m.commandsSent })
     EventsHandled event ->
-      { model | eventsHandled = updateAction event model.eventsHandled }
+      model
+      |> noCommandMessages (\m ->{ m | eventsHandled = updateAction event m.eventsHandled })
     EventsPublished event ->
-      { model | eventsPublished = updateAction event model.eventsPublished }
+      model
+      |> noCommandMessages (\m -> { m | eventsPublished = updateAction event m.eventsPublished })
     QueriesHandled query ->
-      { model | queriesHandled = updateAction query model.queriesHandled }
+      model
+      |> noCommandMessages (\m -> { m | queriesHandled = updateAction query m.queriesHandled })
     QueriesInvoked query ->
-      { model | queriesInvoked = updateAction query model.queriesInvoked }
+      model
+      |> noCommandMessages (\m -> { m | queriesInvoked = updateAction query m.queriesInvoked })
 
 -- VIEW
 
@@ -168,7 +198,7 @@ viewMessage id title { addingName, existingMessages } =
 
 
 view : Model -> Html Msg
-view model =
+view { messages } =
   div []
     [ Html.span
       [ class "text-center"
@@ -183,13 +213,13 @@ view model =
         [ Html.h6
           [ class "text-center", Spacing.p2 ]
           [ Html.strong [] [ text "Messages consumed" ] ]
-        , model.commandsHandled
+        , messages.commandsHandled
             |> viewMessage "commandsHandled" "Commands handled"
             |> Html.map CommandsHandled
-        , model.eventsHandled
+        , messages.eventsHandled
             |> viewMessage "eventsHandled" "Events handled"
             |> Html.map EventsHandled
-        , model.queriesHandled
+        , messages.queriesHandled
             |> viewMessage "queriesHandled" "Queries handled"
             |> Html.map QueriesHandled
         ]
@@ -197,13 +227,13 @@ view model =
         [ Html.h6
           [ class "text-center", Spacing.p2 ]
           [ Html.strong [] [ text "Messages produced" ] ]
-        , model.commandsSent
+        , messages.commandsSent
             |> viewMessage "commandsSent" "Commands sent"
             |> Html.map CommandsSent
-        , model.eventsPublished
+        , messages.eventsPublished
             |> viewMessage "eventsPublished" "Events published"
             |> Html.map EventsPublished
-        , model.queriesInvoked
+        , messages.queriesInvoked
             |> viewMessage "queriesInvoked" "Queries invoked"
             |> Html.map QueriesInvoked
         ]
