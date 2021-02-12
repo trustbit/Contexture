@@ -13,16 +13,24 @@ import Bootstrap.Form.Checkbox as Checkbox
 import Bootstrap.Card as Card
 import Bootstrap.Card.Block as Block
 import Bootstrap.Button as Button
+import Bootstrap.ButtonGroup as ButtonGroup
 import Bootstrap.Text as Text
 import Bootstrap.Utilities.Spacing as Spacing
+import Bootstrap.Utilities.Flex as Flex
 import Bootstrap.Utilities.Display as Display
 
 import Api
+import Http
+import Url
+
 import BoundedContext.BoundedContextId exposing(BoundedContextId)
 import BoundedContext.StrategicClassification as StrategicClassification exposing (StrategicClassification)
+import Html
+import RemoteData
 
 type alias Model =
-  { classification : StrategicClassification
+  { classification : RemoteData.WebData StrategicClassification
+  , changingClassification : Maybe StrategicClassification
   , config : Api.Configuration
   , boundedContextId : BoundedContextId
   }
@@ -30,7 +38,8 @@ type alias Model =
 
 init : Api.Configuration -> BoundedContextId -> StrategicClassification -> (Model, Cmd Msg)
 init configuration id model =
-    ( { classification = model
+    ( { classification = RemoteData.succeed model
+      , changingClassification = Nothing
       , config = configuration
       , boundedContextId = id
       }
@@ -44,43 +53,70 @@ type Action t
 
 
 type Msg
-  = SetDomainType StrategicClassification.DomainType
+  = Saved (Api.ApiResponse StrategicClassification)
+  | StartChanging
+  | SetDomainType StrategicClassification.DomainType
   | ChangeBusinessModel (Action StrategicClassification.BusinessModel)
   | SetEvolution StrategicClassification.Evolution
+  | SaveClassification StrategicClassification
+  | CancelChanging
 
 
 updateClassification : (StrategicClassification -> StrategicClassification) -> Model -> Model
 updateClassification updater model =
-  { model | classification = updater model.classification }
+  { model | changingClassification = model.changingClassification |> Maybe.map updater }
 
 noCommand model = (model, Cmd.none)
 
 update : Msg -> Model -> (Model, Cmd Msg)
-update msg classification =
+update msg model =
   case msg of
+    StartChanging ->
+      noCommand { model | changingClassification = model.classification |> RemoteData.toMaybe }
+
+    CancelChanging ->
+      noCommand { model | changingClassification = Nothing }
+
+    SaveClassification classification ->
+      ( model
+      , StrategicClassification.reclassify model.config model.boundedContextId classification Saved)
+
+    Saved (Ok classification) ->
+      noCommand
+        { model
+        | classification = RemoteData.succeed classification
+        , changingClassification = Nothing
+        }
+
+    Saved (Err error) ->
+      Debug.todo "Error"
+      noCommand <| Debug.log "Error on save " model
+
     SetDomainType class ->
-      classification
+      model
       |> updateClassification (\c -> { c | domain = Just class })
       |> noCommand
 
     ChangeBusinessModel (Add business) ->
-      classification
+      model
       |> updateClassification (\c -> { c | business = business :: c.business})
       |> noCommand
 
     ChangeBusinessModel (Remove business) ->
-      classification
+      model
       |> updateClassification (\c -> { c | business = c.business |> List.filter (\bm -> bm /= business )})
       |> noCommand
 
     SetEvolution evo ->
-      classification
+      model
       |> updateClassification (\c -> { c | evolution = Just evo })
       |> noCommand
 
 
-view : Model -> Html Msg
-view { classification } =
+
+
+viewClassification : StrategicClassification -> Html Msg
+viewClassification classification =
   let
     domainDescriptions =
       [ StrategicClassification.Core, StrategicClassification.Supporting, StrategicClassification.Generic ]
@@ -95,65 +131,99 @@ view { classification } =
       |> List.map StrategicClassification.evolutionDescription
       |> List.map (\d -> (d.name, d.description))
   in
-  Form.group []
-    [ Grid.row []
-      [ Grid.col [] [ viewCaption "" "Strategic Classification"]]
-    , Grid.row []
-      [ Grid.col []
-        [ viewLabel "classification" "Domain"
+    Grid.simpleRow
+    [ Grid.col []
+      [ viewLabel "classification" "Domain"
+      , div []
+          ( Radio.radioList "classification"
+            [ viewRadioButton "core" classification.domain StrategicClassification.Core SetDomainType StrategicClassification.domainDescription
+            , viewRadioButton "supporting" classification.domain StrategicClassification.Supporting SetDomainType StrategicClassification.domainDescription
+            , viewRadioButton "generic" classification.domain StrategicClassification.Generic SetDomainType StrategicClassification.domainDescription
+            -- TODO: Other
+            ]
+          )
+        , viewDescriptionList domainDescriptions Nothing
+          |> viewInfoTooltip "How important is this context to the success of your organisation?"
+        ]
+      , Grid.col []
+        [ viewLabel "businessModel" "Business Model"
         , div []
-            ( Radio.radioList "classification"
-              [ viewRadioButton "core" classification.domain StrategicClassification.Core SetDomainType StrategicClassification.domainDescription
-              , viewRadioButton "supporting" classification.domain StrategicClassification.Supporting SetDomainType StrategicClassification.domainDescription
-              , viewRadioButton "generic" classification.domain StrategicClassification.Generic SetDomainType StrategicClassification.domainDescription
+            [ viewCheckbox "revenue" StrategicClassification.businessDescription StrategicClassification.Revenue classification.business
+            , viewCheckbox "engagement" StrategicClassification.businessDescription StrategicClassification.Engagement classification.business
+            , viewCheckbox "Compliance" StrategicClassification.businessDescription StrategicClassification.Compliance classification.business
+            , viewCheckbox "costReduction" StrategicClassification.businessDescription StrategicClassification.CostReduction classification.business
+            -- TODO: Other
+            ]
+            |> Html.map ChangeBusinessModel
+
+        , viewDescriptionList businessDescriptions Nothing
+          |> viewInfoTooltip "What role does the context play in your business model?"
+        ]
+      , Grid.col []
+        [ viewLabel "evolution" "Evolution"
+        , div []
+            ( Radio.radioList "evolution"
+              [ viewRadioButton "genesis" classification.evolution StrategicClassification.Genesis SetEvolution StrategicClassification.evolutionDescription
+              , viewRadioButton "customBuilt" classification.evolution StrategicClassification.CustomBuilt SetEvolution StrategicClassification.evolutionDescription
+              , viewRadioButton "product" classification.evolution StrategicClassification.Product SetEvolution StrategicClassification.evolutionDescription
+              , viewRadioButton "commodity" classification.evolution StrategicClassification.Commodity SetEvolution StrategicClassification.evolutionDescription
               -- TODO: Other
               ]
             )
-          , viewDescriptionList domainDescriptions Nothing
-            |> viewInfoTooltip "How important is this context to the success of your organisation?"
-          ]
-        , Grid.col []
-          [ viewLabel "businessModel" "Business Model"
-          , div []
-              [ viewCheckbox "revenue" StrategicClassification.businessDescription StrategicClassification.Revenue classification.business
-              , viewCheckbox "engagement" StrategicClassification.businessDescription StrategicClassification.Engagement classification.business
-              , viewCheckbox "Compliance" StrategicClassification.businessDescription StrategicClassification.Compliance classification.business
-              , viewCheckbox "costReduction" StrategicClassification.businessDescription StrategicClassification.CostReduction classification.business
-              -- TODO: Other
-              ]
-              |> Html.map ChangeBusinessModel
-
-          , viewDescriptionList businessDescriptions Nothing
-            |> viewInfoTooltip "What role does the context play in your business model?"
-          ]
-        , Grid.col []
-          [ viewLabel "evolution" "Evolution"
-          , div []
-              ( Radio.radioList "evolution"
-                [ viewRadioButton "genesis" classification.evolution StrategicClassification.Genesis SetEvolution StrategicClassification.evolutionDescription
-                , viewRadioButton "customBuilt" classification.evolution StrategicClassification.CustomBuilt SetEvolution StrategicClassification.evolutionDescription
-                , viewRadioButton "product" classification.evolution StrategicClassification.Product SetEvolution StrategicClassification.evolutionDescription
-                , viewRadioButton "commodity" classification.evolution StrategicClassification.Commodity SetEvolution StrategicClassification.evolutionDescription
-                -- TODO: Other
-                ]
-              )
-            , viewDescriptionList evolutionDescriptions Nothing
-            |> viewInfoTooltip "How evolved is the concept (see Wardley Maps)"
-          ]
+          , viewDescriptionList evolutionDescriptions Nothing
+          |> viewInfoTooltip "How evolved is the concept (see Wardley Maps)"
+        ]
       ]
-    ]
 
 
 
-viewCaption : String -> String -> Html msg
-viewCaption labelId caption =
+view : Model -> Html Msg
+view model =
+  div []
+    ( case model.changingClassification of
+        Just classification ->
+          [ Grid.row []
+            [ Grid.col []
+              [ viewCaption ""
+                [ text "Strategic Classification"
+                , ButtonGroup.buttonGroup []
+                  [ ButtonGroup.button [ Button.primary, Button.small, Button.onClick (SaveClassification classification)] [text "Reclassify"]
+                  , ButtonGroup.button [ Button.secondary, Button.small, Button.onClick CancelChanging] [text "X"]
+                  ]
+                ]
+              ]
+            ]
+          ,  Html.fieldset [] [ viewClassification classification ]
+          ]
+
+        Nothing ->
+          [ Grid.row []
+            [ Grid.col []
+              [ viewCaption "" [text "Strategic Classification"
+              , Button.button [ Button.outlinePrimary, Button.small, Button.onClick StartChanging] [text "Start Classification"]]
+              ]
+            ]
+          , Html.fieldset [ attribute "disabled" "disabled"] [
+            case model.classification of
+              RemoteData.Success classification ->
+                viewClassification classification
+              _ ->
+                text "Loading"
+          ]
+          ]
+      )
+
+
+viewCaption : String -> List(Html msg) -> Html msg
+viewCaption labelId content =
   Form.label
     [ for labelId
-    , Display.block
+    , Flex.justifyBetween
+    , Flex.block
     , style "background-color" "lightGrey"
     , Spacing.p2
     ]
-    [ text caption ]
+    content
 
 viewRadioButton : String  -> Maybe value -> value -> (value -> m) -> (value -> StrategicClassification.Description) -> Radio.Radio m
 viewRadioButton id currentValue option toMsg toTitle =
@@ -188,7 +258,6 @@ viewInfoTooltip title description =
     ]
 
 
-
 viewDescriptionList : List (String, String) -> Maybe String -> Html msg
 viewDescriptionList model sourceReference =
   let
@@ -217,3 +286,5 @@ viewDescriptionList model sourceReference =
       )
     :: footer
     |> div []
+
+

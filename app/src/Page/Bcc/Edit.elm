@@ -40,6 +40,7 @@ import Page.Bcc.Edit.Messages as Messages
 import Page.Bcc.Edit.UbiquitousLanguage as UbiquitousLanguage
 import Page.Bcc.Edit.StrategicClassification as StrategicClassification
 import BoundedContext.UbiquitousLanguage exposing (UbiquitousLanguage(..))
+import BoundedContext.Message exposing (Messages)
 import BoundedContext.BusinessDecision exposing (BusinessDecision(..))
 import Page.Bcc.Edit.BusinessDecision as BusinessDecisionView exposing (view, Msg, Model, init)
 import Page.Bcc.Edit.DomainRoles as DomainRolesView exposing (view, Msg, Model, init)
@@ -228,18 +229,9 @@ update msg model =
         |> Result.andThen (BoundedContext.changeName editable.name >> Result.mapError ContextProblem)
       of
         Ok context ->
-          let
-            c = editable.edit.canvas
-            canvas =
-              { c
-              | messages = editable.addingMessage |> Messages.asMessages
-              , ubiquitousLanguage = editable.ubiquitousLanguage.language
-              , businessDecisions = editable.businessDecisions.decisions
-              , domainRoles = editable.domainRoles.roles
-              , classification = editable.classification.classification
-              }
-          in
-            (model, saveCanvas model.self context canvas)
+          ( model
+          , saveCanvas model.self context editable.edit.canvas.description (editable.addingMessage |> Messages.asMessages) 
+          )
         Err err ->
           let
             _ = Debug.log "error" err
@@ -452,8 +444,8 @@ loadCanvas config contextId =
     , expect = Http.expectJson Loaded decoder
     }
 
-saveCanvas : Api.Configuration -> BoundedContext.BoundedContext -> BoundedContextCanvas -> Cmd Msg
-saveCanvas config context canvas =
+saveCanvas : Api.Configuration -> BoundedContext.BoundedContext -> String -> Messages -> Cmd Msg
+saveCanvas config context description messages =
   Http.request
     { method = "PATCH"
     , headers = []
@@ -463,7 +455,7 @@ saveCanvas config context canvas =
       |> Api.boundedContext
       |> Api.url config
       |> Url.toString
-    , body = Http.jsonBody <| BoundedContext.Canvas.modelEncoder context canvas
+    , body = Http.jsonBody <| BoundedContext.Canvas.modelEncoder context description messages
     , expect = Http.expectWhatever Saved
     , timeout = Nothing
     , tracker = Nothing

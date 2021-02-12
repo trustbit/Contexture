@@ -1,13 +1,19 @@
 module BoundedContext.StrategicClassification exposing (
     StrategicClassification, DomainType(..),BusinessModel(..),Evolution(..),
     noClassification,
-    encoder, decoder,
+    reclassify,
+    stategicClassificationDecoder,optionalStategicClassificationDecoder,
     Description, domainDescription, businessDescription, evolutionDescription
     )
 
 import Json.Encode as Encode
 import Json.Decode as Decode exposing (Decoder)
 import Json.Decode.Pipeline as JP
+
+import Api
+import Http
+import Url
+import BoundedContext.BoundedContextId exposing (BoundedContextId)
 
 
 type DomainType
@@ -131,7 +137,37 @@ evolutionParser evolution =
       "Commodity" -> Just Commodity
       _ -> Nothing
 
+
+reclassify : Api.Configuration -> BoundedContextId -> StrategicClassification -> Api.ApiResult StrategicClassification msg
+reclassify configuration contextId classification =
+    let
+        api = Api.boundedContext contextId
+        request toMsg =
+            Http.request
+                { method = "PATCH"
+                , url = api |> Api.url configuration |> Url.toString
+                , body = Http.jsonBody <|
+                    Encode.object [ stategicClassificationEncoder classification ]
+                , expect = Http.expectJson toMsg stategicClassificationDecoder
+                , timeout = Nothing
+                , tracker = Nothing
+                , headers = []
+                }
+    in
+        request
+
+
 -- encoder
+
+stategicClassificationEncoder classification = ("classification", encoder classification)
+
+stategicClassificationDecoder : Decode.Decoder StrategicClassification
+stategicClassificationDecoder = Decode.at [ "classification"] decoder
+
+optionalStategicClassificationDecoder : Decode.Decoder (StrategicClassification -> b) -> Decode.Decoder b
+optionalStategicClassificationDecoder =
+    JP.optional "classification" decoder noClassification
+
 
 
 maybeEncoder : (t -> Encode.Value) -> Maybe t -> Encode.Value
