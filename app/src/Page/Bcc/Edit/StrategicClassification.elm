@@ -17,16 +17,14 @@ import Bootstrap.ButtonGroup as ButtonGroup
 import Bootstrap.Text as Text
 import Bootstrap.Utilities.Spacing as Spacing
 import Bootstrap.Utilities.Flex as Flex
-import Bootstrap.Utilities.Display as Display
 
 import Api
-import Http
-import Url
 
 import BoundedContext.BoundedContextId exposing(BoundedContextId)
 import BoundedContext.StrategicClassification as StrategicClassification exposing (StrategicClassification)
 import Html
 import RemoteData
+
 
 type alias Model =
   { classification : RemoteData.WebData StrategicClassification
@@ -176,7 +174,6 @@ viewClassification classification =
       ]
 
 
-
 view : Model -> Html Msg
 view model =
   div []
@@ -184,7 +181,7 @@ view model =
         Just classification ->
           [ Grid.row []
             [ Grid.col []
-              [ viewCaption ""
+              [ viewCaption
                 [ text "Strategic Classification"
                 , ButtonGroup.buttonGroup []
                   [ ButtonGroup.button [ Button.primary, Button.small, Button.onClick (SaveClassification classification)] [text "Reclassify"]
@@ -193,43 +190,46 @@ view model =
                 ]
               ]
             ]
-          ,  Html.fieldset [] [ viewClassification classification ]
+          , Html.fieldset [] [ viewClassification classification ]
           ]
 
         Nothing ->
           [ Grid.row []
             [ Grid.col []
-              [ viewCaption "" [text "Strategic Classification"
-              , Button.button [ Button.outlinePrimary, Button.small, Button.onClick StartChanging] [text "Start Classification"]]
+              [ viewCaption
+                [ text "Strategic Classification"
+                , Button.button [ Button.outlinePrimary, Button.small, Button.onClick StartChanging] [text "Start Classification"]
+                ]
               ]
             ]
-          , Html.fieldset [ attribute "disabled" "disabled"] [
-            case model.classification of
-              RemoteData.Success classification ->
-                viewClassification classification
-              _ ->
-                text "Loading"
-          ]
+          , Html.fieldset [ attribute "disabled" "disabled"] 
+            [ case model.classification of
+                RemoteData.Success classification ->
+                  viewClassification classification
+                _ ->
+                  text "Loading"
+            ]
           ]
       )
 
 
-viewCaption : String -> List(Html msg) -> Html msg
-viewCaption labelId content =
+viewCaption : List(Html msg) -> Html msg
+viewCaption content =
   Form.label
-    [ for labelId
-    , Flex.justifyBetween
+    [ Flex.justifyBetween
     , Flex.block
     , style "background-color" "lightGrey"
     , Spacing.p2
     ]
     content
 
+
 viewRadioButton : String  -> Maybe value -> value -> (value -> m) -> (value -> StrategicClassification.Description) -> Radio.Radio m
 viewRadioButton id currentValue option toMsg toTitle =
   Radio.createAdvanced
     [ Radio.id id, Radio.onClick (toMsg option), Radio.checked (currentValue == Just option) ]
     (Radio.label [] [ text (toTitle option).name ])
+
 
 viewCheckbox : String -> (value -> StrategicClassification.Description) -> value -> List value -> Html (Action value)
 viewCheckbox id description value currentValues =
@@ -246,6 +246,7 @@ viewLabel labelId caption =
   Form.label
     [ for labelId ]
     [ Html.b [] [ text caption ] ]
+
 
 viewInfoTooltip : String -> Html msg -> Html msg
 viewInfoTooltip title description =
