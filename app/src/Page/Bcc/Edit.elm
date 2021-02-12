@@ -221,7 +221,7 @@ update msg model =
       of
         Ok context ->
           ( model
-          , saveCanvas model.self context (editable.addingMessage.messages |> Messages.asMessages) 
+          , saveCanvas model.self context
           )
         Err err ->
           let
@@ -386,8 +386,8 @@ loadCanvas config contextId =
     , expect = Http.expectJson Loaded decoder
     }
 
-saveCanvas : Api.Configuration -> BoundedContext.BoundedContext -> Messages -> Cmd Msg
-saveCanvas config context messages =
+saveCanvas : Api.Configuration -> BoundedContext.BoundedContext -> Cmd Msg
+saveCanvas config context =
   Http.request
     { method = "PATCH"
     , headers = []
@@ -397,7 +397,7 @@ saveCanvas config context messages =
       |> Api.boundedContext
       |> Api.url config
       |> Url.toString
-    , body = Http.jsonBody <| BoundedContext.Canvas.modelEncoder context messages
+    , body = Http.jsonBody <| BoundedContext.Canvas.modelEncoder context
     , expect = Http.expectWhatever Saved
     , timeout = Nothing
     , tracker = Nothing

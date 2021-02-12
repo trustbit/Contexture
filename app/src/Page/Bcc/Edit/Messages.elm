@@ -1,8 +1,6 @@
 module Page.Bcc.Edit.Messages exposing (
   Msg(..), Model,
-  view, update, init,
-  asMessages
-  )
+  view, update, init)
 
 import Html exposing (Html, button, div, text)
 import Html.Attributes exposing (..)
@@ -20,7 +18,7 @@ import Bootstrap.Utilities.Flex as Flex
 import Bootstrap.Utilities.Spacing as Spacing
 import Bootstrap.Utilities.Display as Display
 
-import BoundedContext.Message exposing (..)
+import BoundedContext.Message as Message exposing (Messages, Command, Query, Event, Message)
 import Set exposing (Set)
 
 import Api
@@ -100,6 +98,7 @@ type Msg
   | EventsPublished ChangeTypeMsg
   | QueriesHandled ChangeTypeMsg
   | QueriesInvoked ChangeTypeMsg
+  | Saved (Api.ApiResponse Messages)
 
 updateMessageAction : MessageAction -> Set Message  -> Set Message
 updateMessageAction action messages =
@@ -123,8 +122,14 @@ updateAction msg model =
 noCommand model = 
   (model, Cmd.none)
 
-noCommandMessages updater model =
-  noCommand { model | messages = updater model.messages }
+noCommandMessages changeType updater model =
+  case changeType of
+    FieldEdit _ ->
+      noCommand { model | messages = model.messages |> updater}
+    MessageChanged _ ->
+      ( model
+      , Message.updateMessages model.configuration model.boundedContextId (model.messages |> updater |> asMessages) Saved
+      )
 
 
 update : Msg -> Model -> (Model, Cmd Msg)
@@ -132,22 +137,29 @@ update msg model =
   case msg of
     CommandsHandled cmd ->
       model
-      |> noCommandMessages (\m -> { m | commandsHandled = updateAction cmd m.commandsHandled })
+      |> noCommandMessages cmd (\m -> { m | commandsHandled = updateAction cmd m.commandsHandled })
     CommandsSent cmd ->
       model
-      |> noCommandMessages (\m ->{ m | commandsSent = updateAction cmd m.commandsSent })
+      |> noCommandMessages cmd (\m ->{ m | commandsSent = updateAction cmd m.commandsSent })
     EventsHandled event ->
       model
-      |> noCommandMessages (\m ->{ m | eventsHandled = updateAction event m.eventsHandled })
+      |> noCommandMessages event (\m ->{ m | eventsHandled = updateAction event m.eventsHandled })
     EventsPublished event ->
       model
-      |> noCommandMessages (\m -> { m | eventsPublished = updateAction event m.eventsPublished })
+      |> noCommandMessages event (\m -> { m | eventsPublished = updateAction event m.eventsPublished })
     QueriesHandled query ->
       model
-      |> noCommandMessages (\m -> { m | queriesHandled = updateAction query m.queriesHandled })
+      |> noCommandMessages query (\m -> { m | queriesHandled = updateAction query m.queriesHandled })
     QueriesInvoked query ->
       model
-      |> noCommandMessages (\m -> { m | queriesInvoked = updateAction query m.queriesInvoked })
+      |> noCommandMessages query (\m -> { m | queriesInvoked = updateAction query m.queriesInvoked })
+    
+    Saved (Ok messages) ->
+      ( { model | messages = initMessages messages }
+      , Cmd.none
+      )
+    Saved (Err err) ->
+      (model, Cmd.none)
 
 -- VIEW
 
