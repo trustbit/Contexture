@@ -176,7 +176,7 @@ viewClassification classification =
 
 view : Model -> Html Msg
 view model =
-  div []
+  Form.group []
     ( case model.changingClassification of
         Just classification ->
           [ Grid.row []
@@ -190,7 +190,8 @@ view model =
                 ]
               ]
             ]
-          , Html.fieldset [] [ viewClassification classification ]
+          , Grid.simpleRow
+            [ Grid.col [] [ Html.fieldset [] [ viewClassification classification ]] ]
           ]
 
         Nothing ->
@@ -202,12 +203,16 @@ view model =
                 ]
               ]
             ]
-          , Html.fieldset [ attribute "disabled" "disabled"] 
-            [ case model.classification of
-                RemoteData.Success classification ->
-                  viewClassification classification
-                _ ->
-                  text "Loading"
+          , Grid.simpleRow
+            [ Grid.col []
+              [ Html.fieldset [ attribute "disabled" "disabled"]
+                [ case model.classification of
+                    RemoteData.Success classification ->
+                      viewClassification classification
+                    _ ->
+                      text "Loading"
+                ]
+              ]
             ]
           ]
       )
