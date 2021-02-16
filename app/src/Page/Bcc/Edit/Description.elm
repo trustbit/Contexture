@@ -125,7 +125,7 @@ view model =
                 RemoteData.Success description ->
                   if String.isEmpty description
                   then Grid.col [Col.attrs [ class "text-muted", class "text-center"] ] [ Html.i [] [ text "No description :-(" ]]
-                  else Grid.col [] [ Form.help [] [ text description ]]
+                  else Grid.col [ Col.attrs [ class "text-muted" ] ] [ text description ]
                 _ ->
                   Grid.col [] [ text "Loading"]
             ]

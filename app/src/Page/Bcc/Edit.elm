@@ -38,6 +38,7 @@ import Page.Bcc.Edit.Messages as Messages
 import Page.Bcc.Edit.UbiquitousLanguage as UbiquitousLanguage
 import Page.Bcc.Edit.StrategicClassification as StrategicClassification
 import Page.Bcc.Edit.Description as Description
+import Page.Bcc.Edit.Name as Name
 import BoundedContext.UbiquitousLanguage exposing (UbiquitousLanguage(..))
 import BoundedContext.Message exposing (Messages)
 import BoundedContext.BusinessDecision exposing (BusinessDecision(..))
@@ -57,7 +58,7 @@ type alias CanvasModel =
 type alias EditingCanvas =
   { edit : CanvasModel
     -- TODO: discuss we want this in edit or BCC - it's not persisted after all!
-  , name : String
+  , name : Name.Model
   , key : ChangeKey.Model
   , addingMessage : Messages.Model
   , addingDependencies : Dependencies.Model
@@ -90,11 +91,12 @@ initWithCanvas config model =
     (classificationModel, classificationCmd) = StrategicClassification.init config (model.boundedContext |> BoundedContext.id) model.canvas.classification
     (descriptionModel, descriptionCmd) = Description.init config (model.boundedContext |> BoundedContext.id) model.canvas.description
     (messagesModel, messagesCmd) = Messages.init config (model.boundedContext |> BoundedContext.id) model.canvas.messages
+    (nameModel, nameCmd) = Name.init config model.boundedContext
   in
     ( { addingMessage = messagesModel
       , addingDependencies = addingDependency
       , ubiquitousLanguage = ubiquitousLanguageModel
-      , name = model.boundedContext |> BoundedContext.name
+      , name = nameModel
       , key = changeKeyModel
       , edit = model
       , problem = Nothing
@@ -112,6 +114,7 @@ initWithCanvas config model =
       , classificationCmd |> Cmd.map StrategicClassificationField
       , descriptionCmd |> Cmd.map DescriptionField
       , messagesCmd |> Cmd.map MessageField
+      , nameCmd |> Cmd.map SetName
       ]
     )
 
@@ -134,7 +137,7 @@ init key config contextId =
 type EditingMsg
   = DescriptionField Description.Msg
   -- TODO the editing is actually part of the BoundedContext - move there or to the index page?!
-  | SetName String
+  | SetName Name.Msg
   | ChangeKeyMsg ChangeKey.Msg
   | DependencyField Dependencies.Msg
   | MessageField Messages.Msg
@@ -163,8 +166,10 @@ updateEdit msg model =
       |> Tuple.mapFirst(\m -> { model | description = m})
       |> Tuple.mapSecond(Cmd.map DescriptionField)
 
-    SetName name ->
-      ({ model | name = name}, Cmd.none)
+    SetName nameMsg ->
+      Name.update nameMsg model.name
+      |> Tuple.mapFirst(\m -> { model | name = m})
+      |> Tuple.mapSecond(Cmd.map SetName)
 
     UbiquitousLanguageField languageMsg ->
       UbiquitousLanguage.update languageMsg model.ubiquitousLanguage
@@ -217,7 +222,7 @@ update msg model =
         editable.key.value
         |> Result.mapError KeyProblem
         |> Result.map (\k -> BoundedContext.changeKey k editable.edit.boundedContext)
-        |> Result.andThen (BoundedContext.changeName editable.name >> Result.mapError ContextProblem)
+        -- |> Result.andThen (BoundedContext.changeName editable.name >> Result.mapError ContextProblem)
       of
         Ok context ->
           ( model
@@ -297,8 +302,9 @@ viewActions model =
         [ Button.primary
         , Button.onClick Save
         , Button.disabled
-          ( (model.name |> BoundedContext.isNameValid |> not)
-          || (model.problem |> Maybe.map (\_ -> True) |> Maybe.withDefault False)
+          ( 
+            -- (model.name |> BoundedContext.isNameValid |> not)
+           (model.problem |> Maybe.map (\_ -> True) |> Maybe.withDefault False)
           )
         ]
         [ text "Save"]
@@ -314,17 +320,9 @@ viewCanvas model =
 
 viewLeftside : EditingCanvas -> List (Html EditingMsg)
 viewLeftside canvas =
-  [ Form.group []
-    [ viewCaption "name" "Name"
-    , Input.text
-      [ Input.id "name", Input.value canvas.name, Input.onInput SetName
-      , if canvas.name |> BoundedContext.isNameValid
-        then Input.success
-        else Input.danger
-      ]
-    , Form.help [] [ text "Naming is hard. Writing down the name of your context and gaining agreement as a team will frame how you design the context." ]
-    , Form.invalidFeedback [] [ text "A name for a Bounded Context is required!" ]
-    ]
+  [ canvas.name
+    |> Name.view
+    |> Html.map SetName
   , Form.group []
     [ viewCaption "key" "Key"
     , ChangeKey.view canvas.key |> Html.map ChangeKeyMsg

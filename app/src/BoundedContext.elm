@@ -1,6 +1,6 @@
 module BoundedContext exposing (
-  BoundedContext, Problem,
-  changeName, name, isNameValid,
+  BoundedContext, Problem, Name,
+  changeName, name, isName,
   domain, id, key, changeKey,
   move, remove, assignKey,
   newBoundedContext,
@@ -21,6 +21,9 @@ import BoundedContext.BoundedContextId exposing (BoundedContextId, idDecoder)
 
 -- MODEL
 
+type Name
+  = Name String
+
 type Problem
   = NameInvalid
 
@@ -34,19 +37,21 @@ type alias Internals =
   , key : Maybe Key
   }
 
-isNameValid : String -> Bool
-isNameValid couldBeName =
-  String.length couldBeName > 0
+isName : String -> Result Problem Name
+isName couldBeName =
+  if String.length couldBeName > 0
+  then Ok (Name couldBeName)
+  else Err NameInvalid
 
-changeName : String -> BoundedContext -> Result Problem BoundedContext
-changeName couldBeName (BoundedContext context) =
-  if isNameValid couldBeName
-  then
-    { context | name = couldBeName }
-    |> BoundedContext
-    |> Ok
-  else
-    Err NameInvalid
+-- changeName : String -> BoundedContext -> Result Problem Name
+-- changeName couldBeName (BoundedContext context) =
+--   if isNameValid couldBeName
+--   then
+--     { context | name = couldBeName }
+--     |> BoundedContext
+--     |> Ok
+--   else
+--     Err NameInvalid
 
 changeKey : Maybe Key -> BoundedContext -> BoundedContext
 changeKey aKey (BoundedContext context) =
@@ -160,5 +165,22 @@ newBoundedContext config domainId contextName =
         , body = Http.jsonBody <| Encode.object [ ("name", Encode.string contextName) ]
         , expect = Http.expectJson toMsg modelDecoder
         }
+  in
+    request
+
+
+changeName : Api.Configuration -> BoundedContextId -> Name -> ApiResult BoundedContext msg
+changeName config contextId (Name contextName) =
+  let
+    request toMsg =
+      Http.request
+      { method = "PATCH"
+      , headers = []
+      , url = contextId |> Api.boundedContext |> Api.url config |> Url.toString
+      , body = Http.jsonBody <| Encode.object [ ("name", Encode.string contextName) ]
+      , expect = Http.expectJson toMsg modelDecoder
+      , timeout = Nothing
+      , tracker = Nothing
+      }
   in
     request
