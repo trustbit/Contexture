@@ -12,9 +12,6 @@ import Bootstrap.Grid.Row as Row
 import Bootstrap.Grid.Col as Col
 import Bootstrap.Form as Form
 import Bootstrap.Form.Input as Input
-import Bootstrap.Form.Textarea as Textarea
-import Bootstrap.Card as Card
-import Bootstrap.Card.Block as Block
 import Bootstrap.Button as Button
 import Bootstrap.ButtonGroup as ButtonGroup
 import Bootstrap.Utilities.Spacing as Spacing
@@ -24,7 +21,6 @@ import Api
 
 import BoundedContext as BoundedContext exposing(BoundedContext, Name)
 import Html
-import RemoteData
 
 type alias NameChange = 
   { name : String
@@ -102,22 +98,25 @@ view model =
   Form.group []
     ( case model.changingName of
         Just { name, potentialName } ->
-          [ Form.form []
+          let
+            (events, disabled, inputType) = 
+              case potentialName of
+                Ok boundedContext ->
+                  ([ onSubmit (ChangeName boundedContext)],False, Input.success)
+                Err _ ->
+                  ([], True, Input.danger)
+          in 
+          [ Form.form events
             [ Grid.row []
               [ Grid.col []
                 [ viewCaption
                   [ text "Name"
                   , ButtonGroup.buttonGroup []
                     [ ButtonGroup.button 
-                      ( [ Button.primary
+                      [ Button.primary
                       , Button.small
-                      ] |> List.append (case potentialName of 
-                          Ok boundedContext ->
-                            [ Button.onClick (ChangeName boundedContext), Button.attrs [ type_ "submit"]]
-                          Err _ ->
-                            [ Button.disabled True ]
-                      )
-                      )
+                      , Button.disabled disabled
+                      ]
                       [ text "Change Name" ]
                     , ButtonGroup.button [ Button.secondary, Button.small, Button.onClick CancelChanging] [text "X"]
                     ]
@@ -127,10 +126,10 @@ view model =
             , Grid.row [ Row.attrs [ Spacing.pt2, style "min-height" "80px"] ]
               [ Grid.col [] 
                 [ Input.text 
-                  [ Input.id "name", Input.value name, Input.onInput SetName
-                  , case potentialName of
-                      Ok _ -> Input.success
-                      Err _ -> Input.danger
+                  [ Input.id "name"
+                  , Input.value name
+                  , Input.onInput SetName
+                  , inputType
                   ]
                 , Form.help [] [ text "Naming is hard. Writing down the name of your context and gaining agreement as a team will frame how you design the context."] 
                 , Form.invalidFeedback [] [ text "A name for a Bounded Context is required!" ]

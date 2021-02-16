@@ -72,7 +72,6 @@ type alias EditingCanvas =
 
 type Problem
   = KeyProblem ChangeKey.KeyError
-  | ContextProblem BoundedContext.Problem
 
 type alias Model =
   { key: Nav.Key
@@ -114,7 +113,7 @@ initWithCanvas config model =
       , classificationCmd |> Cmd.map StrategicClassificationField
       , descriptionCmd |> Cmd.map DescriptionField
       , messagesCmd |> Cmd.map MessageField
-      , nameCmd |> Cmd.map SetName
+      , nameCmd |> Cmd.map NameField
       ]
     )
 
@@ -137,7 +136,7 @@ init key config contextId =
 type EditingMsg
   = DescriptionField Description.Msg
   -- TODO the editing is actually part of the BoundedContext - move there or to the index page?!
-  | SetName Name.Msg
+  | NameField Name.Msg
   | ChangeKeyMsg ChangeKey.Msg
   | DependencyField Dependencies.Msg
   | MessageField Messages.Msg
@@ -166,10 +165,10 @@ updateEdit msg model =
       |> Tuple.mapFirst(\m -> { model | description = m})
       |> Tuple.mapSecond(Cmd.map DescriptionField)
 
-    SetName nameMsg ->
+    NameField nameMsg ->
       Name.update nameMsg model.name
       |> Tuple.mapFirst(\m -> { model | name = m})
-      |> Tuple.mapSecond(Cmd.map SetName)
+      |> Tuple.mapSecond(Cmd.map NameField)
 
     UbiquitousLanguageField languageMsg ->
       UbiquitousLanguage.update languageMsg model.ubiquitousLanguage
@@ -222,7 +221,6 @@ update msg model =
         editable.key.value
         |> Result.mapError KeyProblem
         |> Result.map (\k -> BoundedContext.changeKey k editable.edit.boundedContext)
-        -- |> Result.andThen (BoundedContext.changeName editable.name >> Result.mapError ContextProblem)
       of
         Ok context ->
           ( model
@@ -303,7 +301,6 @@ viewActions model =
         , Button.onClick Save
         , Button.disabled
           ( 
-            -- (model.name |> BoundedContext.isNameValid |> not)
            (model.problem |> Maybe.map (\_ -> True) |> Maybe.withDefault False)
           )
         ]
@@ -322,7 +319,7 @@ viewLeftside : EditingCanvas -> List (Html EditingMsg)
 viewLeftside canvas =
   [ canvas.name
     |> Name.view
-    |> Html.map SetName
+    |> Html.map NameField
   , Form.group []
     [ viewCaption "key" "Key"
     , ChangeKey.view canvas.key |> Html.map ChangeKeyMsg
