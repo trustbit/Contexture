@@ -10,7 +10,6 @@ import Bootstrap.Grid.Row as Row
 import Bootstrap.Grid.Col as Col
 import Bootstrap.Form as Form
 import Bootstrap.Button as Button
-import Bootstrap.Text as Text
 import Bootstrap.Utilities.Spacing as Spacing
 import Bootstrap.Utilities.Display as Display
 
@@ -26,8 +25,6 @@ import Route
 
 import BoundedContext
 import BoundedContext.BoundedContextId exposing (BoundedContextId)
-import BoundedContext.StrategicClassification as StrategicClassification
-import BoundedContext.UbiquitousLanguage as UbiquitousLanguage
 import BoundedContext.Canvas exposing (BoundedContextCanvas)
 
 
@@ -38,13 +35,8 @@ import Page.Bcc.Edit.StrategicClassification as StrategicClassification
 import Page.Bcc.Edit.Description as Description
 import Page.Bcc.Edit.Name as Name
 import Page.Bcc.Edit.Key as Key
-import BoundedContext.UbiquitousLanguage exposing (UbiquitousLanguage(..))
-import BoundedContext.Message exposing (Messages)
-import BoundedContext.BusinessDecision exposing (BusinessDecision(..))
-import Page.Bcc.Edit.BusinessDecision as BusinessDecisionView exposing (view, Msg, Model, init)
-import Page.Bcc.Edit.DomainRoles as DomainRolesView exposing (view, Msg, Model, init)
-import BoundedContext.DomainRoles exposing (getName)
-
+import Page.Bcc.Edit.BusinessDecision as BusinessDecisionView
+import Page.Bcc.Edit.DomainRoles as DomainRolesView
 
 
 -- MODEL
@@ -64,7 +56,7 @@ type alias EditingCanvas =
   , ubiquitousLanguage : UbiquitousLanguage.Model
   , businessDecisions : BusinessDecisionView.Model
   , domainRoles : DomainRolesView.Model
-  , classification : StrategicClassification.Model 
+  , classification : StrategicClassification.Model
   , description : Description.Model
   }
 
@@ -142,7 +134,7 @@ type EditingMsg
 type Msg
   = Loaded (Result Http.Error CanvasModel)
   | Editing EditingMsg
-   
+
 
 updateEdit : EditingMsg -> EditingCanvas -> (EditingCanvas, Cmd EditingMsg)
 updateEdit msg model =
@@ -178,12 +170,12 @@ updateEdit msg model =
       |> Tuple.mapSecond(Cmd.map DomainRolesField)
 
     StrategicClassificationField scMsg ->
-      StrategicClassification.update scMsg model.classification 
+      StrategicClassification.update scMsg model.classification
       |> Tuple.mapFirst(\d -> { model | classification = d })
       |> Tuple.mapSecond(Cmd.map StrategicClassificationField)
-     
+
     KeyField changeMsg ->
-      Key.update changeMsg model.key 
+      Key.update changeMsg model.key
       |> Tuple.mapFirst(\d -> { model | key = d })
       |> Tuple.mapSecond(Cmd.map KeyField)
 
@@ -191,7 +183,7 @@ updateEdit msg model =
       Dependencies.update dependency model.addingDependencies
       |> Tuple.mapFirst(\d -> { model | addingDependencies = d })
       |> Tuple.mapSecond(Cmd.map DependencyField)
-     
+
 
 update : Msg -> Model -> (Model, Cmd Msg)
 update msg model =
