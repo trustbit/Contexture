@@ -1,6 +1,6 @@
 module BoundedContext exposing (
-  BoundedContext, Problem,
-  changeName, name, isNameValid,
+  BoundedContext, Problem, Name,
+  changeName, name, isName,
   domain, id, key, changeKey,
   move, remove, assignKey,
   newBoundedContext,
@@ -21,6 +21,9 @@ import BoundedContext.BoundedContextId exposing (BoundedContextId, idDecoder)
 
 -- MODEL
 
+type Name
+  = Name String
+
 type Problem
   = NameInvalid
 
@@ -34,19 +37,12 @@ type alias Internals =
   , key : Maybe Key
   }
 
-isNameValid : String -> Bool
-isNameValid couldBeName =
-  String.length couldBeName > 0
+isName : String -> Result Problem Name
+isName couldBeName =
+  if String.length couldBeName > 0
+  then Ok (Name couldBeName)
+  else Err NameInvalid
 
-changeName : String -> BoundedContext -> Result Problem BoundedContext
-changeName couldBeName (BoundedContext context) =
-  if isNameValid couldBeName
-  then
-    { context | name = couldBeName }
-    |> BoundedContext
-    |> Ok
-  else
-    Err NameInvalid
 
 changeKey : Maybe Key -> BoundedContext -> BoundedContext
 changeKey aKey (BoundedContext context) =
@@ -56,13 +52,16 @@ id : BoundedContext -> BoundedContextId
 id (BoundedContext context) =
   context.id
 
+
 name : BoundedContext -> String
 name (BoundedContext context) =
   context.name
 
+
 domain : BoundedContext -> DomainId
 domain (BoundedContext context) =
   context.domain
+
 
 key : BoundedContext -> Maybe Key
 key (BoundedContext context) =
@@ -82,6 +81,12 @@ domainIdFieldDecoder =
   Decode.field "domainId" Domain.idDecoder
 
 
+domainIdEncoder domainId =
+  ("domainId", idEncoder domainId)
+
+nameFieldEncoder bcName =
+   ("name", Encode.string bcName)
+
 modelDecoder : Decoder BoundedContext
 modelDecoder =
   ( Decode.succeed Internals
@@ -91,12 +96,6 @@ modelDecoder =
     |> JP.optional "key" (Decode.maybe Key.keyDecoder) Nothing
   ) |> Decode.map BoundedContext
 
-modelEncoder : BoundedContext -> Encode.Value
-modelEncoder (BoundedContext canvas) =
-  Encode.object
-    [ ("domainId", Domain.idEncoder canvas.domain)
-    , ("name", Encode.string canvas.name)
-    ]
 
 remove : Api.Configuration -> BoundedContextId -> ApiResult () msg
 remove base contextId =
@@ -122,7 +121,7 @@ move base contextId targetDomain =
       { method = "PATCH"
       , headers = []
       , url = contextId |> Api.boundedContext |> Api.url base |> Url.toString
-      , body = Http.jsonBody <| Encode.object[ ("domainId", idEncoder targetDomain) ]
+      , body = Http.jsonBody <| Encode.object[ domainIdEncoder targetDomain ]
       , expect = Http.expectWhatever toMsg
       , timeout = Nothing
       , tracker = Nothing
@@ -157,8 +156,25 @@ newBoundedContext config domainId contextName =
     request toMsg =
       Http.post
         { url = Api.boundedContexts domainId |> Api.url config |> Url.toString
-        , body = Http.jsonBody <| Encode.object [ ("name", Encode.string contextName) ]
+        , body = Http.jsonBody <| Encode.object [ nameFieldEncoder contextName ]
         , expect = Http.expectJson toMsg modelDecoder
         }
+  in
+    request
+
+
+changeName : Api.Configuration -> BoundedContextId -> Name -> ApiResult BoundedContext msg
+changeName config contextId (Name contextName) =
+  let
+    request toMsg =
+      Http.request
+      { method = "PATCH"
+      , headers = []
+      , url = contextId |> Api.boundedContext |> Api.url config |> Url.toString
+      , body = Http.jsonBody <| Encode.object [  nameFieldEncoder contextName ]
+      , expect = Http.expectJson toMsg modelDecoder
+      , timeout = Nothing
+      , tracker = Nothing
+      }
   in
     request

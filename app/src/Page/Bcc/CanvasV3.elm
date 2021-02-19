@@ -1,18 +1,15 @@
-module Page.Bcc.Edit exposing (Msg, Model, update, view, init)
+module Page.Bcc.CanvasV3 exposing (Msg, Model, update, view, init)
 
 import Browser.Navigation as Nav
 
 import Html exposing (Html, div, text)
 import Html.Attributes exposing (..)
-import Html.Events exposing (onClick)
 
 import Bootstrap.Grid as Grid
 import Bootstrap.Grid.Row as Row
 import Bootstrap.Grid.Col as Col
 import Bootstrap.Form as Form
-import Bootstrap.Form.Input as Input
 import Bootstrap.Button as Button
-import Bootstrap.Text as Text
 import Bootstrap.Utilities.Spacing as Spacing
 import Bootstrap.Utilities.Display as Display
 
@@ -28,23 +25,19 @@ import Route
 
 import BoundedContext
 import BoundedContext.BoundedContextId exposing (BoundedContextId)
-import BoundedContext.StrategicClassification as StrategicClassification
-import BoundedContext.UbiquitousLanguage as UbiquitousLanguage
 import BoundedContext.Canvas exposing (BoundedContextCanvas)
 
-import Page.ChangeKey as ChangeKey
+
 import Page.Bcc.Edit.Dependencies as Dependencies
 import Page.Bcc.Edit.Messages as Messages
 import Page.Bcc.Edit.UbiquitousLanguage as UbiquitousLanguage
 import Page.Bcc.Edit.StrategicClassification as StrategicClassification
 import Page.Bcc.Edit.Description as Description
-import BoundedContext.UbiquitousLanguage exposing (UbiquitousLanguage(..))
-import BoundedContext.Message exposing (Messages)
-import BoundedContext.BusinessDecision exposing (BusinessDecision(..))
-import Page.Bcc.Edit.BusinessDecision as BusinessDecisionView exposing (view, Msg, Model, init)
-import Page.Bcc.Edit.DomainRoles as DomainRolesView exposing (view, Msg, Model, init)
-import BoundedContext.DomainRoles exposing (getName)
-
+import Page.Bcc.Edit.Name as Name
+import Page.Bcc.Edit.Key as Key
+import Page.Bcc.Edit.BusinessDecision as BusinessDecisionView
+import Page.Bcc.Edit.DomainRoles as DomainRolesView
+import Domain
 
 
 -- MODEL
@@ -52,26 +45,22 @@ import BoundedContext.DomainRoles exposing (getName)
 type alias CanvasModel =
   { boundedContext : BoundedContext.BoundedContext
   , canvas : BoundedContextCanvas
+  , domain : Domain.Domain
   }
 
 type alias EditingCanvas =
   { edit : CanvasModel
     -- TODO: discuss we want this in edit or BCC - it's not persisted after all!
-  , name : String
-  , key : ChangeKey.Model
+  , name : Name.Model
+  , key : Key.Model
   , addingMessage : Messages.Model
   , addingDependencies : Dependencies.Model
   , ubiquitousLanguage : UbiquitousLanguage.Model
-  , problem : Maybe Problem
   , businessDecisions : BusinessDecisionView.Model
   , domainRoles : DomainRolesView.Model
-  , classification : StrategicClassification.Model 
+  , classification : StrategicClassification.Model
   , description : Description.Model
   }
-
-type Problem
-  = KeyProblem ChangeKey.KeyError
-  | ContextProblem BoundedContext.Problem
 
 type alias Model =
   { key: Nav.Key
@@ -83,21 +72,21 @@ initWithCanvas : Api.Configuration -> CanvasModel -> (EditingCanvas, Cmd Editing
 initWithCanvas config model =
   let
     (addingDependency, addingDependencyCmd) = Dependencies.init config model.boundedContext
-    (changeKeyModel, changeKeyCmd) = ChangeKey.init config (model.boundedContext |> BoundedContext.key)
+    (changeKeyModel, changeKeyCmd) = Key.init config model.boundedContext
     (ubiquitousLanguageModel, ubiquitousLanguageCmd) = UbiquitousLanguage.init config (model.boundedContext |> BoundedContext.id)
     (businessDecisionsModel, businessDecisionsCmd) = BusinessDecisionView.init config (model.boundedContext |> BoundedContext.id)
     (domainRolesModel, domainRolesCmd) = DomainRolesView.init config (model.boundedContext |> BoundedContext.id)
     (classificationModel, classificationCmd) = StrategicClassification.init config (model.boundedContext |> BoundedContext.id) model.canvas.classification
     (descriptionModel, descriptionCmd) = Description.init config (model.boundedContext |> BoundedContext.id) model.canvas.description
     (messagesModel, messagesCmd) = Messages.init config (model.boundedContext |> BoundedContext.id) model.canvas.messages
+    (nameModel, nameCmd) = Name.init config model.boundedContext
   in
     ( { addingMessage = messagesModel
       , addingDependencies = addingDependency
       , ubiquitousLanguage = ubiquitousLanguageModel
-      , name = model.boundedContext |> BoundedContext.name
+      , name = nameModel
       , key = changeKeyModel
       , edit = model
-      , problem = Nothing
       , businessDecisions = businessDecisionsModel
       , domainRoles = domainRolesModel
       , classification = classificationModel
@@ -105,13 +94,14 @@ initWithCanvas config model =
       }
     , Cmd.batch
       [ addingDependencyCmd |> Cmd.map DependencyField
-      , changeKeyCmd |> Cmd.map ChangeKeyMsg
+      , changeKeyCmd |> Cmd.map KeyField
       , domainRolesCmd |> Cmd.map DomainRolesField
       , ubiquitousLanguageCmd |> Cmd.map UbiquitousLanguageField
       , businessDecisionsCmd |> Cmd.map BusinessDecisionField
       , classificationCmd |> Cmd.map StrategicClassificationField
       , descriptionCmd |> Cmd.map DescriptionField
       , messagesCmd |> Cmd.map MessageField
+      , nameCmd |> Cmd.map NameField
       ]
     )
 
@@ -134,8 +124,8 @@ init key config contextId =
 type EditingMsg
   = DescriptionField Description.Msg
   -- TODO the editing is actually part of the BoundedContext - move there or to the index page?!
-  | SetName String
-  | ChangeKeyMsg ChangeKey.Msg
+  | NameField Name.Msg
+  | KeyField Key.Msg
   | DependencyField Dependencies.Msg
   | MessageField Messages.Msg
   | UbiquitousLanguageField UbiquitousLanguage.Msg
@@ -146,9 +136,7 @@ type EditingMsg
 type Msg
   = Loaded (Result Http.Error CanvasModel)
   | Editing EditingMsg
-  | Save
-  | Saved (Result Http.Error ())
-   
+
 
 updateEdit : EditingMsg -> EditingCanvas -> (EditingCanvas, Cmd EditingMsg)
 updateEdit msg model =
@@ -163,8 +151,10 @@ updateEdit msg model =
       |> Tuple.mapFirst(\m -> { model | description = m})
       |> Tuple.mapSecond(Cmd.map DescriptionField)
 
-    SetName name ->
-      ({ model | name = name}, Cmd.none)
+    NameField nameMsg ->
+      Name.update nameMsg model.name
+      |> Tuple.mapFirst(\m -> { model | name = m})
+      |> Tuple.mapSecond(Cmd.map NameField)
 
     UbiquitousLanguageField languageMsg ->
       UbiquitousLanguage.update languageMsg model.ubiquitousLanguage
@@ -182,62 +172,37 @@ updateEdit msg model =
       |> Tuple.mapSecond(Cmd.map DomainRolesField)
 
     StrategicClassificationField scMsg ->
-      StrategicClassification.update scMsg model.classification 
+      StrategicClassification.update scMsg model.classification
       |> Tuple.mapFirst(\d -> { model | classification = d })
       |> Tuple.mapSecond(Cmd.map StrategicClassificationField)
-     
-    ChangeKeyMsg changeMsg ->
-      let
-        (changeKeyModel, changeKeyCmd) = ChangeKey.update changeMsg model.key
-        problem =
-          case changeKeyModel.value of
-            Ok _ -> Nothing
-            Err e -> e |> KeyProblem |> Just
-      in
-        ( { model | key = changeKeyModel, problem = problem }
-        , changeKeyCmd |> Cmd.map ChangeKeyMsg
-        )
+
+    KeyField changeMsg ->
+      Key.update changeMsg model.key
+      |> Tuple.mapFirst(\d -> { model | key = d })
+      |> Tuple.mapSecond(Cmd.map KeyField)
 
     DependencyField dependency ->
       Dependencies.update dependency model.addingDependencies
       |> Tuple.mapFirst(\d -> { model | addingDependencies = d })
       |> Tuple.mapSecond(Cmd.map DependencyField)
-     
+
 
 update : Msg -> Model -> (Model, Cmd Msg)
 update msg model =
   case (msg, model.edit) of
     (Editing editing, RemoteData.Success editable) ->
-      let
-        (editModel, editCmd) = updateEdit editing editable
-      in
-        ({ model | edit = RemoteData.Success <| editModel }, editCmd |> Cmd.map Editing)
-    (Save, RemoteData.Success editable) ->
-      case
-        editable.key.value
-        |> Result.mapError KeyProblem
-        |> Result.map (\k -> BoundedContext.changeKey k editable.edit.boundedContext)
-        |> Result.andThen (BoundedContext.changeName editable.name >> Result.mapError ContextProblem)
-      of
-        Ok context ->
-          ( model
-          , saveCanvas model.self context
-          )
-        Err err ->
-          let
-            _ = Debug.log "error" err
-          in (Debug.log "namechange" model, Cmd.none)
-
-    (Saved (Ok _),_) ->
-      (model, Cmd.none)
+      updateEdit editing editable
+      |> Tuple.mapFirst(\d -> { model | edit = RemoteData.Success <| d })
+      |> Tuple.mapSecond(Cmd.map Editing)
 
     (Loaded (Ok m), _) ->
-      let
-        (canvasModel, canvasCmd) = initWithCanvas model.self m
-      in
-        ({ model | edit = RemoteData.Success <| canvasModel }, canvasCmd |> Cmd.map Editing)
+      initWithCanvas model.self m
+      |> Tuple.mapFirst(\d -> { model | edit = RemoteData.Success <| d })
+      |> Tuple.mapSecond(Cmd.map Editing)
+
     (Loaded (Err e),_) ->
       ({ model | edit = RemoteData.Failure e } , Cmd.none)
+
     _ ->
       let
         _ = Debug.log "bcc msg" msg
@@ -252,10 +217,10 @@ view model =
     details =
       case model.edit of
         RemoteData.Success edit ->
-          [ viewCanvas edit |> Html.map Editing
-          , Grid.row [ Row.attrs [ Spacing.mt3, Spacing.mb3 ] ]
+          [ viewActions edit
+          , Grid.row [ Row.attrs [ Spacing.mt1, Spacing.mb1 ] ]
             [ Grid.col [] [ Html.hr [] [] ] ]
-          , viewActions edit
+          , viewCanvas edit |> Html.map Editing
           ]
         _ ->
           [ Grid.row []
@@ -279,7 +244,7 @@ viewActions model =
             )
           ]
         ]
-        [ text "Back" ]
+        [ text ("Back to Domain '" ++ (model.edit.domain |> Domain.name) ++ "'") ]
       ]
     , Grid.col []
       [ Button.linkButton
@@ -292,17 +257,6 @@ viewActions model =
         ]
         [ text "Source of the descriptions & help text"]
       ]
-    , Grid.col [ Col.textAlign Text.alignLgRight]
-      [ Button.submitButton
-        [ Button.primary
-        , Button.onClick Save
-        , Button.disabled
-          ( (model.name |> BoundedContext.isNameValid |> not)
-          || (model.problem |> Maybe.map (\_ -> True) |> Maybe.withDefault False)
-          )
-        ]
-        [ text "Save"]
-      ]
     ]
 
 viewCanvas : EditingCanvas -> Html EditingMsg
@@ -314,21 +268,12 @@ viewCanvas model =
 
 viewLeftside : EditingCanvas -> List (Html EditingMsg)
 viewLeftside canvas =
-  [ Form.group []
-    [ viewCaption "name" "Name"
-    , Input.text
-      [ Input.id "name", Input.value canvas.name, Input.onInput SetName
-      , if canvas.name |> BoundedContext.isNameValid
-        then Input.success
-        else Input.danger
-      ]
-    , Form.help [] [ text "Naming is hard. Writing down the name of your context and gaining agreement as a team will frame how you design the context." ]
-    , Form.invalidFeedback [] [ text "A name for a Bounded Context is required!" ]
-    ]
-  , Form.group []
-    [ viewCaption "key" "Key"
-    , ChangeKey.view canvas.key |> Html.map ChangeKeyMsg
-    ]
+  [ canvas.name
+    |> Name.view
+    |> Html.map NameField
+  , canvas.key
+    |> Key.view
+    |> Html.map KeyField
   , canvas.description
     |> Description.view
     |> Html.map DescriptionField
@@ -381,24 +326,8 @@ loadCanvas config contextId =
       Decode.succeed CanvasModel
       |> JP.custom BoundedContext.modelDecoder
       |> JP.custom BoundedContext.Canvas.modelDecoder
+      |> JP.requiredAt [ "domain" ] Domain.domainDecoder
   in Http.get
-    { url = Api.boundedContext contextId |> Api.url config |> Url.toString
+    { url = Api.canvas contextId |> Api.url config |> Url.toString
     , expect = Http.expectJson Loaded decoder
-    }
-
-saveCanvas : Api.Configuration -> BoundedContext.BoundedContext -> Cmd Msg
-saveCanvas config context =
-  Http.request
-    { method = "PATCH"
-    , headers = []
-    , url =
-      context
-      |> BoundedContext.id
-      |> Api.boundedContext
-      |> Api.url config
-      |> Url.toString
-    , body = Http.jsonBody <| BoundedContext.Canvas.modelEncoder context
-    , expect = Http.expectWhatever Saved
-    , timeout = Nothing
-    , tracker = Nothing
     }

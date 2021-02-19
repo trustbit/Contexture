@@ -3,6 +3,7 @@ module Api exposing (
   domains, domain, subDomains,
   allBoundedContexts, boundedContexts, boundedContext,
   collaborations, collaboration,
+  canvas, 
   url, config)
 
 import Http
@@ -70,6 +71,10 @@ allBoundedContexts expand =
 boundedContext : BoundedContextId -> Endpoint
 boundedContext context =
   withoutQuery [ "boundedContexts", BoundedContext.idToString context ]
+
+canvas : BoundedContextId -> Endpoint
+canvas context =
+  withQuery [ "boundedContexts", BoundedContext.idToString context ] (expandInRequest [ Domain ])
 
 collaborations : Endpoint
 collaborations =

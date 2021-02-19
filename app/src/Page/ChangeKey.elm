@@ -35,6 +35,7 @@ type KeyError
 type alias Model =
   { existingKeys : List ExistingKey
   , enteredKey : String
+  , initialKey : Maybe Key.Key
   , value : Result KeyError (Maybe Key.Key)
   }
 
@@ -43,14 +44,25 @@ init config maybeAKey =
   let
     model =
       maybeAKey
-      |> Maybe.map (\key -> { existingKeys = [], enteredKey = key |> Key.toString, value = Ok (Just key) } )
-      |> Maybe.withDefault { existingKeys = [], enteredKey = "", value = Ok Nothing }
+      |> Maybe.map (\key ->
+        { existingKeys = []
+        , enteredKey = key |> Key.toString
+        , value = Ok (Just key)
+        , initialKey = Just key
+        }
+      )
+      |> Maybe.withDefault
+        { existingKeys = []
+        , enteredKey = ""
+        , value = Ok Nothing
+        , initialKey = Nothing
+        }
   in
     ( model
     , Cmd.batch
       [ loadDomains config
       , loadBoundedContexts config
-      ] 
+      ]
     )
 
 type Msg
@@ -58,6 +70,13 @@ type Msg
   | BoundedContextKeysLoaded (Api.ApiResponse (List BoundedContext))
   | UpdateKey String
 
+
+keysEqual existing key =
+  case existing of
+    KeyFromDomain k _ ->
+      k == key
+    KeyFromBoundedContext k _ ->
+      k == key
 
 update : Msg -> Model ->  ( Model, Cmd Msg )
 update msg model =
@@ -109,9 +128,15 @@ update msg model =
                   )
                   |> List.head
               in
-                case existingKey of
-                  Just existing -> Err (NotUnique existing)
-                  Nothing -> Ok (Just k)
+                case (existingKey, model.initialKey) of
+                  (Just existing, Just initial) ->
+                    if keysEqual existing initial
+                    then Ok (Just k)
+                    else Err (NotUnique existing)
+                  (Just existing, Nothing) ->
+                    Err (NotUnique existing)
+                  _ ->
+                    Ok (Just k)
             Err (Key.Empty) -> Ok Nothing
             Err e -> Err (Problem e)
 
@@ -119,7 +144,7 @@ update msg model =
         ( { model | enteredKey = newKey, value = value }
         , Cmd.none
         )
-    _ -> 
+    _ ->
       (Debug.log "ChangeKey" model, Cmd.none)
 
 view : Model -> Html Msg
@@ -130,7 +155,7 @@ view model =
       Ok _ -> True
       Err _ -> False
   in
-    div [] 
+    div []
       [ Input.text
         [ Input.id "key"
         , Input.value model.enteredKey
