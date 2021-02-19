@@ -142,8 +142,6 @@ type EditingMsg
 type Msg
   = Loaded (Result Http.Error CanvasModel)
   | Editing EditingMsg
-  | Save
-  | Saved (Result Http.Error ())
    
 
 updateEdit : EditingMsg -> EditingCanvas -> (EditingCanvas, Cmd EditingMsg)
@@ -265,17 +263,6 @@ viewActions model =
         ]
         [ text "Source of the descriptions & help text"]
       ]
-    , Grid.col [ Col.textAlign Text.alignLgRight]
-      [ Button.submitButton
-        [ Button.primary
-        , Button.onClick Save
-        -- , Button.disabled
-          -- ( 
-          --  (model.problem |> Maybe.map (\_ -> True) |> Maybe.withDefault False)
-          -- )
-        ]
-        [ text "Save"]
-      ]
     ]
 
 viewCanvas : EditingCanvas -> Html EditingMsg
@@ -293,10 +280,6 @@ viewLeftside canvas =
   , canvas.key
     |> Key.view
     |> Html.map KeyField
-    -- Form.group []
-    -- [ viewCaption "key" "Key"
-    -- , ChangeKey.view canvas.key |> Html.map ChangeKeyMsg
-    -- ]
   , canvas.description
     |> Description.view
     |> Html.map DescriptionField
@@ -352,21 +335,4 @@ loadCanvas config contextId =
   in Http.get
     { url = Api.boundedContext contextId |> Api.url config |> Url.toString
     , expect = Http.expectJson Loaded decoder
-    }
-
-saveCanvas : Api.Configuration -> BoundedContext.BoundedContext -> Cmd Msg
-saveCanvas config context =
-  Http.request
-    { method = "PATCH"
-    , headers = []
-    , url =
-      context
-      |> BoundedContext.id
-      |> Api.boundedContext
-      |> Api.url config
-      |> Url.toString
-    , body = Http.jsonBody <| BoundedContext.Canvas.modelEncoder context
-    , expect = Http.expectWhatever Saved
-    , timeout = Nothing
-    , tracker = Nothing
     }
