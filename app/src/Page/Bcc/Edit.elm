@@ -4,13 +4,11 @@ import Browser.Navigation as Nav
 
 import Html exposing (Html, div, text)
 import Html.Attributes exposing (..)
-import Html.Events exposing (onClick)
 
 import Bootstrap.Grid as Grid
 import Bootstrap.Grid.Row as Row
 import Bootstrap.Grid.Col as Col
 import Bootstrap.Form as Form
-import Bootstrap.Form.Input as Input
 import Bootstrap.Button as Button
 import Bootstrap.Text as Text
 import Bootstrap.Utilities.Spacing as Spacing
@@ -32,13 +30,14 @@ import BoundedContext.StrategicClassification as StrategicClassification
 import BoundedContext.UbiquitousLanguage as UbiquitousLanguage
 import BoundedContext.Canvas exposing (BoundedContextCanvas)
 
-import Page.ChangeKey as ChangeKey
+
 import Page.Bcc.Edit.Dependencies as Dependencies
 import Page.Bcc.Edit.Messages as Messages
 import Page.Bcc.Edit.UbiquitousLanguage as UbiquitousLanguage
 import Page.Bcc.Edit.StrategicClassification as StrategicClassification
 import Page.Bcc.Edit.Description as Description
 import Page.Bcc.Edit.Name as Name
+import Page.Bcc.Edit.Key as Key
 import BoundedContext.UbiquitousLanguage exposing (UbiquitousLanguage(..))
 import BoundedContext.Message exposing (Messages)
 import BoundedContext.BusinessDecision exposing (BusinessDecision(..))
@@ -59,19 +58,15 @@ type alias EditingCanvas =
   { edit : CanvasModel
     -- TODO: discuss we want this in edit or BCC - it's not persisted after all!
   , name : Name.Model
-  , key : ChangeKey.Model
+  , key : Key.Model
   , addingMessage : Messages.Model
   , addingDependencies : Dependencies.Model
   , ubiquitousLanguage : UbiquitousLanguage.Model
-  , problem : Maybe Problem
   , businessDecisions : BusinessDecisionView.Model
   , domainRoles : DomainRolesView.Model
   , classification : StrategicClassification.Model 
   , description : Description.Model
   }
-
-type Problem
-  = KeyProblem ChangeKey.KeyError
 
 type alias Model =
   { key: Nav.Key
@@ -83,7 +78,7 @@ initWithCanvas : Api.Configuration -> CanvasModel -> (EditingCanvas, Cmd Editing
 initWithCanvas config model =
   let
     (addingDependency, addingDependencyCmd) = Dependencies.init config model.boundedContext
-    (changeKeyModel, changeKeyCmd) = ChangeKey.init config (model.boundedContext |> BoundedContext.key)
+    (changeKeyModel, changeKeyCmd) = Key.init config model.boundedContext
     (ubiquitousLanguageModel, ubiquitousLanguageCmd) = UbiquitousLanguage.init config (model.boundedContext |> BoundedContext.id)
     (businessDecisionsModel, businessDecisionsCmd) = BusinessDecisionView.init config (model.boundedContext |> BoundedContext.id)
     (domainRolesModel, domainRolesCmd) = DomainRolesView.init config (model.boundedContext |> BoundedContext.id)
@@ -98,7 +93,6 @@ initWithCanvas config model =
       , name = nameModel
       , key = changeKeyModel
       , edit = model
-      , problem = Nothing
       , businessDecisions = businessDecisionsModel
       , domainRoles = domainRolesModel
       , classification = classificationModel
@@ -106,7 +100,7 @@ initWithCanvas config model =
       }
     , Cmd.batch
       [ addingDependencyCmd |> Cmd.map DependencyField
-      , changeKeyCmd |> Cmd.map ChangeKeyMsg
+      , changeKeyCmd |> Cmd.map KeyField
       , domainRolesCmd |> Cmd.map DomainRolesField
       , ubiquitousLanguageCmd |> Cmd.map UbiquitousLanguageField
       , businessDecisionsCmd |> Cmd.map BusinessDecisionField
@@ -137,7 +131,7 @@ type EditingMsg
   = DescriptionField Description.Msg
   -- TODO the editing is actually part of the BoundedContext - move there or to the index page?!
   | NameField Name.Msg
-  | ChangeKeyMsg ChangeKey.Msg
+  | KeyField Key.Msg
   | DependencyField Dependencies.Msg
   | MessageField Messages.Msg
   | UbiquitousLanguageField UbiquitousLanguage.Msg
@@ -190,17 +184,10 @@ updateEdit msg model =
       |> Tuple.mapFirst(\d -> { model | classification = d })
       |> Tuple.mapSecond(Cmd.map StrategicClassificationField)
      
-    ChangeKeyMsg changeMsg ->
-      let
-        (changeKeyModel, changeKeyCmd) = ChangeKey.update changeMsg model.key
-        problem =
-          case changeKeyModel.value of
-            Ok _ -> Nothing
-            Err e -> e |> KeyProblem |> Just
-      in
-        ( { model | key = changeKeyModel, problem = problem }
-        , changeKeyCmd |> Cmd.map ChangeKeyMsg
-        )
+    KeyField changeMsg ->
+      Key.update changeMsg model.key 
+      |> Tuple.mapFirst(\d -> { model | key = d })
+      |> Tuple.mapSecond(Cmd.map KeyField)
 
     DependencyField dependency ->
       Dependencies.update dependency model.addingDependencies
@@ -212,35 +199,18 @@ update : Msg -> Model -> (Model, Cmd Msg)
 update msg model =
   case (msg, model.edit) of
     (Editing editing, RemoteData.Success editable) ->
-      let
-        (editModel, editCmd) = updateEdit editing editable
-      in
-        ({ model | edit = RemoteData.Success <| editModel }, editCmd |> Cmd.map Editing)
-    (Save, RemoteData.Success editable) ->
-      case
-        editable.key.value
-        |> Result.mapError KeyProblem
-        |> Result.map (\k -> BoundedContext.changeKey k editable.edit.boundedContext)
-      of
-        Ok context ->
-          ( model
-          , saveCanvas model.self context
-          )
-        Err err ->
-          let
-            _ = Debug.log "error" err
-          in (Debug.log "namechange" model, Cmd.none)
-
-    (Saved (Ok _),_) ->
-      (model, Cmd.none)
+      updateEdit editing editable
+      |> Tuple.mapFirst(\d -> { model | edit = RemoteData.Success <| d })
+      |> Tuple.mapSecond(Cmd.map Editing)
 
     (Loaded (Ok m), _) ->
-      let
-        (canvasModel, canvasCmd) = initWithCanvas model.self m
-      in
-        ({ model | edit = RemoteData.Success <| canvasModel }, canvasCmd |> Cmd.map Editing)
+      initWithCanvas model.self m
+      |> Tuple.mapFirst(\d -> { model | edit = RemoteData.Success <| d })
+      |> Tuple.mapSecond(Cmd.map Editing)
+
     (Loaded (Err e),_) ->
       ({ model | edit = RemoteData.Failure e } , Cmd.none)
+
     _ ->
       let
         _ = Debug.log "bcc msg" msg
@@ -299,10 +269,10 @@ viewActions model =
       [ Button.submitButton
         [ Button.primary
         , Button.onClick Save
-        , Button.disabled
-          ( 
-           (model.problem |> Maybe.map (\_ -> True) |> Maybe.withDefault False)
-          )
+        -- , Button.disabled
+          -- ( 
+          --  (model.problem |> Maybe.map (\_ -> True) |> Maybe.withDefault False)
+          -- )
         ]
         [ text "Save"]
       ]
@@ -320,10 +290,13 @@ viewLeftside canvas =
   [ canvas.name
     |> Name.view
     |> Html.map NameField
-  , Form.group []
-    [ viewCaption "key" "Key"
-    , ChangeKey.view canvas.key |> Html.map ChangeKeyMsg
-    ]
+  , canvas.key
+    |> Key.view
+    |> Html.map KeyField
+    -- Form.group []
+    -- [ viewCaption "key" "Key"
+    -- , ChangeKey.view canvas.key |> Html.map ChangeKeyMsg
+    -- ]
   , canvas.description
     |> Description.view
     |> Html.map DescriptionField
