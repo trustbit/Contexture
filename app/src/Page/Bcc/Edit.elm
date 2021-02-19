@@ -37,6 +37,7 @@ import Page.Bcc.Edit.Name as Name
 import Page.Bcc.Edit.Key as Key
 import Page.Bcc.Edit.BusinessDecision as BusinessDecisionView
 import Page.Bcc.Edit.DomainRoles as DomainRolesView
+import Domain
 
 
 -- MODEL
@@ -44,6 +45,7 @@ import Page.Bcc.Edit.DomainRoles as DomainRolesView
 type alias CanvasModel =
   { boundedContext : BoundedContext.BoundedContext
   , canvas : BoundedContextCanvas
+  , domain : Domain.Domain
   }
 
 type alias EditingCanvas =
@@ -215,10 +217,10 @@ view model =
     details =
       case model.edit of
         RemoteData.Success edit ->
-          [ viewCanvas edit |> Html.map Editing
-          , Grid.row [ Row.attrs [ Spacing.mt3, Spacing.mb3 ] ]
+          [ viewActions edit
+          , Grid.row [ Row.attrs [ Spacing.mt1, Spacing.mb1 ] ]
             [ Grid.col [] [ Html.hr [] [] ] ]
-          , viewActions edit
+          , viewCanvas edit |> Html.map Editing
           ]
         _ ->
           [ Grid.row []
@@ -242,7 +244,7 @@ viewActions model =
             )
           ]
         ]
-        [ text "Back" ]
+        [ text ("Back to Domain '" ++ (model.edit.domain |> Domain.name) ++ "'") ]
       ]
     , Grid.col []
       [ Button.linkButton
@@ -324,7 +326,8 @@ loadCanvas config contextId =
       Decode.succeed CanvasModel
       |> JP.custom BoundedContext.modelDecoder
       |> JP.custom BoundedContext.Canvas.modelDecoder
+      |> JP.requiredAt [ "domain" ] Domain.domainDecoder
   in Http.get
-    { url = Api.boundedContext contextId |> Api.url config |> Url.toString
+    { url = Api.canvas contextId |> Api.url config |> Url.toString
     , expect = Http.expectJson Loaded decoder
     }

@@ -13,11 +13,9 @@ import Bootstrap.Form as Form
 import Bootstrap.Form.Input as Input
 import Bootstrap.Form.Fieldset as Fieldset
 import Bootstrap.Button as Button
-import Bootstrap.Text as Text
 import Bootstrap.Card as Card
 import Bootstrap.Card.Block as Block
 import Bootstrap.Utilities.Spacing as Spacing
-import Bootstrap.Utilities.Display as Display
 
 import RemoteData
 import Url
@@ -33,6 +31,8 @@ import Key
 import BoundedContext exposing (BoundedContext)
 import BoundedContext.BoundedContextId exposing (BoundedContextId)
 import BoundedContext.Technical as Technical exposing(TechnicalDescription)
+
+import Domain as Domain
 
 type alias LifecycleModel =
   { issueTracker : String
@@ -54,6 +54,7 @@ type alias DescriptionModel =
 type alias TechnicalModel =
   { context : BoundedContext
   , description : TechnicalDescription
+  , domain : Domain.Domain
   }
 
 type alias Model = 
@@ -163,7 +164,7 @@ view model =
             [ Grid.col []
                 [ Button.linkButton
                   [ Button.attrs [ href (edit.model.context |> BoundedContext.domain |> Route.Domain |> Route.routeToString ) ], Button.roleLink ]
-                  [ text "Back" ]
+                  [ text ("Back to Domain '" ++ (edit.model.domain |> Domain.name) ++ "'") ]
                 ]
             ]
           , viewTechnical edit
@@ -248,8 +249,9 @@ loadTechnical config contextId =
       Decode.succeed TechnicalModel
       |> JP.custom BoundedContext.modelDecoder
       |> JP.custom Technical.modelDecoder
+      |> JP.requiredAt [ "domain" ] Domain.domainDecoder
   in Http.get
-    { url = Api.boundedContext contextId |> Api.url config |> Url.toString
+    { url = Api.canvas contextId |> Api.url config |> Url.toString
     , expect = Http.expectJson Loaded decoder
     }
 
