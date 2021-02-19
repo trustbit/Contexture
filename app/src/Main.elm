@@ -17,7 +17,7 @@ import Api
 
 import Page.Domain.Index
 import Page.Domain.Edit
-import Page.Bcc.Edit
+import Page.Bcc.CanvasV3 as CanvasV3
 import Page.Bcc.Technical
 
 -- MAIN
@@ -49,7 +49,7 @@ type Page
   = NotFoundPage
   | Domains Page.Domain.Index.Model
   | DomainsEdit Page.Domain.Edit.Model
-  | BoundedContextCanvas Page.Bcc.Edit.Model
+  | BoundedContextCanvas CanvasV3.Model
   | Technical Page.Bcc.Technical.Model
 
 type alias Model =
@@ -79,7 +79,7 @@ initCurrentPage ( model, existingCmds ) =
               ( DomainsEdit pageModel, Cmd.map DomainEditMsg pageCmds )
           Route.BoundedContextCanvas id ->
             let
-              ( pageModel, pageCmds ) = Page.Bcc.Edit.init model.key (Api.config model.baseUrl) id
+              ( pageModel, pageCmds ) = CanvasV3.init model.key (Api.config model.baseUrl) id
             in
               ( BoundedContextCanvas pageModel, Cmd.map BccMsg pageCmds )
           Route.TechnicalDescription id ->
@@ -133,7 +133,7 @@ type Msg
   | NavMsg Navbar.State
   | DomainMsg Page.Domain.Index.Msg
   | DomainEditMsg Page.Domain.Edit.Msg
-  | BccMsg Page.Bcc.Edit.Msg
+  | BccMsg CanvasV3.Msg
   | TechnicalMsg Page.Bcc.Technical.Msg
 
 update : Msg -> Model -> (Model, Cmd Msg)
@@ -172,7 +172,7 @@ update msg model =
         ({ model | page = DomainsEdit updatedModel}, updatedMsg |> Cmd.map DomainEditMsg)
     (BccMsg m, BoundedContextCanvas bccModel) ->
       let
-        (mo, msg2) = Page.Bcc.Edit.update m bccModel
+        (mo, msg2) = CanvasV3.update m bccModel
       in
         ({ model | page = BoundedContextCanvas mo}, Cmd.map BccMsg msg2)
     (TechnicalMsg m, Technical technicalModel) ->
@@ -209,7 +209,7 @@ view model =
     content =
       case model.page of
         BoundedContextCanvas m ->
-          Page.Bcc.Edit.view m |> Html.map BccMsg
+          CanvasV3.view m |> Html.map BccMsg
         Domains o ->
           Page.Domain.Index.view o |> Html.map DomainMsg
         DomainsEdit o ->

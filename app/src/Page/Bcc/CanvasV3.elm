@@ -1,4 +1,4 @@
-module Page.Bcc.Edit exposing (Msg, Model, update, view, init)
+module Page.Bcc.CanvasV3 exposing (Msg, Model, update, view, init)
 
 import Browser.Navigation as Nav
 
