@@ -2,6 +2,7 @@ module Contexture.Api.App
 
 open System
 open Microsoft.AspNetCore.Builder
+open Microsoft.AspNetCore.Cors.Infrastructure
 open Microsoft.AspNetCore.Hosting
 open Microsoft.Extensions.Hosting
 open Microsoft.Extensions.Logging
@@ -20,6 +21,13 @@ let errorHandler (ex : Exception) (logger : ILogger) =
     logger.LogError(ex, "An unhandled exception has occurred while executing the request.")
     clearResponse >=> setStatusCode 500 >=> text ex.Message
 
+let configureCors (builder : CorsPolicyBuilder) =
+    builder
+        .WithOrigins("http://localhost:8000")
+       .AllowAnyMethod()
+       .AllowAnyHeader()
+       |> ignore
+
 let configureApp (app : IApplicationBuilder) =
     let env = app.ApplicationServices.GetService<IWebHostEnvironment>()
     (match env.IsDevelopment() with
@@ -27,9 +35,11 @@ let configureApp (app : IApplicationBuilder) =
         app.UseDeveloperExceptionPage()
     | false ->
         app.UseGiraffeErrorHandler(errorHandler))
+        .UseCors(configureCors)
         .UseGiraffe(webApp)
 
 let configureServices (services : IServiceCollection) =
+    services.AddCors() |> ignore
     services.AddGiraffe() |> ignore
 
 let configureLogging (builder : ILoggingBuilder) =

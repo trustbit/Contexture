@@ -1,15 +1,21 @@
 ﻿namespace Contexture.Api
 
+open Microsoft.AspNetCore.Http
+
 open Giraffe
 
 module Domains =
     
-    let getDomains ctx =
-        negotiate 0 ctx
+    let getDomains =
+        fun (next : HttpFunc) (ctx : HttpContext) ->
+//            let domains = Database.getDomains
+//                            |> List.map(fun x -> { x with Domains = Database.getSubdomains x.Id })
+            
+            negotiate 0 next ctx
     
     let routes: HttpHandler =
         subRoute "/domains"
             (choose [
-                route "" >=> getDomains
+                GET >=> getDomains
             ])
 

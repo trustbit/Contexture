@@ -7,12 +7,16 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <PackageReference Include="FSharp.SystemTextJson" Version="0.16.6" />
     <PackageReference Include="Giraffe" Version="5.0.0-rc-6" />
+    <PackageReference Include="Newtonsoft.Json" Version="12.0.3" />
     <PackageReference Include="Ply" Version="0.3.*" />
   </ItemGroup>
 
   <ItemGroup>
+    <Compile Include="Domain.fs" />
     <Compile Include="Domains.fs" />
+    <Compile Include="Database.fs" />
     <Compile Include="Program.fs" />
   </ItemGroup>
 
