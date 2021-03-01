@@ -8,6 +8,9 @@ import Html exposing (Html, div, text)
 import Html.Attributes exposing (..)
 import Html.Events exposing (onClick, onSubmit)
 
+import Browser.Dom as Dom
+import Task
+
 import Bootstrap.Grid as Grid
 import Bootstrap.Grid.Row as Row
 import Bootstrap.Grid.Col as Col
@@ -47,6 +50,7 @@ type Msg
   | KeyMsg ChangeKey.Msg
   | ChangeKey (Maybe Key.Key)
   | CancelChanging
+  | NoOp
 
 
 noCommand model = (model, Cmd.none)
@@ -59,6 +63,7 @@ update msg model =
       model.boundedContext |> BoundedContext.key |> ChangeKey.init model.config
       |> Tuple.mapFirst (\m -> { model | changingName = Just m })
       |> Tuple.mapSecond (Cmd.map KeyMsg)
+      |> Tuple.mapSecond(\c -> Cmd.batch [ c, Task.attempt (\_ -> NoOp) (Dom.focus "key")])
 
 
     CancelChanging ->
@@ -88,6 +93,10 @@ update msg model =
           |> Tuple.mapSecond(Cmd.map KeyMsg)
         Nothing ->
           (model, Cmd.none)
+
+    NoOp ->
+      noCommand model
+
 
 
 view : Model -> Html Msg

@@ -7,6 +7,9 @@ import Html exposing (Html, div, text)
 import Html.Attributes exposing (..)
 import Html.Events exposing (onClick, onSubmit)
 
+import Browser.Dom as Dom
+import Task
+
 import Bootstrap.Grid as Grid
 import Bootstrap.Grid.Row as Row
 import Bootstrap.Grid.Col as Col
@@ -56,7 +59,7 @@ type Msg
   | SetName String
   | ChangeName Name
   | CancelChanging
-
+  | NoOp
 
 noCommand model = (model, Cmd.none)
 
@@ -64,7 +67,9 @@ update : Msg -> Model -> (Model, Cmd Msg)
 update msg model =
   case msg of
     StartChanging ->
-      noCommand { model | changingName = model.boundedContext |> initNameChange |> Just }
+      ( { model | changingName = model.boundedContext |> initNameChange |> Just }
+      , Task.attempt (\_ -> NoOp) (Dom.focus "name")
+      )
 
     CancelChanging ->
       noCommand { model | changingName = Nothing }
@@ -92,6 +97,9 @@ update msg model =
           |> Maybe.map (\m -> { m | name = name, potentialName = BoundedContext.isName name } ) 
       }
       |> noCommand
+    
+    NoOp ->
+      noCommand model
 
 view : Model -> Html Msg
 view model =
