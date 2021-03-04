@@ -10,20 +10,17 @@ on:
 
 jobs:
   build:
-
+    defaults:
+      run:
+        working-directory: ./
     runs-on: ubuntu-latest
-
-    strategy:
-      matrix:
-        node-version: [10.x, 12.x]
-
     steps:
     - uses: actions/checkout@v2
-    - name: Use Node.js ${{ matrix.node-version }}
-      uses: actions/setup-node@v1
+    - uses: actions/setup-dotnet@v1
       with:
-        node-version: ${{ matrix.node-version }}
-    - run: npm ci
-      working-directory: ./server
-#     - run: npm run build --if-present
-#     - run: npm test
+        dotnet-version: '5.0.103'
+    - run: make publish-server
+      name: Build
+    - run: make test-server
+    - name: Publish
+      run: make publish-server

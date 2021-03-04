@@ -23,7 +23,7 @@ let errorHandler (ex : Exception) (logger : ILogger) =
 
 let configureCors (builder : CorsPolicyBuilder) =
     builder
-        .WithOrigins("http://localhost:8000")
+        .WithOrigins("http://localhost:5000","http://localhost:3000")
        .AllowAnyMethod()
        .AllowAnyHeader()
        |> ignore
@@ -35,7 +35,9 @@ let configureApp (app : IApplicationBuilder) =
         app.UseDeveloperExceptionPage()
     | false ->
         app.UseGiraffeErrorHandler(errorHandler))
+        .UseHttpsRedirection()
         .UseCors(configureCors)
+        .UseStaticFiles()
         .UseGiraffe(webApp)
 
 let configureServices (services : IServiceCollection) =
@@ -52,6 +54,7 @@ let main args =
         .ConfigureWebHostDefaults(
             fun webHostBuilder ->
                 webHostBuilder
+                    .UseKestrel()
                     .Configure(Action<IApplicationBuilder> configureApp)
                     .ConfigureServices(configureServices)
                     .ConfigureLogging(configureLogging)

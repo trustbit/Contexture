@@ -20,9 +20,6 @@ jobs:
     steps:
     # Checks-out your repository under $GITHUB_WORKSPACE, so your job can access it
     - uses: actions/checkout@v2
-
-
     - name: Setup Elm
       uses: jorelali/setup-elm@v2
-    - run: elm make src/Main.elm
-      working-directory: ./app
+    - run: make build-app

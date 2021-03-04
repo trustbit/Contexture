@@ -1,5 +1,5 @@
 FROM mcr.microsoft.com/dotnet/aspnet:5.0
-COPY bin/Release/net5.0/publish/ /app
+COPY ./ /app
 WORKDIR /app
 EXPOSE 8080
 ENV ASPNETCORE_URLS=http://*:3000

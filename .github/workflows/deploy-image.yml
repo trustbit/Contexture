@@ -10,27 +10,22 @@ jobs:
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@master
+    - uses: actions/setup-dotnet@v1
+      with:
+        dotnet-version: '5.0.103'
+    - run: make build-server
+      name: Build
+    - run: make test-server
+      name: Test
     - name: Setup Elm
       uses: jorelali/setup-elm@v2
-    - run: elm make src/Main.elm --output=../server/public/index.html
-      working-directory: ./app
-    - name: Use Node.js ${{ env.NODE_VERSION }}
-      uses: actions/setup-node@v1
-      with:
-        node-version: ${{ env.NODE_VERSION }}
-    - name: npm install, build, and test
-      working-directory: ./server
-      run: |
-        # Build and test the project, then
-        # deploy to Azure Web App.
-        npm install
-        npm run build --if-present
-        npm run test --if-present
+    - run: make prepare-image
+      name: Prepares server & app into an image
     - name: Publish to Registry
       uses: elgohr/Publish-Docker-Github-Action@master
       with:
         name: softwarepark/contexture
-        workdir: ./server
+        workdir: ./artifacts/image
         username: ${{ secrets.DOCKER_USERNAME }}
         password: ${{ secrets.DOCKER_PASSWORD }}
         snapshot: true
