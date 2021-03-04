@@ -25,5 +25,8 @@ prepare-image: publish-backend publish-app
 build-image: prepare-image
 	cd artifacts/image && docker build -t softwarepark/contexture -f Dockerfile .
 
+run-image: build-image
+	docker run -it softwarepark/contexture
+
 run-app:
 	docker run -p 3000:3000 contexture-dotnet
