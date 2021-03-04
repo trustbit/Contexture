@@ -12,15 +12,15 @@ publish-server:
         -o artifacts/server
 
 build-app:
-	cd app && elm make src/Main.elm
+	cd frontend && elm make src/Main.elm
 
 publish-app:
-	cd app && elm make src/Main.elm --output=../artifacts/app/index.html
+	cd frontend && elm make src/Main.elm --output=../artifacts/frontend/index.html
 
 prepare-image: publish-server publish-app
 	mkdir -p artifacts/image/
 	cp -r artifacts/server/ artifacts/image/
-	cp artifacts/app/*.* artifacts/image/wwwroot/
+	cp artifacts/frontend/*.* artifacts/image/wwwroot/
 
 build-image: prepare-image
 	cd artifacts/image && docker build -t softwarepark/contexture -f Dockerfile .
