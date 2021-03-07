@@ -6,7 +6,6 @@ open Xunit
 [<Fact>]
 let ``Unversioned JSON deserialization`` () =
     let exampleInputPath = "../../../../example/restaurant-db.json"
-    //let examplePath = @"D:\Projects\Softwarepark\walter-db-12-2.json"
     
     let expectedJson = exampleInputPath |> Database.Persistence.read
     
