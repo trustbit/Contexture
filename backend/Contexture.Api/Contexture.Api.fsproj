@@ -15,8 +15,8 @@
 
   <ItemGroup>
     <Compile Include="Domain.fs" />
-    <Compile Include="Domains.fs" />
     <Compile Include="Database.fs" />
+    <Compile Include="Domains.fs" />
     <Compile Include="Program.fs" />
   </ItemGroup>
   <ItemGroup>

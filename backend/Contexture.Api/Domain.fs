@@ -1,7 +1,6 @@
 ﻿namespace Contexture.Api
 
 open System
-open System.Text.Json.Serialization
 
 module Domain =
 
