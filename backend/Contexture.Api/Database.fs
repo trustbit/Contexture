@@ -14,11 +14,20 @@ module Database =
           BoundedContexts: BoundedContext list
           BusinessDecisions: BusinessDecision list
           Collaborations: Collaboration list }
+        with
+            static member Empty =
+                { Domains = []
+                  BoundedContexts = []
+                  BusinessDecisions = []
+                  Collaborations = [] }
     
     module Persistence =
         let read path = path |> File.ReadAllText
 
-        let save path data = (path, data) |> File.WriteAllText
+        let save path data =
+            let tempFile = Path.GetTempFileName()
+            (tempFile, data) |> File.WriteAllText
+            File.Move(tempFile,path, true)
 
     module Serialization =
 
@@ -49,21 +58,56 @@ module Database =
             (json, serializerOptions)
             |> JsonSerializer.Deserialize<Root>
     
-    let root = Persistence.read "../../example/restaurant-db.json" |> Serialization.deserialize 
-    
-    let getDomains() =
-        root.Domains
+    type FileBased(fileName: string) =
 
-    let getSubdomains parentDomainId =
-        getDomains()
-        |> List.where (fun x -> x.ParentDomain = Some parentDomainId)
+        let mutable root = Persistence.read fileName |> Serialization.deserialize
         
-    let getBoundedContexts domainId =
-        root.BoundedContexts
-        |> List.where (fun x -> x.DomainId = domainId)
+        let write change =
+            lock fileName (
+                fun () ->
+                    let changed: Root = change root
+                    changed |> Serialization.serialize |> Persistence.save fileName
+            )
+            
+        static member EmptyDatabase fileName =
+            Root.Empty |> Serialization.serialize |> Persistence.save fileName
+            FileBased fileName
         
-    let getCollaborations() =
-        root.Collaborations
+        static member InitializeDatabase fileName =
+            if not (File.Exists fileName) then
+                FileBased.EmptyDatabase(fileName)
+            else
+                FileBased(fileName)
+        
+        member __.getDomains() =
+            root.Domains
+
+        member __.getSubdomains parentDomainId =
+            __.getDomains()
+            |> List.where (fun x -> x.ParentDomain = Some parentDomainId)
+            
+        member __.getBoundedContexts domainId =
+            root.BoundedContexts
+            |> List.where (fun x -> x.DomainId = domainId)
+            
+        member __.getCollaborations() =
+            root.Collaborations
+            
+        member __.AddDomain domainName =
+            write (fun rootDb ->
+                let domain : Domain = {
+                    Id =  rootDb.Domains.Length
+                    Key = None
+                    ParentDomain = None
+                    Name = domainName
+                    Vision = None
+                }
+                { rootDb with Domains = domain :: rootDb.Domains  }
+            )
+            
+
+       
+              
         
 //    let mapInitiator (initiator: Context.Initiator) =
 //        { BoundedContext = initiator.BoundedContext

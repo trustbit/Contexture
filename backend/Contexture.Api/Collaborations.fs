@@ -1,5 +1,6 @@
 ﻿namespace Contexture.Api
 
+open Contexture.Api.Database
 open Microsoft.AspNetCore.Http
 
 open Giraffe
@@ -8,10 +9,11 @@ module Collaborations =
     
     let getCollaborations =
         fun (next : HttpFunc) (ctx : HttpContext) ->
-            let collaborations = Database.getCollaborations()
+            let database = ctx.GetService<FileBased>()
+            let collaborations = database.getCollaborations()
             json collaborations next ctx
     
-    let routes: HttpHandler =
+    let routes : HttpHandler =
         subRoute "/collaborations"
             (choose [
                 GET >=> getCollaborations

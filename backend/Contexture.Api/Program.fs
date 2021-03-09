@@ -1,6 +1,8 @@
 module Contexture.Api.App
 
 open System
+open System.IO
+open Contexture.Api.Database
 open Giraffe
 open Microsoft.AspNetCore.Builder
 open Microsoft.AspNetCore.Cors.Infrastructure
@@ -8,6 +10,12 @@ open Microsoft.AspNetCore.Hosting
 open Microsoft.Extensions.Hosting
 open Microsoft.Extensions.Logging
 open Microsoft.Extensions.DependencyInjection
+open Microsoft.Extensions.Options
+
+[<CLIMutable>]
+type ContextureOptions = {
+    DatabasePath : string
+}
 
 let webApp =
     choose [
@@ -47,7 +55,15 @@ let configureJsonSerializer (services: IServiceCollection) =
     |> ignore
 
 
-let configureServices (services : IServiceCollection) =
+let configureServices (context: WebHostBuilderContext) (services : IServiceCollection) =
+    services.Configure<ContextureOptions>(context.Configuration) |> ignore
+    services.AddOptions<ContextureOptions>()
+        .Validate((fun o -> not (String.IsNullOrEmpty o.DatabasePath)), "A non-empty DatabasePath configuration is required")
+        |> ignore
+    services.AddSingleton<FileBased>(fun s ->
+        FileBased.InitializeDatabase(s.GetRequiredService<IOptions<ContextureOptions>>().Value.DatabasePath)
+        )
+        |> ignore
     services.AddCors() |> ignore
     services.AddGiraffe() |> ignore
     services |> configureJsonSerializer
