@@ -24,7 +24,10 @@ module Database =
     module Persistence =
         let read path = path |> File.ReadAllText
 
-        let save path data = (path, data) |> File.WriteAllText
+        let save path data =
+            let tempFile = Path.GetTempFileName()
+            (tempFile, data) |> File.WriteAllText
+            File.Move(tempFile,path, true)
 
     module Serialization =
 
