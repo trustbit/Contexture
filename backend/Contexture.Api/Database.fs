@@ -57,8 +57,24 @@ module Database =
     
     type FileBased(fileName: string) =
 
+        let mutable root = Persistence.read fileName |> Serialization.deserialize
         
-        let root = Persistence.read fileName |> Serialization.deserialize 
+        let write change =
+            lock fileName (
+                fun () ->
+                    let changed: Root = change root
+                    changed |> Serialization.serialize |> Persistence.save fileName
+            )
+            
+        static member EmptyDatabase fileName =
+            Root.Empty |> Serialization.serialize |> Persistence.save fileName
+            FileBased fileName
+        
+        static member InitializeDatabase fileName =
+            if not (File.Exists fileName) then
+                FileBased.EmptyDatabase(fileName)
+            else
+                FileBased(fileName)
         
         member __.getDomains() =
             root.Domains
@@ -73,17 +89,21 @@ module Database =
             
         member __.getCollaborations() =
             root.Collaborations
+            
+        member __.AddDomain domainName =
+            write (fun rootDb ->
+                let domain : Domain = {
+                    Id =  rootDb.Domains.Length
+                    Key = None
+                    ParentDomain = None
+                    Name = domainName
+                    Vision = None
+                }
+                { rootDb with Domains = domain :: rootDb.Domains  }
+            )
+            
 
-        static member EmptyDatabase fileName =
-            Root.Empty |> Serialization.serialize |> Persistence.save fileName
-            FileBased fileName
-        
-        static member InitializeDatabase fileName =
-            if not (File.Exists fileName) then
-                FileBased.EmptyDatabase(fileName)
-            else
-                FileBased(fileName)
-
+       
               
         
 //    let mapInitiator (initiator: Context.Initiator) =

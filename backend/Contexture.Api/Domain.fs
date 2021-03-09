@@ -83,9 +83,7 @@ module Domain =
           ParentDomain: int option
           Key: string option
           Name: string
-          Vision: string
-          Subdomains: Domain list
-          BoundedContexts: BoundedContext list }
+          Vision: string option }
 
     type SymmetricRelationship =
         | SharedKernel
