@@ -1,19 +1,20 @@
 module Contexture.Api.App
 
 open System
+open Giraffe
 open Microsoft.AspNetCore.Builder
 open Microsoft.AspNetCore.Cors.Infrastructure
 open Microsoft.AspNetCore.Hosting
 open Microsoft.Extensions.Hosting
 open Microsoft.Extensions.Logging
 open Microsoft.Extensions.DependencyInjection
-open Giraffe
 
 let webApp =
     choose [
         subRoute "/api"
             (choose [
                 Domains.routes
+                Collaborations.routes
             ])
         setStatusCode 404 >=> text "Not Found" ]
 
@@ -38,10 +39,18 @@ let configureApp (app : IApplicationBuilder) =
         .UseCors(configureCors)
         .UseStaticFiles()
         .UseGiraffe(webApp)
+        
+let configureJsonSerializer (services: IServiceCollection) =
+    Database.Serialization.serializerOptions
+    |> SystemTextJson.Serializer
+    |> services.AddSingleton<Json.ISerializer>
+    |> ignore
+
 
 let configureServices (services : IServiceCollection) =
     services.AddCors() |> ignore
     services.AddGiraffe() |> ignore
+    services |> configureJsonSerializer
 
 let configureLogging (builder : ILoggingBuilder) =
     builder.AddConsole()

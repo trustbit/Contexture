@@ -8,10 +8,12 @@ module Domains =
     
     let getDomains =
         fun (next : HttpFunc) (ctx : HttpContext) ->
-//            let domains = Database.getDomains
-//                            |> List.map(fun x -> { x with Domains = Database.getSubdomains x.Id })
+            let domains = Database.getDomains()
+                            |> List.map(fun x -> { x with
+                                                    Subdomains = Database.getSubdomains x.Id
+                                                    BoundedContexts = Database.getBoundedContexts x.Id })
             
-            negotiate 0 next ctx
+            json domains next ctx
     
     let routes: HttpHandler =
         subRoute "/domains"

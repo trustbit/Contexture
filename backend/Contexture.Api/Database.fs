@@ -9,6 +9,12 @@ open Contexture.Api.Domain
 
 module Database =
 
+    type Root =
+        { Domains: Domain list
+          BoundedContexts: BoundedContext list
+          BusinessDecisions: BusinessDecision list
+          Collaborations: Collaboration list }
+    
     module Persistence =
         let read path = path |> File.ReadAllText
 
@@ -42,13 +48,23 @@ module Database =
         let deserialize (json: string) =
             (json, serializerOptions)
             |> JsonSerializer.Deserialize<Root>
+    
+    let root = Persistence.read "../../example/restaurant-db.json" |> Serialization.deserialize 
+    
+    let getDomains() =
+        root.Domains
 
-    let getDomains = 0
-
-//    let getSubdomains parentDomainId =
-//        getDomains
-//        |> List.filter (fun x -> x.ParentDomain = Some parentDomainId)
-
+    let getSubdomains parentDomainId =
+        getDomains()
+        |> List.where (fun x -> x.ParentDomain = Some parentDomainId)
+        
+    let getBoundedContexts domainId =
+        root.BoundedContexts
+        |> List.where (fun x -> x.DomainId = domainId)
+        
+    let getCollaborations() =
+        root.Collaborations
+        
 //    let mapInitiator (initiator: Context.Initiator) =
 //        { BoundedContext = initiator.BoundedContext
 //          Domain = initiator.Domain }

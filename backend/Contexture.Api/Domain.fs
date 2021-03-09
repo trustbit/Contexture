@@ -136,9 +136,3 @@ module Domain =
           Initiator: Collaborator
           Recipient: Collaborator
           RelationshipType: RelationshipType option }
-
-    type Root =
-        { Domains: Domain list
-          BoundedContexts: BoundedContext list
-          BusinessDecisions: BusinessDecision list
-          Collaborations: Collaboration list }
