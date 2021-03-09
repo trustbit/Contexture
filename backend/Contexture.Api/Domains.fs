@@ -1,5 +1,6 @@
 ﻿namespace Contexture.Api
 
+open Contexture.Api.Database
 open Microsoft.AspNetCore.Http
 
 open Giraffe
@@ -8,14 +9,15 @@ module Domains =
     
     let getDomains =
         fun (next : HttpFunc) (ctx : HttpContext) ->
-            let domains = Database.getDomains()
+            let database = ctx.GetService<FileBased>()
+            let domains = database.getDomains()
                             |> List.map(fun x -> { x with
-                                                    Subdomains = Database.getSubdomains x.Id
-                                                    BoundedContexts = Database.getBoundedContexts x.Id })
+                                                    Subdomains = database.getSubdomains x.Id
+                                                    BoundedContexts = database.getBoundedContexts x.Id })
             
             json domains next ctx
     
-    let routes: HttpHandler =
+    let routes : HttpHandler =
         subRoute "/domains"
             (choose [
                 GET >=> getDomains

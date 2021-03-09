@@ -14,6 +14,12 @@ module Database =
           BoundedContexts: BoundedContext list
           BusinessDecisions: BusinessDecision list
           Collaborations: Collaboration list }
+        with
+            static member Empty =
+                { Domains = []
+                  BoundedContexts = []
+                  BusinessDecisions = []
+                  Collaborations = [] }
     
     module Persistence =
         let read path = path |> File.ReadAllText
@@ -49,21 +55,36 @@ module Database =
             (json, serializerOptions)
             |> JsonSerializer.Deserialize<Root>
     
-    let root = Persistence.read "../../example/restaurant-db.json" |> Serialization.deserialize 
-    
-    let getDomains() =
-        root.Domains
+    type FileBased(fileName: string) =
 
-    let getSubdomains parentDomainId =
-        getDomains()
-        |> List.where (fun x -> x.ParentDomain = Some parentDomainId)
         
-    let getBoundedContexts domainId =
-        root.BoundedContexts
-        |> List.where (fun x -> x.DomainId = domainId)
+        let root = Persistence.read fileName |> Serialization.deserialize 
         
-    let getCollaborations() =
-        root.Collaborations
+        member __.getDomains() =
+            root.Domains
+
+        member __.getSubdomains parentDomainId =
+            __.getDomains()
+            |> List.where (fun x -> x.ParentDomain = Some parentDomainId)
+            
+        member __.getBoundedContexts domainId =
+            root.BoundedContexts
+            |> List.where (fun x -> x.DomainId = domainId)
+            
+        member __.getCollaborations() =
+            root.Collaborations
+
+        static member EmptyDatabase fileName =
+            Root.Empty |> Serialization.serialize |> Persistence.save fileName
+            FileBased fileName
+        
+        static member InitializeDatabase fileName =
+            if not (File.Exists fileName) then
+                FileBased.EmptyDatabase(fileName)
+            else
+                FileBased(fileName)
+
+              
         
 //    let mapInitiator (initiator: Context.Initiator) =
 //        { BoundedContext = initiator.BoundedContext
