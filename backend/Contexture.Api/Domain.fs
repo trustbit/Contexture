@@ -61,8 +61,8 @@ module Domain =
           Artifacts: Uri option }
 
     type TechnicalDescription =
-        { Tools: Lifecycle
-          Deployment: Deployment }
+        { Tools: Lifecycle option
+          Deployment: Deployment option }
 
     type BoundedContext =
         { Id: int
@@ -76,7 +76,7 @@ module Domain =
           ModelTraits: string
           Messages: Messages
           DomainRoles: DomainRole list
-          TechnicalDescription: TechnicalDescription }
+          TechnicalDescription: TechnicalDescription option }
 
     type Domain =
         { Id: int
@@ -102,15 +102,15 @@ module Domain =
         | Conformist
 
     type InitiatorCustomerSupplierRole =
-        | SupplierRole
-        | CustomerRole
+        | Supplier
+        | Customer
 
     type InitiatorUpstreamDownstreamRole =
         | Upstream
         | Downstream
 
     type UpstreamDownstreamRelationship =
-        | CustomerSupplierRelationship of initiatorRole: InitiatorCustomerSupplierRole
+        | CustomerSupplierRelationship of role: InitiatorCustomerSupplierRole
         | UpstreamDownstreamRelationship of
             initiatorRole: InitiatorUpstreamDownstreamRole *
             upstreamType: UpstreamRelationship *
