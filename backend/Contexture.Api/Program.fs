@@ -7,6 +7,7 @@ open Giraffe
 open Microsoft.AspNetCore.Builder
 open Microsoft.AspNetCore.Cors.Infrastructure
 open Microsoft.AspNetCore.Hosting
+open Microsoft.Extensions.Configuration
 open Microsoft.Extensions.Hosting
 open Microsoft.Extensions.Logging
 open Microsoft.Extensions.DependencyInjection
@@ -56,13 +57,14 @@ let configureJsonSerializer (services: IServiceCollection) =
 
 
 let configureServices (context: WebHostBuilderContext) (services : IServiceCollection) =
-    services.Configure<ContextureOptions>(context.Configuration) |> ignore
-    services.AddOptions<ContextureOptions>()
-        .Validate((fun o -> not (String.IsNullOrEmpty o.DatabasePath)), "A non-empty DatabasePath configuration is required")
+    services
+        .AddOptions<ContextureOptions>()
+        .Bind(context.Configuration)
+        .Validate((fun options -> not (String.IsNullOrEmpty options.DatabasePath)), "A non-empty DatabasePath configuration is required")
         |> ignore
-    services.AddSingleton<FileBased>(fun s ->
-        FileBased.InitializeDatabase(s.GetRequiredService<IOptions<ContextureOptions>>().Value.DatabasePath)
-        )
+    services.AddSingleton<FileBased>(fun services ->
+        let options = services.GetRequiredService<IOptions<ContextureOptions>>()
+        FileBased.InitializeDatabase(options.Value.DatabasePath))
         |> ignore
     services.AddCors() |> ignore
     services.AddGiraffe() |> ignore

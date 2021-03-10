@@ -140,9 +140,12 @@ module Database =
                     changed |> Serialization.serialize |> Persistence.save fileName
             )
             
-        static member EmptyDatabase fileName =
-            Root.Empty |> Serialization.serialize |> Persistence.save fileName
-            FileBased fileName
+        static member EmptyDatabase (path: string) =
+            match Path.GetDirectoryName path with
+            | "" -> ()
+            | directoryPath -> Directory.CreateDirectory directoryPath |> ignore
+            Root.Empty |> Serialization.serialize |> Persistence.save path
+            FileBased path
         
         static member InitializeDatabase fileName =
             if not (File.Exists fileName) then
