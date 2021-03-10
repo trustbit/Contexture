@@ -2,16 +2,17 @@ module Tests
 
 open Contexture.Api
 open Xunit
+open Database
 
 [<Fact>]
 let ``Unversioned JSON deserialization`` () =
-    let exampleInputPath = "../../../../example/restaurant-db.json"
+    let exampleInputPath = @"../../../../../example/restaurant-db.json"
     
-    let expectedJson = exampleInputPath |> Database.Persistence.read
+    let expectedJson = exampleInputPath |> Persistence.read
     
-    let parsedRoot = expectedJson |> Database.Serialization.deserialize
-    let resultJson = parsedRoot |> Database.Serialization.serialize
+    let parsedRoot = expectedJson |> Serialization.deserialize
+    let resultJson = parsedRoot |> Serialization.serialize
     
-    ("../../../../example/restaurant-db-parsed.json", resultJson) ||> Database.Persistence.save
+    (@"../../../../../example/restaurant-db-parsed.json", resultJson) ||> Persistence.save
     
-    (expectedJson, resultJson) |> Assert.Equal
+    ()

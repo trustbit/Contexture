@@ -10,13 +10,15 @@ open Contexture.Api.Domain
 module Database =
 
     type Root =
-        { Domains: Domain list
+        { Version: int option
+          Domains: Domain list
           BoundedContexts: BoundedContext list
           BusinessDecisions: BusinessDecision list
           Collaborations: Collaboration list }
         with
             static member Empty =
-                { Domains = []
+                { Version = None
+                  Domains = []
                   BoundedContexts = []
                   BusinessDecisions = []
                   Collaborations = [] }
@@ -31,6 +33,8 @@ module Database =
 
     module Serialization =
 
+        open Newtonsoft.Json.Linq
+        
         let serializerOptions =
             let options =
                 JsonSerializerOptions
@@ -54,9 +58,76 @@ module Database =
             (data, serializerOptions)
             |> JsonSerializer.Serialize
 
-        let deserialize (json: string) =
-            (json, serializerOptions)
-            |> JsonSerializer.Deserialize<Root>
+        let migrate (json: string) =
+            let root = JObject.Parse json
+            
+            let getRelationshipTypeProperty (content: JObject) = JProperty("relationshipType", content)
+            
+            let fixCasing (token: JObject) =
+                let newValue =
+                    match token.["initiatorRole"].Value<string>() with
+                    | "upstream" -> "Upstream"
+                    | "downstream" -> "Downstream"
+                    | "customer" -> "Customer"
+                    | "supplier" -> "Supplier"
+                    | other -> other
+                    
+                token.["initiatorRole"] <- JValue(newValue)
+                token
+
+            let processRelationship (token: JObject) =
+                let parent = token.Parent
+                
+                let renamedProperty =
+                    match token.Properties() |> List.ofSeq with
+                    | firstProperty :: rest when firstProperty.Name = "initiatorRole" ->
+                        match rest.Length with
+                        | 2 -> JObject(JProperty("upstreamDownstream", fixCasing token)) |> getRelationshipTypeProperty
+                        | 0 ->
+                            let renamedToken = fixCasing token
+                            let newProperty = JProperty("role", renamedToken.["initiatorRole"])
+                            JObject(JProperty("upstreamDownstream", JObject(newProperty))) |> getRelationshipTypeProperty
+                        | _ -> failwith "Unsupported record with initiatorRole" 
+                    | _ ->
+                        getRelationshipTypeProperty token
+                
+                parent.Replace(renamedProperty)
+    
+            let addTechnicalDescription (token: JToken) =
+                let obj = token :?> JObject
+                
+                let tools = obj.Property("tools")
+                let deployment = obj.Property("deployment")
+                
+                let properties = seq {
+                    if tools <> null then yield tools
+                    if deployment <> null then yield deployment
+                }
+                
+                match properties with
+                | _ when Seq.isEmpty properties -> ()
+                | _ ->
+                    properties |> Seq.iter (fun x -> x.Remove())
+                    obj.Add(JProperty("technicalDescription", JObject(properties)))
+
+            root.["collaborations"]
+            |> Seq.map (fun x -> x.["relationship"])
+            |> Seq.where (fun x -> x.HasValues)
+            |> Seq.iter (fun x -> x :?> JObject |> processRelationship)
+
+            root.["boundedContexts"]
+            |> Seq.iter addTechnicalDescription
+
+            root.Add(JProperty("version", 1))
+            root.ToString()
+        
+        let rec deserialize (json: string) =
+            let root = (json, serializerOptions) |> JsonSerializer.Deserialize<Root>
+            match root.Version with
+            | None ->
+                let migratedJson = migrate json
+                deserialize migratedJson
+            | Some _ -> root
     
     type FileBased(fileName: string) =
 
