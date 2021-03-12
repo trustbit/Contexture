@@ -30,13 +30,15 @@ module Domains =
               Subdomains = []
               BoundedContexts = [] }
 
-        let includingSubdomainsAndBoundedContexts (database: FileBased) (domain: Domain) =
+        let includingSubdomainsAndBoundedContexts (database: Document) (domain: Domain) =
             { (domain |> convertDomain) with
                   Subdomains =
                       domain.Id
-                      |> database.getSubdomains
+                      |> Document.subdomainsOf database
                       |> List.map convertDomain
-                  BoundedContexts = database.getBoundedContexts domain.Id }
+                  BoundedContexts =
+                      domain.Id
+                      |> Document.boundedContextsOf database }
 
     module Aggregate =
         type Errors = | EmptyName
@@ -125,11 +127,11 @@ module Domains =
 
     let getDomains =
         fun (next: HttpFunc) (ctx: HttpContext) ->
-            let database = ctx.GetService<FileBased>()
-
+            let database = ctx.GetService<FileBased'>()
+            let document = database.Read
             let domains =
-                database.getDomains ()
-                |> List.map (Results.includingSubdomainsAndBoundedContexts database)
+                document.Domains.All
+                |> List.map (Results.includingSubdomainsAndBoundedContexts document)
 
             json domains next ctx
 
@@ -145,12 +147,12 @@ module Domains =
 
     let getDomain domainId =
         fun (next: HttpFunc) (ctx: HttpContext) ->
-            let database = ctx.GetService<FileBased>()
-
+            let database = ctx.GetService<FileBased'>()
+            let document = database.Read
             let result =
                 domainId
-                |> database.getDomain
-                |> Option.map (Results.includingSubdomainsAndBoundedContexts database)
+                |> document.Domains.ById
+                |> Option.map (Results.includingSubdomainsAndBoundedContexts document)
                 |> Option.map json
                 |> Option.defaultValue (RequestErrors.NOT_FOUND(sprintf "Domain %i not found" domainId))
 

@@ -13,13 +13,11 @@ module Database =
         { Version: int option
           Domains: Domain list
           BoundedContexts: BoundedContext list
-          BusinessDecisions: BusinessDecision list
           Collaborations: Collaboration list }
         static member Empty =
             { Version = None
               Domains = []
               BoundedContexts = []
-              BusinessDecisions = []
               Collaborations = [] }
 
     module Persistence =
@@ -140,6 +138,120 @@ module Database =
     type UpdateError<'Error> =
         | EntityNotFound of int
         | ChangeError of 'Error
+        
+    type Collection<'item when 'item : equality>(items :'item list, getId: 'item -> int) =
+        let itemsById =
+            lazy
+                items
+                |> List.map (fun i -> getId i,i)
+                |> Map.ofList
+                
+        let nextId existingIds =
+            let highestId =
+                match existingIds with
+                | [] -> 0
+                | items -> items |> List.max
+
+            highestId + 1
+            
+        let getById idValue =
+            itemsById.Value.TryFind idValue 
+
+        let update idValue change =
+            match idValue |> getById with
+            | Some item ->
+                match change item with
+                | Ok updatedItem ->
+                    let updatedItems =
+                        updatedItem
+                        :: (items |> List.except ([ item ]))
+
+                    Ok(updatedItems, updatedItem)
+                | Error e -> e |> ChangeError |> Error
+            | None -> idValue |> EntityNotFound |> Error
+            
+        let add seed =
+            let newId =
+                 itemsById.Value
+                 |> Map.toList
+                 |> List.map fst
+                 |> nextId
+            let newItem = seed newId
+            Ok (newItem :: items,newItem)
+        
+        let remove idValue =
+            match idValue |> getById with
+            | Some item ->
+                let updatedItems =
+                    items |> List.except ([ item ])
+                Ok(updatedItems, Some item)
+            | None ->
+                Ok(items, None)
+
+        member __.ById idValue = getById idValue
+        member __.All = items
+        member __.Update idValue change = update idValue change
+        member __.Add seed = add seed
+        member __.Remove idValue = remove idValue
+        
+    type Document =
+        {
+            Domains: Collection<Domain>
+            BoundedContexts: Collection<BoundedContext>
+            Collaborations: Collection<Collaboration>
+        }
+    
+    module Document =
+        let subdomainsOf (document: Document) parentDomainId =
+            document.Domains.All |> List.where (fun x -> x.ParentDomain = Some parentDomainId)
+        let boundedContextsOf (document: Document) domainId =
+             document.BoundedContexts.All
+            |> List.where (fun x -> x.DomainId = domainId)
+        
+    type FileBased'(fileName: string) =
+        let mutable (version,document) =
+            Persistence.read fileName
+            |> Serialization.deserialize
+            |> fun root ->
+                let document = {
+                  Domains = Collection(root.Domains, fun d -> d.Id)
+                  BoundedContexts = Collection (root.BoundedContexts, fun d -> d.Id)
+                  Collaborations = Collection (root.Collaborations, fun d -> d.Id)
+                }
+                root.Version,document
+                
+        let write change =
+            lock fileName (fun () ->
+                match change document with
+                | Ok (changed: Document, returnValue) ->
+                    {
+                        Version = version
+                        Domains = changed.Domains.All
+                        BoundedContexts = changed.BoundedContexts.All
+                        Collaborations = changed.Collaborations.All                        
+                    }
+                    |> Serialization.serialize
+                    |> Persistence.save fileName
+
+                    document <- changed
+                    Ok returnValue
+                | Error e -> Error e)        
+            
+        static member EmptyDatabase(path: string) =
+            match Path.GetDirectoryName path with
+            | "" -> ()
+            | directoryPath -> Directory.CreateDirectory directoryPath |> ignore
+
+            Root.Empty
+            |> Serialization.serialize
+            |> Persistence.save path
+
+            FileBased' path
+        static member InitializeDatabase fileName =
+            if not (File.Exists fileName) then FileBased'.EmptyDatabase(fileName) else FileBased'(fileName)
+        member __.Read = document
+        member __.Change change = write change
+       
 
     type FileBased(fileName: string) =
 
@@ -162,14 +274,14 @@ module Database =
                     root <- changed
                     Ok returnValue
                 | Error e -> Error e)
-
+        
         let nextId existingIds =
             let highestId =
                 match existingIds with
                 | [] -> 0
                 | items -> items |> List.max
 
-            highestId + 1
+            highestId + 1    
 
         static member EmptyDatabase(path: string) =
             match Path.GetDirectoryName path with
@@ -186,8 +298,6 @@ module Database =
             if not (File.Exists fileName) then FileBased.EmptyDatabase(fileName) else FileBased(fileName)
 
         member __.getDomains() = root.Domains
-
-        member __.getDomain domainId = domainById domainId
 
         member __.getSubdomains parentDomainId =
             __.getDomains ()
@@ -210,7 +320,7 @@ module Database =
                       ParentDomain = None
                       Name = domainName
                       Vision = None }
-
+                
                 Ok
                     ({ rootDb with
                            Domains = domain :: rootDb.Domains },
