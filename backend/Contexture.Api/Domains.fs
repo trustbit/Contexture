@@ -72,22 +72,35 @@ module Domains =
     let moveDomain domainId (command: Commands.MoveDomain) =
         fun (next: HttpFunc) (ctx : HttpContext) -> task {
             let database = ctx.GetService<FileBased>()
-            let updatedDomain =
-                database.UpdateDomain
-                    domainId
-                    (fun domain ->
-                        { domain with ParentDomain = command.ParentDomain }
-                        )
-            return! json updatedDomain next ctx
+            let updateDomain domain =
+                { domain with ParentDomain = command.ParentDomain }
+            match database.UpdateDomain domainId updateDomain with
+            | Ok updatedDomain ->
+                return! json updatedDomain next ctx
+            | Error e ->
+                return! ServerErrors.INTERNAL_ERROR e next ctx
         }
         
     let createDomain (command: Commands.CreateDomain) =
         fun (next: HttpFunc) (ctx : HttpContext) -> task {
             let database = ctx.GetService<FileBased>()
-            let addedDomain =
-                command.Name
-                |> database.AddDomain 
-            return! json addedDomain next ctx
+            match  command.Name |> database.AddDomain with
+            | Ok addedDomain ->
+                return! json addedDomain next ctx
+            | Error e ->
+                return! ServerErrors.INTERNAL_ERROR e next ctx
+        }
+        
+    let removeDomain domainId =
+        fun (next: HttpFunc) (ctx : HttpContext) -> task {
+            let database = ctx.GetService<FileBased>()
+            match database.RemoveDomain domainId with
+            | Ok (Some removedDomain) -> 
+                return! json removedDomain next ctx
+            | Ok None ->
+                return! json null next ctx
+            | Error e ->
+                return! ServerErrors.INTERNAL_ERROR e next ctx
         }
     
     let routes : HttpHandler =
@@ -97,12 +110,12 @@ module Domains =
                     (choose [
                         GET >=> route "/domains" >=> getSubDomains domainId
                         GET >=> getDomain domainId 
-                        POST
-                            >=> route "/move"
-                            >=> bindJson<Commands.MoveDomain> (moveDomain domainId)
+                        POST >=> route "/move" >=> bindJson (moveDomain domainId)
+                        DELETE >=> removeDomain domainId
                     ])
                 )
                 GET >=> getDomains
                 POST >=> bindJson createDomain
+                
             ])
 
