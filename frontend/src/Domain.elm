@@ -122,9 +122,9 @@ renameDomain baseUrl domain (InternalName newName) =
   let
     request toMsg =
       Http.request
-      { method = "PATCH"
+      { method = "POST"
       , headers = []
-      , url = domain |> Api.domain [] |> Api.url baseUrl |> Url.toString
+      , url = domain |> Api.domain [] |> Api.url baseUrl |> Url.toString |> (\u -> u ++ "/rename")
       , body = Http.jsonBody <|  Encode.object [ nameFieldEncoder newName ]
       , expect = Http.expectJson toMsg domainDecoder
       , timeout = Nothing
@@ -142,9 +142,9 @@ updateVision baseUrl domain theVision =
         Nothing -> Encode.null
     request toMsg =
       Http.request
-      { method = "PATCH"
+      { method = "POST"
       , headers = []
-      , url = domain |> Api.domain [] |> Api.url baseUrl |> Url.toString
+      , url = domain |> Api.domain [] |> Api.url baseUrl |> Url.toString |> (\u -> u ++ "/vision")
       , body = Http.jsonBody <|  Encode.object [ ("vision", encodedVision) ]
       , expect = Http.expectJson toMsg domainDecoder
       , timeout = Nothing
