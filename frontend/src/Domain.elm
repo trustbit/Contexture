@@ -199,9 +199,9 @@ assignKey base domainId domainKey =
         Nothing -> Encode.null
     request toMsg =
       Http.request
-      { method = "PATCH"
+      { method = "POST"
       , headers = []
-      , url = domainId |> Api.domain [] |> Api.url base |> Url.toString
+      , url = domainId |> Api.domain [] |> Api.url base |> Url.toString|> (\u -> u ++ "/key")
       , body = Http.jsonBody <| Encode.object[ ("key", encodedKey) ]
       , expect = Http.expectJson toMsg domainDecoder
       , timeout = Nothing

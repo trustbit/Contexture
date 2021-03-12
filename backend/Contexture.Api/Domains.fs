@@ -117,6 +117,15 @@ module Domains =
                           |> Option.ofObj
                           |> Option.filter (String.IsNullOrWhiteSpace >> not) }
             updateDomain domainId refineVisionOfDomain
+            
+        let assignKey domainId (command: AssignKey) =
+            let assignKeyToDomain (domain: Domain) =
+                { domain with
+                      Key =
+                          command.Key
+                          |> Option.ofObj
+                          |> Option.filter (String.IsNullOrWhiteSpace >> not) }
+            updateDomain domainId assignKeyToDomain
 
     let getDomains =
         fun (next: HttpFunc) (ctx: HttpContext) ->
@@ -169,6 +178,9 @@ module Domains =
                                     POST
                                     >=> route "/vision"
                                     >=> bindJson (Commands.refineVision domainId)
+                                    POST
+                                    >=> route "/key"
+                                    >=> bindJson (Commands.assignKey domainId)
                                     DELETE >=> Commands.remove domainId ]))
                       GET >=> getDomains
                       POST >=> bindJson Commands.create
