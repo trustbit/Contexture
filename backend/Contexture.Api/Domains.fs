@@ -88,6 +88,11 @@ module Domains =
         type MoveDomain = { ParentDomain: int option }
         type RefineVision = { Vision: string }
         type AssignKey = { Key: string }
+        
+        let private updateDomainsIn (document: Document) =
+            Result.map(fun (domains,item) ->
+                { document with Domains = domains },item
+            )
 
         let create (command: CreateDomain) =
             fun (next: HttpFunc) (ctx: HttpContext) ->
@@ -96,12 +101,10 @@ module Domains =
                     match newDomain command.Name with
                     | Ok addNewDomain ->
                         let changed =
-                            database.Change(fun d ->    
-                                match addNewDomain |> d.Domains.Add with
-                                | Ok (domains, newDomain) ->
-                                    Ok ({ d with Domains = domains },newDomain)
-                                | Error e ->
-                                    Error e
+                            database.Change(fun document ->
+                                addNewDomain
+                                |> document.Domains.Add
+                                |> updateDomainsIn document
                                )
                         match changed with
                         | Ok addedDomain ->
@@ -117,13 +120,9 @@ module Domains =
                     let database = ctx.GetService<FileBased>()
                     let changed =
                         database.Change(fun document ->
-                            match document.Domains.Remove domainId with
-                            | Ok (domains, Some removeDomain) ->
-                                Ok ({document with Domains = domains },Some removeDomain)
-                            | Ok (_, None) ->
-                                Ok (document,None)
-                            | Error e ->
-                                Error e
+                            domainId
+                            |> document.Domains.Remove
+                            |> updateDomainsIn document
                             )
                     match changed with
                     | Ok (Some removedDomain) -> return! json (Results.convertDomain removedDomain) next ctx
@@ -137,11 +136,9 @@ module Domains =
                     let database = ctx.GetService<FileBased>()
                     let changed =
                         database.Change (fun document ->
-                            match document.Domains.Update domainId updateDomain with
-                            | Ok (domains, domain) ->
-                                Ok ({ document with Domains = domains },domain)
-                            | Error e ->
-                                Error e
+                            domainId
+                            |> document.Domains.Update updateDomain
+                            |> updateDomainsIn document
                             )
                     match changed with
                     | Ok updatedDomain -> return! json (Results.convertDomain updatedDomain) next ctx

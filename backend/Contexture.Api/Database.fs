@@ -192,7 +192,7 @@ module Database =
 
         member __.ById idValue = getById idValue
         member __.All = items
-        member __.Update idValue change = update idValue change
+        member __.Update change idValue = update idValue change
         member __.Add seed = add seed
         member __.Remove idValue = remove idValue
         
