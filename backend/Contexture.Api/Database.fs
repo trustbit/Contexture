@@ -133,11 +133,16 @@ module Database =
 
         let mutable root = Persistence.read fileName |> Serialization.deserialize
         
+        let domainById domainId =
+            root.Domains
+            |> List.tryFind(fun x -> x.Id = domainId)
+
         let write change =
             lock fileName (
                 fun () ->
                     let changed: Root = change root
                     changed |> Serialization.serialize |> Persistence.save fileName
+                    root <- changed
             )
             
         static member EmptyDatabase (path: string) =
@@ -155,6 +160,9 @@ module Database =
         
         member __.getDomains() =
             root.Domains
+            
+        member __.getDomain domainId =
+            domainById domainId
 
         member __.getSubdomains parentDomainId =
             __.getDomains()
@@ -179,6 +187,15 @@ module Database =
                 { rootDb with Domains = domain :: rootDb.Domains  }
             )
             
+        member __.UpdateDomain domainId change =
+            write (fun rootDb ->
+                match domainId |> domainById with
+                | Some domain ->
+                    let updatedDomain = change domain
+                    { rootDb with Domains = updatedDomain :: (rootDb.Domains |> List.except([ domain ])) }
+                | None ->
+                    failwithf "No domain %i found" domainId
+                )
 
        
               

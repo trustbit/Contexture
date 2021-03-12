@@ -64,9 +64,11 @@ module Domain =
         { Tools: Lifecycle option
           Deployment: Deployment option }
 
+    type DomainId = int
+    
     type BoundedContext =
         { Id: int
-          DomainId: int
+          DomainId: DomainId
           Key: string
           Name: string
           Description: string
@@ -77,10 +79,10 @@ module Domain =
           Messages: Messages
           DomainRoles: DomainRole list
           TechnicalDescription: TechnicalDescription option }
-
+    
     type Domain =
-        { Id: int
-          ParentDomain: int option
+        { Id: DomainId
+          ParentDomain: DomainId option
           Key: string option
           Name: string
           Vision: string option }

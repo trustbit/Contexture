@@ -160,14 +160,13 @@ moveDomain baseUrl domain target =
       case target of
         Subdomain subDomainId -> Domain.DomainId.idEncoder subDomainId
         Root ->
-          -- we can't encode the root domain as 'null' otherwise json-server will fail
-          Encode.string ""
+          Encode.null
     request toMsg =
       Http.request
-      { method = "PATCH"
+      { method = "POST"
       , headers = []
-      , url = domain |> Api.domain [] |> Api.url baseUrl |> Url.toString
-      , body = Http.jsonBody <| Encode.object[ ("domainId", value) ]
+      , url = domain |> Api.domain [] |> Api.url baseUrl |> Url.toString |> (\u -> u ++ "/move")
+      , body = Http.jsonBody <| Encode.object[ ("parentDomain", value) ]
       , expect = Http.expectWhatever toMsg
       , timeout = Nothing
       , tracker = Nothing
