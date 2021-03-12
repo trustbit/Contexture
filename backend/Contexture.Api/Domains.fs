@@ -43,15 +43,30 @@ module Domains =
         type RenameDomain = { Name: string }
         type MoveDomain = { ParentDomain: int option }
         type RefineVision = { Vision: string }
+        type AssignKey = { Key: string }
+        
+        type DomainErrors =
+            | EmptyName
+        
+        let nameValidation name =
+            if String.IsNullOrWhiteSpace name
+            then Error EmptyName
+            else Ok name
 
         let create (command: CreateDomain) =
             fun (next: HttpFunc) (ctx: HttpContext) ->
                 task {
                     let database = ctx.GetService<FileBased>()
 
-                    match command.Name |> database.AddDomain with
-                    | Ok addedDomain -> return! json (Results.convertDomain addedDomain) next ctx
-                    | Error e -> return! ServerErrors.INTERNAL_ERROR e next ctx
+                    match command.Name |> nameValidation with
+                    | Ok name ->
+                        match name |> database.AddDomain with
+                        | Ok addedDomain ->
+                            return! json (Results.convertDomain addedDomain) next ctx
+                        | Error e ->
+                            return! ServerErrors.INTERNAL_ERROR e next ctx
+                    | Error EmptyName ->
+                        return! RequestErrors.BAD_REQUEST "Name must not be empty" next ctx
                 }
 
         let remove domainId =
@@ -81,8 +96,18 @@ module Domains =
             updateDomain domainId moveDomain
             
         let rename domainId (command: RenameDomain) =
-            let renameDomain (domain: Domain) = { domain with Name = command.Name }
-            updateDomain domainId renameDomain
+            fun (next: HttpFunc) (ctx: HttpContext) ->
+                task {
+                    match command.Name |> nameValidation with
+                    | Ok name ->
+                        let database = ctx.GetService<FileBased>()
+                        let renameDomain (domain: Domain) = { domain with Name = name }
+                        match database.UpdateDomain domainId renameDomain with
+                        | Ok updatedDomain -> return! json (Results.convertDomain updatedDomain) next ctx
+                        | Error e -> return! ServerErrors.INTERNAL_ERROR e next ctx
+                    | Error EmptyName ->
+                        return! RequestErrors.BAD_REQUEST "Name must not be empty" next ctx
+                }
 
         let refineVision domainId (command: RefineVision) =
             let refineVisionOfDomain (domain: Domain) =
