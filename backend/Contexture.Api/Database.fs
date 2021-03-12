@@ -70,6 +70,7 @@ module Database =
                     | "customer" -> "Customer"
                     | "supplier" -> "Supplier"
                     | other -> other
+
                 token.["initiatorRole"] <- JValue(newValue)
                 token
 
@@ -136,7 +137,9 @@ module Database =
                 deserialize migratedJson
             | Some _ -> root
 
-    type UpdateError = EntityNotFound of int
+    type UpdateError<'Error> =
+        | EntityNotFound of int
+        | ChangeError of 'Error
 
     type FileBased(fileName: string) =
 
@@ -217,13 +220,14 @@ module Database =
             write (fun rootDb ->
                 match domainId |> domainById with
                 | Some domain ->
-                    let updatedDomain = change domain
+                    match change domain with
+                    | Ok updatedDomain ->
+                        let updatedDomains =
+                            updatedDomain
+                            :: (rootDb.Domains |> List.except ([ domain ]))
 
-                    let updatedDomains =
-                        updatedDomain
-                        :: (rootDb.Domains |> List.except ([ domain ]))
-
-                    Ok({ rootDb with Domains = updatedDomains }, updatedDomain)
+                        Ok({ rootDb with Domains = updatedDomains }, updatedDomain)
+                    | Error e -> e |> ChangeError |> Error
                 | None -> domainId |> EntityNotFound |> Error)
 
         member __.RemoveDomain domainId =
