@@ -140,11 +140,19 @@ module Database =
         let write change =
             lock fileName (
                 fun () ->
-                    let changed: Root = change root
+                    let (changed: Root, returnValue) = change root
                     changed |> Serialization.serialize |> Persistence.save fileName
                     root <- changed
+                    returnValue
             )
-            
+
+        let nextId existingIds =
+            let highestId =
+                match existingIds with
+                | [] -> 0
+                | items -> items |> List.max
+            highestId + 1
+
         static member EmptyDatabase (path: string) =
             match Path.GetDirectoryName path with
             | "" -> ()
@@ -178,13 +186,13 @@ module Database =
         member __.AddDomain domainName =
             write (fun rootDb ->
                 let domain : Domain = {
-                    Id =  rootDb.Domains.Length
+                    Id =  rootDb.Domains |> List.map (fun d -> d.Id) |> nextId
                     Key = None
                     ParentDomain = None
                     Name = domainName
                     Vision = None
                 }
-                { rootDb with Domains = domain :: rootDb.Domains  }
+                { rootDb with Domains = domain :: rootDb.Domains  }, domain
             )
             
         member __.UpdateDomain domainId change =
@@ -192,7 +200,7 @@ module Database =
                 match domainId |> domainById with
                 | Some domain ->
                     let updatedDomain = change domain
-                    { rootDb with Domains = updatedDomain :: (rootDb.Domains |> List.except([ domain ])) }
+                    { rootDb with Domains = updatedDomain :: (rootDb.Domains |> List.except([ domain ])) }, updatedDomain
                 | None ->
                     failwithf "No domain %i found" domainId
                 )
