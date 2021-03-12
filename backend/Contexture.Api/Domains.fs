@@ -44,20 +44,6 @@ module Domains =
         type MoveDomain = { ParentDomain: int option }
         type RefineVision = { Vision: string }
 
-        let move domainId (command: MoveDomain) =
-            fun (next: HttpFunc) (ctx: HttpContext) ->
-                task {
-                    let database = ctx.GetService<FileBased>()
-
-                    let updateDomain (domain: Domain) =
-                        { domain with
-                              ParentDomain = command.ParentDomain }
-
-                    match database.UpdateDomain domainId updateDomain with
-                    | Ok updatedDomain -> return! json (Results.convertDomain updatedDomain) next ctx
-                    | Error e -> return! ServerErrors.INTERNAL_ERROR e next ctx
-                }
-
         let create (command: CreateDomain) =
             fun (next: HttpFunc) (ctx: HttpContext) ->
                 task {
@@ -78,35 +64,34 @@ module Domains =
                     | Ok None -> return! json null next ctx
                     | Error e -> return! ServerErrors.INTERNAL_ERROR e next ctx
                 }
-
-        let rename domainId (command: RenameDomain) =
+                
+        let private updateDomain domainId updateDomain =
             fun (next: HttpFunc) (ctx: HttpContext) ->
                 task {
                     let database = ctx.GetService<FileBased>()
-                    let updateDomain (domain: Domain) = { domain with Name = command.Name }
-
                     match database.UpdateDomain domainId updateDomain with
                     | Ok updatedDomain -> return! json (Results.convertDomain updatedDomain) next ctx
                     | Error e -> return! ServerErrors.INTERNAL_ERROR e next ctx
                 }
+                
+        let move domainId (command: MoveDomain) =
+            let moveDomain (domain: Domain) =
+                { domain with
+                      ParentDomain = command.ParentDomain }
+            updateDomain domainId moveDomain
+            
+        let rename domainId (command: RenameDomain) =
+            let renameDomain (domain: Domain) = { domain with Name = command.Name }
+            updateDomain domainId renameDomain
 
         let refineVision domainId (command: RefineVision) =
-            fun (next: HttpFunc) (ctx: HttpContext) ->
-                task {
-                    let database = ctx.GetService<FileBased>()
-
-                    let updateDomain (domain: Domain) =
-                        { domain with
-                              Vision =
-                                  command.Vision
-                                  |> Option.ofObj
-                                  |> Option.filter (String.IsNullOrWhiteSpace >> not) }
-
-                    match database.UpdateDomain domainId updateDomain with
-                    | Ok updatedDomain -> return! json (Results.convertDomain updatedDomain) next ctx
-                    | Error e -> return! ServerErrors.INTERNAL_ERROR e next ctx
-                }
-
+            let refineVisionOfDomain (domain: Domain) =
+                { domain with
+                      Vision =
+                          command.Vision
+                          |> Option.ofObj
+                          |> Option.filter (String.IsNullOrWhiteSpace >> not) }
+            updateDomain domainId refineVisionOfDomain
 
     let getDomains =
         fun (next: HttpFunc) (ctx: HttpContext) ->
@@ -162,5 +147,4 @@ module Domains =
                                     DELETE >=> Commands.remove domainId ]))
                       GET >=> getDomains
                       POST >=> bindJson Commands.create
-
                        ])
