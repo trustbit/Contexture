@@ -166,9 +166,11 @@ module Database =
                         updatedItem
                         :: (items |> List.except ([ item ]))
 
-                    Ok(updatedItems, updatedItem)
-                | Error e -> e |> ChangeError |> Error
-            | None -> idValue |> EntityNotFound |> Error
+                    Ok(Collection(updatedItems, getId), updatedItem)
+                | Error e ->
+                    e |> ChangeError |> Error
+            | None ->
+                idValue |> EntityNotFound |> Error
             
         let add seed =
             let newId =
@@ -177,16 +179,16 @@ module Database =
                  |> List.map fst
                  |> nextId
             let newItem = seed newId
-            Ok (newItem :: items,newItem)
+            Ok (Collection(newItem :: items, getId),newItem)
         
         let remove idValue =
             match idValue |> getById with
             | Some item ->
                 let updatedItems =
                     items |> List.except ([ item ])
-                Ok(updatedItems, Some item)
+                Ok(Collection(updatedItems,getId), Some item)
             | None ->
-                Ok(items, None)
+                Ok(Collection(items, getId), None)
 
         member __.ById idValue = getById idValue
         member __.All = items
@@ -202,13 +204,13 @@ module Database =
         }
     
     module Document =
-        let subdomainsOf (document: Document) parentDomainId =
-            document.Domains.All |> List.where (fun x -> x.ParentDomain = Some parentDomainId)
-        let boundedContextsOf (document: Document) domainId =
-             document.BoundedContexts.All
+        let subdomainsOf (domains: Collection<Domain>) parentDomainId =
+            domains.All |> List.where (fun x -> x.ParentDomain = Some parentDomainId)
+        let boundedContextsOf (boundedContexts: Collection<BoundedContext>) domainId =
+             boundedContexts.All
             |> List.where (fun x -> x.DomainId = domainId)
         
-    type FileBased'(fileName: string) =
+    type FileBased(fileName: string) =
         let mutable (version,document) =
             Persistence.read fileName
             |> Serialization.deserialize
@@ -246,114 +248,11 @@ module Database =
             |> Serialization.serialize
             |> Persistence.save path
 
-            FileBased' path
-        static member InitializeDatabase fileName =
-            if not (File.Exists fileName) then FileBased'.EmptyDatabase(fileName) else FileBased'(fileName)
-        member __.Read = document
-        member __.Change change = write change
-       
-
-    type FileBased(fileName: string) =
-
-        let mutable root =
-            Persistence.read fileName
-            |> Serialization.deserialize
-
-        let domainById domainId =
-            root.Domains
-            |> List.tryFind (fun x -> x.Id = domainId)
-
-        let write change =
-            lock fileName (fun () ->
-                match change root with
-                | Ok (changed: Root, returnValue) ->
-                    changed
-                    |> Serialization.serialize
-                    |> Persistence.save fileName
-
-                    root <- changed
-                    Ok returnValue
-                | Error e -> Error e)
-        
-        let nextId existingIds =
-            let highestId =
-                match existingIds with
-                | [] -> 0
-                | items -> items |> List.max
-
-            highestId + 1    
-
-        static member EmptyDatabase(path: string) =
-            match Path.GetDirectoryName path with
-            | "" -> ()
-            | directoryPath -> Directory.CreateDirectory directoryPath |> ignore
-
-            Root.Empty
-            |> Serialization.serialize
-            |> Persistence.save path
-
             FileBased path
-
         static member InitializeDatabase fileName =
             if not (File.Exists fileName) then FileBased.EmptyDatabase(fileName) else FileBased(fileName)
-
-        member __.getDomains() = root.Domains
-
-        member __.getSubdomains parentDomainId =
-            __.getDomains ()
-            |> List.where (fun x -> x.ParentDomain = Some parentDomainId)
-
-        member __.getBoundedContexts domainId =
-            root.BoundedContexts
-            |> List.where (fun x -> x.DomainId = domainId)
-
-        member __.getCollaborations() = root.Collaborations
-
-        member __.AddDomain domainName =
-            write (fun rootDb ->
-                let domain: Domain =
-                    { Id =
-                          rootDb.Domains
-                          |> List.map (fun d -> d.Id)
-                          |> nextId
-                      Key = None
-                      ParentDomain = None
-                      Name = domainName
-                      Vision = None }
-                
-                Ok
-                    ({ rootDb with
-                           Domains = domain :: rootDb.Domains },
-                     domain))
-
-        member __.UpdateDomain domainId change =
-            write (fun rootDb ->
-                match domainId |> domainById with
-                | Some domain ->
-                    match change domain with
-                    | Ok updatedDomain ->
-                        let updatedDomains =
-                            updatedDomain
-                            :: (rootDb.Domains |> List.except ([ domain ]))
-
-                        Ok({ rootDb with Domains = updatedDomains }, updatedDomain)
-                    | Error e -> e |> ChangeError |> Error
-                | None -> domainId |> EntityNotFound |> Error)
-
-        member __.RemoveDomain domainId =
-            write (fun rootDb ->
-                match domainId |> domainById with
-                | Some domain ->
-                    let updatedDomains =
-                        rootDb.Domains |> List.except ([ domain ])
-
-                    Ok({ rootDb with Domains = updatedDomains }, Some domain)
-                | None -> Ok(rootDb, None))
-
-
-
-
-
+        member __.Read = document
+        member __.Change change = write change
 
 //    let mapInitiator (initiator: Context.Initiator) =
 //        { BoundedContext = initiator.BoundedContext

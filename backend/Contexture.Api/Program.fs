@@ -66,10 +66,6 @@ let configureServices (context: WebHostBuilderContext) (services : IServiceColle
         let options = services.GetRequiredService<IOptions<ContextureOptions>>()
         FileBased.InitializeDatabase(options.Value.DatabasePath))
         |> ignore
-    services.AddSingleton<FileBased'>(fun services ->
-        let options = services.GetRequiredService<IOptions<ContextureOptions>>()
-        FileBased'.InitializeDatabase(options.Value.DatabasePath))
-        |> ignore
     services.AddCors() |> ignore
     services.AddGiraffe() |> ignore
     services |> configureJsonSerializer

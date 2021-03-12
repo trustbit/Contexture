@@ -10,7 +10,7 @@ module Collaborations =
     let getCollaborations =
         fun (next : HttpFunc) (ctx : HttpContext) ->
             let database = ctx.GetService<FileBased>()
-            let collaborations = database.getCollaborations()
+            let collaborations = database.Read.Collaborations.All
             json collaborations next ctx
     
     let routes : HttpHandler =
