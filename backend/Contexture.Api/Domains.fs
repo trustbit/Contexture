@@ -12,18 +12,48 @@ module Domains =
 
     module Results =
 
+        type BoundedContextResult =
+            { Id: int
+              ParentDomainId: DomainId
+              Key: string
+              Name: string
+              Description: string
+              Classification: StrategicClassification
+              BusinessDecisions: BusinessDecision list
+              UbiquitousLanguage: Map<string, UbiquitousLanguageTerm>
+              ModelTraits: string
+              Messages: Messages
+              DomainRoles: DomainRole list
+              TechnicalDescription: TechnicalDescription option }
+        
         type DomainResult =
             { Id: int
-              DomainId: int option
+              ParentDomainId: int option
               Key: string option
               Name: string
               Vision: string option
               Subdomains: DomainResult list
-              BoundedContexts: BoundedContext list }
+              BoundedContexts: BoundedContextResult list }
+            
+            
+        let convertBoundedContext (boundedContext: BoundedContext) =
+            { Id = boundedContext.Id
+              ParentDomainId = boundedContext.DomainId
+              Key= boundedContext.Key
+              Name= boundedContext.Name
+              Description= boundedContext.Description
+              Classification= boundedContext.Classification
+              BusinessDecisions = boundedContext. BusinessDecisions
+              UbiquitousLanguage = boundedContext. UbiquitousLanguage
+              ModelTraits= boundedContext.ModelTraits
+              Messages= boundedContext.Messages
+              DomainRoles= boundedContext.DomainRoles
+              TechnicalDescription= boundedContext.TechnicalDescription
+            }
 
         let convertDomain (domain: Domain) =
             { Id = domain.Id
-              DomainId = domain.ParentDomainId
+              ParentDomainId = domain.ParentDomainId
               Key = domain.Key
               Name = domain.Name
               Vision = domain.Vision
@@ -38,7 +68,8 @@ module Domains =
                       |> List.map convertDomain
                   BoundedContexts =
                       domain.Id
-                      |> Document.boundedContextsOf database.BoundedContexts }
+                      |> Document.boundedContextsOf database.BoundedContexts
+                      |> List.map convertBoundedContext }
 
     module Aggregate =
         type Errors = | EmptyName
@@ -199,7 +230,8 @@ module Domains =
             let document = database.Read
             let boundedContexts =
                 domainId
-                |> Document.boundedContextsOf document.BoundedContexts 
+                |> Document.boundedContextsOf document.BoundedContexts
+                |> List.map Results.convertBoundedContext
             
             json boundedContexts next ctx
 
