@@ -138,4 +138,8 @@ module FileBasedCommandHandlers =
                 updateBoundedContext database contextId (moveBoundedContext move.ParentDomainId)
             | ReclassifyBoundedContext (contextId, classification) ->
                 updateBoundedContext database contextId (reclassify classification.Classification)
+            | ChangeDescription (contextId, descriptionText) ->
+                updateBoundedContext database contextId (description descriptionText.Description)
+            | UpdateBusinessDecisions (contextId, decisions) ->
+                updateBoundedContext database contextId (updateBusinessDecisions decisions.BusinessDecisions)
                 

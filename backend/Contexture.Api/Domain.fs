@@ -223,6 +223,9 @@ module Aggregates =
             | RemoveBoundedContext of BoundedContextId
             | MoveBoundedContextToDomain of BoundedContextId * MoveBoundedContextToDomain
             | ReclassifyBoundedContext of BoundedContextId * ReclassifyBoundedContext
+            | ChangeDescription of BoundedContextId * ChangeDescription
+            // TODO: replace with add/remove instead of updateing all
+            | UpdateBusinessDecisions of BoundedContextId * UpdateBusinessDecisions
 
         and CreateBoundedContext = { Name: string }
 
@@ -234,6 +237,10 @@ module Aggregates =
 
         and ReclassifyBoundedContext =
             { Classification: StrategicClassification }
+        and ChangeDescription =
+            { Description: string option }
+        and UpdateBusinessDecisions =
+            { BusinessDecisions: BusinessDecision list }
 
         type Errors = | EmptyName
 
@@ -283,3 +290,13 @@ module Aggregates =
             Ok
                 { boundedContext with
                       Classification = classification }
+                
+        let description description (boundedContext: BoundedContext) =
+            Ok
+                { boundedContext with
+                      Description = description }
+
+        let updateBusinessDecisions decisions (boundedContext: BoundedContext) =
+            Ok
+                { boundedContext with
+                      BusinessDecisions = decisions }

@@ -81,7 +81,12 @@ module BoundedContexts =
             
         let reclassify contextId (command: ReclassifyBoundedContext) =
             updateAndReturnBoundedContext (ReclassifyBoundedContext(contextId, command))
-
+        
+        let description contextId (command: ChangeDescription) =
+            updateAndReturnBoundedContext (ChangeDescription(contextId, command))
+            
+        let businessDecisions contextId (command: UpdateBusinessDecisions) =
+            updateAndReturnBoundedContext (UpdateBusinessDecisions(contextId, command))
 
         let remove contextId =
             fun (next: HttpFunc) (ctx: HttpContext) ->
@@ -138,5 +143,11 @@ module BoundedContexts =
                                     POST
                                     >=> route "/reclassify"
                                     >=> bindJson (CommandEndpoints.reclassify contextId)
+                                    POST
+                                    >=> route "/description"
+                                    >=> bindJson (CommandEndpoints.description contextId)
+                                    POST
+                                    >=> route "/businessDecisions"
+                                    >=> bindJson (CommandEndpoints.businessDecisions contextId)
                                     DELETE >=> CommandEndpoints.remove contextId ]))
                       GET >=> getBoundedContexts ])
