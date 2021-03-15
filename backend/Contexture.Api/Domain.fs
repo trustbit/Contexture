@@ -162,17 +162,18 @@ module Aggregates =
                     
         type Command =
             | CreateDomain of CreateDomain
-            | RenameDomain of RenameDomain
-            | MoveDomain of MoveDomain
-            | RefineVision of RefineVision
-            | AssignKey of AssignKey
+            | RenameDomain of DomainId * RenameDomain
+            | MoveDomain of DomainId * MoveDomain
+            | RefineVision of DomainId * RefineVision
+            | AssignKey of DomainId * AssignKey
+            | RemoveDomain of DomainId
+
         and CreateDomain = { Name: string }
         and RenameDomain = { Name: string }
         and MoveDomain = { ParentDomainId: int option }
         and RefineVision = { Vision: string }
         and AssignKey = { Key: string }
                     
-        
         type Errors = | EmptyName
 
         let nameValidation name =

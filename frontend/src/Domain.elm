@@ -95,7 +95,7 @@ domainDecoder =
     |> JP.custom nameFieldDecoder
     |> JP.optional "vision" Decode.string ""
     |> JP.optional "key" (Decode.maybe Key.keyDecoder) Nothing
-    |> JP.optional "domainId" (Decode.maybe idDecoder) Nothing
+    |> JP.optional "parentDomainId" (Decode.maybe idDecoder) Nothing
   ) |> Decode.map Domain
 
 
@@ -166,7 +166,7 @@ moveDomain baseUrl domain target =
       { method = "POST"
       , headers = []
       , url = domain |> Api.domain [] |> Api.url baseUrl |> Url.toString |> (\u -> u ++ "/move")
-      , body = Http.jsonBody <| Encode.object[ ("parentDomain", value) ]
+      , body = Http.jsonBody <| Encode.object[ ("parentDomainId", value) ]
       , expect = Http.expectWhatever toMsg
       , timeout = Nothing
       , tracker = Nothing

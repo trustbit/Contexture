@@ -136,7 +136,7 @@ module Database =
             | Some _ -> root
 
     type UpdateError<'Error> =
-        | EntityNotFound of int
+        | EntityNotFoundInCollection of int
         | ChangeError of 'Error
         
     type Collection<'item when 'item : equality>(items :'item list, getId: 'item -> int) =
@@ -170,7 +170,7 @@ module Database =
                 | Error e ->
                     e |> ChangeError |> Error
             | None ->
-                idValue |> EntityNotFound |> Error
+                idValue |> EntityNotFoundInCollection |> Error
             
         let add seed =
             let newId =

@@ -72,6 +72,7 @@ module Domains =
    
     module CommandHandler =
         open Aggregates.Domain
+        open FileBasedCommandHandlers
         
         let private updateDomainsIn (document: Document) =
             Result.map(fun (domains,item) ->
@@ -82,19 +83,17 @@ module Domains =
             fun (next: HttpFunc) (ctx: HttpContext) ->
                 task {
                     let database = ctx.GetService<FileBased>()
-                    match newDomain command.Name with
-                    | Ok addNewDomain ->
-                        let changed =
-                            database.Change(fun document ->
-                                addNewDomain
-                                |> document.Domains.Add
-                                |> updateDomainsIn document
-                               )
-                        match changed with
-                        | Ok addedDomain ->
-                            return! json (Results.convertDomain addedDomain) next ctx
-                        | Error e -> return! ServerErrors.INTERNAL_ERROR e next ctx
-                    | Error EmptyName ->
+                    match Domain.handle database (CreateDomain command) with
+                    | Ok addedDomain ->
+                        let domain =
+                            addedDomain
+                            |> database.Read.Domains.ById
+                            |> Option.get
+                            |> Results.convertDomain
+                        return! json domain next ctx
+                    | Error (InfrastructureError e) ->
+                        return! ServerErrors.INTERNAL_ERROR e next ctx
+                    | Error (DomainError EmptyName) ->
                         return! RequestErrors.BAD_REQUEST "Name must not be empty" next ctx
                 }
 
@@ -102,46 +101,39 @@ module Domains =
             fun (next: HttpFunc) (ctx: HttpContext) ->
                 task {
                     let database = ctx.GetService<FileBased>()
-                    let changed =
-                        database.Change(fun document ->
-                            domainId
-                            |> document.Domains.Remove
-                            |> updateDomainsIn document
-                            )
-                    match changed with
-                    | Ok (Some removedDomain) -> return! json (Results.convertDomain removedDomain) next ctx
-                    | Ok None -> return! json null next ctx
+                    match Domain.handle database (RemoveDomain domainId) with
+                    | Ok domainId -> return! json domainId next ctx
                     | Error e -> return! ServerErrors.INTERNAL_ERROR e next ctx
                 }
 
-        let private updateDomain domainId updateDomain =
+        let private updateAndReturnDomain command =
             fun (next: HttpFunc) (ctx: HttpContext) ->
                 task {
                     let database = ctx.GetService<FileBased>()
-                    let changed =
-                        database.Change (fun document ->
-                            domainId
-                            |> document.Domains.Update updateDomain
-                            |> updateDomainsIn document
-                            )
-                    match changed with
-                    | Ok updatedDomain -> return! json (Results.convertDomain updatedDomain) next ctx
-                    | Error (ChangeError EmptyName) ->
+                    match Domain.handle database command with
+                    | Ok updatedDomain ->
+                        let domain =
+                            updatedDomain
+                            |> database.Read.Domains.ById
+                            |> Option.get
+                            |> Results.convertDomain
+                        return! json domain next ctx
+                    | Error (DomainError EmptyName) ->
                         return! RequestErrors.BAD_REQUEST "Name must not be empty" next ctx
                     | Error e -> return! ServerErrors.INTERNAL_ERROR e next ctx
                 }
 
         let move domainId (command: MoveDomain) =
-            updateDomain domainId (moveDomain command.ParentDomainId)
+            updateAndReturnDomain (MoveDomain(domainId,command))
 
         let rename domainId (command: RenameDomain) =
-            updateDomain domainId (renameDomain command.Name)
+            updateAndReturnDomain (RenameDomain(domainId,command))
 
         let refineVision domainId (command: RefineVision) =
-            updateDomain domainId (refineVisionOfDomain command.Vision)
+            updateAndReturnDomain (RefineVision(domainId,command))            
 
         let assignKey domainId (command: AssignKey) =
-            updateDomain domainId (assignKeyToDomain command.Key)
+            updateAndReturnDomain (AssignKey(domainId,command))
             
         let newBoundedContextOn domainId (command: Aggregates.BoundedContext.Commands.CreateBoundedContext) =
             fun (next: HttpFunc) (ctx: HttpContext) -> task {
