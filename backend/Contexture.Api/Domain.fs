@@ -222,9 +222,12 @@ module Aggregates =
             | UpdateTechnicalInformation of BoundedContextId * UpdateTechnicalInformation
             | RenameBoundedContext of BoundedContextId * RenameBoundedContext
             | AssignKey of BoundedContextId * AssignKey
+            | RemoveBoundedContext of BoundedContextId
+            | MoveBoundedContextToDomain of BoundedContextId * MoveBoundedContextToDomain
         and CreateBoundedContext = { Name: string }
         and UpdateTechnicalInformation = TechnicalDescription
         and RenameBoundedContext = { Name: string }
+        and MoveBoundedContextToDomain = { ParentDomainId: DomainId }
 
         type Errors = | EmptyName
 
@@ -266,4 +269,5 @@ module Aggregates =
                           key
                           |> Option.ofObj
                           |> Option.filter (String.IsNullOrWhiteSpace >> not) }
-
+        
+        let moveBoundedContext parent (boundedContext: BoundedContext) = Ok { boundedContext with DomainId = parent }

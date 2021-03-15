@@ -118,9 +118,9 @@ move base contextId targetDomain =
   let
     request toMsg =
       Http.request
-      { method = "PATCH"
+      { method = "POST"
       , headers = []
-      , url = contextId |> Api.boundedContext |> Api.url base |> Url.toString
+      , url = contextId |> Api.boundedContext |> Api.url base |> Url.toString |> (\c -> c ++ "/move")
       , body = Http.jsonBody <| Encode.object[ parentDomainIdEncoder targetDomain ]
       , expect = Http.expectWhatever toMsg
       , timeout = Nothing

@@ -74,6 +74,20 @@ module BoundedContexts =
         let key contextId (command: AssignKey) =
             updateAndReturnBoundedContext (AssignKey(contextId,command))
         
+        let move contextId (command: MoveBoundedContextToDomain) =
+            updateAndReturnBoundedContext (MoveBoundedContextToDomain(contextId,command))
+            
+            
+        let remove contextId =
+            fun (next: HttpFunc) (ctx: HttpContext) ->
+                task {
+                    let database = ctx.GetService<FileBased>()
+                    match BoundedContext.handle database (RemoveBoundedContext contextId) with
+                    | Ok domainId -> return! json domainId next ctx
+                    | Error e -> return! ServerErrors.INTERNAL_ERROR e next ctx
+                }
+
+        
 
     let getBoundedContexts =
         fun (next: HttpFunc) (ctx: HttpContext) ->
@@ -107,7 +121,8 @@ module BoundedContexts =
                             POST >=> route "/technical" >=> bindJson (CommandEndpoints.technical contextId)
                             POST >=> route "/rename" >=> bindJson (CommandEndpoints.rename contextId)
                             POST >=> route "/key" >=> bindJson (CommandEndpoints.key contextId)
-                            
+                            POST >=> route "/move" >=> bindJson (CommandEndpoints.move contextId)
+                            DELETE >=> CommandEndpoints.remove contextId
                         ])
                     )
                 GET >=> getBoundedContexts

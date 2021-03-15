@@ -94,7 +94,18 @@ module FileBasedCommandHandlers =
                 
         let private updateBoundedContextsIn (document: Document) =
             Result.map (fun (contexts, item) -> { document with BoundedContexts = contexts }, item)
-                
+
+        let remove (database: FileBased) contextId =
+            let changed =
+                database.Change(fun document ->
+                    contextId
+                    |> document.BoundedContexts.Remove
+                    |> updateBoundedContextsIn document)
+
+            changed
+            |> Result.map (fun _ -> contextId)
+            |> Result.mapError InfrastructureError
+                        
         let private updateBoundedContext (database: FileBased) contextId update =
             let changed =
                 database.Change(fun document ->
@@ -121,4 +132,9 @@ module FileBasedCommandHandlers =
                 updateBoundedContext database contextId (renameBoundedContext rename.Name)
             | AssignKey (contextId, key) ->
                 updateBoundedContext database contextId (assignKeyToBoundedContext key.Key)
+            | RemoveBoundedContext contextId ->
+                remove database contextId
+            | MoveBoundedContextToDomain (contextId, move) ->
+                updateBoundedContext database contextId (moveBoundedContext move.ParentDomainId)
+                
                 
