@@ -91,8 +91,29 @@ module FileBasedCommandHandlers =
                 |> Result.mapError InfrastructureError                        
             | Error domainError ->
                 domainError |> DomainError |> Error
-        
+                
+        let private updateBoundedContextsIn (document: Document) =
+            Result.map (fun (contexts, item) -> { document with BoundedContexts = contexts }, item)
+                
+        let private updateBoundedContext (database: FileBased) contextId update =
+            let changed =
+                database.Change(fun document ->
+                    contextId
+                    |> document.BoundedContexts.Update update
+                    |> updateBoundedContextsIn document)
+
+            match changed with
+            | Ok _ -> Ok contextId
+            | Error (ChangeError e) -> Error(DomainError e)
+            | Error (EntityNotFoundInCollection id) ->
+                id
+                |> EntityNotFound
+                |> InfrastructureError
+                |> Error
         
         let handle (database: FileBased) (command: Command) =
             match command with
-            | CreateBoundedContext (domainId,createBc) -> create database domainId createBc
+            | CreateBoundedContext (domainId,createBc) ->
+                create database domainId createBc
+            | UpdateTechnicalInformation (contextId,technical) ->
+                updateBoundedContext database contextId (updateTechnicalDescription technical) 

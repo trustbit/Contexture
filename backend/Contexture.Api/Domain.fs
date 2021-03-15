@@ -82,9 +82,10 @@ module Domain =
           Deployment: Deployment option }
 
     type DomainId = int
+    type BoundedContextId = int
     
     type BoundedContext =
-        { Id: int
+        { Id: BoundedContextId
           DomainId: DomainId
           Key: string option
           Name: string
@@ -140,8 +141,8 @@ module Domain =
         | Unknown
 
     type Collaborator =
-        | BoundedContext of BoundedContext: int
-        | Domain of Domain: int
+        | BoundedContext of BoundedContext: BoundedContextId
+        | Domain of Domain: DomainId
         | ExternalSystem of ExternalSystem: string
         | Frontend of Frontend: string
         | UserInteraction of UserInteraction: string
@@ -215,24 +216,26 @@ module Aggregates =
 
     module BoundedContext =
         open Domain
-
+        
         type Command =
             | CreateBoundedContext of DomainId * CreateBoundedContext
+            | UpdateTechnicalInformation of BoundedContextId * UpdateTechnicalInformation 
         and CreateBoundedContext = { Name: string }
+        and UpdateTechnicalInformation = TechnicalDescription
 
         type Errors = | EmptyName
 
         let nameValidation name =
             if String.IsNullOrWhiteSpace name then Error EmptyName else Ok name
             
-        let newBoundedContext domain name =
+        let newBoundedContext domainId name =
             name
             |> nameValidation
             |> Result.map (fun name ->
                 fun id ->
                     { Id = id
                       Key = None
-                      DomainId = domain
+                      DomainId = domainId
                       Name = name
                       Description = None
                       Classification = StrategicClassification.Unknown
@@ -242,5 +245,10 @@ module Aggregates =
                       DomainRoles = []
                       TechnicalDescription = None }
             )
+            
+        let updateTechnicalDescription description context =
+            Ok {
+                context with TechnicalDescription = Some description
+            }
 
 

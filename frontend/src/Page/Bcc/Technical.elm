@@ -248,7 +248,7 @@ loadTechnical config contextId =
     decoder =
       Decode.succeed TechnicalModel
       |> JP.custom BoundedContext.modelDecoder
-      |> JP.custom Technical.modelDecoder
+      |> JP.custom (Decode.at [ "technicalDescription"] Technical.modelDecoder)
       |> JP.requiredAt [ "domain" ] Domain.domainDecoder
   in Http.get
     { url = Api.canvas contextId |> Api.url config |> Url.toString
@@ -258,13 +258,14 @@ loadTechnical config contextId =
 saveTechnical : Api.Configuration -> BoundedContextId -> TechnicalDescription -> Cmd Msg
 saveTechnical config contextId model =
   Http.request
-    { method = "PATCH"
+    { method = "POST"
     , headers = []
     , url =
       contextId
       |> Api.boundedContext
       |> Api.url config
       |> Url.toString
+      |> (\url -> url ++ "/technical")
     , body = Http.jsonBody <| Technical.modelEncoder model
     , expect = Http.expectWhatever Saved
     , timeout = Nothing
