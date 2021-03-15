@@ -1,6 +1,7 @@
 ﻿namespace Contexture.Api
 
 open System
+open Contexture.Api.Aggregates.BoundedContext
 open Contexture.Api.Database
 open Contexture.Api.Domain
 open Microsoft.AspNetCore.Http
@@ -70,7 +71,7 @@ module Domains =
                       |> List.map convertBoundedContext }
 
    
-    module CommandHandler =
+    module CommandEndpoints =
         open Aggregates.Domain
         open FileBasedCommandHandlers
         
@@ -135,25 +136,20 @@ module Domains =
         let assignKey domainId (command: AssignKey) =
             updateAndReturnDomain (AssignKey(domainId,command))
             
-        let newBoundedContextOn domainId (command: Aggregates.BoundedContext.Commands.CreateBoundedContext) =
+        let newBoundedContextOn domainId (command: CreateBoundedContext) =
             fun (next: HttpFunc) (ctx: HttpContext) -> task {
                 let database = ctx.GetService<FileBased>()
-                match Aggregates.BoundedContext.newBoundedContext domainId command.Name with
-                | Ok addNewBoundedContext ->
-                    let changed =
-                        database.Change(fun document ->
-                            addNewBoundedContext
-                            |> document.BoundedContexts.Add
-                            |> Result.map(fun (bcs,item) ->
-                                { document with BoundedContexts = bcs },item
-                            )
-                           )
-                    match changed with
-                    | Ok addedContext ->
-                        return! json (Results.convertBoundedContext addedContext) next ctx
-                    | Error e -> return! ServerErrors.INTERNAL_ERROR e next ctx
-                | Error Aggregates.BoundedContext.EmptyName ->
+                match BoundedContext.handle database (CreateBoundedContext (domainId, command)) with
+                | Ok addedContext ->
+                    let context =
+                        addedContext
+                        |> database.Read.BoundedContexts.ById
+                        |> Option.get
+                        |> Results.convertBoundedContext
+                    return! json context next ctx
+                | Error (DomainError Aggregates.BoundedContext.EmptyName) ->
                     return! RequestErrors.BAD_REQUEST "Name must not be empty" next ctx
+                | Error e -> return! ServerErrors.INTERNAL_ERROR e next ctx
             }
 
     let getDomains =
@@ -200,9 +196,6 @@ module Domains =
                 |> List.map Results.convertBoundedContext
             
             json boundedContexts next ctx
-            
-
-            
 
     let routes: HttpHandler =
         subRoute
@@ -220,22 +213,22 @@ module Domains =
                         >=> getDomain domainId
                         POST
                         >=> route "/rename"
-                        >=> bindJson (CommandHandler.rename domainId)
+                        >=> bindJson (CommandEndpoints.rename domainId)
                         POST
                         >=> route "/move"
-                        >=> bindJson (CommandHandler.move domainId)
+                        >=> bindJson (CommandEndpoints.move domainId)
                         POST
                         >=> route "/vision"
-                        >=> bindJson (CommandHandler.refineVision domainId)
+                        >=> bindJson (CommandEndpoints.refineVision domainId)
                         POST
                         >=> route "/key"
-                        >=> bindJson (CommandHandler.assignKey domainId)
+                        >=> bindJson (CommandEndpoints.assignKey domainId)
                         POST
                         >=> routeCi "/boundedContexts"
-                        >=> bindJson (CommandHandler.newBoundedContextOn domainId)
-                        DELETE >=> CommandHandler.remove domainId
+                        >=> bindJson (CommandEndpoints.newBoundedContextOn domainId)
+                        DELETE >=> CommandEndpoints.remove domainId
                         ]
                     )
                 )
                 GET >=> getDomains
-                POST >=> bindJson CommandHandler.create ])
+                POST >=> bindJson CommandEndpoints.create ])

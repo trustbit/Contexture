@@ -1,6 +1,7 @@
 namespace Contexture.Api
 
 open Contexture.Api
+open Contexture.Api.Aggregates.BoundedContext
 open Contexture.Api.Aggregates.Domain
 open Database
 
@@ -17,7 +18,6 @@ module FileBasedCommandHandlers =
 
     module Domain =
         open Domain
-        open Aggregates.Domain
 
         let private updateDomainsIn (document: Document) =
             Result.map (fun (domains, item) -> { document with Domains = domains }, item)
@@ -72,3 +72,27 @@ module FileBasedCommandHandlers =
             | RefineVision (domainId, refineVision) ->
                 updateDomain database domainId (refineVisionOfDomain refineVision.Vision)
             | AssignKey (domainId, assignKey) -> updateDomain database domainId (assignKeyToDomain assignKey.Key)
+    
+    module BoundedContext =
+        open BoundedContext
+        let create (database: FileBased) domainId command =
+            match newBoundedContext domainId command.Name with
+            | Ok addNewBoundedContext ->
+                let changed =
+                    database.Change(fun document ->
+                        addNewBoundedContext
+                        |> document.BoundedContexts.Add
+                        |> Result.map(fun (bcs,item) ->
+                            { document with BoundedContexts = bcs },item
+                        )
+                       )
+                changed
+                |> Result.map (fun d -> d.Id)
+                |> Result.mapError InfrastructureError                        
+            | Error domainError ->
+                domainError |> DomainError |> Error
+        
+        
+        let handle (database: FileBased) (command: Command) =
+            match command with
+            | CreateBoundedContext (domainId,createBc) -> create database domainId createBc

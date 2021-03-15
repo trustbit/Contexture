@@ -156,10 +156,8 @@ module Domain =
 
 module Aggregates =
     
-    open Domain
-    
     module Domain =
-                    
+        open Domain                
         type Command =
             | CreateDomain of CreateDomain
             | RenameDomain of DomainId * RenameDomain
@@ -216,8 +214,11 @@ module Aggregates =
 
 
     module BoundedContext =
-        module Commands =
-            type CreateBoundedContext = { Name: string }
+        open Domain
+
+        type Command =
+            | CreateBoundedContext of DomainId * CreateBoundedContext
+        and CreateBoundedContext = { Name: string }
 
         type Errors = | EmptyName
 
