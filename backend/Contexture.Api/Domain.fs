@@ -154,19 +154,24 @@ module Domain =
           RelationshipType: RelationshipType option }
 
 
- module Aggregates =
+module Aggregates =
     
     open Domain
     
     module Domain =
-        
-        module Commands =
-            type CreateDomain = { Name: string }
-            type RenameDomain = { Name: string }
-            type MoveDomain = { ParentDomainId: int option }
-            type RefineVision = { Vision: string }
-            type AssignKey = { Key: string }
-            
+                    
+        type Command =
+            | CreateDomain of CreateDomain
+            | RenameDomain of RenameDomain
+            | MoveDomain of MoveDomain
+            | RefineVision of RefineVision
+            | AssignKey of AssignKey
+        and CreateDomain = { Name: string }
+        and RenameDomain = { Name: string }
+        and MoveDomain = { ParentDomainId: int option }
+        and RefineVision = { Vision: string }
+        and AssignKey = { Key: string }
+                    
         
         type Errors = | EmptyName
 
@@ -235,3 +240,5 @@ module Domain =
                       DomainRoles = []
                       TechnicalDescription = None }
             )
+
+

@@ -72,7 +72,6 @@ module Domains =
    
     module CommandHandler =
         open Aggregates.Domain
-        open Aggregates.Domain.Commands
         
         let private updateDomainsIn (document: Document) =
             Result.map(fun (domains,item) ->
