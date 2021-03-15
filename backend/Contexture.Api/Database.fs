@@ -13,13 +13,11 @@ module Database =
         { Version: int option
           Domains: Domain list
           BoundedContexts: BoundedContext list
-          BusinessDecisions: BusinessDecision list
           Collaborations: Collaboration list }
         static member Empty =
             { Version = None
               Domains = []
               BoundedContexts = []
-              BusinessDecisions = []
               Collaborations = [] }
 
     module Persistence =
@@ -70,6 +68,7 @@ module Database =
                     | "customer" -> "Customer"
                     | "supplier" -> "Supplier"
                     | other -> other
+
                 token.["initiatorRole"] <- JValue(newValue)
                 token
 
@@ -136,30 +135,17 @@ module Database =
                 deserialize migratedJson
             | Some _ -> root
 
-    type UpdateError = EntityNotFound of int
-
-    type FileBased(fileName: string) =
-
-        let mutable root =
-            Persistence.read fileName
-            |> Serialization.deserialize
-
-        let domainById domainId =
-            root.Domains
-            |> List.tryFind (fun x -> x.Id = domainId)
-
-        let write change =
-            lock fileName (fun () ->
-                match change root with
-                | Ok (changed: Root, returnValue) ->
-                    changed
-                    |> Serialization.serialize
-                    |> Persistence.save fileName
-
-                    root <- changed
-                    Ok returnValue
-                | Error e -> Error e)
-
+    type UpdateError<'Error> =
+        | EntityNotFound of int
+        | ChangeError of 'Error
+        
+    type Collection<'item when 'item : equality>(items :'item list, getId: 'item -> int) =
+        let itemsById =
+            lazy
+                items
+                |> List.map (fun i -> getId i,i)
+                |> Map.ofList
+                
         let nextId existingIds =
             let highestId =
                 match existingIds with
@@ -167,7 +153,92 @@ module Database =
                 | items -> items |> List.max
 
             highestId + 1
+            
+        let getById idValue =
+            itemsById.Value.TryFind idValue 
 
+        let update idValue change =
+            match idValue |> getById with
+            | Some item ->
+                match change item with
+                | Ok updatedItem ->
+                    let updatedItems =
+                        updatedItem
+                        :: (items |> List.except ([ item ]))
+
+                    Ok(Collection(updatedItems, getId), updatedItem)
+                | Error e ->
+                    e |> ChangeError |> Error
+            | None ->
+                idValue |> EntityNotFound |> Error
+            
+        let add seed =
+            let newId =
+                 itemsById.Value
+                 |> Map.toList
+                 |> List.map fst
+                 |> nextId
+            let newItem = seed newId
+            Ok (Collection(newItem :: items, getId),newItem)
+        
+        let remove idValue =
+            match idValue |> getById with
+            | Some item ->
+                let updatedItems =
+                    items |> List.except ([ item ])
+                Ok(Collection(updatedItems,getId), Some item)
+            | None ->
+                Ok(Collection(items, getId), None)
+
+        member __.ById idValue = getById idValue
+        member __.All = items
+        member __.Update change idValue = update idValue change
+        member __.Add seed = add seed
+        member __.Remove idValue = remove idValue
+        
+    type Document =
+        {
+            Domains: Collection<Domain>
+            BoundedContexts: Collection<BoundedContext>
+            Collaborations: Collection<Collaboration>
+        }
+    
+    module Document =
+        let subdomainsOf (domains: Collection<Domain>) parentDomainId =
+            domains.All |> List.where (fun x -> x.ParentDomain = Some parentDomainId)
+        let boundedContextsOf (boundedContexts: Collection<BoundedContext>) domainId =
+             boundedContexts.All
+            |> List.where (fun x -> x.DomainId = domainId)
+        
+    type FileBased(fileName: string) =
+        let mutable (version,document) =
+            Persistence.read fileName
+            |> Serialization.deserialize
+            |> fun root ->
+                let document = {
+                  Domains = Collection(root.Domains, fun d -> d.Id)
+                  BoundedContexts = Collection (root.BoundedContexts, fun d -> d.Id)
+                  Collaborations = Collection (root.Collaborations, fun d -> d.Id)
+                }
+                root.Version,document
+                
+        let write change =
+            lock fileName (fun () ->
+                match change document with
+                | Ok (changed: Document, returnValue) ->
+                    {
+                        Version = version
+                        Domains = changed.Domains.All
+                        BoundedContexts = changed.BoundedContexts.All
+                        Collaborations = changed.Collaborations.All                        
+                    }
+                    |> Serialization.serialize
+                    |> Persistence.save fileName
+
+                    document <- changed
+                    Ok returnValue
+                | Error e -> Error e)        
+            
         static member EmptyDatabase(path: string) =
             match Path.GetDirectoryName path with
             | "" -> ()
@@ -178,68 +249,10 @@ module Database =
             |> Persistence.save path
 
             FileBased path
-
         static member InitializeDatabase fileName =
             if not (File.Exists fileName) then FileBased.EmptyDatabase(fileName) else FileBased(fileName)
-
-        member __.getDomains() = root.Domains
-
-        member __.getDomain domainId = domainById domainId
-
-        member __.getSubdomains parentDomainId =
-            __.getDomains ()
-            |> List.where (fun x -> x.ParentDomain = Some parentDomainId)
-
-        member __.getBoundedContexts domainId =
-            root.BoundedContexts
-            |> List.where (fun x -> x.DomainId = domainId)
-
-        member __.getCollaborations() = root.Collaborations
-
-        member __.AddDomain domainName =
-            write (fun rootDb ->
-                let domain: Domain =
-                    { Id =
-                          rootDb.Domains
-                          |> List.map (fun d -> d.Id)
-                          |> nextId
-                      Key = None
-                      ParentDomain = None
-                      Name = domainName
-                      Vision = None }
-
-                Ok
-                    ({ rootDb with
-                           Domains = domain :: rootDb.Domains },
-                     domain))
-
-        member __.UpdateDomain domainId change =
-            write (fun rootDb ->
-                match domainId |> domainById with
-                | Some domain ->
-                    let updatedDomain = change domain
-
-                    let updatedDomains =
-                        updatedDomain
-                        :: (rootDb.Domains |> List.except ([ domain ]))
-
-                    Ok({ rootDb with Domains = updatedDomains }, updatedDomain)
-                | None -> domainId |> EntityNotFound |> Error)
-
-        member __.RemoveDomain domainId =
-            write (fun rootDb ->
-                match domainId |> domainById with
-                | Some domain ->
-                    let updatedDomains =
-                        rootDb.Domains |> List.except ([ domain ])
-
-                    Ok({ rootDb with Domains = updatedDomains }, Some domain)
-                | None -> Ok(rootDb, None))
-
-
-
-
-
+        member __.Read = document
+        member __.Change change = write change
 
 //    let mapInitiator (initiator: Context.Initiator) =
 //        { BoundedContext = initiator.BoundedContext

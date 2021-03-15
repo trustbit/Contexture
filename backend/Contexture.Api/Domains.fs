@@ -30,41 +30,86 @@ module Domains =
               Subdomains = []
               BoundedContexts = [] }
 
-        let includingSubdomainsAndBoundedContexts (database: FileBased) (domain: Domain) =
+        let includingSubdomainsAndBoundedContexts (database: Document) (domain: Domain) =
             { (domain |> convertDomain) with
                   Subdomains =
                       domain.Id
-                      |> database.getSubdomains
+                      |> Document.subdomainsOf database.Domains
                       |> List.map convertDomain
-                  BoundedContexts = database.getBoundedContexts domain.Id }
+                  BoundedContexts =
+                      domain.Id
+                      |> Document.boundedContextsOf database.BoundedContexts }
+
+    module Aggregate =
+        type Errors = | EmptyName
+
+        let nameValidation name =
+            if String.IsNullOrWhiteSpace name then Error EmptyName else Ok name
+            
+        let newDomain name =
+            name
+            |> nameValidation
+            |> Result.map (fun name ->
+                fun id ->
+                    { Id = id
+                      Key = None
+                      ParentDomain = None
+                      Name = name
+                      Vision = None }
+            )
+
+        let moveDomain parent (domain: Domain) = Ok { domain with ParentDomain = parent }
+
+        let refineVisionOfDomain vision (domain: Domain) =
+            Ok
+                { domain with
+                      Vision =
+                          vision
+                          |> Option.ofObj
+                          |> Option.filter (String.IsNullOrWhiteSpace >> not) }
+
+        let renameDomain potentialName (domain: Domain) =
+            potentialName
+            |> nameValidation
+            |> Result.map (fun name -> { domain with Name = name })
+
+        let assignKeyToDomain key (domain: Domain) =
+            Ok
+                { domain with
+                      Key =
+                          key
+                          |> Option.ofObj
+                          |> Option.filter (String.IsNullOrWhiteSpace >> not) }
 
     module Commands =
+        open Aggregate
         type CreateDomain = { Name: string }
         type RenameDomain = { Name: string }
         type MoveDomain = { ParentDomain: int option }
         type RefineVision = { Vision: string }
         type AssignKey = { Key: string }
         
-        type DomainErrors =
-            | EmptyName
-        
-        let nameValidation name =
-            if String.IsNullOrWhiteSpace name
-            then Error EmptyName
-            else Ok name
+        let private updateDomainsIn (document: Document) =
+            Result.map(fun (domains,item) ->
+                { document with Domains = domains },item
+            )
 
         let create (command: CreateDomain) =
             fun (next: HttpFunc) (ctx: HttpContext) ->
                 task {
                     let database = ctx.GetService<FileBased>()
-
-                    match command.Name |> nameValidation with
-                    | Ok name ->
-                        match name |> database.AddDomain with
+                    match newDomain command.Name with
+                    | Ok addNewDomain ->
+                        let changed =
+                            database.Change(fun document ->
+                                addNewDomain
+                                |> document.Domains.Add
+                                |> updateDomainsIn document
+                               )
+                        match changed with
                         | Ok addedDomain ->
                             return! json (Results.convertDomain addedDomain) next ctx
-                        | Error e ->
-                            return! ServerErrors.INTERNAL_ERROR e next ctx
+                        | Error e -> return! ServerErrors.INTERNAL_ERROR e next ctx
                     | Error EmptyName ->
                         return! RequestErrors.BAD_REQUEST "Name must not be empty" next ctx
                 }
@@ -73,67 +118,54 @@ module Domains =
             fun (next: HttpFunc) (ctx: HttpContext) ->
                 task {
                     let database = ctx.GetService<FileBased>()
-
-                    match database.RemoveDomain domainId with
+                    let changed =
+                        database.Change(fun document ->
+                            domainId
+                            |> document.Domains.Remove
+                            |> updateDomainsIn document
+                            )
+                    match changed with
                     | Ok (Some removedDomain) -> return! json (Results.convertDomain removedDomain) next ctx
                     | Ok None -> return! json null next ctx
                     | Error e -> return! ServerErrors.INTERNAL_ERROR e next ctx
                 }
-                
+
         let private updateDomain domainId updateDomain =
             fun (next: HttpFunc) (ctx: HttpContext) ->
                 task {
                     let database = ctx.GetService<FileBased>()
-                    match database.UpdateDomain domainId updateDomain with
+                    let changed =
+                        database.Change (fun document ->
+                            domainId
+                            |> document.Domains.Update updateDomain
+                            |> updateDomainsIn document
+                            )
+                    match changed with
                     | Ok updatedDomain -> return! json (Results.convertDomain updatedDomain) next ctx
+                    | Error (ChangeError EmptyName) ->
+                        return! RequestErrors.BAD_REQUEST "Name must not be empty" next ctx
                     | Error e -> return! ServerErrors.INTERNAL_ERROR e next ctx
                 }
-                
+
         let move domainId (command: MoveDomain) =
-            let moveDomain (domain: Domain) =
-                { domain with
-                      ParentDomain = command.ParentDomain }
-            updateDomain domainId moveDomain
-            
+            updateDomain domainId (moveDomain command.ParentDomain)
+
         let rename domainId (command: RenameDomain) =
-            fun (next: HttpFunc) (ctx: HttpContext) ->
-                task {
-                    match command.Name |> nameValidation with
-                    | Ok name ->
-                        let database = ctx.GetService<FileBased>()
-                        let renameDomain (domain: Domain) = { domain with Name = name }
-                        match database.UpdateDomain domainId renameDomain with
-                        | Ok updatedDomain -> return! json (Results.convertDomain updatedDomain) next ctx
-                        | Error e -> return! ServerErrors.INTERNAL_ERROR e next ctx
-                    | Error EmptyName ->
-                        return! RequestErrors.BAD_REQUEST "Name must not be empty" next ctx
-                }
+            updateDomain domainId (renameDomain command.Name)
 
         let refineVision domainId (command: RefineVision) =
-            let refineVisionOfDomain (domain: Domain) =
-                { domain with
-                      Vision =
-                          command.Vision
-                          |> Option.ofObj
-                          |> Option.filter (String.IsNullOrWhiteSpace >> not) }
-            updateDomain domainId refineVisionOfDomain
-            
+            updateDomain domainId (refineVisionOfDomain command.Vision)
+
         let assignKey domainId (command: AssignKey) =
-            let assignKeyToDomain (domain: Domain) =
-                { domain with
-                      Key =
-                          command.Key
-                          |> Option.ofObj
-                          |> Option.filter (String.IsNullOrWhiteSpace >> not) }
-            updateDomain domainId assignKeyToDomain
+            updateDomain domainId (assignKeyToDomain command.Key)
 
     let getDomains =
         fun (next: HttpFunc) (ctx: HttpContext) ->
             let database = ctx.GetService<FileBased>()
-
+            let document = database.Read
             let domains =
-                database.getDomains ()
-                |> List.map (Results.includingSubdomainsAndBoundedContexts database)
+                document.Domains.All
+                |> List.map (Results.includingSubdomainsAndBoundedContexts document)
 
             json domains next ctx
 
@@ -142,7 +174,8 @@ module Domains =
             let database = ctx.GetService<FileBased>()
 
             let domains =
-                database.getSubdomains domainId
+                domainId
+                |> Document.subdomainsOf database.Read.Domains 
                 |> List.map Results.convertDomain
 
             json domains next ctx
@@ -150,11 +183,11 @@ module Domains =
     let getDomain domainId =
         fun (next: HttpFunc) (ctx: HttpContext) ->
             let database = ctx.GetService<FileBased>()
-
+            let document = database.Read
             let result =
                 domainId
-                |> database.getDomain
-                |> Option.map (Results.includingSubdomainsAndBoundedContexts database)
+                |> document.Domains.ById
+                |> Option.map (Results.includingSubdomainsAndBoundedContexts document)
                 |> Option.map json
                 |> Option.defaultValue (RequestErrors.NOT_FOUND(sprintf "Domain %i not found" domainId))
 
@@ -183,5 +216,4 @@ module Domains =
                                     >=> bindJson (Commands.assignKey domainId)
                                     DELETE >=> Commands.remove domainId ]))
                       GET >=> getDomains
-                      POST >=> bindJson Commands.create
-                       ])
+                      POST >=> bindJson Commands.create ])
