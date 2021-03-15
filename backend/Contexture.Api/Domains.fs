@@ -192,28 +192,46 @@ module Domains =
                 |> Option.defaultValue (RequestErrors.NOT_FOUND(sprintf "Domain %i not found" domainId))
 
             result next ctx
-
+            
+    let getBoundedContextsOf domainId =
+        fun (next: HttpFunc) (ctx: HttpContext) ->
+            let database = ctx.GetService<FileBased>()
+            let document = database.Read
+            let boundedContexts =
+                domainId
+                |> Document.boundedContextsOf document.BoundedContexts 
+            
+            json boundedContexts next ctx
 
     let routes: HttpHandler =
         subRoute
             "/domains"
-            (choose [ subRoutef "/%i" (fun domainId ->
-                          (choose [ GET
-                                    >=> route "/domains"
-                                    >=> getSubDomains domainId
-                                    GET >=> getDomain domainId
-                                    POST
-                                    >=> route "/rename"
-                                    >=> bindJson (Commands.rename domainId)
-                                    POST
-                                    >=> route "/move"
-                                    >=> bindJson (Commands.move domainId)
-                                    POST
-                                    >=> route "/vision"
-                                    >=> bindJson (Commands.refineVision domainId)
-                                    POST
-                                    >=> route "/key"
-                                    >=> bindJson (Commands.assignKey domainId)
-                                    DELETE >=> Commands.remove domainId ]))
-                      GET >=> getDomains
-                      POST >=> bindJson Commands.create ])
+            (choose [
+                subRoutef "/%i" (fun domainId ->
+                    (choose [
+                        GET
+                        >=> route "/domains"
+                        >=> getSubDomains domainId
+                        GET
+                        >=> routeCi "/boundedContexts"
+                        >=> getBoundedContextsOf domainId
+                        GET
+                        >=> getDomain domainId
+                        POST
+                        >=> route "/rename"
+                        >=> bindJson (Commands.rename domainId)
+                        POST
+                        >=> route "/move"
+                        >=> bindJson (Commands.move domainId)
+                        POST
+                        >=> route "/vision"
+                        >=> bindJson (Commands.refineVision domainId)
+                        POST
+                        >=> route "/key"
+                        >=> bindJson (Commands.assignKey domainId)
+                        DELETE >=> Commands.remove domainId
+                        ]
+                    )
+                )
+                GET >=> getDomains
+                POST >=> bindJson Commands.create ])

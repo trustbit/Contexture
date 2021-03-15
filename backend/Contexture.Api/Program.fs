@@ -23,6 +23,7 @@ let webApp =
         subRoute "/api"
             (choose [
                 Domains.routes
+                BoundedContexts.routes
                 Collaborations.routes
             ])
         setStatusCode 404 >=> text "Not Found" ]
