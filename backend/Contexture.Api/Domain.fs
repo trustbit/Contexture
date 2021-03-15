@@ -224,10 +224,12 @@ module Aggregates =
             | AssignKey of BoundedContextId * AssignKey
             | RemoveBoundedContext of BoundedContextId
             | MoveBoundedContextToDomain of BoundedContextId * MoveBoundedContextToDomain
+            | ReclassifyBoundedContext of BoundedContextId * ReclassifyBoundedContext 
         and CreateBoundedContext = { Name: string }
         and UpdateTechnicalInformation = TechnicalDescription
         and RenameBoundedContext = { Name: string }
         and MoveBoundedContextToDomain = { ParentDomainId: DomainId }
+        and ReclassifyBoundedContext =  { Classification : StrategicClassification }
 
         type Errors = | EmptyName
 
@@ -271,3 +273,5 @@ module Aggregates =
                           |> Option.filter (String.IsNullOrWhiteSpace >> not) }
         
         let moveBoundedContext parent (boundedContext: BoundedContext) = Ok { boundedContext with DomainId = parent }
+
+        let reclassify classification (boundedContext: BoundedContext) = Ok { boundedContext with Classification = classification }

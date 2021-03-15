@@ -162,9 +162,14 @@ module Database =
             | Some item ->
                 match change item with
                 | Ok updatedItem ->
+                    let itemsExceptUpdated =
+                        itemsById.Value
+                        |> Map.remove idValue
+                        |> Map.toList
+                        |> List.map snd
+                        
                     let updatedItems =
-                        updatedItem
-                        :: (items |> List.except ([ item ]))
+                        updatedItem :: itemsExceptUpdated
 
                     Ok(Collection(updatedItems, getId), updatedItem)
                 | Error e ->

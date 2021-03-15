@@ -136,5 +136,6 @@ module FileBasedCommandHandlers =
                 remove database contextId
             | MoveBoundedContextToDomain (contextId, move) ->
                 updateBoundedContext database contextId (moveBoundedContext move.ParentDomainId)
-                
+            | ReclassifyBoundedContext (contextId, classification) ->
+                updateBoundedContext database contextId (reclassify classification.Classification)
                 
