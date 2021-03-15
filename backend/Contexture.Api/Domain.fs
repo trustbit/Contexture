@@ -27,13 +27,10 @@ module Domain =
         { DomainType: DomainType option
           BusinessModel: BusinessModel list
           Evolution: Evolution option }
-        with
-            static member Unknown =
-                {
-                    DomainType = None
-                    BusinessModel = []
-                    Evolution = None
-                }
+        static member Unknown =
+            { DomainType = None
+              BusinessModel = []
+              Evolution = None }
 
     type BusinessDecision = { Name: string; Description: string }
 
@@ -53,16 +50,13 @@ module Domain =
           EventsPublished: Event list
           QueriesHandled: Query list
           QueriesInvoked: Query list }
-        with
         static member Empty =
-            {
-                CommandsHandled = []
-                CommandsSent = []
-                EventsHandled = []
-                EventsPublished = []
-                QueriesHandled = []
-                QueriesInvoked = []
-            }
+            { CommandsHandled = []
+              CommandsSent = []
+              EventsHandled = []
+              EventsPublished = []
+              QueriesHandled = []
+              QueriesInvoked = [] }
 
     type DomainRole =
         { Name: string
@@ -83,7 +77,7 @@ module Domain =
 
     type DomainId = int
     type BoundedContextId = int
-    
+
     type BoundedContext =
         { Id: BoundedContextId
           DomainId: DomainId
@@ -96,7 +90,7 @@ module Domain =
           Messages: Messages
           DomainRoles: DomainRole list
           TechnicalDescription: TechnicalDescription option }
-    
+
     type Domain =
         { Id: DomainId
           ParentDomainId: DomainId option
@@ -156,9 +150,10 @@ module Domain =
 
 
 module Aggregates =
-    
+
     module Domain =
-        open Domain                
+        open Domain
+
         type Command =
             | CreateDomain of CreateDomain
             | RenameDomain of DomainId * RenameDomain
@@ -168,29 +163,32 @@ module Aggregates =
             | RemoveDomain of DomainId
 
         and CreateDomain = { Name: string }
+
         and RenameDomain = { Name: string }
+
         and MoveDomain = { ParentDomainId: int option }
+
         and RefineVision = { Vision: string }
+
         and AssignKey = { Key: string }
-                    
+
         type Errors = | EmptyName
 
         let nameValidation name =
             if String.IsNullOrWhiteSpace name then Error EmptyName else Ok name
-            
+
         let newDomain name =
             name
             |> nameValidation
-            |> Result.map (fun name ->
-                fun id ->
-                    { Id = id
-                      Key = None
-                      ParentDomainId = None
-                      Name = name
-                      Vision = None }
-            )
+            |> Result.map (fun name id ->
+                { Id = id
+                  Key = None
+                  ParentDomainId = None
+                  Name = name
+                  Vision = None })
 
-        let moveDomain parent (domain: Domain) = Ok { domain with ParentDomainId = parent }
+        let moveDomain parent (domain: Domain) =
+            Ok { domain with ParentDomainId = parent }
 
         let refineVisionOfDomain vision (domain: Domain) =
             Ok
@@ -216,7 +214,7 @@ module Aggregates =
 
     module BoundedContext =
         open Domain
-        
+
         type Command =
             | CreateBoundedContext of DomainId * CreateBoundedContext
             | UpdateTechnicalInformation of BoundedContextId * UpdateTechnicalInformation
@@ -224,46 +222,50 @@ module Aggregates =
             | AssignKey of BoundedContextId * AssignKey
             | RemoveBoundedContext of BoundedContextId
             | MoveBoundedContextToDomain of BoundedContextId * MoveBoundedContextToDomain
-            | ReclassifyBoundedContext of BoundedContextId * ReclassifyBoundedContext 
+            | ReclassifyBoundedContext of BoundedContextId * ReclassifyBoundedContext
+
         and CreateBoundedContext = { Name: string }
+
         and UpdateTechnicalInformation = TechnicalDescription
+
         and RenameBoundedContext = { Name: string }
+
         and MoveBoundedContextToDomain = { ParentDomainId: DomainId }
-        and ReclassifyBoundedContext =  { Classification : StrategicClassification }
+
+        and ReclassifyBoundedContext =
+            { Classification: StrategicClassification }
 
         type Errors = | EmptyName
 
         let nameValidation name =
             if String.IsNullOrWhiteSpace name then Error EmptyName else Ok name
-            
+
         let newBoundedContext domainId name =
             name
             |> nameValidation
-            |> Result.map (fun name ->
-                fun id ->
-                    { Id = id
-                      Key = None
-                      DomainId = domainId
-                      Name = name
-                      Description = None
-                      Classification = StrategicClassification.Unknown
-                      BusinessDecisions = []
-                      UbiquitousLanguage = Map.empty
-                      Messages = Messages.Empty
-                      DomainRoles = []
-                      TechnicalDescription = None }
-            )
-            
+            |> Result.map (fun name id ->
+                { Id = id
+                  Key = None
+                  DomainId = domainId
+                  Name = name
+                  Description = None
+                  Classification = StrategicClassification.Unknown
+                  BusinessDecisions = []
+                  UbiquitousLanguage = Map.empty
+                  Messages = Messages.Empty
+                  DomainRoles = []
+                  TechnicalDescription = None })
+
         let updateTechnicalDescription description context =
-            Ok {
-                context with TechnicalDescription = Some description
-            }
+            Ok
+                { context with
+                      TechnicalDescription = Some description }
 
         let renameBoundedContext potentialName (context: BoundedContext) =
             potentialName
             |> nameValidation
             |> Result.map (fun name -> { context with Name = name })
-            
+
         let assignKeyToBoundedContext key (boundedContext: BoundedContext) =
             Ok
                 { boundedContext with
@@ -271,7 +273,13 @@ module Aggregates =
                           key
                           |> Option.ofObj
                           |> Option.filter (String.IsNullOrWhiteSpace >> not) }
-        
-        let moveBoundedContext parent (boundedContext: BoundedContext) = Ok { boundedContext with DomainId = parent }
 
-        let reclassify classification (boundedContext: BoundedContext) = Ok { boundedContext with Classification = classification }
+        let moveBoundedContext parent (boundedContext: BoundedContext) =
+            Ok
+                { boundedContext with
+                      DomainId = parent }
+
+        let reclassify classification (boundedContext: BoundedContext) =
+            Ok
+                { boundedContext with
+                      Classification = classification }
