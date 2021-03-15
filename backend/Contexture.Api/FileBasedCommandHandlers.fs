@@ -75,7 +75,7 @@ module FileBasedCommandHandlers =
     
     module BoundedContext =
         open BoundedContext
-        let create (database: FileBased) domainId command =
+        let create (database: FileBased) domainId (command: CreateBoundedContext) =
             match newBoundedContext domainId command.Name with
             | Ok addNewBoundedContext ->
                 let changed =
@@ -116,4 +116,9 @@ module FileBasedCommandHandlers =
             | CreateBoundedContext (domainId,createBc) ->
                 create database domainId createBc
             | UpdateTechnicalInformation (contextId,technical) ->
-                updateBoundedContext database contextId (updateTechnicalDescription technical) 
+                updateBoundedContext database contextId (updateTechnicalDescription technical)
+            | RenameBoundedContext (contextId, rename) ->
+                updateBoundedContext database contextId (renameBoundedContext rename.Name)
+            | AssignKey (contextId, key) ->
+                updateBoundedContext database contextId (assignKeyToBoundedContext key.Key)
+                

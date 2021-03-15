@@ -219,9 +219,12 @@ module Aggregates =
         
         type Command =
             | CreateBoundedContext of DomainId * CreateBoundedContext
-            | UpdateTechnicalInformation of BoundedContextId * UpdateTechnicalInformation 
+            | UpdateTechnicalInformation of BoundedContextId * UpdateTechnicalInformation
+            | RenameBoundedContext of BoundedContextId * RenameBoundedContext
+            | AssignKey of BoundedContextId * AssignKey
         and CreateBoundedContext = { Name: string }
         and UpdateTechnicalInformation = TechnicalDescription
+        and RenameBoundedContext = { Name: string }
 
         type Errors = | EmptyName
 
@@ -251,4 +254,16 @@ module Aggregates =
                 context with TechnicalDescription = Some description
             }
 
+        let renameBoundedContext potentialName (context: BoundedContext) =
+            potentialName
+            |> nameValidation
+            |> Result.map (fun name -> { context with Name = name })
+            
+        let assignKeyToBoundedContext key (boundedContext: BoundedContext) =
+            Ok
+                { boundedContext with
+                      Key =
+                          key
+                          |> Option.ofObj
+                          |> Option.filter (String.IsNullOrWhiteSpace >> not) }
 

@@ -138,9 +138,9 @@ assignKey base contextId contextKey =
         Nothing -> Encode.null
     request toMsg =
       Http.request
-      { method = "PATCH"
+      { method = "POST"
       , headers = []
-      , url = contextId |> Api.boundedContext |> Api.url base |> Url.toString
+      , url = contextId |> Api.boundedContext |> Api.url base |> Url.toString |> (\c -> c ++ "/key")
       , body = Http.jsonBody <| Encode.object[ ("key", encodedKey) ]
       , expect = Http.expectJson toMsg modelDecoder
       , timeout = Nothing
@@ -168,9 +168,9 @@ changeName config contextId (Name contextName) =
   let
     request toMsg =
       Http.request
-      { method = "PATCH"
+      { method = "POST"
       , headers = []
-      , url = contextId |> Api.boundedContext |> Api.url config |> Url.toString
+      , url = contextId |> Api.boundedContext |> Api.url config |> Url.toString |> (\c -> c ++ "/rename")
       , body = Http.jsonBody <| Encode.object [  nameFieldEncoder contextName ]
       , expect = Http.expectJson toMsg modelDecoder
       , timeout = Nothing

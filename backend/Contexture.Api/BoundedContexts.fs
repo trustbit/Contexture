@@ -3,6 +3,7 @@ namespace Contexture.Api
 open System
 open System.Reflection.Metadata
 open Contexture.Api.Aggregates
+open Contexture.Api.Aggregates.Domain
 open Contexture.Api.Database
 open Contexture.Api.Domain
 open Contexture.Api.Domains
@@ -66,6 +67,12 @@ module BoundedContexts =
         
         let technical contextId (command: UpdateTechnicalInformation) =
             updateAndReturnBoundedContext (UpdateTechnicalInformation(contextId,command))
+            
+        let rename contextId (command: RenameBoundedContext) =
+            updateAndReturnBoundedContext (RenameBoundedContext(contextId,command))
+            
+        let key contextId (command: AssignKey) =
+            updateAndReturnBoundedContext (AssignKey(contextId,command))
         
 
     let getBoundedContexts =
@@ -98,6 +105,9 @@ module BoundedContexts =
                         (choose [
                             GET >=> getBoundedContext contextId
                             POST >=> route "/technical" >=> bindJson (CommandEndpoints.technical contextId)
+                            POST >=> route "/rename" >=> bindJson (CommandEndpoints.rename contextId)
+                            POST >=> route "/key" >=> bindJson (CommandEndpoints.key contextId)
+                            
                         ])
                     )
                 GET >=> getBoundedContexts
