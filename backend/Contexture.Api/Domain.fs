@@ -27,6 +27,13 @@ module Domain =
         { DomainType: DomainType option
           BusinessModel: BusinessModel list
           Evolution: Evolution option }
+        with
+            static member Unknown =
+                {
+                    DomainType = None
+                    BusinessModel = []
+                    Evolution = None
+                }
 
     type BusinessDecision = { Name: string; Description: string }
 
@@ -46,6 +53,16 @@ module Domain =
           EventsPublished: Event list
           QueriesHandled: Query list
           QueriesInvoked: Query list }
+        with
+        static member Empty =
+            {
+                CommandsHandled = []
+                CommandsSent = []
+                EventsHandled = []
+                EventsPublished = []
+                QueriesHandled = []
+                QueriesInvoked = []
+            }
 
     type DomainRole =
         { Name: string
@@ -69,13 +86,12 @@ module Domain =
     type BoundedContext =
         { Id: int
           DomainId: DomainId
-          Key: string
+          Key: string option
           Name: string
-          Description: string
+          Description: string option
           Classification: StrategicClassification
           BusinessDecisions: BusinessDecision list
           UbiquitousLanguage: Map<string, UbiquitousLanguageTerm>
-          ModelTraits: string
           Messages: Messages
           DomainRoles: DomainRole list
           TechnicalDescription: TechnicalDescription option }
@@ -136,3 +152,86 @@ module Domain =
           Initiator: Collaborator
           Recipient: Collaborator
           RelationshipType: RelationshipType option }
+
+
+ module Aggregates =
+    
+    open Domain
+    
+    module Domain =
+        
+        module Commands =
+            type CreateDomain = { Name: string }
+            type RenameDomain = { Name: string }
+            type MoveDomain = { ParentDomainId: int option }
+            type RefineVision = { Vision: string }
+            type AssignKey = { Key: string }
+            
+        
+        type Errors = | EmptyName
+
+        let nameValidation name =
+            if String.IsNullOrWhiteSpace name then Error EmptyName else Ok name
+            
+        let newDomain name =
+            name
+            |> nameValidation
+            |> Result.map (fun name ->
+                fun id ->
+                    { Id = id
+                      Key = None
+                      ParentDomainId = None
+                      Name = name
+                      Vision = None }
+            )
+
+        let moveDomain parent (domain: Domain) = Ok { domain with ParentDomainId = parent }
+
+        let refineVisionOfDomain vision (domain: Domain) =
+            Ok
+                { domain with
+                      Vision =
+                          vision
+                          |> Option.ofObj
+                          |> Option.filter (String.IsNullOrWhiteSpace >> not) }
+
+        let renameDomain potentialName (domain: Domain) =
+            potentialName
+            |> nameValidation
+            |> Result.map (fun name -> { domain with Name = name })
+
+        let assignKeyToDomain key (domain: Domain) =
+            Ok
+                { domain with
+                      Key =
+                          key
+                          |> Option.ofObj
+                          |> Option.filter (String.IsNullOrWhiteSpace >> not) }
+
+
+    module BoundedContext =
+        module Commands =
+            type CreateBoundedContext = { Name: string }
+
+        type Errors = | EmptyName
+
+        let nameValidation name =
+            if String.IsNullOrWhiteSpace name then Error EmptyName else Ok name
+            
+        let newBoundedContext domain name =
+            name
+            |> nameValidation
+            |> Result.map (fun name ->
+                fun id ->
+                    { Id = id
+                      Key = None
+                      DomainId = domain
+                      Name = name
+                      Description = None
+                      Classification = StrategicClassification.Unknown
+                      BusinessDecisions = []
+                      UbiquitousLanguage = Map.empty
+                      Messages = Messages.Empty
+                      DomainRoles = []
+                      TechnicalDescription = None }
+            )

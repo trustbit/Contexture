@@ -15,13 +15,12 @@ module Domains =
         type BoundedContextResult =
             { Id: int
               ParentDomainId: DomainId
-              Key: string
+              Key: string option
               Name: string
-              Description: string
+              Description: string option
               Classification: StrategicClassification
               BusinessDecisions: BusinessDecision list
               UbiquitousLanguage: Map<string, UbiquitousLanguageTerm>
-              ModelTraits: string
               Messages: Messages
               DomainRoles: DomainRole list
               TechnicalDescription: TechnicalDescription option }
@@ -45,7 +44,6 @@ module Domains =
               Classification= boundedContext.Classification
               BusinessDecisions = boundedContext. BusinessDecisions
               UbiquitousLanguage = boundedContext. UbiquitousLanguage
-              ModelTraits= boundedContext.ModelTraits
               Messages= boundedContext.Messages
               DomainRoles= boundedContext.DomainRoles
               TechnicalDescription= boundedContext.TechnicalDescription
@@ -71,54 +69,10 @@ module Domains =
                       |> Document.boundedContextsOf database.BoundedContexts
                       |> List.map convertBoundedContext }
 
-    module Aggregate =
-        type Errors = | EmptyName
-
-        let nameValidation name =
-            if String.IsNullOrWhiteSpace name then Error EmptyName else Ok name
-            
-        let newDomain name =
-            name
-            |> nameValidation
-            |> Result.map (fun name ->
-                fun id ->
-                    { Id = id
-                      Key = None
-                      ParentDomainId = None
-                      Name = name
-                      Vision = None }
-            )
-
-        let moveDomain parent (domain: Domain) = Ok { domain with ParentDomainId = parent }
-
-        let refineVisionOfDomain vision (domain: Domain) =
-            Ok
-                { domain with
-                      Vision =
-                          vision
-                          |> Option.ofObj
-                          |> Option.filter (String.IsNullOrWhiteSpace >> not) }
-
-        let renameDomain potentialName (domain: Domain) =
-            potentialName
-            |> nameValidation
-            |> Result.map (fun name -> { domain with Name = name })
-
-        let assignKeyToDomain key (domain: Domain) =
-            Ok
-                { domain with
-                      Key =
-                          key
-                          |> Option.ofObj
-                          |> Option.filter (String.IsNullOrWhiteSpace >> not) }
-
-    module Commands =
-        open Aggregate
-        type CreateDomain = { Name: string }
-        type RenameDomain = { Name: string }
-        type MoveDomain = { ParentDomainId: int option }
-        type RefineVision = { Vision: string }
-        type AssignKey = { Key: string }
+   
+    module CommandHandler =
+        open Aggregates.Domain
+        open Aggregates.Domain.Commands
         
         let private updateDomainsIn (document: Document) =
             Result.map(fun (domains,item) ->
@@ -189,6 +143,27 @@ module Domains =
 
         let assignKey domainId (command: AssignKey) =
             updateDomain domainId (assignKeyToDomain command.Key)
+            
+        let newBoundedContextOn domainId (command: Aggregates.BoundedContext.Commands.CreateBoundedContext) =
+            fun (next: HttpFunc) (ctx: HttpContext) -> task {
+                let database = ctx.GetService<FileBased>()
+                match Aggregates.BoundedContext.newBoundedContext domainId command.Name with
+                | Ok addNewBoundedContext ->
+                    let changed =
+                        database.Change(fun document ->
+                            addNewBoundedContext
+                            |> document.BoundedContexts.Add
+                            |> Result.map(fun (bcs,item) ->
+                                { document with BoundedContexts = bcs },item
+                            )
+                           )
+                    match changed with
+                    | Ok addedContext ->
+                        return! json (Results.convertBoundedContext addedContext) next ctx
+                    | Error e -> return! ServerErrors.INTERNAL_ERROR e next ctx
+                | Error Aggregates.BoundedContext.EmptyName ->
+                    return! RequestErrors.BAD_REQUEST "Name must not be empty" next ctx
+            }
 
     let getDomains =
         fun (next: HttpFunc) (ctx: HttpContext) ->
@@ -234,6 +209,9 @@ module Domains =
                 |> List.map Results.convertBoundedContext
             
             json boundedContexts next ctx
+            
+
+            
 
     let routes: HttpHandler =
         subRoute
@@ -251,19 +229,22 @@ module Domains =
                         >=> getDomain domainId
                         POST
                         >=> route "/rename"
-                        >=> bindJson (Commands.rename domainId)
+                        >=> bindJson (CommandHandler.rename domainId)
                         POST
                         >=> route "/move"
-                        >=> bindJson (Commands.move domainId)
+                        >=> bindJson (CommandHandler.move domainId)
                         POST
                         >=> route "/vision"
-                        >=> bindJson (Commands.refineVision domainId)
+                        >=> bindJson (CommandHandler.refineVision domainId)
                         POST
                         >=> route "/key"
-                        >=> bindJson (Commands.assignKey domainId)
-                        DELETE >=> Commands.remove domainId
+                        >=> bindJson (CommandHandler.assignKey domainId)
+                        POST
+                        >=> routeCi "/boundedContexts"
+                        >=> bindJson (CommandHandler.newBoundedContextOn domainId)
+                        DELETE >=> CommandHandler.remove domainId
                         ]
                     )
                 )
                 GET >=> getDomains
-                POST >=> bindJson Commands.create ])
+                POST >=> bindJson CommandHandler.create ])
