@@ -23,7 +23,7 @@ module Domains =
 
         let convertDomain (domain: Domain) =
             { Id = domain.Id
-              DomainId = domain.ParentDomain
+              DomainId = domain.ParentDomainId
               Key = domain.Key
               Name = domain.Name
               Vision = domain.Vision
@@ -53,12 +53,12 @@ module Domains =
                 fun id ->
                     { Id = id
                       Key = None
-                      ParentDomain = None
+                      ParentDomainId = None
                       Name = name
                       Vision = None }
             )
 
-        let moveDomain parent (domain: Domain) = Ok { domain with ParentDomain = parent }
+        let moveDomain parent (domain: Domain) = Ok { domain with ParentDomainId = parent }
 
         let refineVisionOfDomain vision (domain: Domain) =
             Ok
@@ -85,7 +85,7 @@ module Domains =
         open Aggregate
         type CreateDomain = { Name: string }
         type RenameDomain = { Name: string }
-        type MoveDomain = { ParentDomain: int option }
+        type MoveDomain = { ParentDomainId: int option }
         type RefineVision = { Vision: string }
         type AssignKey = { Key: string }
         
@@ -148,7 +148,7 @@ module Domains =
                 }
 
         let move domainId (command: MoveDomain) =
-            updateDomain domainId (moveDomain command.ParentDomain)
+            updateDomain domainId (moveDomain command.ParentDomainId)
 
         let rename domainId (command: RenameDomain) =
             updateDomain domainId (renameDomain command.Name)

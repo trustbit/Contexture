@@ -82,7 +82,7 @@ module Domain =
     
     type Domain =
         { Id: DomainId
-          ParentDomain: DomainId option
+          ParentDomainId: DomainId option
           Key: string option
           Name: string
           Vision: string option }

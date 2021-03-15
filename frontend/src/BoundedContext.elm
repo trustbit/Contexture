@@ -76,13 +76,13 @@ nameFieldDecoder =
   Decode.field "name" Decode.string
 
 
-domainIdFieldDecoder : Decoder DomainId
-domainIdFieldDecoder =
-  Decode.field "domainId" Domain.idDecoder
+parentDomainIdFieldDecoder : Decoder DomainId
+parentDomainIdFieldDecoder =
+  Decode.field "parentDomainId" Domain.idDecoder
 
 
-domainIdEncoder domainId =
-  ("domainId", idEncoder domainId)
+parentDomainIdEncoder domainId =
+  ("parentDomainId", idEncoder domainId)
 
 nameFieldEncoder bcName =
    ("name", Encode.string bcName)
@@ -91,7 +91,7 @@ modelDecoder : Decoder BoundedContext
 modelDecoder =
   ( Decode.succeed Internals
     |> JP.custom idFieldDecoder
-    |> JP.custom domainIdFieldDecoder
+    |> JP.custom parentDomainIdFieldDecoder
     |> JP.custom nameFieldDecoder
     |> JP.optional "key" (Decode.maybe Key.keyDecoder) Nothing
   ) |> Decode.map BoundedContext
@@ -121,7 +121,7 @@ move base contextId targetDomain =
       { method = "PATCH"
       , headers = []
       , url = contextId |> Api.boundedContext |> Api.url base |> Url.toString
-      , body = Http.jsonBody <| Encode.object[ domainIdEncoder targetDomain ]
+      , body = Http.jsonBody <| Encode.object[ parentDomainIdEncoder targetDomain ]
       , expect = Http.expectWhatever toMsg
       , timeout = Nothing
       , tracker = Nothing

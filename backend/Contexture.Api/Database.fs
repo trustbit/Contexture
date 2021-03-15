@@ -205,7 +205,7 @@ module Database =
     
     module Document =
         let subdomainsOf (domains: Collection<Domain>) parentDomainId =
-            domains.All |> List.where (fun x -> x.ParentDomain = Some parentDomainId)
+            domains.All |> List.where (fun x -> x.ParentDomainId = Some parentDomainId)
         let boundedContextsOf (boundedContexts: Collection<BoundedContext>) domainId =
              boundedContexts.All
             |> List.where (fun x -> x.DomainId = domainId)
