@@ -1,9 +1,6 @@
 namespace Contexture.Api
 
-open System
-open System.Reflection.Metadata
 open Contexture.Api.Aggregates
-open Contexture.Api.Aggregates.Domain
 open Contexture.Api.Database
 open Contexture.Api.Entities
 open Contexture.Api.Domains

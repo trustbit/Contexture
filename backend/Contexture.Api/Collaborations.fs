@@ -1,7 +1,6 @@
 ﻿namespace Contexture.Api
 
 open Contexture.Api
-open Contexture.Api
 open Contexture.Api.Aggregates
 open Contexture.Api.Database
 open Microsoft.AspNetCore.Http
@@ -32,8 +31,8 @@ module Collaborations =
                     | Error e -> return! ServerErrors.INTERNAL_ERROR e next ctx
                 }
 
-        let relationshipType collaborationId (command: ChangeRelationshipType) =
-            updateAndReturnCollaboration (ChangeRelationshipType(collaborationId, command))
+        let defineRelationship collaborationId (command: DefineRelationship) =
+            updateAndReturnCollaboration (DefineRelationship(collaborationId, command))
 
         let outboundConnection (command: DefineConnection) =
             updateAndReturnCollaboration (DefineOutboundConnection(command))
@@ -77,8 +76,8 @@ module Collaborations =
             (choose [ subRoutef "/%i" (fun collaborationId ->
                           choose [ GET >=> getCollaboration collaborationId
                                    POST
-                                   >=> route "/relationshipType"
-                                   >=> bindJson (CommandEndpoints.relationshipType collaborationId)
+                                   >=> route "/relationship"
+                                   >=> bindJson (CommandEndpoints.defineRelationship collaborationId)
                                    DELETE >=> CommandEndpoints.remove collaborationId ])
                       POST
                       >=> route "/outboundConnection"

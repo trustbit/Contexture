@@ -336,7 +336,7 @@ module Aggregates =
         open Entities
 
         type Command =
-            | ChangeRelationshipType of CollaborationId * ChangeRelationshipType
+            | DefineRelationship of CollaborationId * DefineRelationship
             | DefineOutboundConnection of DefineConnection
             | DefineInboundConnection of DefineConnection
             | RemoveConnection of CollaborationId
@@ -345,7 +345,7 @@ module Aggregates =
             class
             end
 
-        and ChangeRelationshipType =
+        and DefineRelationship =
             { RelationshipType: RelationshipType option }
 
         and DefineConnection =

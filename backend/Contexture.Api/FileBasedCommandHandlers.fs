@@ -198,7 +198,7 @@ module FileBasedCommandHandlers =
 
         let handle (database: FileBased) (command: Command) =
             match command with
-            | ChangeRelationshipType (collaborationId, relationship) ->
+            | DefineRelationship (collaborationId, relationship) ->
                 updateCollaboration database collaborationId (changeRelationship relationship.RelationshipType)
             | DefineInboundConnection connection -> create database connection
             | DefineOutboundConnection connection -> create database connection

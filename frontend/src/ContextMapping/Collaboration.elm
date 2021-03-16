@@ -129,7 +129,7 @@ defineRelationshipType url collaboration relationshipType =
     request toMsg =
       Http.request
       { method = "POST"
-      , url = api |> Api.url url |> Url.toString |> (\c -> c ++ "/relationshipType")
+      , url = api |> Api.url url |> Url.toString |> (\c -> c ++ "/relationship")
       , body = Http.jsonBody <|
           Encode.object [ ("relationshipType", RelationshipType.encoder relationshipType) ]
       , expect = Http.expectJson toMsg decoder

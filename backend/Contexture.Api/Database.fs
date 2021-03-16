@@ -258,17 +258,3 @@ module Database =
             if not (File.Exists fileName) then FileBased.EmptyDatabase(fileName) else FileBased(fileName)
         member __.Read = document
         member __.Change change = write change
-
-//    let mapInitiator (initiator: Context.Initiator) =
-//        { BoundedContext = initiator.BoundedContext
-//          Domain = initiator.Domain }
-//
-//    let getCollaborations =
-//        root.Collaborations
-//        |> Array.map (fun x -> {
-//            Description = x.Description
-//            Initiator = x.Initiator |> mapInitiator
-//            Recipient = x.Recipient |> mapCollaborator
-//            Relationship = x.Relationship
-//        })
-//        |> Array.toList
