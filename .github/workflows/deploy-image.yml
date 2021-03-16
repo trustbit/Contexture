@@ -28,4 +28,5 @@ jobs:
         workdir: artifacts/image
         username: ${{ secrets.DOCKER_USERNAME }}
         password: ${{ secrets.DOCKER_PASSWORD }}
+        dockerfile: ../backend/Dockerfile
         snapshot: true
