@@ -151,25 +151,19 @@ module FileBasedCommandHandlers =
                 
     module Collaboration =
         open Collaboration
-//        let create (database: FileBased) domainId (command: CreateCollaboration) =
-//            match newBoundedContext domainId command.Name with
-//            | Ok addNewBoundedContext ->
-//                let changed =
-//                    database.Change(fun document ->
-//                        addNewBoundedContext
-//                        |> document.BoundedContexts.Add
-//                        |> Result.map(fun (bcs,item) ->
-//                            { document with BoundedContexts = bcs },item
-//                        )
-//                       )
-//                changed
-//                |> Result.map (fun d -> d.Id)
-//                |> Result.mapError InfrastructureError                        
-//            | Error domainError ->
-//                domainError |> DomainError |> Error
-                
         let private updateCollaborationsIn (document: Document) =
             Result.map (fun (collaborations, item) -> { document with Collaborations = collaborations }, item)
+
+        let create (database: FileBased) (command: DefineConnection) =
+            let changed =
+                database.Change(fun document ->
+                    newConnection command.Initiator command.Recipient command.Description 
+                    |> document.Collaborations.Add
+                    |> updateCollaborationsIn document
+                   )
+            changed
+            |> Result.map (fun d -> d.Id)
+            |> Result.mapError InfrastructureError
 
         let remove (database: FileBased) collaborationId =
             let changed =
@@ -200,7 +194,9 @@ module FileBasedCommandHandlers =
         
         let handle (database: FileBased) (command: Command) =
             match command with
-//            | CreateCollaboration createCommand ->
-//                create database createCommand
             | ChangeRelationshipType (collaborationId,relationship) ->
                 updateCollaboration database collaborationId (changeRelationship relationship.RelationshipType)
+            | DefineInboundConnection connection ->
+                create database connection
+            | DefineOutboundConnection connection ->
+                create database connection

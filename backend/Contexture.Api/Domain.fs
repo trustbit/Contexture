@@ -330,16 +330,31 @@ module Aggregates =
         open Domain
 
         type Command =
-            | CreateCollaboration of CreateCollaboration
-            | ChangeRelationshipType of CollaborationId * ChangeRelationshipType 
+            | ChangeRelationshipType of CollaborationId * ChangeRelationshipType
+            | DefineOutboundConnection of DefineConnection
+            | DefineInboundConnection of DefineConnection
             
         and CreateCollaboration = class end
         and ChangeRelationshipType = {
-            RelationshipType : RelationshipType option
+            RelationshipType: RelationshipType option
+        }
+        and DefineConnection = {
+            Description: string option
+            Initiator: Collaborator
+            Recipient: Collaborator
         }
         
         let changeRelationship relationship (collaboration: Collaboration) =
             Ok
                 { collaboration with
                       RelationshipType = relationship }
+                
+        let newConnection initiator recipient description =
+            fun id ->
+                { Id = id
+                  Description = description
+                  Initiator = initiator
+                  Recipient = recipient
+                  RelationshipType = None
+                }
                 

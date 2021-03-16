@@ -84,7 +84,7 @@ defineInboundCollaboration url context connectionInitiator descriptionText =
 
     request toMsg =
       Http.post
-      { url = api |> Api.url url |> Url.toString
+      { url = api |> Api.url url |> Url.toString |> (\c -> c ++ "/inboundConnection")
       , body = Http.jsonBody <|
               modelEncoder
                 connectionInitiator
@@ -107,7 +107,7 @@ defineOutboundCollaboration url context connectionRecipient descriptionText =
 
     request toMsg =
       Http.post
-      { url = api |> Api.url url |> Url.toString
+      { url = api |> Api.url url |> Url.toString |> (\c -> c ++ "/outboundConnection")
       , body = Http.jsonBody <|
               modelEncoder
                 connectionInitiator

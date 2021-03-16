@@ -33,6 +33,12 @@ module Collaborations =
 
         let relationshipType collaborationId (command: ChangeRelationshipType) =
             updateAndReturnCollaboration (ChangeRelationshipType(collaborationId, command))
+
+        let outboundConnection (command: DefineConnection) =
+            updateAndReturnCollaboration (DefineOutboundConnection(command))
+        let inboundConnection (command: DefineConnection) =
+            updateAndReturnCollaboration (DefineOutboundConnection(command))
+            
     
     let getCollaborations =
         fun (next : HttpFunc) (ctx : HttpContext) ->
@@ -64,6 +70,12 @@ module Collaborations =
                         >=> bindJson (CommandEndpoints.relationshipType contextId)
                     ]
                 )
+                POST
+                >=> route "/outboundConnection"
+                >=> bindJson CommandEndpoints.outboundConnection
+                POST
+                >=> route "/inboundConnection"
+                >=> bindJson CommandEndpoints.inboundConnection
                 GET >=> getCollaborations
             ])
 
