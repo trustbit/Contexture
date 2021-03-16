@@ -142,4 +142,7 @@ module FileBasedCommandHandlers =
                 updateBoundedContext database contextId (description descriptionText.Description)
             | UpdateBusinessDecisions (contextId, decisions) ->
                 updateBoundedContext database contextId (updateBusinessDecisions decisions.BusinessDecisions)
-                
+            | UpdateUbiquitousLanguage (contextId, language) ->
+                updateBoundedContext database contextId (updateUbiquitousLanguage language.UbiquitousLanguage)
+            | UpdateDomainRoles (contextId, roles) ->
+                updateBoundedContext database contextId (updateDomainRoles roles.DomainRoles)

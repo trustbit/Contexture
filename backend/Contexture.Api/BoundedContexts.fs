@@ -87,6 +87,12 @@ module BoundedContexts =
             
         let businessDecisions contextId (command: UpdateBusinessDecisions) =
             updateAndReturnBoundedContext (UpdateBusinessDecisions(contextId, command))
+            
+        let ubiquitousLanguage contextId (command: UpdateUbiquitousLanguage) =
+            updateAndReturnBoundedContext (UpdateUbiquitousLanguage(contextId, command))
+        
+        let domainRoles contextId (command: UpdateDomainRoles) =
+            updateAndReturnBoundedContext (UpdateDomainRoles(contextId, command))
 
         let remove contextId =
             fun (next: HttpFunc) (ctx: HttpContext) ->
@@ -149,5 +155,11 @@ module BoundedContexts =
                                     POST
                                     >=> route "/businessDecisions"
                                     >=> bindJson (CommandEndpoints.businessDecisions contextId)
+                                    POST
+                                    >=> route "/ubiquitousLanguage"
+                                    >=> bindJson (CommandEndpoints.ubiquitousLanguage contextId)
+                                    POST
+                                    >=> route "/domainRoles"
+                                    >=> bindJson (CommandEndpoints.domainRoles contextId)
                                     DELETE >=> CommandEndpoints.remove contextId ]))
                       GET >=> getBoundedContexts ])

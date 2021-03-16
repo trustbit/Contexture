@@ -226,6 +226,8 @@ module Aggregates =
             | ChangeDescription of BoundedContextId * ChangeDescription
             // TODO: replace with add/remove instead of updateing all
             | UpdateBusinessDecisions of BoundedContextId * UpdateBusinessDecisions
+            | UpdateUbiquitousLanguage of BoundedContextId * UpdateUbiquitousLanguage
+            | UpdateDomainRoles of BoundedContextId * UpdateDomainRoles
 
         and CreateBoundedContext = { Name: string }
 
@@ -241,7 +243,11 @@ module Aggregates =
             { Description: string option }
         and UpdateBusinessDecisions =
             { BusinessDecisions: BusinessDecision list }
+        and UpdateUbiquitousLanguage =
+            { UbiquitousLanguage : Map<string, UbiquitousLanguageTerm> }
 
+        and UpdateDomainRoles =
+            { DomainRoles : DomainRole list }
         type Errors = | EmptyName
 
         let nameValidation name =
@@ -300,3 +306,13 @@ module Aggregates =
             Ok
                 { boundedContext with
                       BusinessDecisions = decisions }
+        
+        let updateUbiquitousLanguage language (boundedContext: BoundedContext) =
+            Ok
+                { boundedContext with
+                      UbiquitousLanguage = language }
+
+        let updateDomainRoles roles (boundedContext: BoundedContext) =
+            Ok
+                { boundedContext with
+                      DomainRoles = roles }
