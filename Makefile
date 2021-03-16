@@ -18,7 +18,7 @@ publish-app:
 	cd frontend && elm make src/Main.elm --output=../artifacts/frontend/index.html
 
 prepare-image: publish-backend publish-app
-	mkdir -p artifacts/image/
+	mkdir -p artifacts/image/wwwroot
 	cp -r artifacts/backend/ artifacts/image/
 	cp artifacts/frontend/*.* artifacts/image/wwwroot/
 

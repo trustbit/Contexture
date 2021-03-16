@@ -1,4 +1,4 @@
-name: Deploy Node.js to Azure Web App
+name: Deploy Contexture to Azure Web App
 
 on:
   push:
