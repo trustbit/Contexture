@@ -5,6 +5,7 @@ open System.IO
 open Contexture.Api.Database
 open Giraffe
 open Microsoft.AspNetCore.Builder
+open Microsoft.AspNetCore.Http
 open Microsoft.AspNetCore.Cors.Infrastructure
 open Microsoft.AspNetCore.Hosting
 open Microsoft.Extensions.Configuration
@@ -18,7 +19,7 @@ type ContextureOptions = {
     DatabasePath : string
 }
 
-let webApp =
+let webApp hostFrontend =
     choose [
         subRoute "/api"
             (choose [
@@ -26,7 +27,19 @@ let webApp =
                 BoundedContexts.routes
                 Collaborations.routes
             ])
+        hostFrontend
         setStatusCode 404 >=> text "Not Found" ]
+
+let frontendHostRoutes (env: IWebHostEnvironment) : HttpHandler =
+    if env.IsDevelopment() then
+        let skip : HttpFuncResult = System.Threading.Tasks.Task.FromResult None
+        fun (next : HttpFunc) (ctx : HttpContext) ->
+            skip
+    else
+        choose [
+            route "/" >=> htmlFile "wwwroot/index.html"
+            GET >=> htmlFile "wwwroot/index.html"
+        ]
 
 let errorHandler (ex : Exception) (logger : ILogger) =
     logger.LogError(ex, "An unhandled exception has occurred while executing the request.")
@@ -34,10 +47,10 @@ let errorHandler (ex : Exception) (logger : ILogger) =
 
 let configureCors (builder : CorsPolicyBuilder) =
     builder
-        .WithOrigins("http://localhost:8000")
-       .AllowAnyMethod()
-       .AllowAnyHeader()
-       |> ignore
+        .AllowAnyOrigin()
+        .AllowAnyMethod()
+        .AllowAnyHeader()
+        |> ignore
 
 let configureApp (app : IApplicationBuilder) =
     let env = app.ApplicationServices.GetService<IWebHostEnvironment>()
@@ -48,7 +61,7 @@ let configureApp (app : IApplicationBuilder) =
         app.UseGiraffeErrorHandler(errorHandler))
         .UseCors(configureCors)
         .UseStaticFiles()
-        .UseGiraffe(webApp)
+        .UseGiraffe(webApp (frontendHostRoutes env))
         
 let configureJsonSerializer (services: IServiceCollection) =
     Database.Serialization.serializerOptions

@@ -1,4 +1,4 @@
-.PHONY: publish-backend build-image
+.PHONY: build-image
 
 build-backend:
 	cd backend && dotnet build
@@ -25,8 +25,7 @@ prepare-image: publish-backend publish-app
 build-image: prepare-image
 	cd artifacts/image && docker build -t softwarepark/contexture -f Dockerfile .
 
-run-image: build-image
-	docker run -it softwarepark/contexture
-
 run-app:
-	docker run -p 3000:3000 contexture-dotnet
+	docker run -it -p 4000:4000 -v contexture_data:/data softwarepark/contexture
+
+run-image: build-image run-app
