@@ -200,3 +200,5 @@ module FileBasedCommandHandlers =
                 create database connection
             | DefineOutboundConnection connection ->
                 create database connection
+            | RemoveConnection collaborationId ->
+                remove database collaborationId

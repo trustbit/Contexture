@@ -333,6 +333,7 @@ module Aggregates =
             | ChangeRelationshipType of CollaborationId * ChangeRelationshipType
             | DefineOutboundConnection of DefineConnection
             | DefineInboundConnection of DefineConnection
+            | RemoveConnection of CollaborationId
             
         and CreateCollaboration = class end
         and ChangeRelationshipType = {

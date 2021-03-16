@@ -1,6 +1,7 @@
 ﻿namespace Contexture.Api
 
 open Contexture.Api
+open Contexture.Api
 open Contexture.Api.Aggregates
 open Contexture.Api.Database
 open Microsoft.AspNetCore.Http
@@ -33,11 +34,19 @@ module Collaborations =
 
         let relationshipType collaborationId (command: ChangeRelationshipType) =
             updateAndReturnCollaboration (ChangeRelationshipType(collaborationId, command))
-
         let outboundConnection (command: DefineConnection) =
             updateAndReturnCollaboration (DefineOutboundConnection(command))
         let inboundConnection (command: DefineConnection) =
             updateAndReturnCollaboration (DefineOutboundConnection(command))
+            
+        let remove collaborationId =
+            fun (next: HttpFunc) (ctx: HttpContext) ->
+                task {
+                    let database = ctx.GetService<FileBased>()
+                    match Collaboration.handle database (RemoveConnection collaborationId) with
+                    | Ok collaborationId -> return! json collaborationId next ctx
+                    | Error e -> return! ServerErrors.INTERNAL_ERROR e next ctx
+                }
             
     
     let getCollaborations =
@@ -62,12 +71,13 @@ module Collaborations =
     let routes : HttpHandler =
         subRoute "/collaborations" (
             choose [
-                subRoutef "/%i" (fun contextId ->
+                subRoutef "/%i" (fun collaborationId ->
                     choose [
-                        GET >=> getCollaboration contextId
+                        GET >=> getCollaboration collaborationId
                         POST
                         >=> route "/relationshipType"
-                        >=> bindJson (CommandEndpoints.relationshipType contextId)
+                        >=> bindJson (CommandEndpoints.relationshipType collaborationId)
+                        DELETE >=> CommandEndpoints.remove collaborationId
                     ]
                 )
                 POST
