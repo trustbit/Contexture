@@ -78,22 +78,22 @@ module BoundedContexts =
 
         let move contextId (command: MoveBoundedContextToDomain) =
             updateAndReturnBoundedContext (MoveBoundedContextToDomain(contextId, command))
-            
+
         let reclassify contextId (command: ReclassifyBoundedContext) =
             updateAndReturnBoundedContext (ReclassifyBoundedContext(contextId, command))
-        
+
         let description contextId (command: ChangeDescription) =
             updateAndReturnBoundedContext (ChangeDescription(contextId, command))
-            
+
         let businessDecisions contextId (command: UpdateBusinessDecisions) =
             updateAndReturnBoundedContext (UpdateBusinessDecisions(contextId, command))
-            
+
         let ubiquitousLanguage contextId (command: UpdateUbiquitousLanguage) =
             updateAndReturnBoundedContext (UpdateUbiquitousLanguage(contextId, command))
-        
+
         let domainRoles contextId (command: UpdateDomainRoles) =
             updateAndReturnBoundedContext (UpdateDomainRoles(contextId, command))
-            
+
         let messages contextId (command: UpdateMessages) =
             updateAndReturnBoundedContext (UpdateMessages(contextId, command))
 

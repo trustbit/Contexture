@@ -142,6 +142,7 @@ module Entities =
         | UserInteraction of UserInteraction: string
 
     type CollaborationId = int
+
     type Collaboration =
         { Id: CollaborationId
           Description: string option
@@ -237,24 +238,26 @@ module Aggregates =
         and UpdateTechnicalInformation = TechnicalDescription
 
         and RenameBoundedContext = { Name: string }
-        
+
         and AssignKey = { Key: string }
 
         and MoveBoundedContextToDomain = { ParentDomainId: DomainId }
 
         and ReclassifyBoundedContext =
             { Classification: StrategicClassification }
-        and ChangeDescription =
-            { Description: string option }
+
+        and ChangeDescription = { Description: string option }
+
         and UpdateBusinessDecisions =
             { BusinessDecisions: BusinessDecision list }
-        and UpdateUbiquitousLanguage =
-            { UbiquitousLanguage : Map<string, UbiquitousLanguageTerm> }
-        and UpdateMessages =
-            { Messages: Messages }
 
-        and UpdateDomainRoles =
-            { DomainRoles : DomainRole list }
+        and UpdateUbiquitousLanguage =
+            { UbiquitousLanguage: Map<string, UbiquitousLanguageTerm> }
+
+        and UpdateMessages = { Messages: Messages }
+
+        and UpdateDomainRoles = { DomainRoles: DomainRole list }
+
         type Errors = | EmptyName
 
         let nameValidation name =
@@ -303,7 +306,7 @@ module Aggregates =
             Ok
                 { boundedContext with
                       Classification = classification }
-                
+
         let description description (boundedContext: BoundedContext) =
             Ok
                 { boundedContext with
@@ -313,7 +316,7 @@ module Aggregates =
             Ok
                 { boundedContext with
                       BusinessDecisions = decisions }
-        
+
         let updateUbiquitousLanguage language (boundedContext: BoundedContext) =
             Ok
                 { boundedContext with
@@ -323,12 +326,12 @@ module Aggregates =
             Ok
                 { boundedContext with
                       DomainRoles = roles }
-                
+
         let updateMessages messages (boundedContext: BoundedContext) =
             Ok
                 { boundedContext with
                       Messages = messages }
-                
+
     module Collaboration =
         open Entities
 
@@ -337,28 +340,28 @@ module Aggregates =
             | DefineOutboundConnection of DefineConnection
             | DefineInboundConnection of DefineConnection
             | RemoveConnection of CollaborationId
-            
-        and CreateCollaboration = class end
-        and ChangeRelationshipType = {
-            RelationshipType: RelationshipType option
-        }
-        and DefineConnection = {
-            Description: string option
-            Initiator: Collaborator
-            Recipient: Collaborator
-        }
-        
+
+        and CreateCollaboration =
+            class
+            end
+
+        and ChangeRelationshipType =
+            { RelationshipType: RelationshipType option }
+
+        and DefineConnection =
+            { Description: string option
+              Initiator: Collaborator
+              Recipient: Collaborator }
+
         let changeRelationship relationship (collaboration: Collaboration) =
             Ok
                 { collaboration with
                       RelationshipType = relationship }
-                
+
         let newConnection initiator recipient description =
             fun id ->
                 { Id = id
                   Description = description
                   Initiator = initiator
                   Recipient = recipient
-                  RelationshipType = None
-                }
-                
+                  RelationshipType = None }

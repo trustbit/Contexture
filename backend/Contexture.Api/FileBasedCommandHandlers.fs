@@ -66,17 +66,18 @@ module FileBasedCommandHandlers =
 
         let handle (database: FileBased) (command: Command): Result<DomainId, CommandHandlerError<Errors>> =
             match command with
-            | CreateDomain createDomain -> create database None createDomain 
-            | CreateSubdomain (domainId, createDomain) -> create database (Some domainId) createDomain 
+            | CreateDomain createDomain -> create database None createDomain
+            | CreateSubdomain (domainId, createDomain) -> create database (Some domainId) createDomain
             | RemoveDomain domainId -> remove database domainId
             | MoveDomain (domainId, move) -> updateDomain database domainId (moveDomain move.ParentDomainId)
             | RenameDomain (domainId, rename) -> updateDomain database domainId (renameDomain rename.Name)
             | RefineVision (domainId, refineVision) ->
                 updateDomain database domainId (refineVisionOfDomain refineVision.Vision)
             | AssignKey (domainId, assignKey) -> updateDomain database domainId (assignKeyToDomain assignKey.Key)
-    
+
     module BoundedContext =
         open BoundedContext
+
         let create (database: FileBased) domainId (command: CreateBoundedContext) =
             match newBoundedContext domainId command.Name with
             | Ok addNewBoundedContext ->
@@ -84,18 +85,18 @@ module FileBasedCommandHandlers =
                     database.Change(fun document ->
                         addNewBoundedContext
                         |> document.BoundedContexts.Add
-                        |> Result.map(fun (bcs,item) ->
-                            { document with BoundedContexts = bcs },item
-                        )
-                       )
+                        |> Result.map (fun (bcs, item) -> { document with BoundedContexts = bcs }, item))
+
                 changed
                 |> Result.map (fun d -> d.Id)
-                |> Result.mapError InfrastructureError                        
-            | Error domainError ->
-                domainError |> DomainError |> Error
-                
+                |> Result.mapError InfrastructureError
+            | Error domainError -> domainError |> DomainError |> Error
+
         let private updateBoundedContextsIn (document: Document) =
-            Result.map (fun (contexts, item) -> { document with BoundedContexts = contexts }, item)
+            Result.map (fun (contexts, item) ->
+                { document with
+                      BoundedContexts = contexts },
+                item)
 
         let remove (database: FileBased) contextId =
             let changed =
@@ -107,7 +108,7 @@ module FileBasedCommandHandlers =
             changed
             |> Result.map (fun _ -> contextId)
             |> Result.mapError InfrastructureError
-                        
+
         let private updateBoundedContext (database: FileBased) contextId update =
             let changed =
                 database.Change(fun document ->
@@ -123,19 +124,16 @@ module FileBasedCommandHandlers =
                 |> EntityNotFound
                 |> InfrastructureError
                 |> Error
-        
+
         let handle (database: FileBased) (command: Command) =
             match command with
-            | CreateBoundedContext (domainId,createBc) ->
-                create database domainId createBc
-            | UpdateTechnicalInformation (contextId,technical) ->
+            | CreateBoundedContext (domainId, createBc) -> create database domainId createBc
+            | UpdateTechnicalInformation (contextId, technical) ->
                 updateBoundedContext database contextId (updateTechnicalDescription technical)
             | RenameBoundedContext (contextId, rename) ->
                 updateBoundedContext database contextId (renameBoundedContext rename.Name)
-            | AssignKey (contextId, key) ->
-                updateBoundedContext database contextId (assignKeyToBoundedContext key.Key)
-            | RemoveBoundedContext contextId ->
-                remove database contextId
+            | AssignKey (contextId, key) -> updateBoundedContext database contextId (assignKeyToBoundedContext key.Key)
+            | RemoveBoundedContext contextId -> remove database contextId
             | MoveBoundedContextToDomain (contextId, move) ->
                 updateBoundedContext database contextId (moveBoundedContext move.ParentDomainId)
             | ReclassifyBoundedContext (contextId, classification) ->
@@ -150,19 +148,23 @@ module FileBasedCommandHandlers =
                 updateBoundedContext database contextId (updateDomainRoles roles.DomainRoles)
             | UpdateMessages (contextId, roles) ->
                 updateBoundedContext database contextId (updateMessages roles.Messages)
-                
+
     module Collaboration =
         open Collaboration
+
         let private updateCollaborationsIn (document: Document) =
-            Result.map (fun (collaborations, item) -> { document with Collaborations = collaborations }, item)
+            Result.map (fun (collaborations, item) ->
+                { document with
+                      Collaborations = collaborations },
+                item)
 
         let create (database: FileBased) (command: DefineConnection) =
             let changed =
                 database.Change(fun document ->
-                    newConnection command.Initiator command.Recipient command.Description 
+                    newConnection command.Initiator command.Recipient command.Description
                     |> document.Collaborations.Add
-                    |> updateCollaborationsIn document
-                   )
+                    |> updateCollaborationsIn document)
+
             changed
             |> Result.map (fun d -> d.Id)
             |> Result.mapError InfrastructureError
@@ -177,7 +179,7 @@ module FileBasedCommandHandlers =
             changed
             |> Result.map (fun _ -> collaborationId)
             |> Result.mapError InfrastructureError
-                        
+
         let private updateCollaboration (database: FileBased) collaborationId update =
             let changed =
                 database.Change(fun document ->
@@ -193,14 +195,11 @@ module FileBasedCommandHandlers =
                 |> EntityNotFound
                 |> InfrastructureError
                 |> Error
-        
+
         let handle (database: FileBased) (command: Command) =
             match command with
-            | ChangeRelationshipType (collaborationId,relationship) ->
+            | ChangeRelationshipType (collaborationId, relationship) ->
                 updateCollaboration database collaborationId (changeRelationship relationship.RelationshipType)
-            | DefineInboundConnection connection ->
-                create database connection
-            | DefineOutboundConnection connection ->
-                create database connection
-            | RemoveConnection collaborationId ->
-                remove database collaborationId
+            | DefineInboundConnection connection -> create database connection
+            | DefineOutboundConnection connection -> create database connection
+            | RemoveConnection collaborationId -> remove database collaborationId
