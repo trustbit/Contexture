@@ -16,8 +16,8 @@ on:
 # 2. Change these variables for your configuration:
 env:
   AZURE_WEBAPP_NAME: contexture    # set this to your application's name
-  AZURE_WEBAPP_PACKAGE_PATH: './server'      # set this to the path to your web app project, defaults to the repository root
-  NODE_VERSION: '12.x'                # set this to the node version to use
+  AZURE_WEBAPP_PACKAGE_PATH: './artifacts/image'      # set this to the path to your web app project, defaults to the repository root
+  DOTNET_VERSION: '5.0.103'                # set this to the node version to use
 
 jobs:
   build-and-deploy:
@@ -25,24 +25,18 @@ jobs:
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@master
+    - uses: actions/setup-dotnet@v1
+      with:
+        dotnet-version: '5.0.103'
+    - run: make build-backend
+      name: Build
+    - run: make test-backend
+      name: Test
     - name: Setup Elm
       uses: jorelali/setup-elm@v2
-    - run: elm make src/Main.elm --output=../server/public/index.html
-      working-directory: ./app
-    - name: Use Node.js ${{ env.NODE_VERSION }}
-      uses: actions/setup-node@v1
-      with:
-        node-version: ${{ env.NODE_VERSION }}
-    - name: npm install, build, and test
-      working-directory: ./server
-      run: |
-        # Build and test the project, then
-        # deploy to Azure Web App.
-        npm install
-        npm run build --if-present
-        npm run test --if-present
+    - run: make prepare-image
     - name: prepare scenario
-      run: cp ./example/restaurant-db.json ./server/db.json
+      run: cp ./example/restaurant-db.json ./artifacts/image/db.json
     - name: 'Deploy to Azure WebApp'
       uses: azure/webapps-deploy@v2
       with: 
