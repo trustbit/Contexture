@@ -5,7 +5,7 @@ open System.Text.Encodings.Web
 open System.Text.Json
 open System.Text.Json.Serialization
 
-open Contexture.Api.Domain
+open Contexture.Api.Entities
 
 module Database =
 

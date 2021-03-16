@@ -3,7 +3,7 @@
 open System
 open Contexture.Api.Aggregates.BoundedContext
 open Contexture.Api.Database
-open Contexture.Api.Domain
+open Contexture.Api.Entities
 open Microsoft.AspNetCore.Http
 open FSharp.Control.Tasks
 
@@ -74,30 +74,7 @@ module Domains =
     module CommandEndpoints =
         open Aggregates.Domain
         open FileBasedCommandHandlers
-        
-        let private updateDomainsIn (document: Document) =
-            Result.map(fun (domains,item) ->
-                { document with Domains = domains },item
-            )
-
-        let create (command: CreateDomain) =
-            fun (next: HttpFunc) (ctx: HttpContext) ->
-                task {
-                    let database = ctx.GetService<FileBased>()
-                    match Domain.handle database (CreateDomain command) with
-                    | Ok addedDomain ->
-                        let domain =
-                            addedDomain
-                            |> database.Read.Domains.ById
-                            |> Option.get
-                            |> Results.convertDomain
-                        return! json domain next ctx
-                    | Error (InfrastructureError e) ->
-                        return! ServerErrors.INTERNAL_ERROR e next ctx
-                    | Error (DomainError EmptyName) ->
-                        return! RequestErrors.BAD_REQUEST "Name must not be empty" next ctx
-                }
-
+    
         let remove domainId =
             fun (next: HttpFunc) (ctx: HttpContext) ->
                 task {
@@ -123,6 +100,12 @@ module Domains =
                         return! RequestErrors.BAD_REQUEST "Name must not be empty" next ctx
                     | Error e -> return! ServerErrors.INTERNAL_ERROR e next ctx
                 }
+                
+        let createDomain (command: CreateDomain) =
+            updateAndReturnDomain (CreateDomain(command))
+                
+        let createSubDomain domainId (command: CreateDomain) =
+            updateAndReturnDomain (CreateSubdomain(domainId,command))
 
         let move domainId (command: MoveDomain) =
             updateAndReturnDomain (MoveDomain(domainId,command))
@@ -206,9 +189,15 @@ module Domains =
                         GET
                         >=> route "/domains"
                         >=> getSubDomains domainId
+                        POST
+                        >=> route "/domains"
+                        >=> bindJson (CommandEndpoints.createSubDomain domainId)
                         GET
                         >=> routeCi "/boundedContexts"
                         >=> getBoundedContextsOf domainId
+                        POST
+                        >=> routeCi "/boundedContexts"
+                        >=> bindJson (CommandEndpoints.newBoundedContextOn domainId)
                         GET
                         >=> getDomain domainId
                         POST
@@ -223,12 +212,11 @@ module Domains =
                         POST
                         >=> route "/key"
                         >=> bindJson (CommandEndpoints.assignKey domainId)
-                        POST
-                        >=> routeCi "/boundedContexts"
-                        >=> bindJson (CommandEndpoints.newBoundedContextOn domainId)
+                       
                         DELETE >=> CommandEndpoints.remove domainId
+                       
                         ]
                     )
                 )
                 GET >=> getDomains
-                POST >=> bindJson CommandEndpoints.create ])
+                POST >=> bindJson CommandEndpoints.createDomain ])

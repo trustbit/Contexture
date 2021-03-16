@@ -5,7 +5,7 @@ open System.Reflection.Metadata
 open Contexture.Api.Aggregates
 open Contexture.Api.Aggregates.Domain
 open Contexture.Api.Database
-open Contexture.Api.Domain
+open Contexture.Api.Entities
 open Contexture.Api.Domains
 open Microsoft.AspNetCore.Http
 open FSharp.Control.Tasks

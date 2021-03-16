@@ -17,13 +17,14 @@ module FileBasedCommandHandlers =
         | EntityNotFound of int
 
     module Domain =
+        open Entities
         open Domain
 
         let private updateDomainsIn (document: Document) =
             Result.map (fun (domains, item) -> { document with Domains = domains }, item)
 
-        let create (database: FileBased) (command: CreateDomain) =
-            match newDomain command.Name with
+        let create (database: FileBased) parentDomain (command: CreateDomain) =
+            match newDomain command.Name parentDomain with
             | Ok addNewDomain ->
                 let changed =
                     database.Change(fun document ->
@@ -65,7 +66,8 @@ module FileBasedCommandHandlers =
 
         let handle (database: FileBased) (command: Command): Result<DomainId, CommandHandlerError<Errors>> =
             match command with
-            | CreateDomain createDomain -> create database createDomain
+            | CreateDomain createDomain -> create database None createDomain 
+            | CreateSubdomain (domainId, createDomain) -> create database (Some domainId) createDomain 
             | RemoveDomain domainId -> remove database domainId
             | MoveDomain (domainId, move) -> updateDomain database domainId (moveDomain move.ParentDomainId)
             | RenameDomain (domainId, rename) -> updateDomain database domainId (renameDomain rename.Name)

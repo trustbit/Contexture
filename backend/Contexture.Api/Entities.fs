@@ -2,7 +2,7 @@
 
 open System
 
-module Domain =
+module Entities =
 
     type DomainType =
         | Core
@@ -153,10 +153,11 @@ module Domain =
 module Aggregates =
 
     module Domain =
-        open Domain
+        open Entities
 
         type Command =
             | CreateDomain of CreateDomain
+            | CreateSubdomain of DomainId * CreateDomain
             | RenameDomain of DomainId * RenameDomain
             | MoveDomain of DomainId * MoveDomain
             | RefineVision of DomainId * RefineVision
@@ -178,13 +179,13 @@ module Aggregates =
         let nameValidation name =
             if String.IsNullOrWhiteSpace name then Error EmptyName else Ok name
 
-        let newDomain name =
+        let newDomain name parentDomain =
             name
             |> nameValidation
             |> Result.map (fun name id ->
                 { Id = id
                   Key = None
-                  ParentDomainId = None
+                  ParentDomainId = parentDomain
                   Name = name
                   Vision = None })
 
@@ -214,7 +215,7 @@ module Aggregates =
 
 
     module BoundedContext =
-        open Domain
+        open Entities
 
         type Command =
             | CreateBoundedContext of DomainId * CreateBoundedContext
@@ -236,6 +237,8 @@ module Aggregates =
         and UpdateTechnicalInformation = TechnicalDescription
 
         and RenameBoundedContext = { Name: string }
+        
+        and AssignKey = { Key: string }
 
         and MoveBoundedContextToDomain = { ParentDomainId: DomainId }
 
@@ -327,7 +330,7 @@ module Aggregates =
                       Messages = messages }
                 
     module Collaboration =
-        open Domain
+        open Entities
 
         type Command =
             | ChangeRelationshipType of CollaborationId * ChangeRelationshipType
