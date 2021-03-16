@@ -3,5 +3,5 @@ COPY ./ /app
 WORKDIR /app
 EXPOSE 4000
 ENV ASPNETCORE_URLS=http://*:4000
-ENV DATABASEPATH=/data/db.json
+ENV DatabasePath=/data/db.json
 ENTRYPOINT ["dotnet", "Contexture.Api.App.dll"]

@@ -28,5 +28,4 @@ jobs:
         workdir: artifacts/image
         username: ${{ secrets.DOCKER_USERNAME }}
         password: ${{ secrets.DOCKER_PASSWORD }}
-        context: artifacts/image
         snapshot: true
