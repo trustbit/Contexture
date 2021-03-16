@@ -28,10 +28,10 @@ jobs:
     - uses: actions/setup-dotnet@v1
       with:
         dotnet-version: '5.0.103'
-    - run: make build-backend
-      name: Build
-    - run: make test-backend
-      name: Test
+    # - run: make build-backend
+    #   name: Build
+    # - run: make test-backend
+    #   name: Test
     - name: Setup Elm
       uses: jorelali/setup-elm@v2
     - run: make prepare-image

@@ -15,12 +15,13 @@ build-app:
 	cd frontend && elm make src/Main.elm
 
 publish-app:
+	mkdir -p artifacts/frontend
 	cd frontend && elm make src/Main.elm --output=../artifacts/frontend/index.html
 
 prepare-image: publish-backend publish-app
 	mkdir -p artifacts/image/wwwroot
 	cp -r artifacts/backend/ artifacts/image/
-	cp artifacts/frontend/*.* artifacts/image/wwwroot/
+	cp -r artifacts/frontend/*.* artifacts/image/wwwroot/
 
 build-image: prepare-image
 	cd artifacts/image && docker build -t softwarepark/contexture -f Dockerfile .
