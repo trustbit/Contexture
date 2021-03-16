@@ -37,6 +37,8 @@ jobs:
     - run: make prepare-image
     - name: prepare scenario
       run: cp ./example/restaurant-db.json ./artifacts/image/db.json
+
+    - run: ls ./artifacts/image/
     - name: 'Deploy to Azure WebApp'
       uses: azure/webapps-deploy@v2
       with: 
