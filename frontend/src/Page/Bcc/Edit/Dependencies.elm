@@ -911,7 +911,11 @@ viewCollaborations resolveCaption isInbound collaborations =
               , Button.button
                 [ Button.outlineSecondary
                 , Button.small
-                , Button.onClick (RemoveInboundConnection collaboration)
+                , Button.onClick (
+                    if isInbound
+                    then RemoveInboundConnection collaboration
+                    else RemoveOutboundConnection collaboration
+                  )
                 ]
                 [ text "x" ]
               ]
