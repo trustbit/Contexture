@@ -276,11 +276,15 @@ update msg model =
       ( model, ContextMapping.defineOutboundCollaboration model.config model.boundedContextId coll desc OutboundConnectionAdded )
 
     InboundConnectionAdded (Ok result) ->
-      ( model |> updateCommunication (\c -> { c | inbound = result :: c.inbound })
+      ( model
+       |> updateCommunication (\c -> { c | inbound = result :: c.inbound } )
+       |> (\m -> { m | newCollaborations = Nothing } )
       , Cmd.none
       )
     OutboundConnectionAdded (Ok result) ->
-      ( model |> updateCommunication (\c -> { c | outbound = result :: c.outbound })
+      ( model
+        |> updateCommunication (\c -> { c | outbound = result :: c.outbound } )
+        |> (\m -> { m | newCollaborations = Nothing } )
       , Cmd.none
       )
 

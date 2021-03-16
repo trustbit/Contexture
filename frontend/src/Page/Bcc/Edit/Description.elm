@@ -7,6 +7,9 @@ import Html exposing (Html, div, text)
 import Html.Attributes exposing (..)
 import Html.Events exposing (onClick, onSubmit)
 
+import Browser.Dom as Dom
+import Task
+
 import Bootstrap.Grid as Grid
 import Bootstrap.Grid.Row as Row
 import Bootstrap.Grid.Col as Col
@@ -50,6 +53,7 @@ type Msg
   | SetDescription String
   | SaveDescription Description
   | CancelChanging
+  | NoOp
 
 
 noCommand model = (model, Cmd.none)
@@ -58,7 +62,9 @@ update : Msg -> Model -> (Model, Cmd Msg)
 update msg model =
   case msg of
     StartChanging ->
-      noCommand { model | changingDescription = model.description |> RemoteData.toMaybe }
+      ( { model | changingDescription = model.description |> RemoteData.toMaybe }
+      , Task.attempt (\_ -> NoOp) (Dom.focus "description")
+      )
 
     CancelChanging ->
       noCommand { model | changingDescription = Nothing }
@@ -82,6 +88,9 @@ update msg model =
     SetDescription description ->
       { model | changingDescription = Just description }
       |> noCommand
+
+    NoOp ->
+      noCommand model
 
 view : Model -> Html Msg
 view model =
