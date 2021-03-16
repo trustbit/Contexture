@@ -357,7 +357,7 @@ viewItem communication { context, canvas, technical } =
               |> viewPillMessage "Outbound Communication"
             )
         RemoteData.Failure e ->
-          [ text "Could not load communication"]
+          [ text <| "Could not load communication: " ++ (Debug.toString e)]
         _ ->
           [ text "Loading communication information"]
 

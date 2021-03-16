@@ -52,8 +52,8 @@ updateMessages configuration contextId messages =
     api = Api.boundedContext contextId
     request toMsg =
       Http.request
-        { method = "PATCH"
-        , url = api |> Api.url configuration |> Url.toString
+        { method = "POST"
+        , url = api |> Api.url configuration |> Url.toString |> (\c -> c ++ "/messages")
         , body = Http.jsonBody <|
             Encode.object [ messagesEncoder messages ]
         , expect = Http.expectJson toMsg messagesDecoder

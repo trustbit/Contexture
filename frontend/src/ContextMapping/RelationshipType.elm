@@ -88,20 +88,20 @@ upstreamDownstreamEncoder upstreamDownstreamRealtionship =
   case upstreamDownstreamRealtionship of
     CustomerSupplierRelationship CustomerRole ->
       Encode.object
-        [ ( "initiatorRole",  Encode.string "customer" )
+        [ ( "role",  Encode.string "Customer" )
         ]
     CustomerSupplierRelationship SupplierRole ->
       Encode.object
-        [ ( "initiatorRole",  Encode.string "supplier" )
+        [ ( "role",  Encode.string "Supplier" )
         ]
     UpstreamDownstreamRelationship initiatorRole upstreamType downstreamType ->
       Encode.object
         [ ( "initiatorRole",  Encode.string <|
             case initiatorRole of
               UpstreamRole -> 
-                "upstream"
+                "Upstream"
               DownstreamRole ->
-                "downstream"
+                "Downstream"
           )
         , ( "upstreamType", upstreamCollaboratorEncoder upstreamType )
         , ( "downstreamType", downstreamCollaboratorEncoder downstreamType )
@@ -112,18 +112,18 @@ upstreamDownstreamDecoder : Decoder UpstreamDownstreamRelationship
 upstreamDownstreamDecoder =
   Decode.oneOf
     [ Decode.map CustomerSupplierRelationship 
-      ( Decode.field "initiatorRole" Decode.string |> Decode.andThen (\upstreamType ->
+      ( Decode.field "role" Decode.string |> Decode.andThen (\upstreamType ->
           case upstreamType of
-            "customer" -> Decode.succeed CustomerRole
-            "supplier" -> Decode.succeed SupplierRole
+            "Customer" -> Decode.succeed CustomerRole
+            "Supplier" -> Decode.succeed SupplierRole
             x  -> Decode.fail <| "could not decode pattern: " ++ x
         )
       )
     , Decode.map3 UpstreamDownstreamRelationship
       ( Decode.field "initiatorRole" Decode.string |> Decode.andThen (\upstreamType ->
           case upstreamType of
-            "upstream" -> Decode.succeed UpstreamRole
-            "downstream" -> Decode.succeed DownstreamRole
+            "Upstream" -> Decode.succeed UpstreamRole
+            "Downstream" -> Decode.succeed DownstreamRole
             x  -> Decode.fail <| "could not decode pattern: " ++ x
         )
       )
@@ -149,33 +149,36 @@ symmetricRelationshipToString symmetricType =
     Partnership -> "Partnership"
 
 
+symmetricEnoder : SymmetricRelationship -> Encode.Value
+symmetricEnoder symmetricRelationship =
+  Encode.string <| symmetricRelationshipToString symmetricRelationship
+  
 
+symmetricDeoder : Decoder SymmetricRelationship
+symmetricDeoder =
+  Decode.string 
+  |> Decode.andThen (resultToDecoder symmetricRelationshipFromString)
 
 encoder : RelationshipType -> Encode.Value
 encoder relationshipType =
   case relationshipType of
     Symmetric symmetricType ->
       Encode.object
-        [ ( "symmetric", Encode.string <| symmetricRelationshipToString symmetricType )
-        ]
+        [ ("symmetric", symmetricEnoder symmetricType) ]
     UpstreamDownstream upstreamDownstreamType ->
-      upstreamDownstreamEncoder upstreamDownstreamType
-    Unknown ->
       Encode.object
-        [ ]
+        [ ("upstreamDownstream", upstreamDownstreamEncoder upstreamDownstreamType)]
+    Unknown ->
+      Encode.string "unknown"
 
 
 decoder : Decoder RelationshipType
 decoder =
   Decode.oneOf 
     [ Decode.map Symmetric
-      ( Decode.field 
-          "symmetric" 
-          Decode.string 
-          |> Decode.andThen (resultToDecoder symmetricRelationshipFromString)
-      )      
+        ( Decode.at ["symmetric"] symmetricDeoder )
     , Decode.map UpstreamDownstream
-        upstreamDownstreamDecoder
+        ( Decode.at [ "upstreamDownstream"] upstreamDownstreamDecoder )
     , Decode.succeed Unknown
     ]
 

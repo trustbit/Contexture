@@ -128,10 +128,10 @@ defineRelationshipType url collaboration relationshipType =
 
     request toMsg =
       Http.request
-      { method = "PATCH"
-      , url = api |> Api.url url |> Url.toString
+      { method = "POST"
+      , url = api |> Api.url url |> Url.toString |> (\c -> c ++ "/relationshipType")
       , body = Http.jsonBody <|
-          Encode.object [ ("relationship", RelationshipType.encoder relationshipType) ]
+          Encode.object [ ("relationshipType", RelationshipType.encoder relationshipType) ]
       , expect = Http.expectJson toMsg decoder
       , timeout = Nothing
       , tracker = Nothing
@@ -203,10 +203,10 @@ decoder : Decoder Collaboration
 decoder =
   ( Decode.succeed CollaborationInternal
     |> JP.custom idFieldDecoder
-    |> JP.required "description" (Decode.nullable Decode.string)
+    |> JP.optional "description" (Decode.nullable Decode.string) Nothing
     |> JP.required "initiator" Collaborator.decoder
     |> JP.required "recipient" Collaborator.decoder
-    |> JP.required "relationship" (Decode.nullable RelationshipType.decoder)
+    |> JP.optional "relationshipType" (Decode.nullable RelationshipType.decoder) Nothing
   ) |> Decode.map Collaboration
 
 communicationDecoder : Collaborator -> Decoder Communication
@@ -237,7 +237,7 @@ modelEncoder connectionInitiator connectionRecipient descriptionValue relationsh
     [ ("description", maybeEncoder Encode.string descriptionValue)
     , ("initiator", Collaborator.encoder connectionInitiator)
     , ("recipient", Collaborator.encoder connectionRecipient)
-    , ("relationship", maybeEncoder RelationshipType.encoder relationshipType)
+    , ("relationshipType", maybeEncoder RelationshipType.encoder relationshipType)
     ]
 
 

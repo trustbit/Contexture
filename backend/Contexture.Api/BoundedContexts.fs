@@ -93,6 +93,9 @@ module BoundedContexts =
         
         let domainRoles contextId (command: UpdateDomainRoles) =
             updateAndReturnBoundedContext (UpdateDomainRoles(contextId, command))
+            
+        let messages contextId (command: UpdateMessages) =
+            updateAndReturnBoundedContext (UpdateMessages(contextId, command))
 
         let remove contextId =
             fun (next: HttpFunc) (ctx: HttpContext) ->
@@ -161,5 +164,8 @@ module BoundedContexts =
                                     POST
                                     >=> route "/domainRoles"
                                     >=> bindJson (CommandEndpoints.domainRoles contextId)
+                                    POST
+                                    >=> route "/messages"
+                                    >=> bindJson (CommandEndpoints.messages contextId)
                                     DELETE >=> CommandEndpoints.remove contextId ]))
                       GET >=> getBoundedContexts ])

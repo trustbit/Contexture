@@ -130,8 +130,8 @@ module Domain =
             downstreamType: DownstreamRelationship
 
     type RelationshipType =
-        | Symmetric of Symmetric: SymmetricRelationship
-        | UpstreamDownstream of UpstreamDownstream: UpstreamDownstreamRelationship
+        | Symmetric of symmetric: SymmetricRelationship
+        | UpstreamDownstream of upstreamDownstream: UpstreamDownstreamRelationship
         | Unknown
 
     type Collaborator =
@@ -141,8 +141,9 @@ module Domain =
         | Frontend of Frontend: string
         | UserInteraction of UserInteraction: string
 
+    type CollaborationId = int
     type Collaboration =
-        { Id: int
+        { Id: CollaborationId
           Description: string option
           Initiator: Collaborator
           Recipient: Collaborator
@@ -228,6 +229,7 @@ module Aggregates =
             | UpdateBusinessDecisions of BoundedContextId * UpdateBusinessDecisions
             | UpdateUbiquitousLanguage of BoundedContextId * UpdateUbiquitousLanguage
             | UpdateDomainRoles of BoundedContextId * UpdateDomainRoles
+            | UpdateMessages of BoundedContextId * UpdateMessages
 
         and CreateBoundedContext = { Name: string }
 
@@ -245,6 +247,8 @@ module Aggregates =
             { BusinessDecisions: BusinessDecision list }
         and UpdateUbiquitousLanguage =
             { UbiquitousLanguage : Map<string, UbiquitousLanguageTerm> }
+        and UpdateMessages =
+            { Messages: Messages }
 
         and UpdateDomainRoles =
             { DomainRoles : DomainRole list }
@@ -316,3 +320,26 @@ module Aggregates =
             Ok
                 { boundedContext with
                       DomainRoles = roles }
+                
+        let updateMessages messages (boundedContext: BoundedContext) =
+            Ok
+                { boundedContext with
+                      Messages = messages }
+                
+    module Collaboration =
+        open Domain
+
+        type Command =
+            | CreateCollaboration of CreateCollaboration
+            | ChangeRelationshipType of CollaborationId * ChangeRelationshipType 
+            
+        and CreateCollaboration = class end
+        and ChangeRelationshipType = {
+            RelationshipType : RelationshipType option
+        }
+        
+        let changeRelationship relationship (collaboration: Collaboration) =
+            Ok
+                { collaboration with
+                      RelationshipType = relationship }
+                

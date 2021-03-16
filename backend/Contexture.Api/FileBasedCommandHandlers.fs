@@ -146,3 +146,61 @@ module FileBasedCommandHandlers =
                 updateBoundedContext database contextId (updateUbiquitousLanguage language.UbiquitousLanguage)
             | UpdateDomainRoles (contextId, roles) ->
                 updateBoundedContext database contextId (updateDomainRoles roles.DomainRoles)
+            | UpdateMessages (contextId, roles) ->
+                updateBoundedContext database contextId (updateMessages roles.Messages)
+                
+    module Collaboration =
+        open Collaboration
+//        let create (database: FileBased) domainId (command: CreateCollaboration) =
+//            match newBoundedContext domainId command.Name with
+//            | Ok addNewBoundedContext ->
+//                let changed =
+//                    database.Change(fun document ->
+//                        addNewBoundedContext
+//                        |> document.BoundedContexts.Add
+//                        |> Result.map(fun (bcs,item) ->
+//                            { document with BoundedContexts = bcs },item
+//                        )
+//                       )
+//                changed
+//                |> Result.map (fun d -> d.Id)
+//                |> Result.mapError InfrastructureError                        
+//            | Error domainError ->
+//                domainError |> DomainError |> Error
+                
+        let private updateCollaborationsIn (document: Document) =
+            Result.map (fun (collaborations, item) -> { document with Collaborations = collaborations }, item)
+
+        let remove (database: FileBased) collaborationId =
+            let changed =
+                database.Change(fun document ->
+                    collaborationId
+                    |> document.Collaborations.Remove
+                    |> updateCollaborationsIn document)
+
+            changed
+            |> Result.map (fun _ -> collaborationId)
+            |> Result.mapError InfrastructureError
+                        
+        let private updateCollaboration (database: FileBased) collaborationId update =
+            let changed =
+                database.Change(fun document ->
+                    collaborationId
+                    |> document.Collaborations.Update update
+                    |> updateCollaborationsIn document)
+
+            match changed with
+            | Ok _ -> Ok collaborationId
+            | Error (ChangeError e) -> Error(DomainError e)
+            | Error (EntityNotFoundInCollection id) ->
+                id
+                |> EntityNotFound
+                |> InfrastructureError
+                |> Error
+        
+        let handle (database: FileBased) (command: Command) =
+            match command with
+//            | CreateCollaboration createCommand ->
+//                create database createCommand
+            | ChangeRelationshipType (collaborationId,relationship) ->
+                updateCollaboration database collaborationId (changeRelationship relationship.RelationshipType)
