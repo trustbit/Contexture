@@ -1,5 +1,6 @@
 module BoundedContext.Technical exposing (
   TechnicalDescription, Lifecycle, Deployment,
+  noTechnicalDescription,
   modelDecoder, modelEncoder)
 
 import Json.Encode as Encode
@@ -24,6 +25,7 @@ type alias TechnicalDescription =
   , deployment : Deployment
   }
 
+
 urlDecoder name =
   JP.optional name (Decode.map Url.fromString Decode.string) Nothing
 
@@ -31,6 +33,19 @@ urlEncoder url =
   case url of
     Just value -> value |> Url.toString |> Encode.string
     Nothing -> Encode.null
+
+noTechnicalDescription : TechnicalDescription
+noTechnicalDescription = 
+  { tools =
+    { issueTracker = Nothing
+    , wiki = Nothing
+    , repository = Nothing
+    }
+  , deployment =
+    { healthCheck = Nothing
+    , artifacts = Nothing
+    }
+  }
 
 lifecycleDecoder : Decoder Lifecycle
 lifecycleDecoder =

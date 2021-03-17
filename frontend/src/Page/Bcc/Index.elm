@@ -581,7 +581,7 @@ loadAll config domain =
       Decode.succeed Item
       |> JP.custom BoundedContext.modelDecoder
       |> JP.custom BoundedContext.Canvas.modelDecoder
-      |> JP.custom BoundedContext.Technical.modelDecoder
+      |> JP.optionalAt [ "technicalDescription" ] BoundedContext.Technical.modelDecoder BoundedContext.Technical.noTechnicalDescription
   in Http.get
     { url = Api.boundedContexts domain |> Api.url config |> Url.toString
     , expect = Http.expectJson Loaded (Decode.list decoder)

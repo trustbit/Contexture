@@ -248,7 +248,7 @@ loadTechnical config contextId =
     decoder =
       Decode.succeed TechnicalModel
       |> JP.custom BoundedContext.modelDecoder
-      |> JP.custom (Decode.at [ "technicalDescription"] Technical.modelDecoder)
+      |> JP.optionalAt [ "technicalDescription"] Technical.modelDecoder Technical.noTechnicalDescription
       |> JP.requiredAt [ "domain" ] Domain.domainDecoder
   in Http.get
     { url = Api.canvas contextId |> Api.url config |> Url.toString
