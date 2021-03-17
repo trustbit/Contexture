@@ -113,6 +113,18 @@ module Database =
                     properties |> Seq.iter (fun x -> x.Remove())
                     obj.Add(JProperty("technicalDescription", JObject(properties)))
 
+            let processDomain (token: JToken) =
+                let obj = token :?> JObject
+                let domainIdProperty =
+                    obj.Property("domainId")
+                    |> Option.ofObj
+                    |> Option.bind (fun p -> p.Value |> Option.ofObj)
+                match domainIdProperty with
+                | Some parentIdValue ->
+                    obj.Remove("domainId") |> ignore
+                    obj.Add("parentDomainId", parentIdValue)
+                | None -> ()
+
             root.["collaborations"]
             |> Seq.map (fun x -> x.["relationship"])
             |> Seq.where (fun x -> x.HasValues)
@@ -120,6 +132,9 @@ module Database =
 
             root.["boundedContexts"]
             |> Seq.iter addTechnicalDescription
+
+            root.["domains"]
+            |> Seq.iter processDomain
 
             root.Add(JProperty("version", 1))
             root.ToString()
