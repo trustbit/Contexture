@@ -3,6 +3,7 @@ module Contexture.Api.App
 open System
 open System.IO
 open Contexture.Api.Database
+open Contexture.Api.Domains
 open Giraffe
 open Microsoft.AspNetCore.Builder
 open Microsoft.AspNetCore.Http
@@ -19,6 +20,17 @@ type ContextureOptions = {
     DatabasePath : string
 }
 
+let allRoute =
+     fun (next: HttpFunc) (ctx: HttpContext) ->
+            let database = ctx.GetService<FileBased>()
+            let document = database.Read
+
+            let result =
+                {| BoundedContexts = document.BoundedContexts.All |> List.map Results.convertBoundedContext
+                   Domains = document.Domains.All |> List.map Results.convertDomain
+                   Collaborations = document.Collaborations.All |}
+            json result next ctx
+
 let webApp hostFrontend =
     choose [
         subRoute "/api"
@@ -26,6 +38,7 @@ let webApp hostFrontend =
                 Domains.routes
                 BoundedContexts.routes
                 Collaborations.routes
+                GET >=> route "/all" >=> allRoute
             ])
         hostFrontend
         setStatusCode 404 >=> text "Not Found" ]
