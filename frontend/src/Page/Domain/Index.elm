@@ -269,12 +269,12 @@ viewDomain item =
     |> Card.block []
       [ item.subDomains
         |> List.map Domain.name
-        |> List.map (\name -> Badge.badgePrimary [ Spacing.mr1, title <| "Subdomain " ++ name ] [text name] )
+        |> List.map (\name -> Badge.badgePrimary [ Spacing.mr1, title <| "Subdomain '" ++ name ++ "'" ] [text name] )
         |> Html.div []
         |> Block.custom
       , item.contexts
         |> List.map BoundedContext.name
-        |> List.map (\name -> Badge.pillSecondary [ Spacing.mr1, title <| "Bounded context " ++ name ] [text name] )
+        |> List.map (\name -> Badge.pillSecondary [ Spacing.mr1, title <| "Bounded context '" ++ name ++ "'" ] [text name] )
         |> Html.div []
         |> Block.custom
       ]

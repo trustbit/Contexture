@@ -154,11 +154,11 @@ module Domains =
     let getSubDomains domainId =
         fun (next: HttpFunc) (ctx: HttpContext) ->
             let database = ctx.GetService<FileBased>()
-
+            let document = database.Read
             let domains =
                 domainId
-                |> Document.subdomainsOf database.Read.Domains
-                |> List.map Results.convertDomain
+                |> Document.subdomainsOf document.Domains
+                |> List.map (Results.includingSubdomainsAndBoundedContexts document)
 
             json domains next ctx
 
