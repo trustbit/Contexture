@@ -445,4 +445,5 @@ $RECYCLE.BIN/
 
 elm-stuff/
 data/
-/frontend/index.html
+frontend/index.html
+frontend/css/*

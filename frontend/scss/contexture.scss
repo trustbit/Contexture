@@ -1,0 +1,42 @@
+﻿@import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600;700&display=swap');
+@import "bootstrap-colors";
+@import "bootstrap-required";
+@import "bootstrap-variables";
+@import "bootstrap";
+
+h2 {
+  text-transform: uppercase;
+}
+
+h3 {
+  color: $primary;
+}
+
+.text-danger, .text-success, .text-info {
+  font-size: 0.875rem;
+}
+
+.text-danger, .text-success {
+  font-weight: 600;
+}
+
+// Colors
+
+section {
+  display: flex;
+  padding: 2rem;
+}
+
+.color-swatch
+{
+  height: 5rem;
+  width: 5rem;
+}
+
+figure > div {
+  vertical-align: top;
+}
+
+figcaption {
+  background-color: white;
+}
