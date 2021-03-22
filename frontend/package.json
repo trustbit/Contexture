@@ -1,11 +1,11 @@
 {
   "name": "contexture",
   "scripts": {
-    "css-compile": "node-sass --include-path node_modules --precision 6 scss -o css/",
-    "css-compile2": "node-sass --include-path node_modules --output-style compressed --source-map true --source-map-contents true --precision 6 scss -o css/",
+    "css-compile-dev": "node-sass --include-path node_modules --precision 6 scss -o css/",
+    "css-compile": "node-sass --include-path node_modules --output-style compressed --source-map true --source-map-contents true --precision 6 scss -o css/",
     "css-prefix": "postcss --replace css/contexture.css --use autoprefixer --map",
-    "css": "npm-run-all css-compile",
-    "watch": "nodemon -e scss -x \"npm run css\""
+    "css": "npm-run-all css-compile css-prefix",
+    "watch": "nodemon -e scss -x \"npm run css-compile-dev\""
   },
   "dependencies": {
     "bootstrap": "~4.6.0"
