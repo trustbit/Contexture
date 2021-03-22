@@ -112,11 +112,11 @@ cp artifacts/frontend/*.* artifacts/image/wwwroot/
 cd artifacts/image && docker build -t softwarepark/contexture -f Dockerfile .
 ```
 
-To run the `softwarepark/contexture` image either use `make run-app` and browse to <http://localhost:4000> or execute the following commands:
+To run the `softwarepark/contexture` image either use `make run-app` and browse to <http://localhost:3000> or execute the following commands:
 
 ```bash
 docker volume create contexture_data
-docker run -it -p 4000:4000 -v contexture_data:/data softwarepark/contexture
+docker run -it -p 3000:3000 -v contexture_data:/data softwarepark/contexture
 ```
 
 Your data will be stored in the `/data/db.json` file on the volume `/data`.

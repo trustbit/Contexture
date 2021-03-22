@@ -27,6 +27,6 @@ build-image: prepare-image
 	cd artifacts/image && docker build -t softwarepark/contexture -f ../backend/Dockerfile .
 
 run-app:
-	docker run -it -p 4000:4000 -v contexture_data:/data softwarepark/contexture
+	docker run -it -p 3000:3000 -v contexture_data:/data softwarepark/contexture
 
 run-image: build-image run-app
