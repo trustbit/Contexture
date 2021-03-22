@@ -4,12 +4,21 @@
 @import "bootstrap-variables";
 @import "bootstrap";
 
-h2 {
+.heading-1 {
+  font-size: $font-size-base * 3.125;
+  font-weight: 700;
+}
+
+.heading-2 {
+  font-size: $font-size-base * 1.75;
+  font-weight: 700;
   text-transform: uppercase;
 }
 
-h3 {
+.heading-3 {
   color: $primary;
+  font-size: $font-size-base * 1.125;
+  font-weight: 700;
 }
 
 .text-danger, .text-success, .text-info {
