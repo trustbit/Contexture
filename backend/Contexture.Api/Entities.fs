@@ -74,6 +74,28 @@ module Entities =
     type TechnicalDescription =
         { Tools: Lifecycle option
           Deployment: Deployment option }
+        
+        
+    type NamespaceTemplateId = int
+    type LabelTemplate =
+        { Name: string }
+    type NamespaceTemplate =
+        { Id: NamespaceTemplateId
+          Name: string
+          Template: LabelTemplate list }
+    type LabelId = int
+    type Label =
+        { Id: LabelId
+          Name: string
+          Value: string }
+        
+    type NamespaceId = int
+    type Namespace =
+        { Id: NamespaceId
+          Template: NamespaceTemplateId option
+          Name: string
+          Labels: Label list }
+        
 
     type DomainId = int
     type BoundedContextId = int
@@ -89,7 +111,8 @@ module Entities =
           UbiquitousLanguage: Map<string, UbiquitousLanguageTerm>
           Messages: Messages
           DomainRoles: DomainRole list
-          TechnicalDescription: TechnicalDescription option }
+          TechnicalDescription: TechnicalDescription option
+          Namespaces: Namespace list }
 
     type Domain =
         { Id: DomainId
@@ -149,7 +172,6 @@ module Entities =
           Initiator: Collaborator
           Recipient: Collaborator
           RelationshipType: RelationshipType option }
-
 
 module Aggregates =
 
@@ -214,7 +236,6 @@ module Aggregates =
                           |> Option.ofObj
                           |> Option.filter (String.IsNullOrWhiteSpace >> not) }
 
-
     module BoundedContext =
         open Entities
 
@@ -277,7 +298,8 @@ module Aggregates =
                   UbiquitousLanguage = Map.empty
                   Messages = Messages.Empty
                   DomainRoles = []
-                  TechnicalDescription = None })
+                  TechnicalDescription = None
+                  Namespaces = [] })
 
         let updateTechnicalDescription description context =
             Ok

@@ -133,7 +133,8 @@ module BoundedContexts =
         subRouteCi
             "/boundedcontexts"
             (choose [ subRoutef "/%i" (fun contextId ->
-                          (choose [ GET >=> getBoundedContext contextId
+                          (choose [ Namespaces.routes contextId
+                                    GET >=> getBoundedContext contextId
                                     POST
                                     >=> route "/technical"
                                     >=> bindJson (CommandEndpoints.technical contextId)
