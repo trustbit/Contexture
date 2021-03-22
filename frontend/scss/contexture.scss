@@ -19,24 +19,3 @@ h3 {
 .text-danger, .text-success {
   font-weight: 600;
 }
-
-// Colors
-
-section {
-  display: flex;
-  padding: 2rem;
-}
-
-.color-swatch
-{
-  height: 5rem;
-  width: 5rem;
-}
-
-figure > div {
-  vertical-align: top;
-}
-
-figcaption {
-  background-color: white;
-}
