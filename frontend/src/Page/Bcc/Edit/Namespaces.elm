@@ -180,20 +180,23 @@ update msg model =
         
 
 viewLabel model =
-    Form.row []
+    Block.custom <|
+        Form.row []
         [ Form.colLabel [] [ text model.name]
         , Form.col []
             [ Input.text [ Input.value model.value] ]
         , Form.col [ Col.bottomSm ]
             [ Button.button [ Button.secondary ] [ text "X"] ]
         ]
-
+    
 viewNamespace model = 
-    Fieldset.config
-    |> Fieldset.legend [] [ text model.name ]
-    |> Fieldset.children (model.labels |> List.map viewLabel)
-    |> Fieldset.view
-
+    Accordion.card
+        { id = model.id
+        , options = []
+        , header = Accordion.header [] <| Accordion.toggle [] [ text model.name ]
+        , blocks = (model.labels |> List.map viewLabel |> List.map List.singleton |> List.map (Accordion.block []))
+        }
+    
 view : Model -> Html Msg
 view model =
     Card.config [ Card.attrs [ class "mb-3", class "shadow" ] ]
@@ -203,9 +206,14 @@ view model =
         |> Card.block []
             ( case model.namespaces of
                 RemoteData.Success namespaces ->
-                    namespaces 
-                    |> List.map viewNamespace
-                    |> List.map Block.custom
+                    Accordion.config AccordionMsg
+                    |> Accordion.cards (
+                        namespaces 
+                        |> List.map viewNamespace
+                    )
+                    |> Accordion.view model.accordionState
+                    |> Block.custom
+                    |> List.singleton
                 e ->
                     [ e |> Debug.toString |> text |> Block.custom ]
             )
