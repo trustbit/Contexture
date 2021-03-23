@@ -11,11 +11,11 @@ open FSharp.Control.Tasks
 open Giraffe
 
 module Namespaces =
-    
+
     module CommandEndpoints =
         open Namespaces
         open FileBasedCommandHandlers
-         
+
         let private updateAndReturnNamespaces command =
             fun (next: HttpFunc) (ctx: HttpContext) ->
                 task {
@@ -34,10 +34,10 @@ module Namespaces =
                         return! RequestErrors.BAD_REQUEST (sprintf "Domain Error %A" error) next ctx
                     | Error e -> return! ServerErrors.INTERNAL_ERROR e next ctx
                 }
-                
+
         let newNamespace contextId (command: NamespaceDefinition) =
             updateAndReturnNamespaces (NewNamespace(contextId, command))
-    
+
     let getNamespaces boundedContextId =
         fun (next: HttpFunc) (ctx: HttpContext) ->
             let database = ctx.GetService<FileBased>()
@@ -45,17 +45,20 @@ module Namespaces =
 
             let result =
                 document.BoundedContexts.ById boundedContextId
-                |> Option.map(fun b -> b.Namespaces |> tryUnbox<Namespace list> |> Option.defaultValue [])
+                |> Option.map (fun b ->
+                    b.Namespaces
+                    |> tryUnbox<Namespace list>
+                    |> Option.defaultValue [])
                 |> Option.map json
                 |> Option.defaultValue (RequestErrors.NOT_FOUND "No namespaces for BoundedContext found")
 
             result next ctx
 
-    
+
     let routes boundedContextId: HttpHandler =
         subRouteCi
             "/namespaces"
-            (choose [ subRoutef "/%i" (fun namespaceId ->
-                          (choose [ ]))
+            (choose [ subRoutef "/%i" (fun namespaceId -> (choose []))
                       GET >=> getNamespaces boundedContextId
-                      POST >=> bindJson (CommandEndpoints.newNamespace boundedContextId) ])
+                      POST
+                      >=> bindJson (CommandEndpoints.newNamespace boundedContextId) ])

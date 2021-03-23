@@ -74,28 +74,31 @@ module Entities =
     type TechnicalDescription =
         { Tools: Lifecycle option
           Deployment: Deployment option }
-        
-        
+
+
     type NamespaceTemplateId = int
-    type LabelTemplate =
-        { Name: string }
+    type LabelTemplate = { Name: string }
+
     type NamespaceTemplate =
         { Id: NamespaceTemplateId
           Name: string
           Template: LabelTemplate list }
+
     type LabelId = Guid
+
     type Label =
         { Id: LabelId
           Name: string
           Value: string }
-        
+
     type NamespaceId = Guid
+
     type Namespace =
         { Id: NamespaceId
           Template: NamespaceTemplateId option
           Name: string
           Labels: Label list }
-        
+
 
     type DomainId = int
     type BoundedContextId = int
@@ -383,29 +386,31 @@ module Aggregates =
                   Initiator = initiator
                   Recipient = recipient
                   RelationshipType = None }
-                
-                
+
+
     module Namespaces =
         open Entities
-        
-        type Command =
-            | NewNamespace of BoundedContextId * NamespaceDefinition
-            
+
+        type Command = NewNamespace of BoundedContextId * NamespaceDefinition
+
         and NamespaceDefinition =
             { Name: string
               Labels: LabelDefinition list }
-        and LabelDefinition =
-            { Name: string; Value: string }
-            
+
+        and LabelDefinition = { Name: string; Value: string }
+
         let addNewNamespace name labels namespaces =
             let newLabels =
                 labels
-                |> List.map(fun label ->
+                |> List.map (fun label ->
                     { Id = Guid.NewGuid()
                       Name = label.Name
-                      Value = label.Value }
-                    )
+                      Value = label.Value })
+
             let newNamespace =
-                { Id = Guid.NewGuid(); Template = None; Name = name; Labels = newLabels }
-            Ok (namespaces @ [ newNamespace ])
-            
+                { Id = Guid.NewGuid()
+                  Template = None
+                  Name = name
+                  Labels = newLabels }
+
+            Ok(namespaces @ [ newNamespace ])
