@@ -83,13 +83,13 @@ module Entities =
         { Id: NamespaceTemplateId
           Name: string
           Template: LabelTemplate list }
-    type LabelId = int
+    type LabelId = Guid
     type Label =
         { Id: LabelId
           Name: string
           Value: string }
         
-    type NamespaceId = int
+    type NamespaceId = Guid
     type Namespace =
         { Id: NamespaceId
           Template: NamespaceTemplateId option
@@ -363,10 +363,6 @@ module Aggregates =
             | DefineInboundConnection of DefineConnection
             | RemoveConnection of CollaborationId
 
-        and CreateCollaboration =
-            class
-            end
-
         and DefineRelationship =
             { RelationshipType: RelationshipType option }
 
@@ -387,3 +383,29 @@ module Aggregates =
                   Initiator = initiator
                   Recipient = recipient
                   RelationshipType = None }
+                
+                
+    module Namespaces =
+        open Entities
+        
+        type Command =
+            | NewNamespace of BoundedContextId * NamespaceDefinition
+            
+        and NamespaceDefinition =
+            { Name: string
+              Labels: LabelDefinition list }
+        and LabelDefinition =
+            { Name: string; Value: string }
+            
+        let addNewNamespace name labels namespaces =
+            let newLabels =
+                labels
+                |> List.map(fun label ->
+                    { Id = Guid.NewGuid()
+                      Name = label.Name
+                      Value = label.Value }
+                    )
+            let newNamespace =
+                { Id = Guid.NewGuid(); Template = None; Name = name; Labels = newLabels }
+            Ok (namespaces @ [ newNamespace ])
+            

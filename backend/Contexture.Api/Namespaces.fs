@@ -1,6 +1,7 @@
 namespace Contexture.Api
 
 open Contexture.Api.Aggregates
+open Contexture.Api.Aggregates.Namespaces
 open Contexture.Api.Database
 open Contexture.Api.Entities
 open Contexture.Api.Domains
@@ -10,6 +11,32 @@ open FSharp.Control.Tasks
 open Giraffe
 
 module Namespaces =
+    
+    module CommandEndpoints =
+        open Namespaces
+        open FileBasedCommandHandlers
+         
+        let private updateAndReturnNamespaces command =
+            fun (next: HttpFunc) (ctx: HttpContext) ->
+                task {
+                    let database = ctx.GetService<FileBased>()
+
+                    match Namespaces.handle database command with
+                    | Ok updatedContext ->
+                        let boundedContext =
+                            updatedContext
+                            |> database.Read.BoundedContexts.ById
+                            |> Option.map (fun b -> b.Namespaces)
+                            |> Option.defaultValue []
+
+                        return! json boundedContext next ctx
+                    | Error (DomainError error) ->
+                        return! RequestErrors.BAD_REQUEST (sprintf "Domain Error %A" error) next ctx
+                    | Error e -> return! ServerErrors.INTERNAL_ERROR e next ctx
+                }
+                
+        let newNamespace contextId (command: NamespaceDefinition) =
+            updateAndReturnNamespaces (NewNamespace(contextId, command))
     
     let getNamespaces boundedContextId =
         fun (next: HttpFunc) (ctx: HttpContext) ->
@@ -30,4 +57,5 @@ module Namespaces =
             "/namespaces"
             (choose [ subRoutef "/%i" (fun namespaceId ->
                           (choose [ ]))
-                      GET >=> getNamespaces boundedContextId ])
+                      GET >=> getNamespaces boundedContextId
+                      POST >=> bindJson (CommandEndpoints.newNamespace boundedContextId) ])

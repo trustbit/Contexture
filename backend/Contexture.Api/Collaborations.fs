@@ -26,8 +26,8 @@ module Collaborations =
                             |> Option.get
 
                         return! json collaboration next ctx
-                    | Error (DomainError EmptyName) ->
-                        return! RequestErrors.BAD_REQUEST "Name must not be empty" next ctx
+                    | Error (DomainError error) ->
+                        return! RequestErrors.BAD_REQUEST (sprintf "Domain Error %A" error) next ctx
                     | Error e -> return! ServerErrors.INTERNAL_ERROR e next ctx
                 }
 
