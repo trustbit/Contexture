@@ -40,6 +40,9 @@ module Namespaces =
             
         let removeNamespace contextId (command: NamespaceId) =
             updateAndReturnNamespaces (RemoveNamespace(contextId, command))
+            
+        let removeLabel contextId (command: RemoveLabel) =
+            updateAndReturnNamespaces (RemoveLabel(contextId, command))
 
     let getNamespaces boundedContextId =
         fun (next: HttpFunc) (ctx: HttpContext) ->
@@ -64,6 +67,11 @@ module Namespaces =
             (choose [
                 subRoutef "/%O" (fun namespaceId -> (
                     choose [
+                        subRoutef "/labels/%O" (fun labelId -> (
+                            choose [
+                                DELETE >=> CommandEndpoints.removeLabel boundedContextId { Namespace = namespaceId; Label = labelId }
+                            ])
+                        )
                         DELETE >=> CommandEndpoints.removeNamespace boundedContextId namespaceId
                     ]))
                 GET >=> getNamespaces boundedContextId

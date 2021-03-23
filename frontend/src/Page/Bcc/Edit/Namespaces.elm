@@ -125,6 +125,8 @@ type Msg
     | CancelAddingNamespace
     | RemoveNamespace NamespaceId
     | NamespaceRemoved (Api.ApiResponse (List Namespace))
+    | RemoveLabelFromNamespace NamespaceId LabelId
+    | LabelRemoved (Api.ApiResponse (List Namespace))
 
 
 appendNewLabel namespace =
@@ -203,15 +205,21 @@ update msg model =
         NamespaceRemoved namespaces ->
             ( { model | namespaces = RemoteData.fromResult namespaces }, Cmd.none )
 
+        RemoveLabelFromNamespace namespace label ->
+            ( model, removeLabelFromNamespace model.configuration model.boundedContextId namespace label)
+        
+        LabelRemoved namespaces ->
+            ( { model | namespaces = RemoteData.fromResult namespaces }, Cmd.none )
 
-viewLabel model =
+
+viewLabel namespace model =
     Block.custom <|
         Form.row []
             [ Form.colLabel [] [ text model.name ]
             , Form.col []
                 [ Input.text [ Input.value model.value ] ]
             , Form.col [ Col.bottomSm ]
-                [ Button.button [ Button.secondary ] [ text "X" ] ]
+                [ Button.button [ Button.secondary, Button.onClick (RemoveLabelFromNamespace namespace model.id) ] [ text "X" ] ]
             ]
 
 
@@ -222,7 +230,7 @@ viewNamespace model =
         , header = Accordion.header [] <| Accordion.toggle [] [ text model.name ]
         , blocks =
             (model.labels
-                |> List.map viewLabel
+                |> List.map (viewLabel model.id)
                 |> List.map List.singleton
                 |> List.map (Accordion.block [])
             )
@@ -363,6 +371,18 @@ removeNamespace config boundedContextId namespace =
         , url = Api.boundedContext boundedContextId |> Api.url config |> Url.toString |> (\b -> b ++ "/namespaces/" ++ namespace)
         , body = Http.emptyBody
         , expect = Http.expectJson NamespaceRemoved (Decode.list namespaceDecoder)
+        , timeout = Nothing
+        , tracker = Nothing
+        , headers = []
+        }
+
+removeLabelFromNamespace : Api.Configuration -> BoundedContextId -> NamespaceId -> LabelId -> Cmd Msg
+removeLabelFromNamespace config boundedContextId namespace label =
+    Http.request
+        { method = "DELETE"
+        , url = Api.boundedContext boundedContextId |> Api.url config |> Url.toString |> (\b -> b ++ "/namespaces/" ++ namespace ++ "/labels/" ++ label)
+        , body = Http.emptyBody
+        , expect = Http.expectJson LabelRemoved (Decode.list namespaceDecoder)
         , timeout = Nothing
         , tracker = Nothing
         , headers = []

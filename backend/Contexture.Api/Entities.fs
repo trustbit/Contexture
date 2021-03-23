@@ -394,12 +394,17 @@ module Aggregates =
         type Command =
             | NewNamespace of BoundedContextId * NamespaceDefinition
             | RemoveNamespace of BoundedContextId * NamespaceId
+            | RemoveLabel of BoundedContextId * RemoveLabel
 
         and NamespaceDefinition =
             { Name: string
               Labels: LabelDefinition list }
 
         and LabelDefinition = { Name: string; Value: string }
+
+        and RemoveLabel =
+            { Namespace: NamespaceId
+              Label: LabelId }
 
         let addNewNamespace name labels namespaces =
             let newLabels =
@@ -416,8 +421,18 @@ module Aggregates =
                   Labels = newLabels }
 
             Ok(namespaces @ [ newNamespace ])
-            
+
         let removeNamespace (namespaceId: NamespaceId) (namespaces: Namespace list) =
             namespaces
             |> List.filter (fun n -> n.Id <> namespaceId)
+            |> Ok
+
+        let removeLabel namespaceId labelId (namespaces: Namespace list) =
+            namespaces
+            |> List.map (fun n ->
+                if n.Id = namespaceId then
+                    { n with
+                          Labels = n.Labels |> List.filter (fun l -> l.Id <> labelId) }
+                else
+                    n)
             |> Ok
