@@ -239,3 +239,5 @@ module FileBasedCommandHandlers =
             match command with
             | NewNamespace (boundedContextId, namespaceCommand) ->
                 updateNamespaces database boundedContextId (addNewNamespace namespaceCommand.Name namespaceCommand.Labels)
+            | RemoveNamespace (boundedContextId, namespaceCommand) ->
+                updateNamespaces database boundedContextId (removeNamespace namespaceCommand)

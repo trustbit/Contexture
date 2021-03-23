@@ -37,6 +37,9 @@ module Namespaces =
 
         let newNamespace contextId (command: NamespaceDefinition) =
             updateAndReturnNamespaces (NewNamespace(contextId, command))
+            
+        let removeNamespace contextId (command: NamespaceId) =
+            updateAndReturnNamespaces (RemoveNamespace(contextId, command))
 
     let getNamespaces boundedContextId =
         fun (next: HttpFunc) (ctx: HttpContext) ->
@@ -58,7 +61,11 @@ module Namespaces =
     let routes boundedContextId: HttpHandler =
         subRouteCi
             "/namespaces"
-            (choose [ subRoutef "/%i" (fun namespaceId -> (choose []))
-                      GET >=> getNamespaces boundedContextId
-                      POST
-                      >=> bindJson (CommandEndpoints.newNamespace boundedContextId) ])
+            (choose [
+                subRoutef "/%O" (fun namespaceId -> (
+                    choose [
+                        DELETE >=> CommandEndpoints.removeNamespace boundedContextId namespaceId
+                    ]))
+                GET >=> getNamespaces boundedContextId
+                POST
+                >=> bindJson (CommandEndpoints.newNamespace boundedContextId) ])

@@ -123,6 +123,8 @@ type Msg
     | AddNamespace CreateNamespace
     | NamespaceAdded (Api.ApiResponse (List Namespace))
     | CancelAddingNamespace
+    | RemoveNamespace NamespaceId
+    | NamespaceRemoved (Api.ApiResponse (List Namespace))
 
 
 appendNewLabel namespace =
@@ -195,6 +197,12 @@ update msg model =
         CancelAddingNamespace ->
             ( { model | newNamespace = Nothing }, Cmd.none )
 
+        RemoveNamespace namespaceId ->
+            ( model, removeNamespace model.configuration model.boundedContextId namespaceId )
+
+        NamespaceRemoved namespaces ->
+            ( { model | namespaces = RemoteData.fromResult namespaces }, Cmd.none )
+
 
 viewLabel model =
     Block.custom <|
@@ -212,7 +220,19 @@ viewNamespace model =
         { id = model.id
         , options = []
         , header = Accordion.header [] <| Accordion.toggle [] [ text model.name ]
-        , blocks = model.labels |> List.map viewLabel |> List.map List.singleton |> List.map (Accordion.block [])
+        , blocks =
+            (model.labels
+                |> List.map viewLabel
+                |> List.map List.singleton
+                |> List.map (Accordion.block [])
+            )
+                ++ [ Accordion.block []
+                        [ Block.custom <|
+                            Button.button
+                                [ Button.secondary, Button.onClick (RemoveNamespace model.id) ]
+                                [ text "Remove Namespace" ]
+                        ]
+                   ]
         }
 
 
@@ -333,4 +353,17 @@ addNamespace config boundedContextId namespace =
         { url = Api.boundedContext boundedContextId |> Api.url config |> Url.toString |> (\b -> b ++ "/namespaces")
         , body = Http.jsonBody <| namespaceEncoder namespace
         , expect = Http.expectJson NamespaceAdded (Decode.list namespaceDecoder)
+        }
+
+
+removeNamespace : Api.Configuration -> BoundedContextId -> NamespaceId -> Cmd Msg
+removeNamespace config boundedContextId namespace =
+    Http.request
+        { method = "DELETE"
+        , url = Api.boundedContext boundedContextId |> Api.url config |> Url.toString |> (\b -> b ++ "/namespaces/" ++ namespace)
+        , body = Http.emptyBody
+        , expect = Http.expectJson NamespaceRemoved (Decode.list namespaceDecoder)
+        , timeout = Nothing
+        , tracker = Nothing
+        , headers = []
         }

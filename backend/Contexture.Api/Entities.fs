@@ -391,7 +391,9 @@ module Aggregates =
     module Namespaces =
         open Entities
 
-        type Command = NewNamespace of BoundedContextId * NamespaceDefinition
+        type Command =
+            | NewNamespace of BoundedContextId * NamespaceDefinition
+            | RemoveNamespace of BoundedContextId * NamespaceId
 
         and NamespaceDefinition =
             { Name: string
@@ -414,3 +416,8 @@ module Aggregates =
                   Labels = newLabels }
 
             Ok(namespaces @ [ newNamespace ])
+            
+        let removeNamespace (namespaceId: NamespaceId) (namespaces: Namespace list) =
+            namespaces
+            |> List.filter (fun n -> n.Id <> namespaceId)
+            |> Ok
