@@ -28,3 +28,16 @@
 .text-danger, .text-success {
   font-weight: 600;
 }
+
+.btn-cancel {
+  color: $secondary;
+  
+  &:hover, &:active {
+    color: $primary;
+  }
+  
+  &.active
+  {
+    color: $primary;
+  }
+}
