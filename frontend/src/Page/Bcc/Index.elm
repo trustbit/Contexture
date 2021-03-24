@@ -21,6 +21,7 @@ import Bootstrap.ButtonGroup as ButtonGroup
 import Bootstrap.Utilities.Border as Border
 import Bootstrap.Card as Card
 import Bootstrap.Card.Block as Block
+import Bootstrap.ListGroup as ListGroup
 import Bootstrap.Badge as Badge
 import Bootstrap.Modal as Modal
 import Bootstrap.Utilities.Spacing as Spacing
@@ -48,6 +49,7 @@ import BoundedContext.Technical exposing (TechnicalDescription)
 import BoundedContext.StrategicClassification as StrategicClassification
 import ContextMapping.Collaboration as Collaboration
 import ContextMapping.Collaborator as Collaborator
+import BoundedContext.Namespace as Namespace exposing (Namespace)
 import List
 
 -- MODEL
@@ -56,6 +58,7 @@ type alias Item =
   { context : BoundedContext
   , canvas : BoundedContextCanvas
   , technical : TechnicalDescription
+  , namespaces : List Namespace
   }
 
 type alias MoveContextModel =
@@ -71,9 +74,9 @@ type alias DeleteBoundedContextModel =
   , modalVisibility : Modal.Visibility
   }
 
-type alias Communication = 
+type alias Communication =
   { initiators : Dict Int Collaboration.Collaborations
-  , recipients : Dict Int Collaboration.Collaborations 
+  , recipients : Dict Int Collaboration.Collaborations
   }
 
 type alias Model =
@@ -110,7 +113,7 @@ init config key domain =
   , Cmd.batch
     [ loadAll config domain
     , loadAllConnections config
-    ] 
+    ]
   )
 
 -- UPDATE
@@ -157,8 +160,8 @@ update msg model =
         updateCollaborationLookup selectCollaborator dictionary collaboration =
           case selectCollaborator collaboration of
             Collaborator.BoundedContext bcId ->
-              let 
-                items = 
+              let
+                items =
                   dictionary
                   |> dictBcGet bcId
                   |> Maybe.withDefault []
@@ -168,9 +171,9 @@ update msg model =
             _ ->
               dictionary
 
-        (bcInitiators, bcRecipients) = 
+        (bcInitiators, bcRecipients) =
           connections
-          |> List.foldl(\collaboration (initiators, recipients) -> 
+          |> List.foldl(\collaboration (initiators, recipients) ->
               ( updateCollaborationLookup Collaboration.initiator initiators collaboration
               , updateCollaborationLookup Collaboration.recipient recipients collaboration
               )
@@ -179,7 +182,7 @@ update msg model =
         ( { model | communication = RemoteData.Success { initiators = bcInitiators, recipients = bcRecipients }}
         , Cmd.none
         )
-    
+
     CommunicationLoaded (Err e) ->
       ({ model |  communication = RemoteData.Failure e }, Cmd.none)
 
@@ -308,7 +311,7 @@ urlAsLinkItem caption canBeLink =
   |> Maybe.map (\value -> Html.a [ href <| Url.toString value, target "_blank" ] [ text caption] )
 
 viewItem : RemoteData.WebData Communication -> Item -> Card.Config Msg
-viewItem communication { context, canvas, technical } =
+viewItem communication { context, canvas, technical, namespaces } =
   let
     domainBadge =
       case canvas.classification.domain |> Maybe.map StrategicClassification.domainDescription of
@@ -344,13 +347,13 @@ viewItem communication { context, canvas, technical } =
     dependencies =
       case communication of
         RemoteData.Success { initiators, recipients } ->
-          initiators 
+          initiators
           |> dictBcGet (context |> BoundedContext.id)
           |> Maybe.map (List.length)
           |> Maybe.withDefault 0
           |> viewPillMessage "Inbound Communication"
           |> List.append
-            ( recipients 
+            ( recipients
               |> dictBcGet (context |> BoundedContext.id)
               |> Maybe.map (List.length)
               |> Maybe.withDefault 0
@@ -375,6 +378,27 @@ viewItem communication { context, canvas, technical } =
             )
         )
 
+    namespaceBlocks =
+      namespaces
+      |> List.map (\namespace ->
+        ListGroup.li []
+          [ Html.h6 []
+            [ text namespace.name
+            , Html.small [ class "text-muted"] [ text " Namespace" ]
+            ]
+          , div [] (
+              namespace.labels
+              |> List.map(\label ->
+                Badge.badgeInfo
+                  [ Spacing.ml1
+                  , title <| "The label '" ++ label.name ++ "' has the value '" ++ label.value ++ "'"
+                  ]
+                  [ text <| label.name ++ ": " ++ label.value ]
+              )
+            )
+          ]
+      )
+
   in
   Card.config [ Card.attrs [ class "mb-3", class "shadow" ] ]
     |> Card.block []
@@ -392,6 +416,7 @@ viewItem communication { context, canvas, technical } =
       [ Block.custom (div [] dependencies)
       , Block.custom (div [] messages)
       ]
+    |> Card.listGroup namespaceBlocks
     |> Card.block []
       [ Block.custom technicalLinks ]
     |> Card.footer []
@@ -582,6 +607,7 @@ loadAll config domain =
       |> JP.custom BoundedContext.modelDecoder
       |> JP.custom BoundedContext.Canvas.modelDecoder
       |> JP.optionalAt [ "technicalDescription" ] BoundedContext.Technical.modelDecoder BoundedContext.Technical.noTechnicalDescription
+      |> JP.optionalAt [ "namespaces" ] (Decode.list Namespace.namespaceDecoder) []
   in Http.get
     { url = Api.boundedContexts domain |> Api.url config |> Url.toString
     , expect = Http.expectJson Loaded (Decode.list decoder)

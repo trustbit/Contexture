@@ -24,7 +24,8 @@ module Domains =
               UbiquitousLanguage: Map<string, UbiquitousLanguageTerm>
               Messages: Messages
               DomainRoles: DomainRole list
-              TechnicalDescription: TechnicalDescription option }
+              TechnicalDescription: TechnicalDescription option
+              Namespaces : Namespace list }
 
         type DomainResult =
             { Id: int
@@ -47,7 +48,8 @@ module Domains =
               UbiquitousLanguage = boundedContext.UbiquitousLanguage
               Messages = boundedContext.Messages
               DomainRoles = boundedContext.DomainRoles
-              TechnicalDescription = boundedContext.TechnicalDescription }
+              TechnicalDescription = boundedContext.TechnicalDescription
+              Namespaces = boundedContext.Namespaces }
 
         let convertDomain (domain: Domain) =
             { Id = domain.Id

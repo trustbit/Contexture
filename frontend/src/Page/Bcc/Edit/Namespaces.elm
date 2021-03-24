@@ -36,36 +36,7 @@ import Page.Bcc.Edit.BusinessDecision exposing (Msg(..))
 import RemoteData exposing (RemoteData)
 import Url
 
-
-type alias Uuid =
-    String
-
-
-type alias NamespaceId =
-    Uuid
-
-
-type alias NamespaceTemplateId =
-    Int
-
-
-type alias LabelId =
-    Uuid
-
-
-type alias Label =
-    { id : LabelId
-    , name : String
-    , value : String
-    }
-
-
-type alias Namespace =
-    { id : NamespaceId
-    , template : Maybe NamespaceTemplateId
-    , name : String
-    , labels : List Label
-    }
+import BoundedContext.Namespace exposing(..)
 
 
 type alias NewLabel =
@@ -318,21 +289,7 @@ viewNewNamespace model =
         )
 
 
-labelDecoder =
-    Decode.map3 Label
-        (Decode.field "id" Decode.string)
-        (Decode.field "name" Decode.string)
-        (Decode.field "value" Decode.string)
-
-
-namespaceDecoder =
-    Decode.map4 Namespace
-        (Decode.field "id" Decode.string)
-        (Decode.maybe (Decode.field "template" Decode.int))
-        (Decode.field "name" Decode.string)
-        (Decode.field "labels" (Decode.list labelDecoder))
-
-
+labelEncoder : NewLabel -> Encode.Value
 labelEncoder model =
     Encode.object
         [ ( "name", Encode.string model.name )
@@ -340,12 +297,12 @@ labelEncoder model =
         ]
 
 
+namespaceEncoder : CreateNamespace -> Encode.Value
 namespaceEncoder model =
     Encode.object
         [ ( "name", Encode.string model.name )
         , ( "labels", model.labels |> Array.toList |> Encode.list labelEncoder )
         ]
-
 
 loadNamespaces : Api.Configuration -> BoundedContextId -> Cmd Msg
 loadNamespaces config boundedContextId =
