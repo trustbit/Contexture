@@ -37,12 +37,15 @@ module Namespaces =
 
         let newNamespace contextId (command: NamespaceDefinition) =
             updateAndReturnNamespaces (NewNamespace(contextId, command))
-            
+
         let removeNamespace contextId (command: NamespaceId) =
             updateAndReturnNamespaces (RemoveNamespace(contextId, command))
-            
+
         let removeLabel contextId (command: RemoveLabel) =
             updateAndReturnNamespaces (RemoveLabel(contextId, command))
+
+        let newLabel contextId namespaceId (command: LabelDefinition) =
+            updateAndReturnNamespaces (AddLabel(contextId, namespaceId, command))
 
     let getNamespaces boundedContextId =
         fun (next: HttpFunc) (ctx: HttpContext) ->
@@ -60,20 +63,24 @@ module Namespaces =
 
             result next ctx
 
-
     let routes boundedContextId: HttpHandler =
-        subRouteCi
-            "/namespaces"
+        subRouteCi "/namespaces"
             (choose [
-                subRoutef "/%O" (fun namespaceId -> (
-                    choose [
-                        subRoutef "/labels/%O" (fun labelId -> (
-                            choose [
-                                DELETE >=> CommandEndpoints.removeLabel boundedContextId { Namespace = namespaceId; Label = labelId }
-                            ])
-                        )
-                        DELETE >=> CommandEndpoints.removeNamespace boundedContextId namespaceId
-                    ]))
+                subRoutef "/%O" (fun namespaceId ->
+                    (choose [
+                        subRoute "/labels"
+                            (choose [
+                                subRoutef "/%O" (fun labelId ->
+                                    (choose [
+                                        DELETE
+                                        >=> CommandEndpoints.removeLabel
+                                                boundedContextId
+                                                { Namespace = namespaceId
+                                                  Label = labelId } ]))
+                                POST
+                                >=> bindJson (CommandEndpoints.newLabel boundedContextId namespaceId) ])
+                        DELETE
+                        >=> CommandEndpoints.removeNamespace boundedContextId namespaceId ]))
                 GET >=> getNamespaces boundedContextId
                 POST
                 >=> bindJson (CommandEndpoints.newNamespace boundedContextId) ])

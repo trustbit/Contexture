@@ -21,10 +21,12 @@ import Bootstrap.Grid as Grid
 import Bootstrap.Grid.Col as Col
 import Bootstrap.Grid.Row as Row
 import Bootstrap.ListGroup as ListGroup
+import Bootstrap.Text as Text
 import Bootstrap.Utilities.Display as Display
 import Bootstrap.Utilities.Flex as Flex
 import Bootstrap.Utilities.Spacing as Spacing
 import BoundedContext.BoundedContextId exposing (BoundedContextId)
+import BoundedContext.Namespace exposing (..)
 import Html exposing (Html, button, div, text)
 import Html.Attributes exposing (..)
 import Html.Events exposing (onClick)
@@ -35,8 +37,6 @@ import Json.Encode as Encode
 import Page.Bcc.Edit.BusinessDecision exposing (Msg(..))
 import RemoteData exposing (RemoteData)
 import Url
-
-import BoundedContext.Namespace exposing(..)
 
 
 type alias NewLabel =
@@ -51,13 +51,33 @@ type alias CreateNamespace =
     }
 
 
+type alias NamespaceModel =
+    { namespace : Namespace
+    , addLabel : Maybe NewLabel
+    }
+
+
 type alias Model =
-    { namespaces : RemoteData.WebData (List Namespace)
+    { namespaces : RemoteData.WebData (List NamespaceModel)
     , accordionState : Accordion.State
     , newNamespace : Maybe CreateNamespace
     , configuration : Api.Configuration
     , boundedContextId : BoundedContextId
     }
+
+
+initNamespace : Api.ApiResponse (List Namespace) -> RemoteData.WebData (List NamespaceModel)
+initNamespace namespaceResult =
+    namespaceResult
+        |> RemoteData.fromResult
+        |> RemoteData.map
+            (\namespaces ->
+                namespaces
+                    |> List.map
+                        (\n ->
+                            { namespace = n, addLabel = Nothing }
+                        )
+            )
 
 
 init : Api.Configuration -> BoundedContextId -> ( Model, Cmd Msg )
@@ -98,6 +118,12 @@ type Msg
     | NamespaceRemoved (Api.ApiResponse (List Namespace))
     | RemoveLabelFromNamespace NamespaceId LabelId
     | LabelRemoved (Api.ApiResponse (List Namespace))
+    | AddingLabelToExistingNamespace NamespaceId
+    | UpdateLabelNameForExistingNamespace NamespaceId String
+    | UpdateLabelValueForExistingNamespace NamespaceId String
+    | AddLabelToExistingNamespace NamespaceId NewLabel
+    | CancelAddingLabelToExistingNamespace NamespaceId
+    | LabelAddedToNamespace (Api.ApiResponse (List Namespace))
 
 
 appendNewLabel namespace =
@@ -117,6 +143,18 @@ updateLabel index updateLabelProperty namespace =
     { namespace | labels = namespace.labels |> Array.set index item }
 
 
+editingNamespace namespaceId updateNamespace namespaces =
+    namespaces
+        |> List.map
+            (\n ->
+                if n.namespace.id == namespaceId then
+                    updateNamespace n
+
+                else
+                    n
+            )
+
+
 removeLabel : Int -> Array a -> Array a
 removeLabel i a =
     let
@@ -133,7 +171,7 @@ update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
     case msg of
         NamespacesLoaded namespaces ->
-            ( { model | namespaces = RemoteData.fromResult namespaces }, Cmd.none )
+            ( { model | namespaces = initNamespace namespaces }, Cmd.none )
 
         AccordionMsg state ->
             ( { model | accordionState = state }, Cmd.none )
@@ -161,7 +199,7 @@ update msg model =
 
         NamespaceAdded namespaces ->
             ( { model
-                | namespaces = RemoteData.fromResult namespaces
+                | namespaces = initNamespace namespaces
                 , newNamespace = Nothing
               }
             , Cmd.none
@@ -174,13 +212,50 @@ update msg model =
             ( model, removeNamespace model.configuration model.boundedContextId namespaceId )
 
         NamespaceRemoved namespaces ->
-            ( { model | namespaces = RemoteData.fromResult namespaces }, Cmd.none )
+            ( { model | namespaces = initNamespace namespaces }, Cmd.none )
 
         RemoveLabelFromNamespace namespace label ->
-            ( model, removeLabelFromNamespace model.configuration model.boundedContextId namespace label)
-        
+            ( model, removeLabelFromNamespace model.configuration model.boundedContextId namespace label )
+
         LabelRemoved namespaces ->
-            ( { model | namespaces = RemoteData.fromResult namespaces }, Cmd.none )
+            ( { model | namespaces = initNamespace namespaces }, Cmd.none )
+
+        AddingLabelToExistingNamespace namespace ->
+            ( { model | namespaces = model.namespaces |> RemoteData.map (editingNamespace namespace (\n -> { n | addLabel = Just initNewLabel })) }, Cmd.none )
+
+        UpdateLabelNameForExistingNamespace namespace name ->
+            ( { model | namespaces = model.namespaces |> RemoteData.map (editingNamespace namespace (\n -> { n | addLabel = n.addLabel |> Maybe.map (\l -> { l | name = name }) })) }, Cmd.none )
+
+        UpdateLabelValueForExistingNamespace namespace value ->
+            ( { model | namespaces = model.namespaces |> RemoteData.map (editingNamespace namespace (\n -> { n | addLabel = n.addLabel |> Maybe.map (\l -> { l | value = value }) })) }, Cmd.none )
+
+        CancelAddingLabelToExistingNamespace namespace ->
+            ( { model | namespaces = model.namespaces |> RemoteData.map (editingNamespace namespace (\n -> { n | addLabel = Nothing })) }, Cmd.none )
+
+        AddLabelToExistingNamespace namespace newLabel ->
+            ( model, addLabelToNamespace model.configuration model.boundedContextId namespace newLabel )
+
+        LabelAddedToNamespace namespaces ->
+            ( { model | namespaces = initNamespace namespaces }, Cmd.none )
+
+
+viewAddLabelToExistingNamespace namespace model =
+    Form.row []
+        [ Form.col []
+            [ Form.label [] [ text "Label" ]
+            , Input.text [ Input.placeholder "Label name", Input.value model.name, Input.onInput (UpdateLabelNameForExistingNamespace namespace) ]
+            ]
+        , Form.col []
+            [ Form.label [] [ text "Value" ]
+            , Input.text [ Input.placeholder "Label value", Input.value model.value, Input.onInput (UpdateLabelValueForExistingNamespace namespace) ]
+            ]
+        , Form.col [ Col.bottomSm ]
+            [ ButtonGroup.buttonGroup []
+                [ ButtonGroup.button [ Button.secondary, Button.onClick (CancelAddingLabelToExistingNamespace namespace) ] [ text "Cancel" ]
+                , ButtonGroup.button [ Button.primary, Button.onClick (AddLabelToExistingNamespace namespace model) ] [ text "Add Label" ]
+                ]
+            ]
+        ]
 
 
 viewLabel namespace model =
@@ -188,30 +263,45 @@ viewLabel namespace model =
         Form.row []
             [ Form.colLabel [] [ text model.name ]
             , Form.col []
-                [ Input.text [ Input.value model.value ] ]
+                [ Input.text [ Input.disabled True, Input.value model.value ] ]
             , Form.col [ Col.bottomSm ]
                 [ Button.button [ Button.secondary, Button.onClick (RemoveLabelFromNamespace namespace model.id) ] [ text "X" ] ]
             ]
 
 
-viewNamespace model =
+viewNamespace : NamespaceModel -> Accordion.Card Msg
+viewNamespace { namespace, addLabel } =
     Accordion.card
-        { id = model.id
+        { id = namespace.id
         , options = []
-        , header = Accordion.header [] <| Accordion.toggle [] [ text model.name ]
+        , header = Accordion.header [] <| Accordion.toggle [] [ text namespace.name ]
         , blocks =
-            (model.labels
-                |> List.map (viewLabel model.id)
-                |> List.map List.singleton
-                |> List.map (Accordion.block [])
-            )
-                ++ [ Accordion.block []
-                        [ Block.custom <|
-                            Button.button
-                                [ Button.secondary, Button.onClick (RemoveNamespace model.id) ]
+            [ Accordion.block []
+                (namespace.labels |> List.map (viewLabel namespace.id))
+            , Accordion.block []
+                (case addLabel of
+                    Just label ->
+                        [ Block.custom <| viewAddLabelToExistingNamespace namespace.id label ]
+
+                    Nothing ->
+                        []
+                )
+            , Accordion.block []
+                [ Block.custom <|
+                    Grid.row []
+                        [ Grid.col []
+                            [ Button.button
+                                [ Button.primary, Button.onClick (AddingLabelToExistingNamespace namespace.id) ]
+                                [ text "Add Label" ]
+                            ]
+                        , Grid.col [ Col.textAlign Text.alignSmRight ]
+                            [ Button.button
+                                [ Button.secondary, Button.onClick (RemoveNamespace namespace.id), Button.attrs [ class "align-sm-right" ] ]
                                 [ text "Remove Namespace" ]
+                            ]
                         ]
-                   ]
+                ]
+            ]
         }
 
 
@@ -243,7 +333,7 @@ view model =
                         [ Button.primary
                         , Button.onClick StartAddingNamespace
                         ]
-                        [ text "add a namespace" ]
+                        [ text "Add a new Namespace" ]
 
                 Just newNamespace ->
                     viewNewNamespace newNamespace
@@ -304,6 +394,7 @@ namespaceEncoder model =
         , ( "labels", model.labels |> Array.toList |> Encode.list labelEncoder )
         ]
 
+
 loadNamespaces : Api.Configuration -> BoundedContextId -> Cmd Msg
 loadNamespaces config boundedContextId =
     Http.get
@@ -333,6 +424,7 @@ removeNamespace config boundedContextId namespace =
         , headers = []
         }
 
+
 removeLabelFromNamespace : Api.Configuration -> BoundedContextId -> NamespaceId -> LabelId -> Cmd Msg
 removeLabelFromNamespace config boundedContextId namespace label =
     Http.request
@@ -343,4 +435,13 @@ removeLabelFromNamespace config boundedContextId namespace label =
         , timeout = Nothing
         , tracker = Nothing
         , headers = []
+        }
+
+
+addLabelToNamespace : Api.Configuration -> BoundedContextId -> NamespaceId -> NewLabel -> Cmd Msg
+addLabelToNamespace config boundedContextId namespace label =
+    Http.post
+        { url = Api.boundedContext boundedContextId |> Api.url config |> Url.toString |> (\b -> b ++ "/namespaces/" ++ namespace ++ "/labels")
+        , body = Http.jsonBody <| labelEncoder label
+        , expect = Http.expectJson LabelAddedToNamespace (Decode.list namespaceDecoder)
         }

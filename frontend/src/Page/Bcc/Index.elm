@@ -449,7 +449,7 @@ viewItem communication { context, canvas, technical, namespaces } =
               [ text "Technical Description" ]
             ]
           ]
-        , Grid.col [ Col.textAlign Text.alignLgRight ]
+        , Grid.col [ Col.textAlign Text.alignSmRight ]
           [ ButtonGroup.buttonGroup [ ButtonGroup.small, ButtonGroup.attrs [ class "mt-auto", class "mb-auto" ] ]
             [ ButtonGroup.button
               [ Button.secondary

@@ -395,6 +395,7 @@ module Aggregates =
             | NewNamespace of BoundedContextId * NamespaceDefinition
             | RemoveNamespace of BoundedContextId * NamespaceId
             | RemoveLabel of BoundedContextId * RemoveLabel
+            | AddLabel of BoundedContextId * NamespaceId * LabelDefinition
 
         and NamespaceDefinition =
             { Name: string
@@ -405,14 +406,19 @@ module Aggregates =
         and RemoveLabel =
             { Namespace: NamespaceId
               Label: LabelId }
+            
+        module Label =
+            let create name value =
+                { Id = Guid.NewGuid()
+                  Name = name
+                  Value = value }
 
         let addNewNamespace name labels namespaces =
             let newLabels =
                 labels
                 |> List.map (fun label ->
-                    { Id = Guid.NewGuid()
-                      Name = label.Name
-                      Value = label.Value })
+                    Label.create label.Name label.Value
+                )
 
             let newNamespace =
                 { Id = Guid.NewGuid()
@@ -433,6 +439,16 @@ module Aggregates =
                 if n.Id = namespaceId then
                     { n with
                           Labels = n.Labels |> List.filter (fun l -> l.Id <> labelId) }
+                else
+                    n)
+            |> Ok
+            
+        let addLabel namespaceId name value (namespaces: Namespace list) =
+            namespaces
+            |> List.map (fun n ->
+                if n.Id = namespaceId then
+                    { n with
+                          Labels = n.Labels @ [ Label.create name value ] }
                 else
                     n)
             |> Ok
