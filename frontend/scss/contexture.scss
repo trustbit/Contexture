@@ -37,7 +37,11 @@
   }
   
   &.active
-  {
+  { 
     color: $primary;
   }
+}
+
+input:checked + label {
+  font-weight: 700;
 }
