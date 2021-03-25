@@ -3,6 +3,7 @@
 @import "bootstrap-required";
 @import "bootstrap-variables";
 @import "bootstrap";
+@import "accordion";
 
 .heading-1 {
   font-size: $font-size-base * 3.125;
@@ -31,13 +32,12 @@
 
 .btn-cancel {
   color: $secondary;
-  
+
   &:hover, &:active {
     color: $primary;
   }
-  
-  &.active
-  { 
+
+  &.active {
     color: $primary;
   }
 }

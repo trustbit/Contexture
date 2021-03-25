@@ -7,3 +7,9 @@ $enable-rounded: false;
 $btn-font-weight: 700;
 $btn-border-width: 2px;
 $btn-font-size: 0.875rem;
+
+$accordion-button-active-color: inherit;
+$accordion-button-active-bg: inherit;
+
+$accordion-button-icon: url("../node_modules/bootstrap-icons/icons/chevron-right.svg");
+$accordion-button-active-icon: url("../node_modules/bootstrap-icons/icons/chevron-up.svg");
