@@ -29,7 +29,7 @@ import BoundedContext.BoundedContextId exposing (BoundedContextId)
 import BoundedContext.Namespace exposing (..)
 import Html exposing (Html, button, div, text)
 import Html.Attributes exposing (..)
-import Html.Events exposing (onClick)
+import Html.Events exposing (onClick, onSubmit)
 import Http
 import Json.Decode as Decode exposing (Decoder)
 import Json.Decode.Pipeline as JP
@@ -42,11 +42,13 @@ import Url
 type alias NewLabel =
     { name : String
     , value : String
+    , isValid : Bool
     }
 
 
 type alias CreateNamespace =
     { name : String
+    , isValid : Bool
     , labels : Array NewLabel
     }
 
@@ -93,11 +95,12 @@ init config contextId =
 
 
 initNewLabel =
-    { name = "", value = "" }
+    { name = "", value = "", isValid = False }
 
 
 initNewNamespace =
     { name = ""
+    , isValid = False
     , labels = Array.empty
     }
 
@@ -167,6 +170,13 @@ removeLabel i a =
     Array.append a1 a2
 
 
+updateLabelName name label =
+    { label
+        | name = name
+        , isValid = not <| String.isEmpty name
+    }
+
+
 update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
     case msg of
@@ -180,13 +190,19 @@ update msg model =
             ( { model | newNamespace = Just initNewNamespace }, Cmd.none )
 
         ChangeNamespace name ->
-            ( { model | newNamespace = model.newNamespace |> Maybe.map (\namespace -> { namespace | name = name }) }, Cmd.none )
+            ( { model
+                | newNamespace =
+                    model.newNamespace
+                        |> Maybe.map (\namespace -> { namespace | name = name, isValid = not <| String.isEmpty name })
+              }
+            , Cmd.none
+            )
 
         AppendNewLabel ->
             ( { model | newNamespace = model.newNamespace |> Maybe.map appendNewLabel }, Cmd.none )
 
         UpdateLabelName index name ->
-            ( { model | newNamespace = model.newNamespace |> Maybe.map (updateLabel index (\l -> { l | name = name })) }, Cmd.none )
+            ( { model | newNamespace = model.newNamespace |> Maybe.map (updateLabel index (updateLabelName name)) }, Cmd.none )
 
         UpdateLabelValue index value ->
             ( { model | newNamespace = model.newNamespace |> Maybe.map (updateLabel index (\l -> { l | value = value })) }, Cmd.none )
@@ -224,7 +240,7 @@ update msg model =
             ( { model | namespaces = model.namespaces |> RemoteData.map (editingNamespace namespace (\n -> { n | addLabel = Just initNewLabel })) }, Cmd.none )
 
         UpdateLabelNameForExistingNamespace namespace name ->
-            ( { model | namespaces = model.namespaces |> RemoteData.map (editingNamespace namespace (\n -> { n | addLabel = n.addLabel |> Maybe.map (\l -> { l | name = name }) })) }, Cmd.none )
+            ( { model | namespaces = model.namespaces |> RemoteData.map (editingNamespace namespace (\n -> { n | addLabel = n.addLabel |> Maybe.map (updateLabelName name) })) }, Cmd.none )
 
         UpdateLabelValueForExistingNamespace namespace value ->
             ( { model | namespaces = model.namespaces |> RemoteData.map (editingNamespace namespace (\n -> { n | addLabel = n.addLabel |> Maybe.map (\l -> { l | value = value }) })) }, Cmd.none )
@@ -240,19 +256,32 @@ update msg model =
 
 
 viewAddLabelToExistingNamespace namespace model =
-    Form.row []
-        [ Form.col []
-            [ Form.label [] [ text "Label" ]
-            , Input.text [ Input.placeholder "Label name", Input.value model.name, Input.onInput (UpdateLabelNameForExistingNamespace namespace) ]
-            ]
-        , Form.col []
-            [ Form.label [] [ text "Value" ]
-            , Input.text [ Input.placeholder "Label value", Input.value model.value, Input.onInput (UpdateLabelValueForExistingNamespace namespace) ]
-            ]
-        , Form.col [ Col.bottomSm ]
-            [ ButtonGroup.buttonGroup []
-                [ ButtonGroup.button [ Button.secondary, Button.onClick (CancelAddingLabelToExistingNamespace namespace) ] [ text "Cancel" ]
-                , ButtonGroup.button [ Button.primary, Button.onClick (AddLabelToExistingNamespace namespace model) ] [ text "Add Label" ]
+    Form.form [ onSubmit (AddLabelToExistingNamespace namespace model) ]
+        [ Form.row []
+            [ Form.col []
+                [ Form.label [] [ text "Label" ]
+                , Input.text
+                    [ Input.placeholder "Label name"
+                    , Input.value model.name
+                    , if model.isValid then
+                        Input.success
+
+                      else
+                        Input.danger
+                    , Input.onInput (UpdateLabelNameForExistingNamespace namespace)
+                    ]
+                ]
+            , Form.col []
+                [ Form.label [] [ text "Value" ]
+                , Input.text [ Input.placeholder "Label value", Input.value model.value, Input.onInput (UpdateLabelValueForExistingNamespace namespace) ]
+                ]
+            , Form.col [ Col.bottomSm ]
+                [ ButtonGroup.buttonGroup []
+                    [ ButtonGroup.button [ Button.secondary, Button.onClick (CancelAddingLabelToExistingNamespace namespace), Button.attrs [ type_ "button" ] ] [ text "Cancel" ]
+                    , ButtonGroup.button
+                        [ Button.primary, Button.disabled (not <| model.isValid) ]
+                        [ text "Add Label" ]
+                    ]
                 ]
             ]
         ]
@@ -345,23 +374,41 @@ viewAddLabel index model =
     Form.row []
         [ Form.col []
             [ Form.label [] [ text "Label" ]
-            , Input.text [ Input.placeholder "Label name", Input.value model.name, Input.onInput (UpdateLabelName index) ]
+            , Input.text
+                [ Input.placeholder "Label name"
+                , Input.value model.name
+                , if model.isValid then
+                    Input.success
+
+                  else
+                    Input.danger
+                , Input.onInput (UpdateLabelName index)
+                ]
             ]
         , Form.col []
             [ Form.label [] [ text "Value" ]
             , Input.text [ Input.placeholder "Label value", Input.value model.value, Input.onInput (UpdateLabelValue index) ]
             ]
         , Form.col [ Col.bottomSm ]
-            [ Button.button [ Button.secondary, Button.onClick (RemoveLabel index) ] [ text "X" ] ]
+            [ Button.button [ Button.roleLink, Button.onClick (RemoveLabel index), Button.attrs [ type_ "button" ] ] [ text "X" ] ]
         ]
 
 
 viewNewNamespace model =
-    Form.form []
+    Form.form [ onSubmit (AddNamespace model) ]
         (Form.row []
             [ Form.col []
                 [ Form.label [ for "namespace" ] [ text "Namespace" ]
-                , Input.text [ Input.id "namespace", Input.placeholder "The name of namespace containing the labels", Input.onInput ChangeNamespace ]
+                , Input.text
+                    [ Input.id "namespace"
+                    , Input.placeholder "The name of namespace containing the labels"
+                    , Input.onInput ChangeNamespace
+                    , if model.isValid then
+                        Input.success
+
+                      else
+                        Input.danger
+                    ]
                 ]
             ]
             :: (model.labels |> Array.indexedMap viewAddLabel |> Array.toList)
@@ -371,7 +418,9 @@ viewNewNamespace model =
                     , Form.col [ Col.smAuto ]
                         [ ButtonGroup.buttonGroup []
                             [ ButtonGroup.button [ Button.secondary, Button.onClick CancelAddingNamespace ] [ text "Cancel" ]
-                            , ButtonGroup.button [ Button.primary, Button.onClick (AddNamespace model) ] [ text "Add Namespace" ]
+                            , ButtonGroup.button
+                                [ Button.primary, Button.disabled <| not model.isValid, Button.attrs [ type_ "submit" ] ]
+                                [ text "Add Namespace" ]
                             ]
                         ]
                     ]

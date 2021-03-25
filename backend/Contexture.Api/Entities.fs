@@ -390,6 +390,7 @@ module Aggregates =
 
     module Namespaces =
         open Entities
+        type Errors = | EmptyName
 
         type Command =
             | NewNamespace of BoundedContextId * NamespaceDefinition
@@ -408,15 +409,22 @@ module Aggregates =
               Label: LabelId }
             
         module Label =
-            let create name value =
-                { Id = Guid.NewGuid()
-                  Name = name
-                  Value = value }
+            let create name (value: string) =
+                if String.IsNullOrWhiteSpace name
+                then None
+                else Some  {
+                  Id = Guid.NewGuid()
+                  Name = name.Trim()
+                  Value =
+                      if not (isNull value)
+                      then value.Trim()
+                      else null 
+                }
 
         let addNewNamespace name labels namespaces =
             let newLabels =
                 labels
-                |> List.map (fun label ->
+                |> List.choose (fun label ->
                     Label.create label.Name label.Value
                 )
 
@@ -443,12 +451,16 @@ module Aggregates =
                     n)
             |> Ok
             
-        let addLabel namespaceId name value (namespaces: Namespace list) =
-            namespaces
-            |> List.map (fun n ->
-                if n.Id = namespaceId then
-                    { n with
-                          Labels = n.Labels @ [ Label.create name value ] }
-                else
-                    n)
-            |> Ok
+        let addLabel namespaceId labelName value (namespaces: Namespace list) =
+            match Label.create labelName value with
+            | Some label ->
+                namespaces
+                |> List.map (fun n ->
+                    if n.Id = namespaceId then
+                        { n with
+                              Labels = n.Labels @ [ label ] }
+                    else
+                        n)
+                |> Ok
+            | None ->
+                Error EmptyName
