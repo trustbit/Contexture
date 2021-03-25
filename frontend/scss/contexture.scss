@@ -1,4 +1,4 @@
-﻿@import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600;700&display=swap');
+﻿@import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700&display=swap');
 @import "bootstrap-colors";
 @import "bootstrap-required";
 @import "bootstrap-variables";
@@ -27,7 +27,7 @@
 }
 
 .text-danger, .text-success {
-  font-weight: 600;
+  font-weight: 500;
 }
 
 .btn-cancel {
@@ -44,4 +44,16 @@
 
 input:checked + label {
   font-weight: 700;
+}
+
+.form-text {
+  border-left: 2px solid $secondary;
+  font-weight: 500;
+  line-height: 2em;
+  margin-top: 0.75rem;
+  padding-left: 0.5rem;
+}
+
+.form-floating > textarea.form-control {
+  height: 10em;
 }
