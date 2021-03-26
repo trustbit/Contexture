@@ -42,6 +42,7 @@ let webApp hostFrontend =
                 Collaborations.routes
                 GET >=> route "/all" >=> allRoute
             ])
+        Search.routes
         hostFrontend
         setStatusCode 404 >=> text "Not Found" ]
 
