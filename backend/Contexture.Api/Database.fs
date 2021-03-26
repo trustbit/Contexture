@@ -9,18 +9,80 @@ open Contexture.Api.Entities
 
 module Database =
 
-    type Root =
-        { Version: int option
-          Domains: Domain list
-          BoundedContexts: BoundedContext list
-          Collaborations: Collaboration list
-          NamespaceTemplates: NamespaceTemplate list }
-        static member Empty =
-            { Version = None
-              Domains = []
-              BoundedContexts = []
-              Collaborations = []
-              NamespaceTemplates = [] }
+    type UpdateError<'Error> =
+        | EntityNotFoundInCollection of int
+        | ChangeError of 'Error
+
+    type Collection<'item>(itemsById: Map<int, 'item>) =
+
+        let nextId existingIds =
+            let highestId =
+                match existingIds with
+                | [] -> 0
+                | items -> items |> List.max
+
+            highestId + 1
+
+        let getById idValue = itemsById.TryFind idValue
+
+        let update idValue change =
+            match idValue |> getById with
+            | Some item ->
+                match change item with
+                | Ok updatedItem ->
+                    let itemsUpdated = itemsById |> Map.add idValue updatedItem
+
+
+                    Ok(Collection(itemsUpdated), updatedItem)
+                | Error e -> e |> ChangeError |> Error
+            | None -> idValue |> EntityNotFoundInCollection |> Error
+
+        let add seed =
+            let newId =
+                itemsById |> Map.toList |> List.map fst |> nextId
+
+            let newItem = seed newId
+            let updatedItems = itemsById |> Map.add newId newItem
+            Ok(Collection(updatedItems), newItem)
+
+        let remove idValue =
+            match idValue |> getById with
+            | Some item ->
+                let updatedItems = itemsById |> Map.remove idValue
+                Ok(Collection(updatedItems), Some item)
+            | None -> Ok(Collection(itemsById), None)
+
+        member __.ById idValue = getById idValue
+        member __.All = itemsById |> Map.toList |> List.map snd
+        member __.Update change idValue = update idValue change
+        member __.Add seed = add seed
+        member __.Remove idValue = remove idValue
+
+    let collectionOf (items: _ list) getId =
+        let collectionItems =
+            if items |> box |> isNull then [] else items
+
+        let byId =
+            collectionItems
+            |> List.map (fun i -> getId i, i)
+            |> Map.ofList
+
+        Collection(byId)
+
+    type Document =
+        { Domains: Collection<Domain>
+          BoundedContexts: Collection<BoundedContext>
+          Collaborations: Collection<Collaboration>
+          NamespaceTemplates: Collection<NamespaceTemplate> }
+
+    module Document =
+        let subdomainsOf (domains: Collection<Domain>) parentDomainId =
+            domains.All
+            |> List.where (fun x -> x.ParentDomainId = Some parentDomainId)
+
+        let boundedContextsOf (boundedContexts: Collection<BoundedContext>) domainId =
+            boundedContexts.All
+            |> List.where (fun x -> x.DomainId = domainId)
 
     module Persistence =
         let read path = path |> File.ReadAllText
@@ -33,6 +95,19 @@ module Database =
     module Serialization =
 
         open Newtonsoft.Json.Linq
+
+        type Root =
+            { Version: int option
+              Domains: Domain list
+              BoundedContexts: BoundedContext list
+              Collaborations: Collaboration list
+              NamespaceTemplates: NamespaceTemplate list }
+            static member Empty =
+                { Version = None
+                  Domains = []
+                  BoundedContexts = []
+                  Collaborations = []
+                  NamespaceTemplates = [] }
 
         let serializerOptions =
             let options =
@@ -152,82 +227,8 @@ module Database =
                 deserialize migratedJson
             | Some _ -> root
 
-    type UpdateError<'Error> =
-        | EntityNotFoundInCollection of int
-        | ChangeError of 'Error
-
-    type Collection<'item>(itemsById: Map<int, 'item>) =
-
-        let nextId existingIds =
-            let highestId =
-                match existingIds with
-                | [] -> 0
-                | items -> items |> List.max
-
-            highestId + 1
-
-        let getById idValue = itemsById.TryFind idValue
-
-        let update idValue change =
-            match idValue |> getById with
-            | Some item ->
-                match change item with
-                | Ok updatedItem ->
-                    let itemsUpdated = itemsById |> Map.add idValue updatedItem
-
-
-                    Ok(Collection(itemsUpdated), updatedItem)
-                | Error e -> e |> ChangeError |> Error
-            | None -> idValue |> EntityNotFoundInCollection |> Error
-
-        let add seed =
-            let newId =
-                itemsById |> Map.toList |> List.map fst |> nextId
-
-            let newItem = seed newId
-            let updatedItems = itemsById |> Map.add newId newItem
-            Ok(Collection(updatedItems), newItem)
-
-        let remove idValue =
-            match idValue |> getById with
-            | Some item ->
-                let updatedItems = itemsById |> Map.remove idValue
-                Ok(Collection(updatedItems), Some item)
-            | None -> Ok(Collection(itemsById), None)
-
-        member __.ById idValue = getById idValue
-        member __.All = itemsById |> Map.toList |> List.map snd
-        member __.Update change idValue = update idValue change
-        member __.Add seed = add seed
-        member __.Remove idValue = remove idValue
-
-    let collectionOf (items: _ list) getId =
-        let collectionItems =
-            if items |> box |> isNull then [] else items
-
-        let byId =
-            collectionItems
-            |> List.map (fun i -> getId i, i)
-            |> Map.ofList
-
-        Collection(byId)
-
-    type Document =
-        { Domains: Collection<Domain>
-          BoundedContexts: Collection<BoundedContext>
-          Collaborations: Collection<Collaboration>
-          NamespaceTemplates: Collection<NamespaceTemplate> }
-
-    module Document =
-        let subdomainsOf (domains: Collection<Domain>) parentDomainId =
-            domains.All
-            |> List.where (fun x -> x.ParentDomainId = Some parentDomainId)
-
-        let boundedContextsOf (boundedContexts: Collection<BoundedContext>) domainId =
-            boundedContexts.All
-            |> List.where (fun x -> x.DomainId = domainId)
-
     type FileBased(fileName: string) =
+
         let mutable (version, document) =
             Persistence.read fileName
             |> Serialization.deserialize
@@ -244,11 +245,11 @@ module Database =
             lock fileName (fun () ->
                 match change document with
                 | Ok (changed: Document, returnValue) ->
-                    { Version = version
-                      Domains = changed.Domains.All
-                      BoundedContexts = changed.BoundedContexts.All
-                      Collaborations = changed.Collaborations.All
-                      NamespaceTemplates = changed.NamespaceTemplates.All }
+                    { Serialization.Version = version
+                      Serialization.Domains = changed.Domains.All
+                      Serialization.BoundedContexts = changed.BoundedContexts.All
+                      Serialization.Collaborations = changed.Collaborations.All
+                      Serialization.NamespaceTemplates = changed.NamespaceTemplates.All }
                     |> Serialization.serialize
                     |> Persistence.save fileName
 
@@ -261,7 +262,7 @@ module Database =
             | "" -> ()
             | directoryPath -> Directory.CreateDirectory directoryPath |> ignore
 
-            Root.Empty
+            Serialization.Root.Empty
             |> Serialization.serialize
             |> Persistence.save path
 
