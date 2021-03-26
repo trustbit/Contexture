@@ -54,13 +54,7 @@ module BoundedContexts =
 
                     match BoundedContext.handle database command with
                     | Ok updatedContext ->
-                        let boundedContext =
-                            updatedContext
-                            |> database.Read.BoundedContexts.ById
-                            |> Option.get
-                            |> Results.convertBoundedContext
-
-                        return! json boundedContext next ctx
+                        return! redirectTo false (sprintf "/api/boundedcontexts/%i" updatedContext) next ctx
                     | Error (DomainError EmptyName) ->
                         return! RequestErrors.BAD_REQUEST "Name must not be empty" next ctx
                     | Error e -> return! ServerErrors.INTERNAL_ERROR e next ctx

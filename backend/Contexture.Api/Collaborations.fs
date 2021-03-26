@@ -20,12 +20,7 @@ module Collaborations =
 
                     match Collaboration.handle database command with
                     | Ok updatedContext ->
-                        let collaboration =
-                            updatedContext
-                            |> database.Read.Collaborations.ById
-                            |> Option.get
-
-                        return! json collaboration next ctx
+                        return! redirectTo false (sprintf "/api/collaborations/%i" updatedContext) next ctx
                     | Error (DomainError error) ->
                         return! RequestErrors.BAD_REQUEST (sprintf "Domain Error %A" error) next ctx
                     | Error e -> return! ServerErrors.INTERNAL_ERROR e next ctx

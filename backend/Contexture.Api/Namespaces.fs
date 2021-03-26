@@ -12,6 +12,15 @@ open Giraffe
 
 module Namespaces =
 
+    let private fetchNamespaces (database: FileBased) boundedContext =
+        boundedContext
+        |> database.Read.BoundedContexts.ById
+        |> Option.map (fun b ->
+            b.Namespaces
+            |> tryUnbox<Namespace list>
+            |> Option.defaultValue []
+        )
+
     module CommandEndpoints =
         open Namespaces
         open FileBasedCommandHandlers
@@ -23,12 +32,11 @@ module Namespaces =
 
                     match Namespaces.handle database command with
                     | Ok updatedContext ->
+                        // for namespaces we don't use redirects ATM
                         let boundedContext =
                             updatedContext
-                            |> database.Read.BoundedContexts.ById
-                            |> Option.map (fun b -> b.Namespaces)
+                            |> fetchNamespaces database 
                             |> Option.defaultValue []
-
                         return! json boundedContext next ctx
                     | Error (DomainError error) ->
                         return! RequestErrors.BAD_REQUEST (sprintf "Domain Error %A" error) next ctx
@@ -50,14 +58,9 @@ module Namespaces =
     let getNamespaces boundedContextId =
         fun (next: HttpFunc) (ctx: HttpContext) ->
             let database = ctx.GetService<FileBased>()
-            let document = database.Read
-
             let result =
-                document.BoundedContexts.ById boundedContextId
-                |> Option.map (fun b ->
-                    b.Namespaces
-                    |> tryUnbox<Namespace list>
-                    |> Option.defaultValue [])
+                boundedContextId
+                |> fetchNamespaces database
                 |> Option.map json
                 |> Option.defaultValue (RequestErrors.NOT_FOUND "No namespaces for BoundedContext found")
 

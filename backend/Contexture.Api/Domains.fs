@@ -93,13 +93,7 @@ module Domains =
 
                     match Domain.handle database command with
                     | Ok updatedDomain ->
-                        let domain =
-                            updatedDomain
-                            |> database.Read.Domains.ById
-                            |> Option.get
-                            |> Results.convertDomain
-
-                        return! json domain next ctx
+                        return! redirectTo false (sprintf "/api/domains/%i" updatedDomain) next ctx
                     | Error (DomainError EmptyName) ->
                         return! RequestErrors.BAD_REQUEST "Name must not be empty" next ctx
                     | Error e -> return! ServerErrors.INTERNAL_ERROR e next ctx
