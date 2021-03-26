@@ -13,12 +13,14 @@ module Database =
         { Version: int option
           Domains: Domain list
           BoundedContexts: BoundedContext list
-          Collaborations: Collaboration list }
+          Collaborations: Collaboration list
+          NamespaceTemplates: NamespaceTemplate list }
         static member Empty =
             { Version = None
               Domains = []
               BoundedContexts = []
-              Collaborations = [] }
+              Collaborations = []
+              NamespaceTemplates = [] }
 
     module Persistence =
         let read path = path |> File.ReadAllText
@@ -215,12 +217,21 @@ module Database =
         member __.Update change idValue = update idValue change
         member __.Add seed = add seed
         member __.Remove idValue = remove idValue
+    
+    let collectionOf (items: _ list) getId =
+        let collectionItems =
+            if items |> box |> isNull
+            then []
+            else items
+        
+        Collection(collectionItems, getId)
         
     type Document =
         {
             Domains: Collection<Domain>
             BoundedContexts: Collection<BoundedContext>
             Collaborations: Collection<Collaboration>
+            NamespaceTemplates: Collection<NamespaceTemplate>
         }
     
     module Document =
@@ -236,9 +247,10 @@ module Database =
             |> Serialization.deserialize
             |> fun root ->
                 let document = {
-                  Domains = Collection(root.Domains, fun d -> d.Id)
-                  BoundedContexts = Collection (root.BoundedContexts, fun d -> d.Id)
-                  Collaborations = Collection (root.Collaborations, fun d -> d.Id)
+                  Domains = collectionOf root.Domains (fun d -> d.Id)
+                  BoundedContexts = collectionOf root.BoundedContexts (fun d -> d.Id)
+                  Collaborations = collectionOf root.Collaborations (fun d -> d.Id)
+                  NamespaceTemplates = collectionOf root.NamespaceTemplates (fun d -> d.Id)
                 }
                 root.Version,document
                 
@@ -250,7 +262,8 @@ module Database =
                         Version = version
                         Domains = changed.Domains.All
                         BoundedContexts = changed.BoundedContexts.All
-                        Collaborations = changed.Collaborations.All                        
+                        Collaborations = changed.Collaborations.All
+                        NamespaceTemplates = changed.NamespaceTemplates.All
                     }
                     |> Serialization.serialize
                     |> Persistence.save fileName

@@ -18,6 +18,7 @@
     <Compile Include="Database.fs" />
     <Compile Include="FileBasedCommandHandlers.fs" />
     <Compile Include="Domains.fs" />
+    <Compile Include="Namespaces.fs" />
     <Compile Include="BoundedContexts.fs" />
     <Compile Include="Collaborations.fs" />
     <Compile Include="Program.fs" />

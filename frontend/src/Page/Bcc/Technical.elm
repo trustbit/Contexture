@@ -32,6 +32,8 @@ import BoundedContext exposing (BoundedContext)
 import BoundedContext.BoundedContextId exposing (BoundedContextId)
 import BoundedContext.Technical as Technical exposing(TechnicalDescription)
 
+import Page.Bcc.Edit.Namespaces as Namespaces
+
 import Domain as Domain
 
 type alias LifecycleModel =
@@ -58,9 +60,10 @@ type alias TechnicalModel =
   }
 
 type alias Model = 
-  { key: Nav.Key
+  { key : Nav.Key
   , self : Api.Configuration
-  , edit: RemoteData.WebData DescriptionModel
+  , namespaces : Namespaces.Model
+  , edit : RemoteData.WebData DescriptionModel
   }
 
 urlAsEmptyString url =
@@ -86,15 +89,19 @@ initDescriptionEdit model =
 init : Nav.Key -> Api.Configuration -> BoundedContextId -> (Model, Cmd Msg)
 init key config contextId =
   let
+    (namespacesModel, namespacesCmd) = Namespaces.init config contextId
     model =
       { key = key
       , self = config
       , edit = RemoteData.Loading
+      , namespaces = namespacesModel
       }
   in
     (
       model
-    , loadTechnical config contextId
+    , Cmd.batch
+      [ loadTechnical config contextId 
+      , namespacesCmd |> Cmd.map NamespacesMsg ]
     )
 
 
@@ -105,6 +112,7 @@ type Msg
   | ChangeIssueTracker String
   | ChangeWiki String
   | ChangeRepository String
+  | NamespacesMsg Namespaces.Msg
 
 updateEdit : (DescriptionModel -> DescriptionModel) -> Model -> Model
 updateEdit action model  =
@@ -153,6 +161,11 @@ update msg model =
     ChangeRepository url ->
       ( model |> updateEdit (\m -> m |> updateLifecycle (\l -> {l | repository = url})), Cmd.none)
 
+    NamespacesMsg namespacesMsg ->
+      Namespaces.update namespacesMsg model.namespaces
+      |> Tuple.mapFirst(\m -> { model | namespaces = m})
+      |> Tuple.mapSecond(\m -> m |> Cmd.map NamespacesMsg)
+
 
 view : Model -> Html Msg
 view model =
@@ -168,9 +181,7 @@ view model =
                 ]
             ]
           , viewTechnical edit
-          , Grid.row [ Row.attrs [ Spacing.mt3, Spacing.mb3 ] ]
-            [ Grid.col [] [ Html.hr [] [] ] ]
-          -- , viewActions edit
+          , model.namespaces |> Namespaces.view |> Html.map NamespacesMsg
           ]
         _ ->
           [ Grid.row []

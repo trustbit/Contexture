@@ -75,6 +75,31 @@ module Entities =
         { Tools: Lifecycle option
           Deployment: Deployment option }
 
+
+    type NamespaceTemplateId = int
+    type LabelTemplate = { Name: string }
+
+    type NamespaceTemplate =
+        { Id: NamespaceTemplateId
+          Name: string
+          Template: LabelTemplate list }
+
+    type LabelId = Guid
+
+    type Label =
+        { Id: LabelId
+          Name: string
+          Value: string }
+
+    type NamespaceId = Guid
+
+    type Namespace =
+        { Id: NamespaceId
+          Template: NamespaceTemplateId option
+          Name: string
+          Labels: Label list }
+
+
     type DomainId = int
     type BoundedContextId = int
 
@@ -89,7 +114,8 @@ module Entities =
           UbiquitousLanguage: Map<string, UbiquitousLanguageTerm>
           Messages: Messages
           DomainRoles: DomainRole list
-          TechnicalDescription: TechnicalDescription option }
+          TechnicalDescription: TechnicalDescription option
+          Namespaces: Namespace list }
 
     type Domain =
         { Id: DomainId
@@ -149,7 +175,6 @@ module Entities =
           Initiator: Collaborator
           Recipient: Collaborator
           RelationshipType: RelationshipType option }
-
 
 module Aggregates =
 
@@ -214,7 +239,6 @@ module Aggregates =
                           |> Option.ofObj
                           |> Option.filter (String.IsNullOrWhiteSpace >> not) }
 
-
     module BoundedContext =
         open Entities
 
@@ -277,7 +301,8 @@ module Aggregates =
                   UbiquitousLanguage = Map.empty
                   Messages = Messages.Empty
                   DomainRoles = []
-                  TechnicalDescription = None })
+                  TechnicalDescription = None
+                  Namespaces = [] })
 
         let updateTechnicalDescription description context =
             Ok
@@ -341,10 +366,6 @@ module Aggregates =
             | DefineInboundConnection of DefineConnection
             | RemoveConnection of CollaborationId
 
-        and CreateCollaboration =
-            class
-            end
-
         and DefineRelationship =
             { RelationshipType: RelationshipType option }
 
@@ -365,3 +386,81 @@ module Aggregates =
                   Initiator = initiator
                   Recipient = recipient
                   RelationshipType = None }
+
+
+    module Namespaces =
+        open Entities
+        type Errors = | EmptyName
+
+        type Command =
+            | NewNamespace of BoundedContextId * NamespaceDefinition
+            | RemoveNamespace of BoundedContextId * NamespaceId
+            | RemoveLabel of BoundedContextId * RemoveLabel
+            | AddLabel of BoundedContextId * NamespaceId * LabelDefinition
+
+        and NamespaceDefinition =
+            { Name: string
+              Labels: LabelDefinition list }
+
+        and LabelDefinition = { Name: string; Value: string }
+
+        and RemoveLabel =
+            { Namespace: NamespaceId
+              Label: LabelId }
+            
+        module Label =
+            let create name (value: string) =
+                if String.IsNullOrWhiteSpace name
+                then None
+                else Some  {
+                  Id = Guid.NewGuid()
+                  Name = name.Trim()
+                  Value =
+                      if not (isNull value)
+                      then value.Trim()
+                      else null 
+                }
+
+        let addNewNamespace name labels namespaces =
+            let newLabels =
+                labels
+                |> List.choose (fun label ->
+                    Label.create label.Name label.Value
+                )
+
+            let newNamespace =
+                { Id = Guid.NewGuid()
+                  Template = None
+                  Name = name
+                  Labels = newLabels }
+
+            Ok(namespaces @ [ newNamespace ])
+
+        let removeNamespace (namespaceId: NamespaceId) (namespaces: Namespace list) =
+            namespaces
+            |> List.filter (fun n -> n.Id <> namespaceId)
+            |> Ok
+
+        let removeLabel namespaceId labelId (namespaces: Namespace list) =
+            namespaces
+            |> List.map (fun n ->
+                if n.Id = namespaceId then
+                    { n with
+                          Labels = n.Labels |> List.filter (fun l -> l.Id <> labelId) }
+                else
+                    n)
+            |> Ok
+            
+        let addLabel namespaceId labelName value (namespaces: Namespace list) =
+            match Label.create labelName value with
+            | Some label ->
+                namespaces
+                |> List.map (fun n ->
+                    if n.Id = namespaceId then
+                        { n with
+                              Labels = n.Labels @ [ label ] }
+                    else
+                        n)
+                |> Ok
+            | None ->
+                Error EmptyName

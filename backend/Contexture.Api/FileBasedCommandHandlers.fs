@@ -203,3 +203,45 @@ module FileBasedCommandHandlers =
             | DefineInboundConnection connection -> create database connection
             | DefineOutboundConnection connection -> create database connection
             | RemoveConnection collaborationId -> remove database collaborationId
+
+    module Namespaces =
+        open Entities
+        open Namespaces        
+        let private updateBoundedContextsIn (document: Document) =
+            Result.map (fun (contexts, item) ->
+                { document with
+                      BoundedContexts = contexts },
+                item)
+        let private updateNamespaces (database: FileBased) contextId update =
+            let updateNamespacesOnly (boundedContext: BoundedContext) =
+                boundedContext.Namespaces
+                |> tryUnbox<Namespace list>
+                |> Option.defaultValue []
+                |> update
+                |> Result.map (fun namespaces -> { boundedContext with Namespaces = namespaces })
+                
+            let changed =
+                database.Change(fun document ->
+                    contextId
+                    |> document.BoundedContexts.Update updateNamespacesOnly
+                    |> updateBoundedContextsIn document)
+
+            match changed with
+            | Ok _ -> Ok contextId
+            | Error (ChangeError e) -> Error(DomainError e)
+            | Error (EntityNotFoundInCollection id) ->
+                id
+                |> EntityNotFound
+                |> InfrastructureError
+                |> Error
+        
+        let handle (database: FileBased) (command: Command) =
+            match command with
+            | NewNamespace (boundedContextId, namespaceCommand) ->
+                updateNamespaces database boundedContextId (addNewNamespace namespaceCommand.Name namespaceCommand.Labels)
+            | RemoveNamespace (boundedContextId, namespaceCommand) ->
+                updateNamespaces database boundedContextId (removeNamespace namespaceCommand)
+            | RemoveLabel (boundedContextId, namespaceCommand) ->
+                updateNamespaces database boundedContextId (removeLabel namespaceCommand.Namespace namespaceCommand.Label)
+            | AddLabel(boundedContextId, namespaceId, namespaceCommand) ->
+                updateNamespaces database boundedContextId (addLabel namespaceId namespaceCommand.Name namespaceCommand.Value)

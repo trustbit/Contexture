@@ -25,7 +25,8 @@ module BoundedContexts =
               Messages: Messages
               DomainRoles: DomainRole list
               TechnicalDescription: TechnicalDescription option
-              Domain: Domain option }
+              Domain: Domain option
+              Namespaces: Namespace list }
 
         let convertBoundedContextWithDomain (database: Document) (boundedContext: BoundedContext) =
             { Id = boundedContext.Id
@@ -39,7 +40,8 @@ module BoundedContexts =
               Messages = boundedContext.Messages
               DomainRoles = boundedContext.DomainRoles
               TechnicalDescription = boundedContext.TechnicalDescription
-              Domain = database.Domains.ById boundedContext.DomainId }
+              Domain = database.Domains.ById boundedContext.DomainId
+              Namespaces = boundedContext.Namespaces }
 
     module CommandEndpoints =
         open BoundedContext
@@ -133,7 +135,8 @@ module BoundedContexts =
         subRouteCi
             "/boundedcontexts"
             (choose [ subRoutef "/%i" (fun contextId ->
-                          (choose [ GET >=> getBoundedContext contextId
+                          (choose [ Namespaces.routes contextId
+                                    GET >=> getBoundedContext contextId
                                     POST
                                     >=> route "/technical"
                                     >=> bindJson (CommandEndpoints.technical contextId)
