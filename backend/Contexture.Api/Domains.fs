@@ -76,7 +76,7 @@ module Domains =
         open Aggregates.Domain
         open FileBasedCommandHandlers
 
-        let remove domainId =
+        let removeAndReturnId domainId =
             fun (next: HttpFunc) (ctx: HttpContext) ->
                 task {
                     let database = ctx.GetService<FileBased>()
@@ -130,16 +130,11 @@ module Domains =
 
                     match BoundedContext.handle database (CreateBoundedContext(domainId, command)) with
                     | Ok addedContext ->
-                        let context =
-                            addedContext
-                            |> database.Read.BoundedContexts.ById
-                            |> Option.get
-                            |> Results.convertBoundedContext
-
-                        return! json context next ctx
+                        return! redirectTo false (sprintf "/api/boundedcontexts/%i" addedContext) next ctx
                     | Error (DomainError Aggregates.BoundedContext.EmptyName) ->
                         return! RequestErrors.BAD_REQUEST "Name must not be empty" next ctx
-                    | Error e -> return! ServerErrors.INTERNAL_ERROR e next ctx
+                    | Error e ->
+                        return! ServerErrors.INTERNAL_ERROR e next ctx
                 }
 
     let getDomains =
@@ -220,7 +215,7 @@ module Domains =
                                     >=> route "/key"
                                     >=> bindJson (CommandEndpoints.assignKey domainId)
 
-                                    DELETE >=> CommandEndpoints.remove domainId
+                                    DELETE >=> CommandEndpoints.removeAndReturnId domainId
 
                                      ]))
                       GET >=> getDomains

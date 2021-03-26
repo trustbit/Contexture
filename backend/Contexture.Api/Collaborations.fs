@@ -40,7 +40,7 @@ module Collaborations =
         let inboundConnection (command: DefineConnection) =
             updateAndReturnCollaboration (DefineOutboundConnection(command))
 
-        let remove collaborationId =
+        let removeAndReturnId collaborationId =
             fun (next: HttpFunc) (ctx: HttpContext) ->
                 task {
                     let database = ctx.GetService<FileBased>()
@@ -78,7 +78,7 @@ module Collaborations =
                                    POST
                                    >=> route "/relationship"
                                    >=> bindJson (CommandEndpoints.defineRelationship collaborationId)
-                                   DELETE >=> CommandEndpoints.remove collaborationId ])
+                                   DELETE >=> CommandEndpoints.removeAndReturnId collaborationId ])
                       POST
                       >=> route "/outboundConnection"
                       >=> bindJson CommandEndpoints.outboundConnection

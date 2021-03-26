@@ -96,13 +96,13 @@ module BoundedContexts =
         let messages contextId (command: UpdateMessages) =
             updateAndReturnBoundedContext (UpdateMessages(contextId, command))
 
-        let remove contextId =
+        let removeAndReturnId contextId =
             fun (next: HttpFunc) (ctx: HttpContext) ->
                 task {
                     let database = ctx.GetService<FileBased>()
 
                     match BoundedContext.handle database (RemoveBoundedContext contextId) with
-                    | Ok domainId -> return! json domainId next ctx
+                    | Ok id -> return! json id next ctx
                     | Error e -> return! ServerErrors.INTERNAL_ERROR e next ctx
                 }
 
@@ -167,5 +167,5 @@ module BoundedContexts =
                                     POST
                                     >=> route "/messages"
                                     >=> bindJson (CommandEndpoints.messages contextId)
-                                    DELETE >=> CommandEndpoints.remove contextId ]))
+                                    DELETE >=> CommandEndpoints.removeAndReturnId contextId ]))
                       GET >=> getBoundedContexts ])
