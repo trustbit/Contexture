@@ -1,0 +1,219 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>UI Elements</title>
+    <link rel="stylesheet" href="css/contexture.css"/>
+    <link rel="stylesheet" href="css/ui-elements.css"/>
+    <link rel="stylesheet" href="node_modules/bootstrap-icons/font/bootstrap-icons.css">
+</head>
+<body class="container">
+
+<h1 class="display-5">Colors</h1>
+
+<section class="row">
+    <figure class="d-flex col-2 flex-column align-items-center">
+        <div class="color-swatch bg-primary"></div>
+        <figcaption class="text-center">Primary</figcaption>
+    </figure>
+    <figure class="d-flex col-2 flex-column align-items-center">
+        <div class="color-swatch bg-secondary"></div>
+        <figcaption class="text-center">Secondary</figcaption>
+    </figure>
+    <figure class="d-flex col-2 flex-column align-items-center">
+        <div class="color-swatch bg-danger"></div>
+        <figcaption class="text-center">Error</figcaption>
+    </figure>
+    <figure class="d-flex col-2 flex-column align-items-center">
+        <div class="color-swatch bg-success"></div>
+        <figcaption class="text-center">Success</figcaption>
+    </figure>
+    <figure class="d-flex col-2 flex-column align-items-center">
+        <div class="color-swatch bg-light"></div>
+        <figcaption class="text-center">Light background</figcaption>
+    </figure>
+</section>
+
+<h1 class="display-5">Typography</h1>
+
+<h1 class="heading-1">Heading style 1</h1>
+<h2 class="heading-2">Heading style 2</h2>
+<h3 class="heading-3">Heading style 3</h3>
+
+<p class="text-danger">Error message</p>
+<p class="text-success">Success message</p>
+<p>Regular text</p>
+<p class="text-info">Informational text</p>
+
+<h1 class="display-5">Atoms</h1>
+
+<h2 class="display-6">Buttons</h2>
+
+<section class="row">
+    <figure class="d-flex col-2 flex-column align-items-center">
+        <button class="btn btn-outline-primary">Save</button>
+        <figcaption class="text-center">Default</figcaption>
+    </figure>
+    <figure class="d-flex col-2 flex-column align-items-center">
+        <button class="btn btn-outline-primary active">Save</button>
+        <figcaption class="text-center">Hover</figcaption>
+    </figure>
+</section>
+
+<section class="row">
+    <figure class="d-flex col-2 flex-column align-items-center">
+        <button class="btn btn-cancel">Cancel</button>
+        <figcaption class="text-center">Default</figcaption>
+    </figure>
+    <figure class="d-flex col-2 flex-column align-items-center">
+        <button class="btn btn-cancel active">Cancel</button>
+        <figcaption class="text-center">Hover</figcaption>
+    </figure>
+</section>
+
+<h2 class="display-6">Radiobuttons and checkboxes</h2>
+
+<section class="row">
+    <div class="col-8">
+        <div class="form-check">
+            <input id="radiobutton-inactive" name="radio" type="radio" class="form-check-input">
+            <label for="radiobutton-inactive" class="form-check-label">Radiobutton inactive</label>
+        </div>
+        <div class="form-check">
+            <input id="radiobutton-active" name="radio" type="radio" class="form-check-input" checked>
+            <label for="radiobutton-active" class="form-check-label">Radiobutton active</label>
+        </div>
+    </div>
+</section>
+
+<section class="row">
+    <div class="col-8">
+        <div class="form-check">
+            <input id="checkbox-inactive" type="checkbox" class="form-check-input">
+            <label for="checkbox-inactive" class="form-check-label">Radiobutton inactive</label>
+        </div>
+        <div class="form-check">
+            <input id="checkbox-active" name="radio" type="checkbox" class="form-check-input" checked>
+            <label for="checkbox-active" class="form-check-label">Radiobutton active</label>
+        </div>
+    </div>
+</section>
+
+<h1 class="display-5">Accordions</h1>
+
+<div class="accordion" id="accordionExample">
+    <div class="accordion-item">
+        <h2 class="accordion-header" id="headingOne">
+            <button class="accordion-button" type="button" data-bs-toggle="collapse" data-bs-target="#collapseOne"
+                    aria-expanded="true" aria-controls="collapseOne">
+                Accordion Title #1
+            </button>
+        </h2>
+        <div id="collapseOne" class="accordion-collapse collapse show" aria-labelledby="headingOne"
+             data-bs-parent="#accordionExample">
+            <div class="accordion-body">
+                Vestibulum ante ipsum primis in faucibus orci luctus et ultrices posuere cubilia curae; Pellentesque
+                maximus neque a velit hendrerit, laoreet luctus dolor consectetur. Sed tempor efficitur elit, vel congue
+                metus pellentesque at. Proin ex enim, feugiat vel sodales sed, euismod vitae lorem. Nulla sodales
+                venenatis fringilla. Nulla et maximus velit. Nulla eu ultrices libero. Donec diam tortor, luctus eget
+                lobortis nec, auctor eu mauris.
+            </div>
+        </div>
+    </div>
+    <div class="accordion-item">
+        <h2 class="accordion-header" id="headingTwo">
+            <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse"
+                    data-bs-target="#collapseTwo" aria-expanded="false" aria-controls="collapseTwo">
+                Accordion Title #2
+            </button>
+        </h2>
+        <div id="collapseTwo" class="accordion-collapse collapse" aria-labelledby="headingTwo"
+             data-bs-parent="#accordionExample">
+            <div class="accordion-body">
+                Vestibulum ante ipsum primis in faucibus orci luctus et ultrices posuere cubilia curae; Pellentesque
+                maximus neque a velit hendrerit, laoreet luctus dolor consectetur. Sed tempor efficitur elit, vel congue
+                metus pellentesque at. Proin ex enim, feugiat vel sodales sed, euismod vitae lorem. Nulla sodales
+                venenatis fringilla. Nulla et maximus velit. Nulla eu ultrices libero. Donec diam tortor, luctus eget
+                lobortis nec, auctor eu mauris.
+            </div>
+        </div>
+    </div>
+</div>
+
+<h1 class="display-5">Input fields</h1>
+
+<div class="row">
+    <div class="col-6">
+        <h2>Input field</h2>
+        <div class="form-floating">
+            <input id="simple-input" class="form-control" placeholder="First name">
+            <label for="simple-input">First name</label>
+        </div>
+    </div>
+
+    <div class="col-6">
+        <h2>Input field with info text</h2>
+        <div class="form-floating">
+            <input id="simple-input-info" class="form-control" placeholder="First name">
+            <label for="simple-input-info">First name</label>
+            <div class="form-text">
+                To help us identify you next time, please enter your first name
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-6">
+        <h2>Text field</h2>
+        <div class="form-floating">
+            <textarea id="text-input" class="form-control" placeholder="First name"></textarea>
+            <label for="text-input">First name</label>
+        </div>
+    </div>
+
+    <div class="col-6">
+        <h2>Text field with info text</h2>
+        <div class="form-floating">
+            <textarea id="text-input-info" class="form-control" placeholder="First name"></textarea>
+            <label for="text-input-info">First name</label>
+            <div class="form-text">
+                To help us identify you next time, please enter your first name
+            </div>
+        </div>
+    </div>
+</div>
+
+<h1 class="display-5">Components</h1>
+
+<div class="row">
+    <div class="col-6 form form-inactive">
+        <div class="form-title">
+            <h3>Description</h3>
+            <div class="bi-pencil-square"></div>
+        </div>
+        <p>This is a test</p>
+    </div>
+    <div class="col-6 form form-active">
+        <div class="form-title">
+            <h3>Description</h3>
+            <div class="bi-pencil-square"></div>
+        </div>
+        <div class="form-floating">
+            <textarea id="text-input-form" class="form-control" placeholder="First name"></textarea>
+            <label for="text-input-form">First name</label>
+        </div>
+        <div class="form-text">
+            To help us identify you next time, please enter your first name
+        </div>
+        <div class="button-row">
+            <button class="btn btn-cancel">Cancel</button>
+            <button class="btn btn-outline-primary">Save</button>
+        </div>
+    </div>
+</div>
+
+<script src="node_modules/jquery/dist/jquery.slim.min.js"></script>
+<script src="node_modules/bootstrap/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>

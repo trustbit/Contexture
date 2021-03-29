@@ -1,0 +1,100 @@
+﻿@import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700&display=swap');
+@import "bootstrap-colors";
+@import "bootstrap-required";
+@import "bootstrap-variables";
+@import "bootstrap";
+@import "accordion";
+
+.heading-1 {
+  font-size: $font-size-base * 3.125;
+  font-weight: 700;
+}
+
+.heading-2 {
+  font-size: $font-size-base * 1.75;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.heading-3 {
+  color: $primary;
+  font-size: $font-size-base * 1.125;
+  font-weight: 700;
+}
+
+.text-danger, .text-success, .text-info {
+  font-size: 0.875rem;
+}
+
+.text-danger, .text-success {
+  font-weight: 500;
+}
+
+.btn-cancel {
+  color: $secondary;
+
+  &:hover, &:active {
+    color: $primary;
+  }
+
+  &.active {
+    color: $primary;
+  }
+}
+
+input:checked + label {
+  font-weight: 700;
+}
+
+.form-text {
+  border-left: 2px solid $secondary;
+  font-weight: 500;
+  line-height: 2em;
+  margin-top: 0.75rem;
+  padding-left: 0.5rem;
+}
+
+.form-floating > textarea.form-control {
+  height: 10em;
+}
+
+.form-floating label {
+  color: #a3a6ac;
+  opacity: 1 !important;
+}
+
+.form-title {
+  display: flex;
+  justify-content: space-between;
+  
+  div.bi-pencil-square {
+    font-size: $font-size-base * 1.25;
+    color: $secondary;
+    cursor: pointer;
+
+    &:hover, &:active {
+      color: $primary;
+    }
+  }
+  
+  h3 {
+    font-size: $font-size-base * 1.25;
+    font-weight: 700;
+    text-transform: uppercase;
+  }
+}
+
+.form {
+  border-radius: 1rem;
+  padding: 2rem;
+}
+
+.form .button-row {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 1rem;
+}
+
+.form-active {
+  background-color: $light;
+}
