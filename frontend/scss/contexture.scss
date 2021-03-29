@@ -57,3 +57,44 @@ input:checked + label {
 .form-floating > textarea.form-control {
   height: 10em;
 }
+
+.form-floating label {
+  color: #a3a6ac;
+  opacity: 1 !important;
+}
+
+.form-title {
+  display: flex;
+  justify-content: space-between;
+  
+  div.bi-pencil-square {
+    font-size: $font-size-base * 1.25;
+    color: $secondary;
+    cursor: pointer;
+
+    &:hover, &:active {
+      color: $primary;
+    }
+  }
+  
+  h3 {
+    font-size: $font-size-base * 1.25;
+    font-weight: 700;
+    text-transform: uppercase;
+  }
+}
+
+.form {
+  border-radius: 1rem;
+  padding: 2rem;
+}
+
+.form .button-row {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 1rem;
+}
+
+.form-active {
+  background-color: $light;
+}
