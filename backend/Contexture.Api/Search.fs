@@ -50,8 +50,26 @@ module Search =
 
         let documentTemplate (head: XmlNode) (body: XmlNode) = html [] [ head; body ]
 
+        let embedElm name =
+            script [ _src (sprintf "/js/%s.js" name) ] []
+            
+        let initElm name node =
+            script [] [
+                rawText (sprintf "
+  var app = Elm.%s.init({
+    node: document.getElementById('%s'),
+    flags: Date.now()
+  }); " name node)
+            ]
         let index =
-            documentTemplate headTemplate (bodyTemplate (Text "Hello World"))
+            let searchSnipped =
+                div []
+                    [ embedElm "Page.Search"
+                      div [ _id "search" ][]
+                      initElm "Page.Search" "search"
+                    ]
+                
+            documentTemplate headTemplate (bodyTemplate searchSnipped)
 
 
     let routes: HttpHandler =
