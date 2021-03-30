@@ -447,3 +447,4 @@ elm-stuff/
 data/
 frontend/index.html
 frontend/css/*
+frontend/src/dummy.elm
