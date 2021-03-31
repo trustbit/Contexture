@@ -39,7 +39,7 @@
     "assets/",
     "node_modules/"
   ],
-  "bundleDependencies": [
+  "bundledDependencies": [
     "bootstrap",
     "bootstrap-icons",
     "jquery"
