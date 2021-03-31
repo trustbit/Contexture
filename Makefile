@@ -12,11 +12,14 @@ publish-backend:
         -o artifacts/backend
 
 build-app:
-	cd frontend && elm make src/Main.elm
+	cd frontend && npm run build
 
 publish-app:
 	mkdir -p artifacts/frontend
-	cd frontend && elm make src/Main.elm --output=../artifacts/frontend/index.html
+	cd frontend && npm pack
+	mv frontend/*.tgz artifacts/frontend
+	cd artifacts/frontend && tar xf *.tgz --strip=1 package/
+	rm artifacts/frontend/*.tgz
 
 prepare-image: publish-backend publish-app
 	mkdir -p artifacts/image/wwwroot
