@@ -6,18 +6,16 @@
     "css:compile": "node-sass --include-path node_modules --output-style compressed --source-map true --source-map-contents true --precision 6 scss/ -o assets/css/",
     "css:prefix": "postcss --replace assets/css/contexture.css --use autoprefixer --map",
     "css:build": "npm-run-all css:compile css:prefix",
-    
     "elm:reload": "nodetouch src/dummy.elm",
     "elm:build": "elm make src/Main.elm --output=assets/js/Contexture.js",
     "elm:start": "elm-live src/Main.elm --open --pushstate -- --output=assets/js/Contexture.js",
-
     "build": "npm-run-all css:build elm:build",
-    
     "watch": "nodemon -e scss -x \"npm-run-all css:compile-dev elm:reload\"",
     "start": "npm-run-all -p elm:start watch"
   },
   "devDependencies": {
     "autoprefixer": "~10.2.5",
+    "bootstrap": "~5.0.0-beta3",
     "elm": "~0.19.1-5",
     "elm-live": "~4.0.2",
     "node-sass": "~5.0.0",
@@ -29,9 +27,7 @@
     "touch": "~3.1.0"
   },
   "dependencies": {
-    "bootstrap": "~5.0.0-beta3",
-    "bootstrap-icons": "~1.4.0",
-    "jquery": "~3.6.0"
+    "bootstrap-icons": "~1.4.0"
   },
   "main": "index.html",
   "files": [
@@ -39,9 +35,8 @@
     "assets/",
     "node_modules/"
   ],
-  "bundledDependencies": [
-    "bootstrap",
+  "bundleDependencies": [
     "bootstrap-icons",
-    "jquery"
+    "bootstrap"
   ]
 }
