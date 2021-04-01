@@ -10,7 +10,8 @@ open Contexture.Api.Entities
 module Database =
 
     open System
-    type UpdateError<'Error,'Id> =
+
+    type UpdateError<'Error, 'Id> =
         | EntityNotFoundInCollection of 'Id
         | DuplicateKey of 'Id
         | ChangeError of 'Error
@@ -59,10 +60,10 @@ module Database =
         member __.Update change idValue = update idValue change
         member __.Add seed = add seed
         member __.Remove idValue = remove idValue
-        
-        
+
+
     type CollectionOfGuid<'item>(itemsById: Map<Guid, 'item>) =
-        
+
         let getById idValue = itemsById.TryFind idValue
 
         let update idValue change =
@@ -78,9 +79,9 @@ module Database =
             | None -> idValue |> EntityNotFoundInCollection |> Error
 
         let add newId item =
-            if itemsById.ContainsKey newId
-            then newId |> DuplicateKey |> Error
-            else 
+            if itemsById.ContainsKey newId then
+                newId |> DuplicateKey |> Error
+            else
                 let updatedItems = itemsById |> Map.add newId item
                 Ok(CollectionOfGuid(updatedItems), item)
 
@@ -96,7 +97,7 @@ module Database =
         member __.Update change idValue = update idValue change
         member __.Add newId item = add newId item
         member __.Remove idValue = remove idValue
-        
+
 
     let collectionOfInt (items: _ list) getId =
         let collectionItems =
@@ -108,7 +109,7 @@ module Database =
             |> Map.ofList
 
         CollectionOfInt(byId)
-    
+
     let collectionOfGuid (items: _ list) getId =
         let collectionItems =
             if items |> box |> isNull then [] else items
@@ -184,12 +185,10 @@ module Database =
             |> JsonSerializer.Serialize
 
         module Migrations =
-            open System
             module IdentityHash =
-                
                 open System.Text
                 open System.Security.Cryptography
-                
+
                 let private swapByteOrderPairs (bytes: byte []): byte [] =
                     Array.mapi (fun index value ->
                         match index with
@@ -203,13 +202,19 @@ module Database =
                         | 7 -> Array.get bytes 6
                         | _ -> value) bytes
 
-                let buildNamespace (namespaceId:Guid) = swapByteOrderPairs (namespaceId.ToByteArray())
+                let buildNamespace (namespaceId: Guid) =
+                    swapByteOrderPairs (namespaceId.ToByteArray())
 
-                let generate namespaceBytes (identitierName:string) : Guid =
+                let generate namespaceBytes (identitierName: string): Guid =
                     let inputBytes = Encoding.UTF8.GetBytes(identitierName)
+
                     using (SHA1.Create()) (fun algorithm ->
-                        algorithm.TransformBlock(namespaceBytes, 0, namespaceBytes.Length, null, 0) |> ignore
-                        algorithm.TransformFinalBlock(inputBytes, 0, inputBytes.Length) |> ignore
+                        algorithm.TransformBlock(namespaceBytes, 0, namespaceBytes.Length, null, 0)
+                        |> ignore
+
+                        algorithm.TransformFinalBlock(inputBytes, 0, inputBytes.Length)
+                        |> ignore
+
                         let result =
                             Array.truncate 16 algorithm.Hash
                             |> Array.mapi (fun index (value: byte) ->
@@ -218,9 +223,11 @@ module Database =
                                 | 8 -> (value &&& 0x3Fuy) ||| 0x80uy
                                 | _ -> Array.get algorithm.Hash index)
                             |> swapByteOrderPairs
+
                         Guid(result))
 
-            let private CollaborationNamespaceBytes = IdentityHash.buildNamespace (Guid("d24eb67c-1aed-4995-986b-5442c074549a"))
+            let private CollaborationNamespaceBytes =
+                IdentityHash.buildNamespace (Guid("d24eb67c-1aed-4995-986b-5442c074549a"))
 
             let processId identityNamespace (token: JToken) =
                 let obj = token :?> JObject
@@ -228,17 +235,19 @@ module Database =
                 let idProperty =
                     obj.Property("id")
                     |> Option.ofObj
-                    |> Option.bind (fun p -> p.Value |> Option.ofObj |> Option.bind (tryUnbox<JValue>))
+                    |> Option.bind (fun p ->
+                        p.Value
+                        |> Option.ofObj
+                        |> Option.bind (tryUnbox<JValue>))
 
                 match idProperty with
                 | Some idValue ->
                     let newId =
                         idValue.Value.ToString()
                         |> IdentityHash.generate identityNamespace
-                        
-                    obj.Property("id").Value <- JValue(newId) 
+                    obj.Property("id").Value <- JValue(newId)
                 | None -> ()
-            
+
             let toVersion1 (json: string) =
                 let root = JObject.Parse json
 
@@ -252,6 +261,7 @@ module Database =
                         | "customer" -> "Customer"
                         | "supplier" -> "Supplier"
                         | other -> other
+
                     token.["initiatorRole"] <- JValue(newValue)
                     token
 
@@ -312,7 +322,7 @@ module Database =
 
                 root.["collaborations"]
                 |> Seq.map (fun x -> x.["relationship"])
-                |> Seq.where (fun x -> not (isNull x) &&  x.HasValues)
+                |> Seq.where (fun x -> not (isNull x) && x.HasValues)
                 |> Seq.iter (fun x -> x :?> JObject |> processRelationship)
 
                 root.["boundedContexts"]
@@ -322,65 +332,58 @@ module Database =
 
                 root.Add(JProperty("version", 1))
                 root.ToString()
-                
+
             let toVersion2 (json: string) =
                 let root = JObject.Parse json
-                    
+
                 let addEmptyNamespaces (token: JToken) =
                     let obj = token :?> JObject
 
                     let namespaces = obj.Property("namespaces")
-                    if isNull namespaces then
-                        obj.Add("namespaces", JArray())                    
-                    
-                    
+                    if isNull namespaces then obj.Add("namespaces", JArray())
+
+
                 let processCollaborations (token: JToken) =
                     processId CollaborationNamespaceBytes token
-                
+
                 root.["collaborations"]
                 |> Seq.iter processCollaborations
-                
+
                 root.["boundedContexts"]
                 |> Seq.iter addEmptyNamespaces
-                
-                if root.Property("namespaceTemplates") |> isNull || not <| root.Property("namespaceTemplates").HasValues then
-                    root.Add(JProperty("namespaceTemplates",JArray()))
-                
-                
+
+                if root.Property("namespaceTemplates") |> isNull
+                   || not
+                      <| root.Property("namespaceTemplates").HasValues then
+                    root.Add(JProperty("namespaceTemplates", JArray()))
                 root.Property("version").Value <- JValue(2)
                 root.ToString()
 
-        type HasVersion =
-            { Version: int option}
-            
+        type HasVersion = { Version: int option }
+
         let applyMigrations version json =
             let versions =
-                [
-                    0, Migrations.toVersion1
-                    1, Migrations.toVersion2
-                ]
-            
+                [ 0, Migrations.toVersion1
+                  1, Migrations.toVersion2 ]
+
             versions
             |> List.skipWhile (fun (v, _) -> version > v)
             |> List.map snd
             |> List.fold (fun j migration -> migration j) json
-        
-        let private deserializeWithOptions<'T> (json: string) =
-            JsonSerializer.Deserialize<'T> (json, serializerOptions)
-        
-        let rec deserialize (json: string) =
-            let root =
-                json
-                |> deserializeWithOptions<HasVersion>
 
-            let currentVersion =
-                root.Version
-                |> Option.defaultValue 0
-                
+        let private deserializeWithOptions<'T> (json: string) =
+            JsonSerializer.Deserialize<'T>(json, serializerOptions)
+
+        let deserialize (json: string) =
+            let root =
+                json |> deserializeWithOptions<HasVersion>
+
+            let currentVersion = root.Version |> Option.defaultValue 0
+
             json
             |> applyMigrations currentVersion
             |> deserializeWithOptions<Root>
-            
+
 
     type FileBased(fileName: string) =
 
