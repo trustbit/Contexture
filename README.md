@@ -33,13 +33,6 @@ A detailed view of the "Billing" Bounded Context with the help of the Bounded-Co
 
 The Contexture server implements a simple storage backend that exposes a file system backed API and serves static assets through a Giraffe F# application.
 
-### Installation
-
-```bash
-cd backend
-dotnet restore
-```
-
 ### Run the backend
 
 Contexture server will listen on port `5000` per default and use `data/db.json` as default database file.
@@ -47,10 +40,9 @@ If you want to have the server listening on any other port, set the environment 
 To choose a different database file configure the `DatabasePath` configuration via an environment variable.
 Note: you might need to exclude launch-profiles on start via `--no-launch-profile`.
 
-
 ```bash
 cd backend
-dotnet run --project Contexture.Api/Contexture.Api.fsproj
+dotnet run --project Contexture.Api
 ```
 
 ### Publish and running the backend manually
@@ -75,23 +67,14 @@ ASPNETCORE_URLS=http://*:8080 DATABASEPATH=data/mydb.json dotnet Contexture.Api.
 
 The application is developed with [Elm](https://elm-lang.org/) and connects to the backend via the API.
 
-Make sure [Elm](https://guide.elm-lang.org/install/elm.html) is installed and part of your path.
+Make sure [Node](https://nodejs.org/en/) is installed and NPM is in your path.
 
 ### Run the frontend
 
-During development use `elm-live` for handling routes correctly.
-
 ```bash
-npm install elm elm-live -g
-cd app
-elm-live src/Main.elm --pushstate
-```
-
-Building the app
-
-```bash
-cd app
-elm make src/Main.elm
+cd frontend
+npm install
+npm start
 ```
 
 Make sure the backend part is reachable with its default url <http://localhost:3000>
