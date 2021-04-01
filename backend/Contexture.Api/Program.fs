@@ -101,8 +101,7 @@ let configureLogging (builder : ILoggingBuilder) =
     builder.AddConsole()
            .AddDebug() |> ignore
 
-[<EntryPoint>]
-let main args =
+let buildHost args =
     Host.CreateDefaultBuilder(args)
         .ConfigureWebHostDefaults(
             fun webHostBuilder ->
@@ -112,5 +111,13 @@ let main args =
                     .ConfigureLogging(configureLogging)
                     |> ignore)
         .Build()
-        .Run()
+
+[<EntryPoint>]
+let main args =
+    let host = buildHost args
+
+    // make sure the database is loaded
+    let _ = host.Services.GetRequiredService<FileBased>();
+
+    host.Run()
     0
