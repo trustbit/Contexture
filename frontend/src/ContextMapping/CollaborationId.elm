@@ -9,30 +9,30 @@ import Json.Decode as Decode exposing (Decoder)
 import Json.Encode as Encode
 
 type CollaborationId = 
-  CollaborationId Int
+  CollaborationId String
 
 
 idToString : CollaborationId -> String
 idToString (CollaborationId contextId) =
-  String.fromInt contextId
+  contextId
 
 idParser : Parser (CollaborationId -> a) a
 idParser =
     custom "COLLID" <|
         \collaborationId ->
-            Maybe.map CollaborationId (String.toInt collaborationId)
+            idFromString collaborationId
 
 
 idFromString : String -> Maybe CollaborationId
 idFromString value =
-  value
-  |> String.toInt
-  |> Maybe.map CollaborationId
+  if String.isEmpty value
+  then Nothing
+  else Just (CollaborationId value)
 
 idDecoder : Decoder CollaborationId
 idDecoder =
-  Decode.map CollaborationId Decode.int
+  Decode.map CollaborationId Decode.string
 
 idEncoder : CollaborationId -> Encode.Value
 idEncoder (CollaborationId value) =
-  Encode.int value
+  Encode.string value

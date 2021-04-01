@@ -15,7 +15,7 @@ module Database =
         | DuplicateKey of 'Id
         | ChangeError of 'Error
 
-    type CollectionInt<'item>(itemsById: Map<int, 'item>) =
+    type CollectionOfInt<'item>(itemsById: Map<int, 'item>) =
 
         let nextId existingIds =
             let highestId =
@@ -35,7 +35,7 @@ module Database =
                     let itemsUpdated = itemsById |> Map.add idValue updatedItem
 
 
-                    Ok(CollectionInt(itemsUpdated), updatedItem)
+                    Ok(CollectionOfInt(itemsUpdated), updatedItem)
                 | Error e -> e |> ChangeError |> Error
             | None -> idValue |> EntityNotFoundInCollection |> Error
 
@@ -45,14 +45,14 @@ module Database =
 
             let newItem = seed newId
             let updatedItems = itemsById |> Map.add newId newItem
-            Ok(CollectionInt(updatedItems), newItem)
+            Ok(CollectionOfInt(updatedItems), newItem)
 
         let remove idValue =
             match idValue |> getById with
             | Some item ->
                 let updatedItems = itemsById |> Map.remove idValue
-                Ok(CollectionInt(updatedItems), Some item)
-            | None -> Ok(CollectionInt(itemsById), None)
+                Ok(CollectionOfInt(updatedItems), Some item)
+            | None -> Ok(CollectionOfInt(itemsById), None)
 
         member __.ById idValue = getById idValue
         member __.All = itemsById |> Map.toList |> List.map snd
@@ -61,7 +61,7 @@ module Database =
         member __.Remove idValue = remove idValue
         
         
-    type CollectionGuid<'item>(itemsById: Map<Guid, 'item>) =
+    type CollectionOfGuid<'item>(itemsById: Map<Guid, 'item>) =
         
         let getById idValue = itemsById.TryFind idValue
 
@@ -73,7 +73,7 @@ module Database =
                     let itemsUpdated = itemsById |> Map.add idValue updatedItem
 
 
-                    Ok(CollectionGuid(itemsUpdated), updatedItem)
+                    Ok(CollectionOfGuid(itemsUpdated), updatedItem)
                 | Error e -> e |> ChangeError |> Error
             | None -> idValue |> EntityNotFoundInCollection |> Error
 
@@ -82,14 +82,14 @@ module Database =
             then newId |> DuplicateKey |> Error
             else 
                 let updatedItems = itemsById |> Map.add newId item
-                Ok(CollectionGuid(updatedItems), item)
+                Ok(CollectionOfGuid(updatedItems), item)
 
         let remove idValue =
             match idValue |> getById with
             | Some item ->
                 let updatedItems = itemsById |> Map.remove idValue
-                Ok(CollectionGuid(updatedItems), Some item)
-            | None -> Ok(CollectionGuid(itemsById), None)
+                Ok(CollectionOfGuid(updatedItems), Some item)
+            | None -> Ok(CollectionOfGuid(itemsById), None)
 
         member __.ById idValue = getById idValue
         member __.All = itemsById |> Map.toList |> List.map snd
@@ -98,7 +98,7 @@ module Database =
         member __.Remove idValue = remove idValue
         
 
-    let collectionOf (items: _ list) getId =
+    let collectionOfInt (items: _ list) getId =
         let collectionItems =
             if items |> box |> isNull then [] else items
 
@@ -107,9 +107,9 @@ module Database =
             |> List.map (fun i -> getId i, i)
             |> Map.ofList
 
-        CollectionInt(byId)
+        CollectionOfInt(byId)
     
-    let collectionGuidOf (items: _ list) getId =
+    let collectionOfGuid (items: _ list) getId =
         let collectionItems =
             if items |> box |> isNull then [] else items
 
@@ -118,20 +118,20 @@ module Database =
             |> List.map (fun i -> getId i, i)
             |> Map.ofList
 
-        CollectionGuid(byId)
+        CollectionOfGuid(byId)
 
     type Document =
-        { Domains: CollectionInt<Domain>
-          BoundedContexts: CollectionInt<BoundedContext>
-          Collaborations: CollectionGuid<Collaboration>
-          NamespaceTemplates: CollectionInt<NamespaceTemplate> }
+        { Domains: CollectionOfInt<Domain>
+          BoundedContexts: CollectionOfInt<BoundedContext>
+          Collaborations: CollectionOfGuid<Collaboration>
+          NamespaceTemplates: CollectionOfInt<NamespaceTemplate> }
 
     module Document =
-        let subdomainsOf (domains: CollectionInt<Domain>) parentDomainId =
+        let subdomainsOf (domains: CollectionOfInt<Domain>) parentDomainId =
             domains.All
             |> List.where (fun x -> x.ParentDomainId = Some parentDomainId)
 
-        let boundedContextsOf (boundedContexts: CollectionInt<BoundedContext>) domainId =
+        let boundedContextsOf (boundedContexts: CollectionOfInt<BoundedContext>) domainId =
             boundedContexts.All
             |> List.where (fun x -> x.DomainId = domainId)
 
@@ -329,31 +329,46 @@ module Database =
                             idValue.Value.ToString()
                             |> IdentityHash.generate identityNamespace
                             
-                        obj.Replace(JProperty("id", JValue(newId))) 
+                        obj.Property("id").Value <- JValue(newId) 
                     | None -> ()
                 
                 root.["collaborations"]
                 |> Seq.iter (processId CollaborationNamespaceBytes)
                 
-                root.Replace(JProperty("version", 1))
+                root.Property("version").Value <- JValue(2)
                 root.ToString()
 
+        type HasVersion =
+            { Version: int option}
+            
+        let applyMigrations version json =
+            let versions =
+                [
+                    0, Migrations.toVersion1
+                    1, Migrations.toVersion2
+                ]
+            
+            versions
+            |> List.skipWhile (fun (v, _) -> version > v)
+            |> List.map snd
+            |> List.fold (fun j migration -> migration j) json
+        
+        let private deserializeWithOptions<'T> (json: string) =
+            JsonSerializer.Deserialize<'T> (json, serializerOptions)
+        
         let rec deserialize (json: string) =
             let root =
-                (json, serializerOptions)
-                |> JsonSerializer.Deserialize<Root>
+                json
+                |> deserializeWithOptions<HasVersion>
 
-            match root.Version with
-            | None ->
-                let migratedJson = Migrations.toVersion1 json
-                deserialize migratedJson
-            | Some version ->
-                match version with
-                | 1 ->
-                    json
-                    |> Migrations.toVersion2
-                    |> deserialize
-                | _ -> root
+            let currentVersion =
+                root.Version
+                |> Option.defaultValue 0
+                
+            json
+            |> applyMigrations currentVersion
+            |> deserializeWithOptions<Root>
+            
 
     type FileBased(fileName: string) =
 
@@ -362,10 +377,10 @@ module Database =
             |> Serialization.deserialize
             |> fun root ->
                 let document =
-                    { Domains = collectionOf root.Domains (fun d -> d.Id)
-                      BoundedContexts = collectionOf root.BoundedContexts (fun d -> d.Id)
-                      Collaborations = collectionGuidOf root.Collaborations (fun d -> d.Id)
-                      NamespaceTemplates = collectionOf root.NamespaceTemplates (fun d -> d.Id) }
+                    { Domains = collectionOfInt root.Domains (fun d -> d.Id)
+                      BoundedContexts = collectionOfInt root.BoundedContexts (fun d -> d.Id)
+                      Collaborations = collectionOfGuid root.Collaborations (fun d -> d.Id)
+                      NamespaceTemplates = collectionOfInt root.NamespaceTemplates (fun d -> d.Id) }
 
                 root.Version, document
 
