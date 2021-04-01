@@ -74,7 +74,7 @@ module Database =
                     let itemsUpdated = itemsById |> Map.add idValue updatedItem
 
 
-                    Ok(CollectionOfGuid(itemsUpdated), updatedItem)
+                    itemsUpdated |> CollectionOfGuid |> Ok
                 | Error e -> e |> ChangeError |> Error
             | None -> idValue |> EntityNotFoundInCollection |> Error
 
@@ -83,14 +83,15 @@ module Database =
                 newId |> DuplicateKey |> Error
             else
                 let updatedItems = itemsById |> Map.add newId item
-                Ok(CollectionOfGuid(updatedItems), item)
+                updatedItems  |> CollectionOfGuid |> Ok
 
         let remove idValue =
             match idValue |> getById with
             | Some item ->
                 let updatedItems = itemsById |> Map.remove idValue
-                Ok(CollectionOfGuid(updatedItems), Some item)
-            | None -> Ok(CollectionOfGuid(itemsById), None)
+                updatedItems  |> CollectionOfGuid |> Ok
+            | None ->
+                itemsById  |> CollectionOfGuid |> Ok
 
         member __.ById idValue = getById idValue
         member __.All = itemsById |> Map.toList |> List.map snd

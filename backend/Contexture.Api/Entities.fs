@@ -412,6 +412,13 @@ module Aggregates =
                     Deleted
                 | _ -> Existing
                 
+        let identify =
+            function
+            | DefineInboundConnection (collaborationId, _) -> collaborationId
+            | DefineOutboundConnection (collaborationId, _) -> collaborationId
+            | DefineRelationship (collaborationId, _) -> collaborationId
+            | RemoveConnection (collaborationId) -> collaborationId
+                
         let handle (state: State) (command: Command) =
             match state,command with
             | Existing, DefineRelationship (collaborationId, relationship)->
@@ -428,20 +435,6 @@ module Aggregates =
                 Ok [ ConnectionRemoved { CollaborationId = collaborationId } ]
             | _,_ ->
                 Ok []
-//
-//        let changeRelationship relationship (collaboration: Collaboration) =
-//            Ok
-//                { collaboration with
-//                      RelationshipType = relationship }
-//
-//        let newConnection initiator recipient description =
-//            fun id ->
-//                { Id = id
-//                  Description = description
-//                  Initiator = initiator
-//                  Recipient = recipient
-//                  RelationshipType = None }
-
 
     module Namespaces =
         open Entities
