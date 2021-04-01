@@ -33,3 +33,6 @@ run-app:
 	docker run -it -p 3000:3000 -v contexture_data:/data softwarepark/contexture
 
 run-image: build-image run-app
+
+clean:
+	rm -rf artifacts/
