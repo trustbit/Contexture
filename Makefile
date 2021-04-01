@@ -24,7 +24,7 @@ publish-app:
 prepare-image: publish-backend publish-app
 	mkdir -p artifacts/image/wwwroot
 	cp -r artifacts/backend/*.* artifacts/image/
-	cp -r artifacts/frontend/*.* artifacts/image/wwwroot/
+	cp -r artifacts/frontend/** artifacts/image/wwwroot/
 
 build-image: prepare-image
 	cd artifacts/image && docker build -t softwarepark/contexture -f ../backend/Dockerfile .
