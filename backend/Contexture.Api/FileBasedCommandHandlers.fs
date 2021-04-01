@@ -3,6 +3,7 @@ namespace Contexture.Api
 open Contexture.Api
 open Contexture.Api.Aggregates.BoundedContext
 open Contexture.Api.Aggregates.Domain
+open Contexture.Api.Entities
 open Database
 
 module FileBasedCommandHandlers =
@@ -161,6 +162,39 @@ module FileBasedCommandHandlers =
 
     module Collaboration =
         open Collaboration
+        
+        let asEvents (collaboration: Collaboration option) =
+            collaboration
+            |> Option.map (fun c ->
+                CollaborationImported {
+                    CollaborationId = c.Id
+                    Description = c.Description
+                    RelationshipType = c.RelationshipType
+                    Initiator = c.Initiator
+                    Recipient = c.Recipient
+                }
+            )
+            |> Option.toList
+            
+        let projectToCollaboration (events: Event list) : Collaboration option =
+            let fold collaboration event =
+                match event with
+                | CollaborationImported c ->
+                    Some { Id = c.CollaborationId; Description = c.Description; Initiator = c.Initiator; Recipient = c.Recipient; RelationshipType = c.RelationshipType }
+                | CollaboratorsConnected c ->
+                    Some { Id = c.CollaborationId; Description = c.Description; Initiator = c.Initiator; Recipient = c.Recipient; RelationshipType = None }
+                | RelationshipDefined c ->
+                    collaboration
+                    |> Option.map ( fun o -> { o with RelationshipType = Some c.RelationshipType })
+                | RelationshipUnknown c ->
+                    collaboration
+                    |> Option.map ( fun o -> { o with RelationshipType = None })
+                | ConnectionRemoved _ ->
+                    None
+                
+            events
+            |> List.fold fold None 
+            
 
         let private updateCollaborationsIn (document: Document) =
             Result.map (fun (collaborations, item) ->
@@ -209,12 +243,69 @@ module FileBasedCommandHandlers =
                 |> EntityNotFound
                 |> InfrastructureError
                 |> Error
-            | Error (DuplicateKey id) ->
+                
+        type ChangeOperation =
+            | Add of Collaboration
+            | Update of Collaboration
+            | Remove of CollaborationId
+            | NoOp
+                
+        let viaEvents collaboration command =
+            let stream = collaboration |> asEvents
+            
+            let state =
+                stream   
+                |> List.fold State.Fold State.Initial
+            
+            let result = handle state command
+            result
+            |> Result.map (fun publishedEvents ->
+                let result =
+                    stream @ publishedEvents
+                    |> projectToCollaboration
+                
+                match collaboration,result with
+                | None, Some c ->
+                    Add c
+                | Some _, Some c ->
+                    Update c
+                | Some c, None ->
+                    Remove c.Id
+                | None, None ->
+                    NoOp
+            )
+
+        let private updateCollaborationViaEvents (database: FileBased) collaborationId command =
+            let changed =
+                database.Change(fun document ->
+                    let collaborations =
+                        command
+                        |> viaEvents (document.Collaborations.ById collaborationId)
+                        |> Result.map (function
+                            | Add c ->
+                                collaborationId
+                                |> document.Collaborations.Add (fun _ -> Ok c)
+                            | Update c ->
+                                collaborationId
+                                |> document.Collaborations.Update (fun _ -> Ok c)
+                            | Remove id ->
+                                document.Collaborations.Remove id
+                            | NoOp ->
+                                ()
+                            )
+                        
+                    collaborations
+                    |> updateCollaborationsIn document)
+
+            match changed with
+            | Ok _ -> Ok collaborationId
+            | Error (ChangeError e) -> Error(DomainError e)
+            | Error (EntityNotFoundInCollection id) ->
                 id
                 |> EntityNotFound
                 |> InfrastructureError
                 |> Error
-
+        
         let handle (database: FileBased) (command: Command) =
             match command with
             | DefineRelationship (collaborationId, relationship) ->
