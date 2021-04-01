@@ -102,8 +102,6 @@ deriveBaseUrl appUrl =
   case appUrl.port_ of
     -- local dev with elm-live
     Just 8000 -> localDev
-    -- local deployed version
-    Just 3000 -> localDev
     -- default: assume it's running on the same server with the same port in the root
     _ -> { appUrl | path = "/api",  query = Nothing, fragment = Nothing }
 
