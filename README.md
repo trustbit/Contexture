@@ -29,16 +29,9 @@ An overview on the Bounded Contexts of the "Restaurant Experience" domain
 A detailed view of the "Billing" Bounded Context with the help of the Bounded-Context-Canvas-v3
 ![A detailed view on the Bounded-Context-Canvas, v3](example/CanvasV3Overview.png)
 
-## Contexture server backend
+## Contexture backend
 
 The Contexture server implements a simple storage backend that exposes a file system backed API and serves static assets through a Giraffe F# application.
-
-### Installation
-
-```bash
-cd backend
-dotnet restore
-```
 
 ### Run the backend
 
@@ -47,10 +40,9 @@ If you want to have the server listening on any other port, set the environment 
 To choose a different database file configure the `DatabasePath` configuration via an environment variable.
 Note: you might need to exclude launch-profiles on start via `--no-launch-profile`.
 
-
 ```bash
 cd backend
-dotnet run --project Contexture.Api/Contexture.Api.fsproj
+dotnet run --project Contexture.Api
 ```
 
 ### Publish and running the backend manually
@@ -75,49 +67,23 @@ ASPNETCORE_URLS=http://*:8080 DATABASEPATH=data/mydb.json dotnet Contexture.Api.
 
 The application is developed with [Elm](https://elm-lang.org/) and connects to the backend via the API.
 
-Make sure [Elm](https://guide.elm-lang.org/install/elm.html) is installed and part of your path.
+Make sure [Node](https://nodejs.org/en/) is installed and NPM is in your path.
 
 ### Run the frontend
 
-During development use `elm-live` for handling routes correctly.
-
 ```bash
-npm install elm elm-live -g
-cd app
-elm-live src/Main.elm --pushstate
-```
-
-Building the app
-
-```bash
-cd app
-elm make src/Main.elm
+cd frontend
+npm install
+npm start
 ```
 
 Make sure the backend part is reachable with its default url <http://localhost:3000>
 
 ## Running with Docker
 
-To build the Docker image either the `Makefile` via `make build-image` can be used or the following commands can be executed manually:
+To build the Docker image use the `Makefile` via `make build-image` or execute the commands manually.
 
-```bash
-dotnet publish backend/Contexture.Api/Contexture.Api.fsproj \
-    -c Release \
-    -o artifacts/backend
-
-cd frontend && elm make src/Main.elm --output=../artifacts/frontend/index.html
-mkdir -p artifacts/image/
-cp -r artifacts/backend/ artifacts/image/
-cp artifacts/frontend/*.* artifacts/image/wwwroot/
-cd artifacts/image && docker build -t softwarepark/contexture -f Dockerfile .
-```
-
-To run the `softwarepark/contexture` image either use `make run-app` and browse to <http://localhost:3000> or execute the following commands:
-
-```bash
-docker volume create contexture_data
-docker run -it -p 3000:3000 -v contexture_data:/data softwarepark/contexture
-```
+To run the `softwarepark/contexture` image use `make run-app` and browse to <http://localhost:3000>.
 
 Your data will be stored in the `/data/db.json` file on the volume `/data`.
 

@@ -445,5 +445,6 @@ $RECYCLE.BIN/
 
 elm-stuff/
 data/
-frontend/index.html
-frontend/css/*
+frontend/assets/css/*
+frontend/assets/js/Contexture.js
+frontend/src/dummy.elm
