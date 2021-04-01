@@ -12,9 +12,10 @@ publish-backend:
         -o artifacts/backend
 
 build-app:
+	cd frontend && npm install
 	cd frontend && npm run build
 
-publish-app:
+publish-app: build-app
 	mkdir -p artifacts/frontend
 	cd frontend && npm pack
 	mv frontend/*.tgz artifacts/frontend
