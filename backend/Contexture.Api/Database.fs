@@ -222,11 +222,22 @@ module Database =
 
             let private CollaborationNamespaceBytes = IdentityHash.buildNamespace (Guid("d24eb67c-1aed-4995-986b-5442c074549a"))
 
-            let generate identityNamespace (identifier: int) : Guid =
-                identifier
-                |> string
-                |> IdentityHash.generate identityNamespace 
-                
+            let processId identityNamespace (token: JToken) =
+                let obj = token :?> JObject
+
+                let idProperty =
+                    obj.Property("id")
+                    |> Option.ofObj
+                    |> Option.bind (fun p -> p.Value |> Option.ofObj |> Option.bind (tryUnbox<JValue>))
+
+                match idProperty with
+                | Some idValue ->
+                    let newId =
+                        idValue.Value.ToString()
+                        |> IdentityHash.generate identityNamespace
+                        
+                    obj.Property("id").Value <- JValue(newId) 
+                | None -> ()
             
             let toVersion1 (json: string) =
                 let root = JObject.Parse json
@@ -301,7 +312,7 @@ module Database =
 
                 root.["collaborations"]
                 |> Seq.map (fun x -> x.["relationship"])
-                |> Seq.where (fun x -> x.HasValues)
+                |> Seq.where (fun x -> not (isNull x) &&  x.HasValues)
                 |> Seq.iter (fun x -> x :?> JObject |> processRelationship)
 
                 root.["boundedContexts"]
@@ -314,26 +325,27 @@ module Database =
                 
             let toVersion2 (json: string) =
                 let root = JObject.Parse json
-                
-                let processId identityNamespace (token: JToken) =
+                    
+                let addEmptyNamespaces (token: JToken) =
                     let obj = token :?> JObject
 
-                    let idProperty =
-                        obj.Property("id")
-                        |> Option.ofObj
-                        |> Option.bind (fun p -> p.Value |> Option.ofObj)
-
-                    match idProperty with
-                    | Some idValue ->
-                        let newId =
-                            idValue.Value.ToString()
-                            |> IdentityHash.generate identityNamespace
-                            
-                        obj.Property("id").Value <- JValue(newId) 
-                    | None -> ()
+                    let namespaces = obj.Property("namespaces")
+                    if isNull namespaces then
+                        obj.Add("namespaces", JArray())                    
+                    
+                    
+                let processCollaborations (token: JToken) =
+                    processId CollaborationNamespaceBytes token
                 
                 root.["collaborations"]
-                |> Seq.iter (processId CollaborationNamespaceBytes)
+                |> Seq.iter processCollaborations
+                
+                root.["boundedContexts"]
+                |> Seq.iter addEmptyNamespaces
+                
+                if root.Property("namespaceTemplates") |> isNull || not <| root.Property("namespaceTemplates").HasValues then
+                    root.Add(JProperty("namespaceTemplates",JArray()))
+                
                 
                 root.Property("version").Value <- JValue(2)
                 root.ToString()
