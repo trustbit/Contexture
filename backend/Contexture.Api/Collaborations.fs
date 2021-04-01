@@ -13,14 +13,15 @@ module Collaborations =
         open Collaboration
         open FileBasedCommandHandlers
 
+        open System
         let private updateAndReturnCollaboration command =
             fun (next: HttpFunc) (ctx: HttpContext) ->
                 task {
                     let database = ctx.GetService<FileBased>()
 
                     match Collaboration.handle database command with
-                    | Ok updatedContext ->
-                        return! redirectTo false (sprintf "/api/collaborations/%i" updatedContext) next ctx
+                    | Ok collaborationId ->
+                        return! redirectTo false (sprintf "/api/collaborations/%O" collaborationId) next ctx
                     | Error (DomainError error) ->
                         return! RequestErrors.BAD_REQUEST (sprintf "Domain Error %A" error) next ctx
                     | Error e -> return! ServerErrors.INTERNAL_ERROR e next ctx
@@ -30,10 +31,10 @@ module Collaborations =
             updateAndReturnCollaboration (DefineRelationship(collaborationId, command))
 
         let outboundConnection (command: DefineConnection) =
-            updateAndReturnCollaboration (DefineOutboundConnection(command))
+            updateAndReturnCollaboration (DefineOutboundConnection(Guid.NewGuid(),command))
 
         let inboundConnection (command: DefineConnection) =
-            updateAndReturnCollaboration (DefineOutboundConnection(command))
+            updateAndReturnCollaboration (DefineOutboundConnection(Guid.NewGuid(),command))
 
         let removeAndReturnId collaborationId =
             fun (next: HttpFunc) (ctx: HttpContext) ->
@@ -61,14 +62,14 @@ module Collaborations =
                 collaborationId
                 |> document.Collaborations.ById
                 |> Option.map json
-                |> Option.defaultValue (RequestErrors.NOT_FOUND(sprintf "Collaboration %i not found" collaborationId))
+                |> Option.defaultValue (RequestErrors.NOT_FOUND(sprintf "Collaboration %O not found" collaborationId))
 
             result next ctx
 
     let routes: HttpHandler =
         subRoute
             "/collaborations"
-            (choose [ subRoutef "/%i" (fun collaborationId ->
+            (choose [ subRoutef "/%O" (fun collaborationId ->
                           choose [ GET >=> getCollaboration collaborationId
                                    POST
                                    >=> route "/relationship"

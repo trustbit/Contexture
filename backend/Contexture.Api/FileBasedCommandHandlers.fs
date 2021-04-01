@@ -8,13 +8,13 @@ open Database
 module FileBasedCommandHandlers =
     open Aggregates
 
-    type CommandHandlerError<'T> =
+    type CommandHandlerError<'T,'Id> =
         | DomainError of 'T
-        | InfrastructureError of InfrastructureError
+        | InfrastructureError of InfrastructureError<'Id>
 
-    and InfrastructureError =
+    and InfrastructureError<'Id> =
         | Exception of exn
-        | EntityNotFound of int
+        | EntityNotFound of 'Id
 
     module Domain =
         open Entities
@@ -63,8 +63,13 @@ module FileBasedCommandHandlers =
                 |> EntityNotFound
                 |> InfrastructureError
                 |> Error
+            | Error (DuplicateKey id) ->
+                id
+                |> EntityNotFound
+                |> InfrastructureError
+                |> Error
 
-        let handle (database: FileBased) (command: Command): Result<DomainId, CommandHandlerError<Errors>> =
+        let handle (database: FileBased) (command: Command) =
             match command with
             | CreateDomain createDomain -> create database None createDomain
             | CreateSubdomain (domainId, createDomain) -> create database (Some domainId) createDomain
@@ -124,6 +129,11 @@ module FileBasedCommandHandlers =
                 |> EntityNotFound
                 |> InfrastructureError
                 |> Error
+            | Error (DuplicateKey id) ->
+                id
+                |> EntityNotFound
+                |> InfrastructureError
+                |> Error
 
         let handle (database: FileBased) (command: Command) =
             match command with
@@ -158,16 +168,20 @@ module FileBasedCommandHandlers =
                       Collaborations = collaborations },
                 item)
 
-        let create (database: FileBased) (command: DefineConnection) =
+        let create (database: FileBased) collaborationId (command: DefineConnection) =
             let changed =
                 database.Change(fun document ->
-                    newConnection command.Initiator command.Recipient command.Description
-                    |> document.Collaborations.Add
+                    newConnection collaborationId command.Initiator command.Recipient command.Description
+                    |> document.Collaborations.Add collaborationId
                     |> updateCollaborationsIn document)
 
             changed
             |> Result.map (fun d -> d.Id)
-            |> Result.mapError InfrastructureError
+            |> Result.mapError (function
+                | ChangeError e -> DomainError e
+                | EntityNotFoundInCollection e -> e |> EntityNotFound |> InfrastructureError
+                | DuplicateKey k -> k |> EntityNotFound |> InfrastructureError
+                )
 
         let remove (database: FileBased) collaborationId =
             let changed =
@@ -195,13 +209,19 @@ module FileBasedCommandHandlers =
                 |> EntityNotFound
                 |> InfrastructureError
                 |> Error
+            | Error (DuplicateKey id) ->
+                id
+                |> EntityNotFound
+                |> InfrastructureError
+                |> Error
 
         let handle (database: FileBased) (command: Command) =
             match command with
             | DefineRelationship (collaborationId, relationship) ->
                 updateCollaboration database collaborationId (changeRelationship relationship.RelationshipType)
-            | DefineInboundConnection connection -> create database connection
-            | DefineOutboundConnection connection -> create database connection
+            | DefineInboundConnection (collaborationId, connection) ->
+                create database collaborationId connection
+            | DefineOutboundConnection (collaborationId, connection) -> create database collaborationId connection
             | RemoveConnection collaborationId -> remove database collaborationId
 
     module Namespaces =
@@ -230,6 +250,11 @@ module FileBasedCommandHandlers =
             | Ok _ -> Ok contextId
             | Error (ChangeError e) -> Error(DomainError e)
             | Error (EntityNotFoundInCollection id) ->
+                id
+                |> EntityNotFound
+                |> InfrastructureError
+                |> Error
+            | Error (DuplicateKey id) ->
                 id
                 |> EntityNotFound
                 |> InfrastructureError

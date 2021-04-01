@@ -9,11 +9,13 @@ open Contexture.Api.Entities
 
 module Database =
 
-    type UpdateError<'Error> =
-        | EntityNotFoundInCollection of int
+    open System
+    type UpdateError<'Error,'Id> =
+        | EntityNotFoundInCollection of 'Id
+        | DuplicateKey of 'Id
         | ChangeError of 'Error
 
-    type Collection<'item>(itemsById: Map<int, 'item>) =
+    type CollectionInt<'item>(itemsById: Map<int, 'item>) =
 
         let nextId existingIds =
             let highestId =
@@ -33,7 +35,7 @@ module Database =
                     let itemsUpdated = itemsById |> Map.add idValue updatedItem
 
 
-                    Ok(Collection(itemsUpdated), updatedItem)
+                    Ok(CollectionInt(itemsUpdated), updatedItem)
                 | Error e -> e |> ChangeError |> Error
             | None -> idValue |> EntityNotFoundInCollection |> Error
 
@@ -43,20 +45,58 @@ module Database =
 
             let newItem = seed newId
             let updatedItems = itemsById |> Map.add newId newItem
-            Ok(Collection(updatedItems), newItem)
+            Ok(CollectionInt(updatedItems), newItem)
 
         let remove idValue =
             match idValue |> getById with
             | Some item ->
                 let updatedItems = itemsById |> Map.remove idValue
-                Ok(Collection(updatedItems), Some item)
-            | None -> Ok(Collection(itemsById), None)
+                Ok(CollectionInt(updatedItems), Some item)
+            | None -> Ok(CollectionInt(itemsById), None)
 
         member __.ById idValue = getById idValue
         member __.All = itemsById |> Map.toList |> List.map snd
         member __.Update change idValue = update idValue change
         member __.Add seed = add seed
         member __.Remove idValue = remove idValue
+        
+        
+    type CollectionGuid<'item>(itemsById: Map<Guid, 'item>) =
+        
+        let getById idValue = itemsById.TryFind idValue
+
+        let update idValue change =
+            match idValue |> getById with
+            | Some item ->
+                match change item with
+                | Ok updatedItem ->
+                    let itemsUpdated = itemsById |> Map.add idValue updatedItem
+
+
+                    Ok(CollectionGuid(itemsUpdated), updatedItem)
+                | Error e -> e |> ChangeError |> Error
+            | None -> idValue |> EntityNotFoundInCollection |> Error
+
+        let add newId item =
+            if itemsById.ContainsKey newId
+            then newId |> DuplicateKey |> Error
+            else 
+                let updatedItems = itemsById |> Map.add newId item
+                Ok(CollectionGuid(updatedItems), item)
+
+        let remove idValue =
+            match idValue |> getById with
+            | Some item ->
+                let updatedItems = itemsById |> Map.remove idValue
+                Ok(CollectionGuid(updatedItems), Some item)
+            | None -> Ok(CollectionGuid(itemsById), None)
+
+        member __.ById idValue = getById idValue
+        member __.All = itemsById |> Map.toList |> List.map snd
+        member __.Update change idValue = update idValue change
+        member __.Add newId item = add newId item
+        member __.Remove idValue = remove idValue
+        
 
     let collectionOf (items: _ list) getId =
         let collectionItems =
@@ -67,20 +107,31 @@ module Database =
             |> List.map (fun i -> getId i, i)
             |> Map.ofList
 
-        Collection(byId)
+        CollectionInt(byId)
+    
+    let collectionGuidOf (items: _ list) getId =
+        let collectionItems =
+            if items |> box |> isNull then [] else items
+
+        let byId =
+            collectionItems
+            |> List.map (fun i -> getId i, i)
+            |> Map.ofList
+
+        CollectionGuid(byId)
 
     type Document =
-        { Domains: Collection<Domain>
-          BoundedContexts: Collection<BoundedContext>
-          Collaborations: Collection<Collaboration>
-          NamespaceTemplates: Collection<NamespaceTemplate> }
+        { Domains: CollectionInt<Domain>
+          BoundedContexts: CollectionInt<BoundedContext>
+          Collaborations: CollectionGuid<Collaboration>
+          NamespaceTemplates: CollectionInt<NamespaceTemplate> }
 
     module Document =
-        let subdomainsOf (domains: Collection<Domain>) parentDomainId =
+        let subdomainsOf (domains: CollectionInt<Domain>) parentDomainId =
             domains.All
             |> List.where (fun x -> x.ParentDomainId = Some parentDomainId)
 
-        let boundedContextsOf (boundedContexts: Collection<BoundedContext>) domainId =
+        let boundedContextsOf (boundedContexts: CollectionInt<BoundedContext>) domainId =
             boundedContexts.All
             |> List.where (fun x -> x.DomainId = domainId)
 
@@ -132,89 +183,160 @@ module Database =
             (data, serializerOptions)
             |> JsonSerializer.Serialize
 
-        let migrate (json: string) =
-            let root = JObject.Parse json
+        module Migrations =
+            open System
+            module IdentityHash =
+                
+                open System.Text
+                open System.Security.Cryptography
+                
+                let private swapByteOrderPairs (bytes: byte []): byte [] =
+                    Array.mapi (fun index value ->
+                        match index with
+                        | 0 -> Array.get bytes 3
+                        | 1 -> Array.get bytes 2
+                        | 2 -> Array.get bytes 1
+                        | 3 -> Array.get bytes 0
+                        | 4 -> Array.get bytes 5
+                        | 5 -> Array.get bytes 4
+                        | 6 -> Array.get bytes 7
+                        | 7 -> Array.get bytes 6
+                        | _ -> value) bytes
 
-            let getRelationshipTypeProperty (content: JObject) = JProperty("relationshipType", content)
+                let buildNamespace (namespaceId:Guid) = swapByteOrderPairs (namespaceId.ToByteArray())
 
-            let fixCasing (token: JObject) =
-                let newValue =
-                    match token.["initiatorRole"].Value<string>() with
-                    | "upstream" -> "Upstream"
-                    | "downstream" -> "Downstream"
-                    | "customer" -> "Customer"
-                    | "supplier" -> "Supplier"
-                    | other -> other
-                token.["initiatorRole"] <- JValue(newValue)
-                token
+                let generate namespaceBytes (identitierName:string) : Guid =
+                    let inputBytes = Encoding.UTF8.GetBytes(identitierName)
+                    using (SHA1.Create()) (fun algorithm ->
+                        algorithm.TransformBlock(namespaceBytes, 0, namespaceBytes.Length, null, 0) |> ignore
+                        algorithm.TransformFinalBlock(inputBytes, 0, inputBytes.Length) |> ignore
+                        let result =
+                            Array.truncate 16 algorithm.Hash
+                            |> Array.mapi (fun index (value: byte) ->
+                                match index with
+                                | 6 -> (value &&& 0x0Fuy) ||| (5uy <<< 4)
+                                | 8 -> (value &&& 0x3Fuy) ||| 0x80uy
+                                | _ -> Array.get algorithm.Hash index)
+                            |> swapByteOrderPairs
+                        Guid(result))
 
-            let processRelationship (token: JObject) =
-                let parent = token.Parent
+            let private CollaborationNamespaceBytes = IdentityHash.buildNamespace (Guid("d24eb67c-1aed-4995-986b-5442c074549a"))
 
-                let renamedProperty =
-                    match token.Properties() |> List.ofSeq with
-                    | firstProperty :: rest when firstProperty.Name = "initiatorRole" ->
-                        match rest.Length with
-                        | 2 ->
-                            JObject(JProperty("upstreamDownstream", fixCasing token))
-                            |> getRelationshipTypeProperty
-                        | 0 ->
-                            let renamedToken = fixCasing token
+            let generate identityNamespace (identifier: int) : Guid =
+                identifier
+                |> string
+                |> IdentityHash.generate identityNamespace 
+                
+            
+            let toVersion1 (json: string) =
+                let root = JObject.Parse json
 
-                            let newProperty =
-                                JProperty("role", renamedToken.["initiatorRole"])
+                let getRelationshipTypeProperty (content: JObject) = JProperty("relationshipType", content)
 
-                            JObject(JProperty("upstreamDownstream", JObject(newProperty)))
-                            |> getRelationshipTypeProperty
-                        | _ -> failwith "Unsupported record with initiatorRole"
-                    | _ -> getRelationshipTypeProperty token
+                let fixCasing (token: JObject) =
+                    let newValue =
+                        match token.["initiatorRole"].Value<string>() with
+                        | "upstream" -> "Upstream"
+                        | "downstream" -> "Downstream"
+                        | "customer" -> "Customer"
+                        | "supplier" -> "Supplier"
+                        | other -> other
+                    token.["initiatorRole"] <- JValue(newValue)
+                    token
 
-                parent.Replace(renamedProperty)
+                let processRelationship (token: JObject) =
+                    let parent = token.Parent
 
-            let addTechnicalDescription (token: JToken) =
-                let obj = token :?> JObject
+                    let renamedProperty =
+                        match token.Properties() |> List.ofSeq with
+                        | firstProperty :: rest when firstProperty.Name = "initiatorRole" ->
+                            match rest.Length with
+                            | 2 ->
+                                JObject(JProperty("upstreamDownstream", fixCasing token))
+                                |> getRelationshipTypeProperty
+                            | 0 ->
+                                let renamedToken = fixCasing token
 
-                let tools = obj.Property("tools")
-                let deployment = obj.Property("deployment")
+                                let newProperty =
+                                    JProperty("role", renamedToken.["initiatorRole"])
 
-                let properties =
-                    seq {
-                        if tools <> null then yield tools
-                        if deployment <> null then yield deployment
-                    }
+                                JObject(JProperty("upstreamDownstream", JObject(newProperty)))
+                                |> getRelationshipTypeProperty
+                            | _ -> failwith "Unsupported record with initiatorRole"
+                        | _ -> getRelationshipTypeProperty token
 
-                match properties with
-                | _ when Seq.isEmpty properties -> ()
-                | _ ->
-                    properties |> Seq.iter (fun x -> x.Remove())
-                    obj.Add(JProperty("technicalDescription", JObject(properties)))
+                    parent.Replace(renamedProperty)
 
-            let processDomain (token: JToken) =
-                let obj = token :?> JObject
+                let addTechnicalDescription (token: JToken) =
+                    let obj = token :?> JObject
 
-                let domainIdProperty =
-                    obj.Property("domainId")
-                    |> Option.ofObj
-                    |> Option.bind (fun p -> p.Value |> Option.ofObj)
+                    let tools = obj.Property("tools")
+                    let deployment = obj.Property("deployment")
 
-                match domainIdProperty with
-                | Some parentIdValue ->
-                    obj.Remove("domainId") |> ignore
-                    obj.Add("parentDomainId", parentIdValue)
-                | None -> ()
+                    let properties =
+                        seq {
+                            if tools <> null then yield tools
+                            if deployment <> null then yield deployment
+                        }
 
-            root.["collaborations"]
-            |> Seq.map (fun x -> x.["relationship"])
-            |> Seq.where (fun x -> x.HasValues)
-            |> Seq.iter (fun x -> x :?> JObject |> processRelationship)
+                    match properties with
+                    | _ when Seq.isEmpty properties -> ()
+                    | _ ->
+                        properties |> Seq.iter (fun x -> x.Remove())
+                        obj.Add(JProperty("technicalDescription", JObject(properties)))
 
-            root.["boundedContexts"]
-            |> Seq.iter addTechnicalDescription
+                let processDomain (token: JToken) =
+                    let obj = token :?> JObject
 
-            root.["domains"] |> Seq.iter processDomain
+                    let domainIdProperty =
+                        obj.Property("domainId")
+                        |> Option.ofObj
+                        |> Option.bind (fun p -> p.Value |> Option.ofObj)
 
-            root.Add(JProperty("version", 1))
-            root.ToString()
+                    match domainIdProperty with
+                    | Some parentIdValue ->
+                        obj.Remove("domainId") |> ignore
+                        obj.Add("parentDomainId", parentIdValue)
+                    | None -> ()
+
+                root.["collaborations"]
+                |> Seq.map (fun x -> x.["relationship"])
+                |> Seq.where (fun x -> x.HasValues)
+                |> Seq.iter (fun x -> x :?> JObject |> processRelationship)
+
+                root.["boundedContexts"]
+                |> Seq.iter addTechnicalDescription
+
+                root.["domains"] |> Seq.iter processDomain
+
+                root.Add(JProperty("version", 1))
+                root.ToString()
+                
+            let toVersion2 (json: string) =
+                let root = JObject.Parse json
+                
+                let processId identityNamespace (token: JToken) =
+                    let obj = token :?> JObject
+
+                    let idProperty =
+                        obj.Property("id")
+                        |> Option.ofObj
+                        |> Option.bind (fun p -> p.Value |> Option.ofObj)
+
+                    match idProperty with
+                    | Some idValue ->
+                        let newId =
+                            idValue.Value.ToString()
+                            |> IdentityHash.generate identityNamespace
+                            
+                        obj.Replace(JProperty("id", JValue(newId))) 
+                    | None -> ()
+                
+                root.["collaborations"]
+                |> Seq.iter (processId CollaborationNamespaceBytes)
+                
+                root.Replace(JProperty("version", 1))
+                root.ToString()
 
         let rec deserialize (json: string) =
             let root =
@@ -223,9 +345,15 @@ module Database =
 
             match root.Version with
             | None ->
-                let migratedJson = migrate json
+                let migratedJson = Migrations.toVersion1 json
                 deserialize migratedJson
-            | Some _ -> root
+            | Some version ->
+                match version with
+                | 1 ->
+                    json
+                    |> Migrations.toVersion2
+                    |> deserialize
+                | _ -> root
 
     type FileBased(fileName: string) =
 
@@ -236,7 +364,7 @@ module Database =
                 let document =
                     { Domains = collectionOf root.Domains (fun d -> d.Id)
                       BoundedContexts = collectionOf root.BoundedContexts (fun d -> d.Id)
-                      Collaborations = collectionOf root.Collaborations (fun d -> d.Id)
+                      Collaborations = collectionGuidOf root.Collaborations (fun d -> d.Id)
                       NamespaceTemplates = collectionOf root.NamespaceTemplates (fun d -> d.Id) }
 
                 root.Version, document

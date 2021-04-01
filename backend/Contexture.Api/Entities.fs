@@ -167,7 +167,7 @@ module Entities =
         | Frontend of Frontend: string
         | UserInteraction of UserInteraction: string
 
-    type CollaborationId = int
+    type CollaborationId = Guid
 
     type Collaboration =
         { Id: CollaborationId
@@ -362,8 +362,8 @@ module Aggregates =
 
         type Command =
             | DefineRelationship of CollaborationId * DefineRelationship
-            | DefineOutboundConnection of DefineConnection
-            | DefineInboundConnection of DefineConnection
+            | DefineOutboundConnection of CollaborationId * DefineConnection
+            | DefineInboundConnection of CollaborationId * DefineConnection
             | RemoveConnection of CollaborationId
 
         and DefineRelationship =
@@ -379,13 +379,12 @@ module Aggregates =
                 { collaboration with
                       RelationshipType = relationship }
 
-        let newConnection initiator recipient description =
-            fun id ->
-                { Id = id
-                  Description = description
-                  Initiator = initiator
-                  Recipient = recipient
-                  RelationshipType = None }
+        let newConnection id initiator recipient description =
+            { Id = id
+              Description = description
+              Initiator = initiator
+              Recipient = recipient
+              RelationshipType = None }
 
 
     module Namespaces =
