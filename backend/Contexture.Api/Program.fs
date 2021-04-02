@@ -124,8 +124,8 @@ let main args =
     let database = host.Services.GetRequiredService<FileBased>()
     let store = host.Services.GetRequiredService<Store>()
     database.Read.Collaborations.All
-    |> List.map Collaboration.asEvents
-    |> List.iter (fun (name, items) -> store.Append name items)
+    |> List.map (Collaboration.asEvents (fun () -> System.DateTime.UtcNow))
+    |> List.iter (fun items -> store.Append items)
     
     store.Subscribe (Collaboration.subscription database)
 

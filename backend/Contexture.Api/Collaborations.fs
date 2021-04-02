@@ -14,12 +14,13 @@ module Collaborations =
         open FileBasedCommandHandlers
 
         open System
+        let clock =
+            fun () -> DateTime.UtcNow
         let private updateAndReturnCollaboration command =
             fun (next: HttpFunc) (ctx: HttpContext) ->
                 task {
                     let database = ctx.GetService<Store>()
-
-                    match Collaboration.handle database command with
+                    match Collaboration.handle clock database command with
                     | Ok collaborationId ->
                         return! redirectTo false (sprintf "/api/collaborations/%O" collaborationId) next ctx
                     | Error (DomainError error) ->
@@ -41,7 +42,7 @@ module Collaborations =
                 task {
                     let database = ctx.GetService<Store>()
 
-                    match Collaboration.handle database (RemoveConnection collaborationId) with
+                    match Collaboration.handle clock database (RemoveConnection collaborationId) with
                     | Ok collaborationId -> return! json collaborationId next ctx
                     | Error e -> return! ServerErrors.INTERNAL_ERROR e next ctx
                 }
