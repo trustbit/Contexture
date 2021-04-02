@@ -438,6 +438,33 @@ module Aggregates =
                 Ok [ ConnectionRemoved { CollaborationId = collaborationId } ]
             | _,_ ->
                 Ok []
+                
+        module Projections =
+            let asCollaboration collaboration event =
+                match event with
+                | CollaborationImported c ->
+                    Some
+                        { Id = c.CollaborationId
+                          Description = c.Description
+                          Initiator = c.Initiator
+                          Recipient = c.Recipient
+                          RelationshipType = c.RelationshipType }
+                | CollaboratorsConnected c ->
+                    Some
+                        { Id = c.CollaborationId
+                          Description = c.Description
+                          Initiator = c.Initiator
+                          Recipient = c.Recipient
+                          RelationshipType = None }
+                | RelationshipDefined c ->
+                    collaboration
+                    |> Option.map (fun o ->
+                        { o with
+                              RelationshipType = Some c.RelationshipType })
+                | RelationshipUnknown c ->
+                    collaboration
+                    |> Option.map (fun o -> { o with RelationshipType = None })
+                | ConnectionRemoved _ -> None
 
     module Namespaces =
         open Entities

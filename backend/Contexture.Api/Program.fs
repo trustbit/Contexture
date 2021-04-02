@@ -5,7 +5,7 @@ open System.IO
 open Contexture.Api.Aggregates
 open Contexture.Api.Database
 open Contexture.Api.Domains
-open Contexture.Api.Entities
+open Contexture.Api.Infrastructure
 open Contexture.Api.FileBasedCommandHandlers
 open Giraffe
 open Microsoft.AspNetCore.Builder
@@ -96,7 +96,7 @@ let configureServices (context: WebHostBuilderContext) (services : IServiceColle
         let options = services.GetRequiredService<IOptions<ContextureOptions>>()
         FileBased.InitializeDatabase(options.Value.DatabasePath))
         |> ignore
-    services.AddSingleton<Store> (Store()) |> ignore
+    services.AddSingleton<EventStore> (EventStore.Empty) |> ignore
     services.AddCors() |> ignore
     services.AddGiraffe() |> ignore
     services |> configureJsonSerializer
@@ -122,11 +122,12 @@ let main args =
 
     // make sure the database is loaded
     let database = host.Services.GetRequiredService<FileBased>()
-    let store = host.Services.GetRequiredService<Store>()
+    let store = host.Services.GetRequiredService<EventStore>()
     database.Read.Collaborations.All
     |> List.map (Collaboration.asEvents (fun () -> System.DateTime.UtcNow))
-    |> List.iter (fun items -> store.Append items)
+    |> List.iter store.Append
     
+    // collaboration subscription is added after initial seeding
     store.Subscribe (Collaboration.subscription database)
 
     host.Run()

@@ -19,7 +19,7 @@ module Collaborations =
         let private updateAndReturnCollaboration command =
             fun (next: HttpFunc) (ctx: HttpContext) ->
                 task {
-                    let database = ctx.GetService<Store>()
+                    let database = ctx.GetService<EventStore>()
                     match Collaboration.handle clock database command with
                     | Ok collaborationId ->
                         return! redirectTo false (sprintf "/api/collaborations/%O" collaborationId) next ctx
@@ -40,7 +40,7 @@ module Collaborations =
         let removeAndReturnId collaborationId =
             fun (next: HttpFunc) (ctx: HttpContext) ->
                 task {
-                    let database = ctx.GetService<Store>()
+                    let database = ctx.GetService<EventStore>()
 
                     match Collaboration.handle clock database (RemoveConnection collaborationId) with
                     | Ok collaborationId -> return! json collaborationId next ctx

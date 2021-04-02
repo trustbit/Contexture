@@ -16,6 +16,7 @@
   <ItemGroup>
     <Compile Include="Entities.fs" />
     <Compile Include="Database.fs" />
+    <Compile Include="Infrastructure.fs" />
     <Compile Include="FileBasedCommandHandlers.fs" />
     <Compile Include="Domains.fs" />
     <Compile Include="Namespaces.fs" />

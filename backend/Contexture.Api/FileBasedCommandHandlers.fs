@@ -1,77 +1,11 @@
 namespace Contexture.Api
 
-open System
-open System.Collections.Concurrent
-open System.Collections.Generic
 open Contexture.Api
 open Contexture.Api.Aggregates.BoundedContext
 open Contexture.Api.Aggregates.Domain
 open Contexture.Api.Entities
 open Database
-
-type EventSource = System.Guid
-type EventMetadata =
-    { Source : EventSource
-      RecordedAt : System.DateTime  }
-type EventEnvelope<'Event> =
-    { Metadata : EventMetadata
-      Event: 'Event }
-type Subscription<'E> = EventEnvelope<'E> list -> unit
-
-type Store() =
-    let items = Dictionary<EventSource, EventEnvelope<obj> list>()
-
-    let subscriptions =
-        ConcurrentDictionary<System.Type, Subscription<obj> list>()
-
-    let boxEnvelope (envelope: EventEnvelope<'E>) =
-        { Metadata = envelope.Metadata; Event = box envelope.Event }
-        
-    let unboxEnvelope (envelope:EventEnvelope<obj>) : EventEnvelope<'E>=
-        { Metadata = envelope.Metadata; Event= unbox<'E> envelope.Event }
-
-    let stream source =
-        let (success, events) = items.TryGetValue source
-        if success
-        then events |> List.map unboxEnvelope
-        else []
-
-    let subscriptionsOf key =
-        let (success, items) = subscriptions.TryGetValue key
-        if success then items else []
-
-    let append (newItems: EventEnvelope<'E> list) =
-        newItems
-        |> List.iter (fun envelope ->
-            let source = envelope.Metadata.Source
-            let fullStream =
-                source
-                |> stream
-                |> fun s -> s @ [ envelope ]
-                |> List.map boxEnvelope
-            items.[source] <- fullStream
-            )
-
-        subscriptionsOf typedefof<'E>
-        |> List.iter (fun subscription ->
-            let upcastSubscription events =
-                events |> List.map boxEnvelope |> subscription
-
-            upcastSubscription newItems)
-
-    let subscribe (subscription: Subscription<'E>) =
-        let key = typedefof<'E>
-
-        let upcastSubscription events =
-            events |> List.map unboxEnvelope |> subscription
-
-        subscriptions.AddOrUpdate
-            (key, (fun _ -> [ upcastSubscription ]), (fun _ subscriptions -> subscriptions @ [ upcastSubscription ]))
-        |> ignore
-
-    member __.Stream name : EventEnvelope<'E> list = stream name
-    member __.Append items = lock __ (fun () -> append items)
-    member __.Subscribe(subscription: Subscription<'E>) = subscribe subscription
+open Contexture.Api.Infrastructure
 
 module FileBasedCommandHandlers =
     open Aggregates
@@ -231,41 +165,18 @@ module FileBasedCommandHandlers =
         open Collaboration
 
         let asEvents clock (collaboration: Collaboration) =
-            { Metadata = { Source = collaboration.Id; RecordedAt = clock() }
-              Event = CollaborationImported
-                { CollaborationId = collaboration.Id
-                  Description = collaboration.Description
-                  RelationshipType = collaboration.RelationshipType
-                  Initiator = collaboration.Initiator
-                  Recipient = collaboration.Recipient }
-            }
+            { Metadata =
+                  { Source = collaboration.Id
+                    RecordedAt = clock () }
+              Event =
+                  CollaborationImported
+                      { CollaborationId = collaboration.Id
+                        Description = collaboration.Description
+                        RelationshipType = collaboration.RelationshipType
+                        Initiator = collaboration.Initiator
+                        Recipient = collaboration.Recipient } }
             |> List.singleton
 
-        let fold collaboration event =
-            match event.Event with
-            | CollaborationImported c ->
-                Some
-                    { Id = c.CollaborationId
-                      Description = c.Description
-                      Initiator = c.Initiator
-                      Recipient = c.Recipient
-                      RelationshipType = c.RelationshipType }
-            | CollaboratorsConnected c ->
-                Some
-                    { Id = c.CollaborationId
-                      Description = c.Description
-                      Initiator = c.Initiator
-                      Recipient = c.Recipient
-                      RelationshipType = None }
-            | RelationshipDefined c ->
-                collaboration
-                |> Option.map (fun o ->
-                    { o with
-                          RelationshipType = Some c.RelationshipType })
-            | RelationshipUnknown c ->
-                collaboration
-                |> Option.map (fun o -> { o with RelationshipType = None })
-            | ConnectionRemoved _ -> None
 
         let private updateCollaborationsIn (document: Document) =
             Result.map (fun collaborations ->
@@ -278,7 +189,7 @@ module FileBasedCommandHandlers =
             | Remove of CollaborationId
             | NoOp
 
-        let handle clock (store: Store) command =
+        let handle clock (store: EventStore) command =
             let identity = Collaboration.identify command
             let streamName = Collaboration.name identity
 
@@ -291,17 +202,22 @@ module FileBasedCommandHandlers =
             match handle state command with
             | Ok newEvents ->
                 newEvents
-                |> List.map (fun e -> { Event = e; Metadata = { Source = streamName; RecordedAt = clock() } })
+                |> List.map (fun e ->
+                    { Event = e
+                      Metadata =
+                          { Source = streamName
+                            RecordedAt = clock () } })
                 |> store.Append
+
                 Ok identity
             | Error e -> Error e
-            
-            
-        let mapEventToDocument fetchCollaboration (event:EventEnvelope<_>) =
+
+
+        let mapEventToDocument fetchCollaboration (event: EventEnvelope<_>) =
             let storedCollaboration = fetchCollaboration event
             let result =
-                event
-                |> fold storedCollaboration
+                event.Event
+                |> Projections.asCollaboration storedCollaboration
 
             match storedCollaboration, result with
             | None, Some c -> Add c
@@ -310,7 +226,7 @@ module FileBasedCommandHandlers =
             | None, None -> NoOp
 
         let fetchCollaboration (collection: CollectionOfGuid<_>) (event: EventEnvelope<_>) =
-            collection.ById (event.Metadata.Source)
+            collection.ById(event.Metadata.Source)
 
         let subscription (database: FileBased): Subscription<Event> =
             fun (events: EventEnvelope<Event> list) ->
@@ -321,18 +237,15 @@ module FileBasedCommandHandlers =
                             event
                             |> mapEventToDocument (fetchCollaboration collection)
                             |> function
-                                | Add c -> collection.Add c.Id c
-                                | Update c ->
-                                    c.Id
-                                    |> collection.Update(fun _ -> Ok c)
-                                | Remove id -> collection.Remove id
-                                | NoOp -> collection |> Ok
-                        | Error e ->
-                            Error e
+                            | Add c -> collection.Add c.Id c
+                            | Update c -> c.Id |> collection.Update(fun _ -> Ok c)
+                            | Remove id -> collection.Remove id
+                            | NoOp -> collection |> Ok
+                        | Error e -> Error e
+
                     events
                     |> List.fold applyToCollection (Ok document.Collaborations)
-                    |> Result.map (fun c -> { document with Collaborations = c  }, System.Guid.Empty)
-                )
+                    |> Result.map (fun c -> { document with Collaborations = c }, System.Guid.Empty))
                 |> ignore
 
     module Namespaces =
