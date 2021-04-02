@@ -18,6 +18,36 @@ module FileBasedCommandHandlers =
         | Exception of exn
         | EntityNotFound of 'Id
 
+    module BridgeEventSourcingWithDatabase =
+        type ChangeOperation<'Item, 'Id> =
+            | Add of 'Item
+            | Update of 'Item
+            | Remove of 'Id
+            | NoOp
+
+        let mapEventToDocument fetch project (event: EventEnvelope<_>) =
+            let stored = fetch event
+            let result = event.Event |> project stored
+
+            match stored, result with
+            | None, Some c -> Add c
+            | Some _, Some c -> Update c
+            | Some c, None -> Remove c.Id
+            | None, None -> NoOp
+
+        let applyToCollection fetch project =
+            fun state event ->
+                match state with
+                | Ok (collection: CollectionOfGuid<_>) ->
+                    event
+                    |> mapEventToDocument (fetch collection) project
+                    |> function
+                    | Add c -> collection.Add c.Id c
+                    | Update c -> c.Id |> collection.Update(fun _ -> Ok c)
+                    | Remove id -> collection.Remove id
+                    | NoOp -> collection |> Ok
+                | Error e -> Error e
+
     module Domain =
         open Entities
         open Domain
@@ -163,32 +193,8 @@ module FileBasedCommandHandlers =
 
     module Collaboration =
         open Collaboration
-
-        let asEvents clock (collaboration: Collaboration) =
-            { Metadata =
-                  { Source = collaboration.Id
-                    RecordedAt = clock () }
-              Event =
-                  CollaborationImported
-                      { CollaborationId = collaboration.Id
-                        Description = collaboration.Description
-                        RelationshipType = collaboration.RelationshipType
-                        Initiator = collaboration.Initiator
-                        Recipient = collaboration.Recipient } }
-            |> List.singleton
-
-
-        let private updateCollaborationsIn (document: Document) =
-            Result.map (fun collaborations ->
-                { document with
-                      Collaborations = collaborations })
-
-        type ChangeOperation =
-            | Add of Collaboration
-            | Update of Collaboration
-            | Remove of CollaborationId
-            | NoOp
-
+        open BridgeEventSourcingWithDatabase
+        
         let handle clock (store: EventStore) command =
             let identity = Collaboration.identify command
             let streamName = Collaboration.name identity
@@ -212,18 +218,18 @@ module FileBasedCommandHandlers =
                 Ok identity
             | Error e -> Error e
 
-
-        let mapEventToDocument fetchCollaboration (event: EventEnvelope<_>) =
-            let storedCollaboration = fetchCollaboration event
-            let result =
-                event.Event
-                |> Projections.asCollaboration storedCollaboration
-
-            match storedCollaboration, result with
-            | None, Some c -> Add c
-            | Some _, Some c -> Update c
-            | Some c, None -> Remove c.Id
-            | None, None -> NoOp
+        let asEvents clock (collaboration: Collaboration) =
+            { Metadata =
+                  { Source = collaboration.Id
+                    RecordedAt = clock () }
+              Event =
+                  CollaborationImported
+                      { CollaborationId = collaboration.Id
+                        Description = collaboration.Description
+                        RelationshipType = collaboration.RelationshipType
+                        Initiator = collaboration.Initiator
+                        Recipient = collaboration.Recipient } }
+            |> List.singleton
 
         let fetchCollaboration (collection: CollectionOfGuid<_>) (event: EventEnvelope<_>) =
             collection.ById(event.Metadata.Source)
@@ -231,20 +237,10 @@ module FileBasedCommandHandlers =
         let subscription (database: FileBased): Subscription<Event> =
             fun (events: EventEnvelope<Event> list) ->
                 database.Change(fun document ->
-                    let applyToCollection result event =
-                        match result with
-                        | Ok collection ->
-                            event
-                            |> mapEventToDocument (fetchCollaboration collection)
-                            |> function
-                            | Add c -> collection.Add c.Id c
-                            | Update c -> c.Id |> collection.Update(fun _ -> Ok c)
-                            | Remove id -> collection.Remove id
-                            | NoOp -> collection |> Ok
-                        | Error e -> Error e
-
                     events
-                    |> List.fold applyToCollection (Ok document.Collaborations)
+                    |> List.fold
+                        (applyToCollection fetchCollaboration Projections.asCollaboration)
+                           (Ok document.Collaborations)
                     |> Result.map (fun c -> { document with Collaborations = c }, System.Guid.Empty))
                 |> ignore
 
