@@ -2,7 +2,12 @@
 
 open Contexture.Api
 open Contexture.Api.Aggregates
+open Contexture.Api.Aggregates.Collaboration
 open Contexture.Api.Database
+open Contexture.Api.Entities
+open Contexture.Api.FileBasedCommandHandlers
+open Contexture.Api.Infrastructure
+open Contexture.Api.Infrastructure.Projections
 open Microsoft.AspNetCore.Http
 open FSharp.Control.Tasks
 
@@ -10,9 +15,6 @@ open Giraffe
 
 module Collaborations =
     module CommandEndpoints =
-        open Collaboration
-        open FileBasedCommandHandlers
-
         open System
         let clock =
             fun () -> DateTime.UtcNow
@@ -45,23 +47,31 @@ module Collaborations =
                     match Collaboration.handle clock database (RemoveConnection collaborationId) with
                     | Ok collaborationId -> return! json collaborationId next ctx
                     | Error e -> return! ServerErrors.INTERNAL_ERROR e next ctx
-                }
+                }            
 
+    let collaborationsProjection: Projection<Collaboration option,Collaboration.Event> =
+        { Init = None
+          Update = Projections.asCollaboration }
 
     let getCollaborations =
         fun (next: HttpFunc) (ctx: HttpContext) ->
-            let database = ctx.GetService<FileBased>()
-            let collaborations = database.Read.Collaborations.All
+            let database = ctx.GetService<EventStore>()
+            let collaborations =
+                database.Get<Collaboration.Event>()
+                |> List.fold (projectIntoMap collaborationsProjection) Map.empty
+                |> Map.toList
+                |> List.map snd
+                
             json collaborations next ctx
 
     let getCollaboration collaborationId =
         fun (next: HttpFunc) (ctx: HttpContext) ->
-            let database = ctx.GetService<FileBased>()
-            let document = database.Read
-
+            let database = ctx.GetService<EventStore>()
             let result =
                 collaborationId
-                |> document.Collaborations.ById
+                |> database.Stream
+                |> List.map (fun e -> e.Event)
+                |> List.fold Projections.asCollaboration None
                 |> Option.map json
                 |> Option.defaultValue (RequestErrors.NOT_FOUND(sprintf "Collaboration %O not found" collaborationId))
 
