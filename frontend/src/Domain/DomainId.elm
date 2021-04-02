@@ -8,23 +8,23 @@ import Json.Encode as Encode
 import Url.Parser exposing (Parser, custom)
 
 type DomainId
-  = DomainId Int
+  = DomainId String
 
-extractInt : DomainId -> Int
-extractInt value =
+extractValue : DomainId -> String
+extractValue value =
   case value of
     DomainId v -> v
 
 idToString : DomainId -> String
 idToString domainId =
   case domainId of
-    DomainId id -> String.fromInt id
+    DomainId id -> id
 
 idFromString : String -> Maybe DomainId
 idFromString value =
-  value
-  |> String.toInt
-  |> Maybe.map DomainId
+  if String.isEmpty value
+  then Nothing
+  else value |> DomainId |> Just
 
 idFromStringSuccess : String -> Decoder DomainId
 idFromStringSuccess value =
@@ -36,15 +36,15 @@ idParser : Parser (DomainId -> a) a
 idParser =
     custom "DOMAINID" <|
         \domainId ->
-            Maybe.map DomainId (String.toInt domainId)
+            idFromString domainId
 
 idDecoder : Decoder DomainId
 idDecoder =
   Decode.oneOf
-    [ Decode.map DomainId Decode.int
+    [ Decode.map DomainId Decode.string
     , Decode.string |> Decode.andThen idFromStringSuccess]
 
 
 idEncoder : DomainId -> Encode.Value
 idEncoder value =
-  Encode.int (extractInt value)
+  Encode.string (extractValue value)

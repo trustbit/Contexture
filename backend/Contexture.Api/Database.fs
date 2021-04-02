@@ -85,7 +85,7 @@ module Database =
 
         let remove idValue =
             match idValue |> getById with
-            | Some item ->
+            | Some _ ->
                 let updatedItems = itemsById |> Map.remove idValue
                 updatedItems  |> CollectionOfGuid |> Ok
             | None ->
@@ -121,13 +121,13 @@ module Database =
         CollectionOfGuid(byId)
 
     type Document =
-        { Domains: CollectionOfInt<Domain>
+        { Domains: CollectionOfGuid<Domain>
           BoundedContexts: CollectionOfInt<BoundedContext>
           Collaborations: CollectionOfGuid<Collaboration>
           NamespaceTemplates: CollectionOfInt<NamespaceTemplate> }
 
     module Document =
-        let subdomainsOf (domains: CollectionOfInt<Domain>) parentDomainId =
+        let subdomainsOf (domains: CollectionOfGuid<Domain>) parentDomainId =
             domains.All
             |> List.where (fun x -> x.ParentDomainId = Some parentDomainId)
 
@@ -227,12 +227,12 @@ module Database =
 
             let private CollaborationNamespaceBytes =
                 IdentityHash.buildNamespace (Guid("d24eb67c-1aed-4995-986b-5442c074549a"))
+            let private DomainNamespaceBytes =
+                IdentityHash.buildNamespace (Guid("04DF3500-497C-4973-902A-AED206345B21"))
 
-            let processId identityNamespace (token: JToken) =
-                let obj = token :?> JObject
-
+            let replaceIdProperty propertyName identityNamespace (obj: JObject) =
                 let idProperty =
-                    obj.Property("id")
+                    obj.Property(propertyName)
                     |> Option.ofObj
                     |> Option.bind (fun p ->
                         p.Value
@@ -244,9 +244,9 @@ module Database =
                     let newId =
                         idValue.Value.ToString()
                         |> IdentityHash.generate identityNamespace
-                    obj.Property("id").Value <- JValue(newId)
+                    obj.Property(propertyName).Value <- JValue(newId)
                 | None -> ()
-
+                
             let toVersion1 (json: string) =
                 let root = JObject.Parse json
 
@@ -343,13 +343,38 @@ module Database =
 
 
                 let processCollaborations (token: JToken) =
-                    processId CollaborationNamespaceBytes token
+                    let obj = token :?> JObject
+                    obj |> replaceIdProperty "id" CollaborationNamespaceBytes
+                    
+                    obj.Property("initiator")
+                    |> Option.ofObj
+                    |> Option.iter( fun p ->
+                        ( p.Value :?> JObject) |> replaceIdProperty "domain" DomainNamespaceBytes)
+                    
+                    obj.Property("recipient")
+                    |> Option.ofObj
+                    |> Option.iter( fun p ->
+                        ( p.Value :?> JObject) |> replaceIdProperty "domain" DomainNamespaceBytes)
+                    
+                let processDomains (token: JToken) =
+                    let obj = token :?> JObject
+                    obj |> replaceIdProperty "id" DomainNamespaceBytes 
+                    obj |> replaceIdProperty "parentDomainId" DomainNamespaceBytes 
+                    
+                let processBoundedContexts (token: JToken) =
+                    let obj = token :?> JObject
+                    token |> addEmptyNamespaces
+                    obj |> replaceIdProperty "domainId" DomainNamespaceBytes
+                    
 
                 root.["collaborations"]
                 |> Seq.iter processCollaborations
+                
+                root.["domains"]
+                |> Seq.iter processDomains
 
                 root.["boundedContexts"]
-                |> Seq.iter addEmptyNamespaces
+                |> Seq.iter processBoundedContexts
 
                 if root.Property("namespaceTemplates") |> isNull
                    || not
@@ -391,7 +416,7 @@ module Database =
             |> Serialization.deserialize
             |> fun root ->
                 let document =
-                    { Domains = collectionOfInt root.Domains (fun d -> d.Id)
+                    { Domains = collectionOfGuid root.Domains (fun d -> d.Id)
                       BoundedContexts = collectionOfInt root.BoundedContexts (fun d -> d.Id)
                       Collaborations = collectionOfGuid root.Collaborations (fun d -> d.Id)
                       NamespaceTemplates = collectionOfInt root.NamespaceTemplates (fun d -> d.Id) }

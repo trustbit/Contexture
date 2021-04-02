@@ -55,18 +55,30 @@ module FileBasedCommandHandlers =
         let private updateDomainsIn (document: Document) =
             Result.map (fun (domains, item) -> { document with Domains = domains }, item)
 
-        let create (database: FileBased) parentDomain (command: CreateDomain) =
-            match newDomain command.Name parentDomain with
+        let create (database: FileBased) id parentDomain (command: CreateDomain) =
+            match newDomain id command.Name parentDomain with
             | Ok addNewDomain ->
                 let changed =
                     database.Change(fun document ->
                         addNewDomain
-                        |> document.Domains.Add
+                        |> document.Domains.Add id
+                        |> Result.map (fun r -> r, id)
                         |> updateDomainsIn document)
 
                 changed
-                |> Result.map (fun d -> d.Id)
-                |> Result.mapError InfrastructureError
+                |> Result.mapError (fun e ->
+                    match e with
+                    | ChangeError err ->
+                        err |> DomainError
+                    | EntityNotFoundInCollection id ->
+                        id
+                        |> EntityNotFound
+                        |> InfrastructureError
+                    | DuplicateKey id ->
+                        id
+                        |> EntityNotFound
+                        |> InfrastructureError
+                    )
             | Error domainError -> domainError |> DomainError |> Error
 
         let remove (database: FileBased) domainId =
@@ -74,17 +86,31 @@ module FileBasedCommandHandlers =
                 database.Change(fun document ->
                     domainId
                     |> document.Domains.Remove
+                    |> Result.map(fun r -> r, domainId)
                     |> updateDomainsIn document)
 
             changed
             |> Result.map (fun _ -> domainId)
-            |> Result.mapError InfrastructureError
+            |> Result.mapError (fun e ->
+                    match e with
+                    | ChangeError err ->
+                        err |> DomainError
+                    | EntityNotFoundInCollection id ->
+                        id
+                        |> EntityNotFound
+                        |> InfrastructureError
+                    | DuplicateKey id ->
+                        id
+                        |> EntityNotFound
+                        |> InfrastructureError
+                    )
 
         let private updateDomain (database: FileBased) domainId updateDomain =
             let changed =
                 database.Change(fun document ->
                     domainId
                     |> document.Domains.Update updateDomain
+                    |> Result.map(fun r -> r,domainId)
                     |> updateDomainsIn document)
 
             match changed with
@@ -103,8 +129,8 @@ module FileBasedCommandHandlers =
 
         let handle (database: FileBased) (command: Command) =
             match command with
-            | CreateDomain createDomain -> create database None createDomain
-            | CreateSubdomain (domainId, createDomain) -> create database (Some domainId) createDomain
+            | CreateDomain (domainId,createDomain) -> create database domainId None createDomain
+            | CreateSubdomain (domainId, subdomainId, createDomain) -> create database domainId (Some subdomainId) createDomain
             | RemoveDomain domainId -> remove database domainId
             | MoveDomain (domainId, move) -> updateDomain database domainId (moveDomain move.ParentDomainId)
             | RenameDomain (domainId, rename) -> updateDomain database domainId (renameDomain rename.Name)

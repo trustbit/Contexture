@@ -100,7 +100,7 @@ module Entities =
           Labels: Label list }
 
 
-    type DomainId = int
+    type DomainId = Guid
     type BoundedContextId = int
 
     type BoundedContext =
@@ -182,8 +182,8 @@ module Aggregates =
         open Entities
 
         type Command =
-            | CreateDomain of CreateDomain
-            | CreateSubdomain of DomainId * CreateDomain
+            | CreateDomain of DomainId * CreateDomain
+            | CreateSubdomain of DomainId * subdomainOf: DomainId * CreateDomain
             | RenameDomain of DomainId * RenameDomain
             | MoveDomain of DomainId * MoveDomain
             | RefineVision of DomainId * RefineVision
@@ -194,7 +194,7 @@ module Aggregates =
 
         and RenameDomain = { Name: string }
 
-        and MoveDomain = { ParentDomainId: int option }
+        and MoveDomain = { ParentDomainId: DomainId option }
 
         and RefineVision = { Vision: string }
 
@@ -205,10 +205,10 @@ module Aggregates =
         let nameValidation name =
             if String.IsNullOrWhiteSpace name then Error EmptyName else Ok name
 
-        let newDomain name parentDomain =
+        let newDomain id name parentDomain =
             name
             |> nameValidation
-            |> Result.map (fun name id ->
+            |> Result.map (fun name ->
                 { Id = id
                   Key = None
                   ParentDomainId = parentDomain

@@ -28,8 +28,8 @@ module Domains =
               Namespaces : Namespace list }
 
         type DomainResult =
-            { Id: int
-              ParentDomainId: int option
+            { Id: DomainId
+              ParentDomainId: DomainId option
               Key: string option
               Name: string
               Vision: string option
@@ -93,17 +93,17 @@ module Domains =
 
                     match Domain.handle database command with
                     | Ok updatedDomain ->
-                        return! redirectTo false (sprintf "/api/domains/%i" updatedDomain) next ctx
+                        return! redirectTo false (sprintf "/api/domains/%O" updatedDomain) next ctx
                     | Error (DomainError EmptyName) ->
                         return! RequestErrors.BAD_REQUEST "Name must not be empty" next ctx
                     | Error e -> return! ServerErrors.INTERNAL_ERROR e next ctx
                 }
 
         let createDomain (command: CreateDomain) =
-            updateAndReturnDomain (CreateDomain(command))
+            updateAndReturnDomain (CreateDomain(Guid.NewGuid(),command))
 
         let createSubDomain domainId (command: CreateDomain) =
-            updateAndReturnDomain (CreateSubdomain(domainId, command))
+            updateAndReturnDomain (CreateSubdomain(Guid.NewGuid(),domainId, command))
 
         let move domainId (command: MoveDomain) =
             updateAndReturnDomain (MoveDomain(domainId, command))
@@ -163,7 +163,7 @@ module Domains =
                 |> document.Domains.ById
                 |> Option.map (Results.includingSubdomainsAndBoundedContexts document)
                 |> Option.map json
-                |> Option.defaultValue (RequestErrors.NOT_FOUND(sprintf "Domain %i not found" domainId))
+                |> Option.defaultValue (RequestErrors.NOT_FOUND(sprintf "Domain %O not found" domainId))
 
             result next ctx
 
@@ -182,7 +182,7 @@ module Domains =
     let routes: HttpHandler =
         subRoute
             "/domains"
-            (choose [ subRoutef "/%i" (fun domainId ->
+            (choose [ subRoutef "/%O" (fun domainId ->
                           (choose [ GET
                                     >=> route "/domains"
                                     >=> getSubDomains domainId
