@@ -58,6 +58,7 @@ type EventStore(items: Dictionary<EventSource, EventEnvelope<obj> list>,
                 |> stream
                 |> fun s -> s @ [ envelope ]
                 |> List.map boxEnvelope
+
             items.[source] <- fullStream
             let eventType = typedefof<'E>
             let allEvents = getAll eventType
@@ -96,7 +97,6 @@ module Projections =
         { Init: 'State
           Update: 'State -> 'Event -> 'State }
 
-
     let projectIntoMap projection =
         fun state eventEnvelope ->
             state
@@ -108,3 +108,8 @@ module Projections =
             |> fun newState ->
                 state
                 |> Map.add eventEnvelope.Metadata.Source newState
+
+    let project projection events =
+        events
+        |> List.map (fun e -> e.Event)
+        |> List.fold projection.Update projection.Init

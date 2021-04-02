@@ -70,8 +70,7 @@ module Collaborations =
             let result =
                 collaborationId
                 |> database.Stream
-                |> List.map (fun e -> e.Event)
-                |> List.fold Projections.asCollaboration None
+                |> project collaborationsProjection
                 |> Option.map json
                 |> Option.defaultValue (RequestErrors.NOT_FOUND(sprintf "Collaboration %O not found" collaborationId))
 
