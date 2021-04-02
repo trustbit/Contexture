@@ -1,4 +1,4 @@
-﻿namespace Contexture.Api
+namespace Contexture.Api
 
 open System
 
@@ -374,18 +374,97 @@ module Aggregates =
               Initiator: Collaborator
               Recipient: Collaborator }
 
-        let changeRelationship relationship (collaboration: Collaboration) =
-            Ok
-                { collaboration with
-                      RelationshipType = relationship }
+        type Event =
+            | CollaborationImported of CollaborationImported
+            | RelationshipDefined of RelationshipDefined
+            | RelationshipUnknown of RelationshipUnknown
+            | CollaboratorsConnected of CollaboratorsConnected
+            | ConnectionRemoved of ConnectionRemoved
 
-        let newConnection id initiator recipient description =
-            { Id = id
-              Description = description
-              Initiator = initiator
-              Recipient = recipient
-              RelationshipType = None }
+        and CollaborationImported =
+            { CollaborationId: CollaborationId
+              Description: string option
+              Initiator: Collaborator
+              Recipient: Collaborator
+              RelationshipType: RelationshipType option }
 
+        and RelationshipDefined =
+            { CollaborationId: CollaborationId
+              RelationshipType: RelationshipType }
+
+        and RelationshipUnknown = { CollaborationId: CollaborationId }
+
+        and CollaboratorsConnected =
+            { CollaborationId: CollaborationId
+              Description: string option
+              Initiator: Collaborator
+              Recipient: Collaborator }
+
+        and ConnectionRemoved = { CollaborationId: CollaborationId }
+        
+        type State =
+            | Initial
+            | Existing
+            | Deleted
+            static member Fold (state: State) (event: Event) =
+                match event with
+                | ConnectionRemoved _ ->
+                    Deleted
+                | _ -> Existing
+                
+        let identify =
+            function
+            | DefineInboundConnection (collaborationId, _) -> collaborationId
+            | DefineOutboundConnection (collaborationId, _) -> collaborationId
+            | DefineRelationship (collaborationId, _) -> collaborationId
+            | RemoveConnection (collaborationId) -> collaborationId
+
+        let name identity =
+            identity
+                
+        let handle (state: State) (command: Command) =
+            match state,command with
+            | Existing, DefineRelationship (collaborationId, relationship)->
+                match relationship.RelationshipType with
+                | Some r ->
+                    Ok [ RelationshipDefined { CollaborationId = collaborationId; RelationshipType = r }]
+                | None ->
+                    Ok [ RelationshipUnknown { CollaborationId = collaborationId } ]
+            | Initial, DefineInboundConnection (collaborationId,connection) ->
+                Ok [ CollaboratorsConnected { CollaborationId = collaborationId; Description = connection.Description; Initiator = connection.Initiator; Recipient = connection.Recipient } ]
+            | Initial, DefineOutboundConnection (collaborationId,connection) ->
+                Ok [ CollaboratorsConnected { CollaborationId = collaborationId; Description = connection.Description; Initiator = connection.Initiator; Recipient = connection.Recipient } ]
+            | _ , RemoveConnection collaborationId ->
+                Ok [ ConnectionRemoved { CollaborationId = collaborationId } ]
+            | _,_ ->
+                Ok []
+                
+        module Projections =
+            let asCollaboration collaboration event =
+                match event with
+                | CollaborationImported c ->
+                    Some
+                        { Id = c.CollaborationId
+                          Description = c.Description
+                          Initiator = c.Initiator
+                          Recipient = c.Recipient
+                          RelationshipType = c.RelationshipType }
+                | CollaboratorsConnected c ->
+                    Some
+                        { Id = c.CollaborationId
+                          Description = c.Description
+                          Initiator = c.Initiator
+                          Recipient = c.Recipient
+                          RelationshipType = None }
+                | RelationshipDefined c ->
+                    collaboration
+                    |> Option.map (fun o ->
+                        { o with
+                              RelationshipType = Some c.RelationshipType })
+                | RelationshipUnknown c ->
+                    collaboration
+                    |> Option.map (fun o -> { o with RelationshipType = None })
+                | ConnectionRemoved _ -> None
 
     module Namespaces =
         open Entities
@@ -406,26 +485,21 @@ module Aggregates =
         and RemoveLabel =
             { Namespace: NamespaceId
               Label: LabelId }
-            
+
         module Label =
             let create name (value: string) =
-                if String.IsNullOrWhiteSpace name
-                then None
-                else Some  {
-                  Id = Guid.NewGuid()
-                  Name = name.Trim()
-                  Value =
-                      if not (isNull value)
-                      then value.Trim()
-                      else null 
-                }
+                if String.IsNullOrWhiteSpace name then
+                    None
+                else
+                    Some
+                        { Id = Guid.NewGuid()
+                          Name = name.Trim()
+                          Value = if not (isNull value) then value.Trim() else null }
 
         let addNewNamespace name labels namespaces =
             let newLabels =
                 labels
-                |> List.choose (fun label ->
-                    Label.create label.Name label.Value
-                )
+                |> List.choose (fun label -> Label.create label.Name label.Value)
 
             let newNamespace =
                 { Id = Guid.NewGuid()
@@ -449,17 +523,11 @@ module Aggregates =
                 else
                     n)
             |> Ok
-            
+
         let addLabel namespaceId labelName value (namespaces: Namespace list) =
             match Label.create labelName value with
             | Some label ->
                 namespaces
-                |> List.map (fun n ->
-                    if n.Id = namespaceId then
-                        { n with
-                              Labels = n.Labels @ [ label ] }
-                    else
-                        n)
+                |> List.map (fun n -> if n.Id = namespaceId then { n with Labels = n.Labels @ [ label ] } else n)
                 |> Ok
-            | None ->
-                Error EmptyName
+            | None -> Error EmptyName

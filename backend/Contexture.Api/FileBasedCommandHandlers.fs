@@ -3,18 +3,50 @@ namespace Contexture.Api
 open Contexture.Api
 open Contexture.Api.Aggregates.BoundedContext
 open Contexture.Api.Aggregates.Domain
+open Contexture.Api.Entities
 open Database
+open Contexture.Api.Infrastructure
 
 module FileBasedCommandHandlers =
     open Aggregates
 
-    type CommandHandlerError<'T,'Id> =
+    type CommandHandlerError<'T, 'Id> =
         | DomainError of 'T
         | InfrastructureError of InfrastructureError<'Id>
 
     and InfrastructureError<'Id> =
         | Exception of exn
         | EntityNotFound of 'Id
+
+    module BridgeEventSourcingWithDatabase =
+        type ChangeOperation<'Item, 'Id> =
+            | Add of 'Item
+            | Update of 'Item
+            | Remove of 'Id
+            | NoOp
+
+        let mapEventToDocument fetch project (event: EventEnvelope<_>) =
+            let stored = fetch event
+            let result = event.Event |> project stored
+
+            match stored, result with
+            | None, Some c -> Add c
+            | Some _, Some c -> Update c
+            | Some c, None -> Remove c.Id
+            | None, None -> NoOp
+
+        let applyToCollection fetch project =
+            fun state event ->
+                match state with
+                | Ok (collection: CollectionOfGuid<_>) ->
+                    event
+                    |> mapEventToDocument (fetch collection) project
+                    |> function
+                    | Add c -> collection.Add c.Id c
+                    | Update c -> c.Id |> collection.Update(fun _ -> Ok c)
+                    | Remove id -> collection.Remove id
+                    | NoOp -> collection |> Ok
+                | Error e -> Error e
 
     module Domain =
         open Entities
@@ -161,85 +193,77 @@ module FileBasedCommandHandlers =
 
     module Collaboration =
         open Collaboration
+        open BridgeEventSourcingWithDatabase
+        
+        let handle clock (store: EventStore) command =
+            let identity = Collaboration.identify command
+            let streamName = Collaboration.name identity
 
-        let private updateCollaborationsIn (document: Document) =
-            Result.map (fun (collaborations, item) ->
-                { document with
-                      Collaborations = collaborations },
-                item)
+            let state =
+                streamName
+                |> store.Stream
+                |> List.map (fun e -> e.Event)
+                |> List.fold State.Fold State.Initial
 
-        let create (database: FileBased) collaborationId (command: DefineConnection) =
-            let changed =
+            match handle state command with
+            | Ok newEvents ->
+                newEvents
+                |> List.map (fun e ->
+                    { Event = e
+                      Metadata =
+                          { Source = streamName
+                            RecordedAt = clock () } })
+                |> store.Append
+
+                Ok identity
+            | Error e -> Error e
+
+        let asEvents clock (collaboration: Collaboration) =
+            { Metadata =
+                  { Source = collaboration.Id
+                    RecordedAt = clock () }
+              Event =
+                  CollaborationImported
+                      { CollaborationId = collaboration.Id
+                        Description = collaboration.Description
+                        RelationshipType = collaboration.RelationshipType
+                        Initiator = collaboration.Initiator
+                        Recipient = collaboration.Recipient } }
+            |> List.singleton
+
+        let fetchCollaboration (collection: CollectionOfGuid<_>) (event: EventEnvelope<_>) =
+            collection.ById(event.Metadata.Source)
+
+        let subscription (database: FileBased): Subscription<Event> =
+            fun (events: EventEnvelope<Event> list) ->
                 database.Change(fun document ->
-                    newConnection collaborationId command.Initiator command.Recipient command.Description
-                    |> document.Collaborations.Add collaborationId
-                    |> updateCollaborationsIn document)
-
-            changed
-            |> Result.map (fun d -> d.Id)
-            |> Result.mapError (function
-                | ChangeError e -> DomainError e
-                | EntityNotFoundInCollection e -> e |> EntityNotFound |> InfrastructureError
-                | DuplicateKey k -> k |> EntityNotFound |> InfrastructureError
-                )
-
-        let remove (database: FileBased) collaborationId =
-            let changed =
-                database.Change(fun document ->
-                    collaborationId
-                    |> document.Collaborations.Remove
-                    |> updateCollaborationsIn document)
-
-            changed
-            |> Result.map (fun _ -> collaborationId)
-            |> Result.mapError InfrastructureError
-
-        let private updateCollaboration (database: FileBased) collaborationId update =
-            let changed =
-                database.Change(fun document ->
-                    collaborationId
-                    |> document.Collaborations.Update update
-                    |> updateCollaborationsIn document)
-
-            match changed with
-            | Ok _ -> Ok collaborationId
-            | Error (ChangeError e) -> Error(DomainError e)
-            | Error (EntityNotFoundInCollection id) ->
-                id
-                |> EntityNotFound
-                |> InfrastructureError
-                |> Error
-            | Error (DuplicateKey id) ->
-                id
-                |> EntityNotFound
-                |> InfrastructureError
-                |> Error
-
-        let handle (database: FileBased) (command: Command) =
-            match command with
-            | DefineRelationship (collaborationId, relationship) ->
-                updateCollaboration database collaborationId (changeRelationship relationship.RelationshipType)
-            | DefineInboundConnection (collaborationId, connection) ->
-                create database collaborationId connection
-            | DefineOutboundConnection (collaborationId, connection) -> create database collaborationId connection
-            | RemoveConnection collaborationId -> remove database collaborationId
+                    events
+                    |> List.fold
+                        (applyToCollection fetchCollaboration Projections.asCollaboration)
+                           (Ok document.Collaborations)
+                    |> Result.map (fun c -> { document with Collaborations = c }, System.Guid.Empty))
+                |> ignore
 
     module Namespaces =
         open Entities
-        open Namespaces        
+        open Namespaces
+
         let private updateBoundedContextsIn (document: Document) =
             Result.map (fun (contexts, item) ->
                 { document with
                       BoundedContexts = contexts },
                 item)
+
         let private updateNamespaces (database: FileBased) contextId update =
             let updateNamespacesOnly (boundedContext: BoundedContext) =
                 boundedContext.Namespaces
                 |> tryUnbox<Namespace list>
                 |> Option.defaultValue []
                 |> update
-                |> Result.map (fun namespaces -> { boundedContext with Namespaces = namespaces })
-                
+                |> Result.map (fun namespaces ->
+                    { boundedContext with
+                          Namespaces = namespaces })
+
             let changed =
                 database.Change(fun document ->
                     contextId
@@ -259,14 +283,23 @@ module FileBasedCommandHandlers =
                 |> EntityNotFound
                 |> InfrastructureError
                 |> Error
-        
+
         let handle (database: FileBased) (command: Command) =
             match command with
             | NewNamespace (boundedContextId, namespaceCommand) ->
-                updateNamespaces database boundedContextId (addNewNamespace namespaceCommand.Name namespaceCommand.Labels)
+                updateNamespaces
+                    database
+                    boundedContextId
+                    (addNewNamespace namespaceCommand.Name namespaceCommand.Labels)
             | RemoveNamespace (boundedContextId, namespaceCommand) ->
                 updateNamespaces database boundedContextId (removeNamespace namespaceCommand)
             | RemoveLabel (boundedContextId, namespaceCommand) ->
-                updateNamespaces database boundedContextId (removeLabel namespaceCommand.Namespace namespaceCommand.Label)
-            | AddLabel(boundedContextId, namespaceId, namespaceCommand) ->
-                updateNamespaces database boundedContextId (addLabel namespaceId namespaceCommand.Name namespaceCommand.Value)
+                updateNamespaces
+                    database
+                    boundedContextId
+                    (removeLabel namespaceCommand.Namespace namespaceCommand.Label)
+            | AddLabel (boundedContextId, namespaceId, namespaceCommand) ->
+                updateNamespaces
+                    database
+                    boundedContextId
+                    (addLabel namespaceId namespaceCommand.Name namespaceCommand.Value)
