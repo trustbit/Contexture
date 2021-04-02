@@ -418,6 +418,9 @@ module Aggregates =
             | DefineOutboundConnection (collaborationId, _) -> collaborationId
             | DefineRelationship (collaborationId, _) -> collaborationId
             | RemoveConnection (collaborationId) -> collaborationId
+
+        let name identity =
+            identity
                 
         let handle (state: State) (command: Command) =
             match state,command with

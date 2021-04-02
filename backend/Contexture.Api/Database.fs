@@ -72,8 +72,6 @@ module Database =
                 match change item with
                 | Ok updatedItem ->
                     let itemsUpdated = itemsById |> Map.add idValue updatedItem
-
-
                     itemsUpdated |> CollectionOfGuid |> Ok
                 | Error e -> e |> ChangeError |> Error
             | None -> idValue |> EntityNotFoundInCollection |> Error

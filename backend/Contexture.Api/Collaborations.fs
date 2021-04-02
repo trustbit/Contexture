@@ -17,7 +17,7 @@ module Collaborations =
         let private updateAndReturnCollaboration command =
             fun (next: HttpFunc) (ctx: HttpContext) ->
                 task {
-                    let database = ctx.GetService<FileBased>()
+                    let database = ctx.GetService<Store>()
 
                     match Collaboration.handle database command with
                     | Ok collaborationId ->
@@ -39,7 +39,7 @@ module Collaborations =
         let removeAndReturnId collaborationId =
             fun (next: HttpFunc) (ctx: HttpContext) ->
                 task {
-                    let database = ctx.GetService<FileBased>()
+                    let database = ctx.GetService<Store>()
 
                     match Collaboration.handle database (RemoveConnection collaborationId) with
                     | Ok collaborationId -> return! json collaborationId next ctx
