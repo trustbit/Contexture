@@ -14,7 +14,7 @@ module BoundedContexts =
 
     module Results =
         type BoundedContextResult =
-            { Id: int
+            { Id: BoundedContextId
               ParentDomainId: DomainId
               Key: string option
               Name: string
@@ -54,7 +54,7 @@ module BoundedContexts =
 
                     match BoundedContext.handle database command with
                     | Ok updatedContext ->
-                        return! redirectTo false (sprintf "/api/boundedcontexts/%i" updatedContext) next ctx
+                        return! redirectTo false (sprintf "/api/boundedcontexts/%O" updatedContext) next ctx
                     | Error (DomainError EmptyName) ->
                         return! RequestErrors.BAD_REQUEST "Name must not be empty" next ctx
                     | Error e -> return! ServerErrors.INTERNAL_ERROR e next ctx
@@ -121,14 +121,14 @@ module BoundedContexts =
                 |> document.BoundedContexts.ById
                 |> Option.map (Results.convertBoundedContextWithDomain database.Read)
                 |> Option.map json
-                |> Option.defaultValue (RequestErrors.NOT_FOUND(sprintf "BoundedContext %i not found" contextId))
+                |> Option.defaultValue (RequestErrors.NOT_FOUND(sprintf "BoundedContext %O not found" contextId))
 
             result next ctx
 
     let routes: HttpHandler =
         subRouteCi
             "/boundedcontexts"
-            (choose [ subRoutef "/%i" (fun contextId ->
+            (choose [ subRoutef "/%O" (fun contextId ->
                           (choose [ Namespaces.routes contextId
                                     GET >=> getBoundedContext contextId
                                     POST

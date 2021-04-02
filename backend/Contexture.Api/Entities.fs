@@ -101,7 +101,7 @@ module Entities =
 
 
     type DomainId = Guid
-    type BoundedContextId = int
+    type BoundedContextId = Guid
 
     type BoundedContext =
         { Id: BoundedContextId
@@ -243,7 +243,7 @@ module Aggregates =
         open Entities
 
         type Command =
-            | CreateBoundedContext of DomainId * CreateBoundedContext
+            | CreateBoundedContext of BoundedContextId * DomainId * CreateBoundedContext
             | UpdateTechnicalInformation of BoundedContextId * UpdateTechnicalInformation
             | RenameBoundedContext of BoundedContextId * RenameBoundedContext
             | AssignKey of BoundedContextId * AssignKey
@@ -287,10 +287,10 @@ module Aggregates =
         let nameValidation name =
             if String.IsNullOrWhiteSpace name then Error EmptyName else Ok name
 
-        let newBoundedContext domainId name =
+        let newBoundedContext id domainId name =
             name
             |> nameValidation
-            |> Result.map (fun name id ->
+            |> Result.map (fun name ->
                 { Id = id
                   Key = None
                   DomainId = domainId

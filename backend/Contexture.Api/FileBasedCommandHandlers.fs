@@ -141,18 +141,29 @@ module FileBasedCommandHandlers =
     module BoundedContext =
         open BoundedContext
 
-        let create (database: FileBased) domainId (command: CreateBoundedContext) =
-            match newBoundedContext domainId command.Name with
+        let create (database: FileBased) id domainId (command: CreateBoundedContext) =
+            match newBoundedContext id domainId command.Name with
             | Ok addNewBoundedContext ->
                 let changed =
                     database.Change(fun document ->
                         addNewBoundedContext
-                        |> document.BoundedContexts.Add
-                        |> Result.map (fun (bcs, item) -> { document with BoundedContexts = bcs }, item))
+                        |> document.BoundedContexts.Add id
+                        |> Result.map (fun bcs -> { document with BoundedContexts = bcs }, id))
 
                 changed
-                |> Result.map (fun d -> d.Id)
-                |> Result.mapError InfrastructureError
+                |> Result.mapError (fun e ->
+                    match e with
+                    | ChangeError err ->
+                        err |> DomainError
+                    | EntityNotFoundInCollection id ->
+                        id
+                        |> EntityNotFound
+                        |> InfrastructureError
+                    | DuplicateKey id ->
+                        id
+                        |> EntityNotFound
+                        |> InfrastructureError
+                    )
             | Error domainError -> domainError |> DomainError |> Error
 
         let private updateBoundedContextsIn (document: Document) =
@@ -166,17 +177,31 @@ module FileBasedCommandHandlers =
                 database.Change(fun document ->
                     contextId
                     |> document.BoundedContexts.Remove
+                    |> Result.map (fun r -> r,contextId)
                     |> updateBoundedContextsIn document)
 
             changed
             |> Result.map (fun _ -> contextId)
-            |> Result.mapError InfrastructureError
+            |> Result.mapError (fun e ->
+                match e with
+                | ChangeError err ->
+                    err |> DomainError
+                | EntityNotFoundInCollection id ->
+                    id
+                    |> EntityNotFound
+                    |> InfrastructureError
+                | DuplicateKey id ->
+                    id
+                    |> EntityNotFound
+                    |> InfrastructureError
+                )
 
         let private updateBoundedContext (database: FileBased) contextId update =
             let changed =
                 database.Change(fun document ->
                     contextId
                     |> document.BoundedContexts.Update update
+                    |> Result.map (fun r -> r,contextId)
                     |> updateBoundedContextsIn document)
 
             match changed with
@@ -195,7 +220,7 @@ module FileBasedCommandHandlers =
 
         let handle (database: FileBased) (command: Command) =
             match command with
-            | CreateBoundedContext (domainId, createBc) -> create database domainId createBc
+            | CreateBoundedContext (id, domainId, createBc) -> create database id domainId createBc
             | UpdateTechnicalInformation (contextId, technical) ->
                 updateBoundedContext database contextId (updateTechnicalDescription technical)
             | RenameBoundedContext (contextId, rename) ->
@@ -294,6 +319,7 @@ module FileBasedCommandHandlers =
                 database.Change(fun document ->
                     contextId
                     |> document.BoundedContexts.Update updateNamespacesOnly
+                    |> Result.map (fun r -> r,contextId)
                     |> updateBoundedContextsIn document)
 
             match changed with

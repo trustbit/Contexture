@@ -122,7 +122,7 @@ module Database =
 
     type Document =
         { Domains: CollectionOfGuid<Domain>
-          BoundedContexts: CollectionOfInt<BoundedContext>
+          BoundedContexts: CollectionOfGuid<BoundedContext>
           Collaborations: CollectionOfGuid<Collaboration>
           NamespaceTemplates: CollectionOfInt<NamespaceTemplate> }
 
@@ -131,7 +131,7 @@ module Database =
             domains.All
             |> List.where (fun x -> x.ParentDomainId = Some parentDomainId)
 
-        let boundedContextsOf (boundedContexts: CollectionOfInt<BoundedContext>) domainId =
+        let boundedContextsOf (boundedContexts: CollectionOfGuid<BoundedContext>) domainId =
             boundedContexts.All
             |> List.where (fun x -> x.DomainId = domainId)
 
@@ -229,6 +229,8 @@ module Database =
                 IdentityHash.buildNamespace (Guid("d24eb67c-1aed-4995-986b-5442c074549a"))
             let private DomainNamespaceBytes =
                 IdentityHash.buildNamespace (Guid("04DF3500-497C-4973-902A-AED206345B21"))
+            let private BoundedContextNamespaceBytes =
+                IdentityHash.buildNamespace (Guid("676FA85B-CB26-469C-B7C7-D1C9E4CCC2A3"))
 
             let replaceIdProperty propertyName identityNamespace (obj: JObject) =
                 let idProperty =
@@ -346,15 +348,17 @@ module Database =
                     let obj = token :?> JObject
                     obj |> replaceIdProperty "id" CollaborationNamespaceBytes
                     
-                    obj.Property("initiator")
-                    |> Option.ofObj
-                    |> Option.iter( fun p ->
-                        ( p.Value :?> JObject) |> replaceIdProperty "domain" DomainNamespaceBytes)
+                    let replaceReferences propertyName =
+                        obj.Property(propertyName)
+                        |> Option.ofObj
+                        |> Option.iter( fun p ->
+                            let propertyObject = p.Value :?> JObject
+                            propertyObject |> replaceIdProperty "domain" DomainNamespaceBytes
+                            propertyObject |> replaceIdProperty "boundedContext" BoundedContextNamespaceBytes
+                        )
                     
-                    obj.Property("recipient")
-                    |> Option.ofObj
-                    |> Option.iter( fun p ->
-                        ( p.Value :?> JObject) |> replaceIdProperty "domain" DomainNamespaceBytes)
+                    replaceReferences "initiator"
+                    replaceReferences "recipient"
                     
                 let processDomains (token: JToken) =
                     let obj = token :?> JObject
@@ -365,6 +369,7 @@ module Database =
                     let obj = token :?> JObject
                     token |> addEmptyNamespaces
                     obj |> replaceIdProperty "domainId" DomainNamespaceBytes
+                    obj |> replaceIdProperty "id" BoundedContextNamespaceBytes
                     
 
                 root.["collaborations"]
@@ -417,7 +422,7 @@ module Database =
             |> fun root ->
                 let document =
                     { Domains = collectionOfGuid root.Domains (fun d -> d.Id)
-                      BoundedContexts = collectionOfInt root.BoundedContexts (fun d -> d.Id)
+                      BoundedContexts = collectionOfGuid root.BoundedContexts (fun d -> d.Id)
                       Collaborations = collectionOfGuid root.Collaborations (fun d -> d.Id)
                       NamespaceTemplates = collectionOfInt root.NamespaceTemplates (fun d -> d.Id) }
 

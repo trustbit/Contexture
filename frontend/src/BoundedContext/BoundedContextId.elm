@@ -10,35 +10,35 @@ import Json.Decode as Decode exposing (Decoder)
 import Json.Encode as Encode
 
 type BoundedContextId
-  = BoundedContextId Int
+  = BoundedContextId String
 
 
-value : BoundedContextId -> Int
+value : BoundedContextId -> String
 value (BoundedContextId id) =
   id
 
 
 idToString : BoundedContextId -> String
 idToString (BoundedContextId contextId) =
-  String.fromInt contextId
+  contextId
 
 idParser : Parser (BoundedContextId -> a) a
 idParser =
     custom "BCCID" <|
         \bccId ->
-            Maybe.map BoundedContextId (String.toInt bccId)
+            bccId |> idFromString
 
 
 idFromString : String -> Maybe BoundedContextId
 idFromString id =
-  id
-  |> String.toInt
-  |> Maybe.map BoundedContextId
+  if String.isEmpty id
+  then Nothing
+  else id |> BoundedContextId |> Just
 
 idDecoder : Decoder BoundedContextId
 idDecoder =
-  Decode.map BoundedContextId Decode.int
+  Decode.map BoundedContextId Decode.string
 
 idEncoder : BoundedContextId -> Encode.Value
 idEncoder (BoundedContextId id) =
-  Encode.int id
+  Encode.string id

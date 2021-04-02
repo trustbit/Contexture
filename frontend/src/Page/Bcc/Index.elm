@@ -75,8 +75,8 @@ type alias DeleteBoundedContextModel =
   }
 
 type alias Communication =
-  { initiators : Dict Int Collaboration.Collaborations
-  , recipients : Dict Int Collaboration.Collaborations
+  { initiators : Dict String Collaboration.Collaborations
+  , recipients : Dict String Collaboration.Collaborations
   }
 
 type alias Model =

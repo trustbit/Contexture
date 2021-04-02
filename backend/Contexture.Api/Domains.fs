@@ -14,7 +14,7 @@ module Domains =
     module Results =
 
         type BoundedContextResult =
-            { Id: int
+            { Id: BoundedContextId
               ParentDomainId: DomainId
               Key: string option
               Name: string
@@ -122,9 +122,9 @@ module Domains =
                 task {
                     let database = ctx.GetService<FileBased>()
 
-                    match BoundedContext.handle database (CreateBoundedContext(domainId, command)) with
+                    match BoundedContext.handle database (CreateBoundedContext(Guid.NewGuid(),domainId, command)) with
                     | Ok addedContext ->
-                        return! redirectTo false (sprintf "/api/boundedcontexts/%i" addedContext) next ctx
+                        return! redirectTo false (sprintf "/api/boundedcontexts/%O" addedContext) next ctx
                     | Error (DomainError Aggregates.BoundedContext.EmptyName) ->
                         return! RequestErrors.BAD_REQUEST "Name must not be empty" next ctx
                     | Error e ->
