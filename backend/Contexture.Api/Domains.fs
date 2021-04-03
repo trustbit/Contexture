@@ -150,6 +150,11 @@ module Domains =
         |> List.groupBy (fun l -> l.ParentDomainId)
         |> List.choose (fun (key, values) -> key |> Option.map (fun parent -> (parent, values)))
         |> Map.ofList
+        
+    let buildDomain (eventStore: EventStore) domainId =
+        domainId
+        |> eventStore.Stream
+        |> project domainsProjection
 
     let getDomains =
         fun (next: HttpFunc) (ctx: HttpContext) ->
@@ -192,8 +197,7 @@ module Domains =
 
             let result =
                 domainId
-                |> eventStore.Stream
-                |> project domainsProjection
+                |> buildDomain eventStore
                 |> Option.map (Results.includingSubdomainsAndBoundedContexts document subdomains)
                 |> Option.map json
                 |> Option.defaultValue (RequestErrors.NOT_FOUND(sprintf "Domain %O not found" domainId))

@@ -127,10 +127,6 @@ module Database =
           NamespaceTemplates: CollectionOfInt<NamespaceTemplate> }
 
     module Document =
-        let subdomainsOf (domains: CollectionOfGuid<Domain>) parentDomainId =
-            domains.All
-            |> List.where (fun x -> x.ParentDomainId = Some parentDomainId)
-
         let boundedContextsOf (boundedContexts: CollectionOfGuid<BoundedContext>) domainId =
             boundedContexts.All
             |> List.where (fun x -> x.DomainId = domainId)

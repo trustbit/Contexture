@@ -29,8 +29,8 @@ let allRoute =
             let document = database.Read
 
             let result =
-                {| BoundedContexts = document.BoundedContexts.All |> List.map Results.convertBoundedContext
-                   Domains = document.Domains.All |> List.map Results.convertDomain
+                {| BoundedContexts = document.BoundedContexts.All
+                   Domains = document.Domains.All
                    Collaborations = document.Collaborations.All |}
             json result next ctx
 

@@ -4,6 +4,7 @@ open Contexture.Api.Aggregates
 open Contexture.Api.Database
 open Contexture.Api.Entities
 open Contexture.Api.Domains
+open Contexture.Api.Infrastructure
 open Microsoft.AspNetCore.Http
 open FSharp.Control.Tasks
 
@@ -28,7 +29,7 @@ module BoundedContexts =
               Domain: Domain option
               Namespaces: Namespace list }
 
-        let convertBoundedContextWithDomain (database: Document) (boundedContext: BoundedContext) =
+        let convertBoundedContextWithDomain (findDomain: DomainId -> Domain option) (boundedContext: BoundedContext) =
             { Id = boundedContext.Id
               ParentDomainId = boundedContext.DomainId
               Key = boundedContext.Key
@@ -40,7 +41,7 @@ module BoundedContexts =
               Messages = boundedContext.Messages
               DomainRoles = boundedContext.DomainRoles
               TechnicalDescription = boundedContext.TechnicalDescription
-              Domain = database.Domains.ById boundedContext.DomainId
+              Domain = boundedContext.DomainId |> findDomain
               Namespaces = boundedContext.Namespaces }
 
     module CommandEndpoints =
@@ -104,10 +105,11 @@ module BoundedContexts =
         fun (next: HttpFunc) (ctx: HttpContext) ->
             let database = ctx.GetService<FileBased>()
             let document = database.Read
+            let eventStore = ctx.GetService<EventStore>()
 
             let boundedContexts =
                 document.BoundedContexts.All
-                |> List.map (Results.convertBoundedContextWithDomain database.Read)
+                |> List.map (Results.convertBoundedContextWithDomain (Domains.buildDomain eventStore))
 
             json boundedContexts next ctx
 
@@ -115,11 +117,12 @@ module BoundedContexts =
         fun (next: HttpFunc) (ctx: HttpContext) ->
             let database = ctx.GetService<FileBased>()
             let document = database.Read
+            let eventStore = ctx.GetService<EventStore>()
 
             let result =
                 contextId
                 |> document.BoundedContexts.ById
-                |> Option.map (Results.convertBoundedContextWithDomain database.Read)
+                |> Option.map (Results.convertBoundedContextWithDomain (Domains.buildDomain eventStore))
                 |> Option.map json
                 |> Option.defaultValue (RequestErrors.NOT_FOUND(sprintf "BoundedContext %O not found" contextId))
 
