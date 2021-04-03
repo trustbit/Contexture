@@ -116,6 +116,15 @@ let buildHost args =
                     |> ignore)
         .Build()
 
+let importFromDocument (store: EventStore) (database: Document) =
+    database.Collaborations.All
+    |> List.map (Collaboration.asEvents (fun () -> System.DateTime.UtcNow))
+    |> List.iter store.Append
+    
+    database.Domains.All
+    |> List.map (Domain.asEvents (fun () -> System.DateTime.UtcNow))
+    |> List.iter store.Append
+
 [<EntryPoint>]
 let main args =
     let host = buildHost args
@@ -123,12 +132,12 @@ let main args =
     // make sure the database is loaded
     let database = host.Services.GetRequiredService<FileBased>()
     let store = host.Services.GetRequiredService<EventStore>()
-    database.Read.Collaborations.All
-    |> List.map (Collaboration.asEvents (fun () -> System.DateTime.UtcNow))
-    |> List.iter store.Append
+    
+    importFromDocument store database.Read
     
     // collaboration subscription is added after initial seeding
     store.Subscribe (Collaboration.subscription database)
+    store.Subscribe (Domain.subscription database)
 
     host.Run()
     0

@@ -60,7 +60,7 @@ module Collaborations =
                 database.Get<Collaboration.Event>()
                 |> List.fold (projectIntoMap collaborationsProjection) Map.empty
                 |> Map.toList
-                |> List.map snd
+                |> List.choose snd
                 
             json collaborations next ctx
 

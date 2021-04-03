@@ -32,111 +32,72 @@ module FileBasedCommandHandlers =
             match stored, result with
             | None, Some c -> Add c
             | Some _, Some c -> Update c
-            | Some c, None -> Remove c.Id
+            | Some c, None -> Remove event.Metadata.Source
             | None, None -> NoOp
-
-        let applyToCollection fetch project =
+        let fetchFromCollection (collection: CollectionOfGuid<_>) (event: EventEnvelope<_>) =
+            collection.ById(event.Metadata.Source)
+        let applyToCollection project =
             fun state event ->
                 match state with
                 | Ok (collection: CollectionOfGuid<_>) ->
                     event
-                    |> mapEventToDocument (fetch collection) project
+                    |> mapEventToDocument (fetchFromCollection collection) project
                     |> function
-                    | Add c -> collection.Add c.Id c
-                    | Update c -> c.Id |> collection.Update(fun _ -> Ok c)
+                    | Add c -> collection.Add event.Metadata.Source c
+                    | Update c -> event.Metadata.Source |> collection.Update(fun _ -> Ok c)
                     | Remove id -> collection.Remove id
                     | NoOp -> collection |> Ok
                 | Error e -> Error e
 
     module Domain =
-        open Entities
-        open Domain
+        open BridgeEventSourcingWithDatabase
+        
+        let handle clock (store: EventStore) command =
+            let identity = Domain.identify command
+            let streamName = Domain.name identity
 
-        let private updateDomainsIn (document: Document) =
-            Result.map (fun (domains, item) -> { document with Domains = domains }, item)
+            let state =
+                streamName
+                |> store.Stream
+                |> List.map (fun e -> e.Event)
+                |> List.fold State.Fold State.Initial
 
-        let create (database: FileBased) id parentDomain (command: CreateDomain) =
-            match newDomain id command.Name parentDomain with
-            | Ok addNewDomain ->
-                let changed =
-                    database.Change(fun document ->
-                        addNewDomain
-                        |> document.Domains.Add id
-                        |> Result.map (fun r -> r, id)
-                        |> updateDomainsIn document)
+            match handle state command with
+            | Ok newEvents ->
+                newEvents
+                |> List.map (fun e ->
+                    { Event = e
+                      Metadata =
+                          { Source = streamName
+                            RecordedAt = clock () } })
+                |> store.Append
 
-                changed
-                |> Result.mapError (fun e ->
-                    match e with
-                    | ChangeError err ->
-                        err |> DomainError
-                    | EntityNotFoundInCollection id ->
-                        id
-                        |> EntityNotFound
-                        |> InfrastructureError
-                    | DuplicateKey id ->
-                        id
-                        |> EntityNotFound
-                        |> InfrastructureError
-                    )
-            | Error domainError -> domainError |> DomainError |> Error
+                Ok identity
+            | Error e ->
+                e |> DomainError |> Error
+            
+        let asEvents clock (domain: Domain) =
+            { Metadata =
+                  { Source = domain.Id
+                    RecordedAt = clock () }
+              Event =
+                  DomainImported
+                      { DomainId = domain.Id
+                        Name = domain.Name
+                        ParentDomainId = domain.ParentDomainId
+                        Vision = domain.Vision
+                        Key = domain.Key } }
+            |> List.singleton
 
-        let remove (database: FileBased) domainId =
-            let changed =
+        let subscription (database: FileBased): Subscription<Domain.Event> =
+            fun (events: EventEnvelope<Domain.Event> list) ->
                 database.Change(fun document ->
-                    domainId
-                    |> document.Domains.Remove
-                    |> Result.map(fun r -> r, domainId)
-                    |> updateDomainsIn document)
-
-            changed
-            |> Result.map (fun _ -> domainId)
-            |> Result.mapError (fun e ->
-                    match e with
-                    | ChangeError err ->
-                        err |> DomainError
-                    | EntityNotFoundInCollection id ->
-                        id
-                        |> EntityNotFound
-                        |> InfrastructureError
-                    | DuplicateKey id ->
-                        id
-                        |> EntityNotFound
-                        |> InfrastructureError
-                    )
-
-        let private updateDomain (database: FileBased) domainId updateDomain =
-            let changed =
-                database.Change(fun document ->
-                    domainId
-                    |> document.Domains.Update updateDomain
-                    |> Result.map(fun r -> r,domainId)
-                    |> updateDomainsIn document)
-
-            match changed with
-            | Ok _ -> Ok domainId
-            | Error (ChangeError e) -> Error(DomainError e)
-            | Error (EntityNotFoundInCollection id) ->
-                id
-                |> EntityNotFound
-                |> InfrastructureError
-                |> Error
-            | Error (DuplicateKey id) ->
-                id
-                |> EntityNotFound
-                |> InfrastructureError
-                |> Error
-
-        let handle (database: FileBased) (command: Command) =
-            match command with
-            | CreateDomain (domainId,createDomain) -> create database domainId None createDomain
-            | CreateSubdomain (domainId, subdomainId, createDomain) -> create database domainId (Some subdomainId) createDomain
-            | RemoveDomain domainId -> remove database domainId
-            | MoveDomain (domainId, move) -> updateDomain database domainId (moveDomain move.ParentDomainId)
-            | RenameDomain (domainId, rename) -> updateDomain database domainId (renameDomain rename.Name)
-            | RefineVision (domainId, refineVision) ->
-                updateDomain database domainId (refineVisionOfDomain refineVision.Vision)
-            | AssignKey (domainId, assignKey) -> updateDomain database domainId (assignKeyToDomain assignKey.Key)
+                    events
+                    |> List.fold
+                        (applyToCollection Projections.asDomain)
+                           (Ok document.Domains)
+                    |> Result.map (fun c -> { document with Domains = c }, System.Guid.Empty))
+                |> ignore
 
     module BoundedContext =
         open BoundedContext
@@ -267,7 +228,8 @@ module FileBasedCommandHandlers =
                 |> store.Append
 
                 Ok identity
-            | Error e -> Error e
+            | Error e ->
+                e |> DomainError |> Error
 
         let asEvents clock (collaboration: Collaboration) =
             { Metadata =
@@ -282,15 +244,12 @@ module FileBasedCommandHandlers =
                         Recipient = collaboration.Recipient } }
             |> List.singleton
 
-        let fetchCollaboration (collection: CollectionOfGuid<_>) (event: EventEnvelope<_>) =
-            collection.ById(event.Metadata.Source)
-
         let subscription (database: FileBased): Subscription<Event> =
             fun (events: EventEnvelope<Event> list) ->
                 database.Change(fun document ->
                     events
                     |> List.fold
-                        (applyToCollection fetchCollaboration Projections.asCollaboration)
+                        (applyToCollection Projections.asCollaboration)
                            (Ok document.Collaborations)
                     |> Result.map (fun c -> { document with Collaborations = c }, System.Guid.Empty))
                 |> ignore

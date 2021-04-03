@@ -4,13 +4,15 @@ open System
 open Contexture.Api.Aggregates.BoundedContext
 open Contexture.Api.Database
 open Contexture.Api.Entities
+open Contexture.Api.Infrastructure
+open Contexture.Api.Infrastructure.Projections
 open Microsoft.AspNetCore.Http
 open FSharp.Control.Tasks
 
 open Giraffe
 
 module Domains =
-
+    open Aggregates.Domain
     module Results =
 
         type BoundedContextResult =
@@ -71,17 +73,15 @@ module Domains =
                       |> Document.boundedContextsOf database.BoundedContexts
                       |> List.map convertBoundedContext }
 
-
     module CommandEndpoints =
-        open Aggregates.Domain
         open FileBasedCommandHandlers
-
+        let clock =
+            fun () -> DateTime.UtcNow
         let removeAndReturnId domainId =
             fun (next: HttpFunc) (ctx: HttpContext) ->
                 task {
-                    let database = ctx.GetService<FileBased>()
-
-                    match Domain.handle database (RemoveDomain domainId) with
+                    let database = ctx.GetService<EventStore>()
+                    match Domain.handle clock database (RemoveDomain domainId) with
                     | Ok domainId -> return! json domainId next ctx
                     | Error e -> return! ServerErrors.INTERNAL_ERROR e next ctx
                 }
@@ -89,9 +89,8 @@ module Domains =
         let private updateAndReturnDomain command =
             fun (next: HttpFunc) (ctx: HttpContext) ->
                 task {
-                    let database = ctx.GetService<FileBased>()
-
-                    match Domain.handle database command with
+                    let database = ctx.GetService<EventStore>()
+                    match Domain.handle clock database  command with
                     | Ok updatedDomain ->
                         return! redirectTo false (sprintf "/api/domains/%O" updatedDomain) next ctx
                     | Error (DomainError EmptyName) ->
@@ -130,14 +129,22 @@ module Domains =
                     | Error e ->
                         return! ServerErrors.INTERNAL_ERROR e next ctx
                 }
+                
+    let domainsProjection: Projection<Domain option,Aggregates.Domain.Event> =
+        { Init = None
+          Update = Projections.asDomain }
 
     let getDomains =
         fun (next: HttpFunc) (ctx: HttpContext) ->
             let database = ctx.GetService<FileBased>()
             let document = database.Read
-
+            let eventStore = ctx.GetService<EventStore>()
+            
             let domains =
-                document.Domains.All
+                eventStore.Get<Aggregates.Domain.Event>()
+                |> List.fold (projectIntoMap domainsProjection) Map.empty
+                |> Map.toList
+                |> List.choose snd
                 |> List.map (Results.includingSubdomainsAndBoundedContexts document)
 
             json domains next ctx
