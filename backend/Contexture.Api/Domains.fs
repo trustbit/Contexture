@@ -13,6 +13,7 @@ open Giraffe
 
 module Domains =
     open Aggregates.Domain
+
     module Results =
 
         type BoundedContextResult =
@@ -27,7 +28,7 @@ module Domains =
               Messages: Messages
               DomainRoles: DomainRole list
               TechnicalDescription: TechnicalDescription option
-              Namespaces : Namespace list }
+              Namespaces: Namespace list }
 
         type DomainResult =
             { Id: DomainId
@@ -62,11 +63,15 @@ module Domains =
               Subdomains = []
               BoundedContexts = [] }
 
-        let includingSubdomainsAndBoundedContexts (database: Document) (domain: Domain) =
+        let includingSubdomainsAndBoundedContexts (database: Document)
+                                                  (subDomains: Map<DomainId, Domain list>)
+                                                  (domain: Domain)
+                                                  =
             { (domain |> convertDomain) with
                   Subdomains =
-                      domain.Id
-                      |> Document.subdomainsOf database.Domains
+                      subDomains
+                      |> Map.tryFind domain.Id
+                      |> Option.defaultValue []
                       |> List.map convertDomain
                   BoundedContexts =
                       domain.Id
@@ -75,12 +80,13 @@ module Domains =
 
     module CommandEndpoints =
         open FileBasedCommandHandlers
-        let clock =
-            fun () -> DateTime.UtcNow
+        let clock = fun () -> DateTime.UtcNow
+
         let removeAndReturnId domainId =
             fun (next: HttpFunc) (ctx: HttpContext) ->
                 task {
                     let database = ctx.GetService<EventStore>()
+
                     match Domain.handle clock database (RemoveDomain domainId) with
                     | Ok domainId -> return! json domainId next ctx
                     | Error e -> return! ServerErrors.INTERNAL_ERROR e next ctx
@@ -90,19 +96,19 @@ module Domains =
             fun (next: HttpFunc) (ctx: HttpContext) ->
                 task {
                     let database = ctx.GetService<EventStore>()
-                    match Domain.handle clock database  command with
-                    | Ok updatedDomain ->
-                        return! redirectTo false (sprintf "/api/domains/%O" updatedDomain) next ctx
+
+                    match Domain.handle clock database command with
+                    | Ok updatedDomain -> return! redirectTo false (sprintf "/api/domains/%O" updatedDomain) next ctx
                     | Error (DomainError EmptyName) ->
                         return! RequestErrors.BAD_REQUEST "Name must not be empty" next ctx
                     | Error e -> return! ServerErrors.INTERNAL_ERROR e next ctx
                 }
 
         let createDomain (command: CreateDomain) =
-            updateAndReturnDomain (CreateDomain(Guid.NewGuid(),command))
+            updateAndReturnDomain (CreateDomain(Guid.NewGuid(), command))
 
         let createSubDomain domainId (command: CreateDomain) =
-            updateAndReturnDomain (CreateSubdomain(Guid.NewGuid(),domainId, command))
+            updateAndReturnDomain (CreateSubdomain(Guid.NewGuid(), domainId, command))
 
         let move domainId (command: MoveDomain) =
             updateAndReturnDomain (MoveDomain(domainId, command))
@@ -121,54 +127,74 @@ module Domains =
                 task {
                     let database = ctx.GetService<FileBased>()
 
-                    match BoundedContext.handle database (CreateBoundedContext(Guid.NewGuid(),domainId, command)) with
+                    match BoundedContext.handle database (CreateBoundedContext(Guid.NewGuid(), domainId, command)) with
                     | Ok addedContext ->
                         return! redirectTo false (sprintf "/api/boundedcontexts/%O" addedContext) next ctx
                     | Error (DomainError Aggregates.BoundedContext.EmptyName) ->
                         return! RequestErrors.BAD_REQUEST "Name must not be empty" next ctx
-                    | Error e ->
-                        return! ServerErrors.INTERNAL_ERROR e next ctx
+                    | Error e -> return! ServerErrors.INTERNAL_ERROR e next ctx
                 }
-                
-    let domainsProjection: Projection<Domain option,Aggregates.Domain.Event> =
+
+    let private domainsProjection: Projection<Domain option, Aggregates.Domain.Event> =
         { Init = None
           Update = Projections.asDomain }
+
+    let private allDomains (eventStore: EventStore) =
+        eventStore.Get<Aggregates.Domain.Event>()
+        |> List.fold (projectIntoMap domainsProjection) Map.empty
+        |> Map.toList
+        |> List.choose snd
+
+    let private subdomainLookup (domains: Domain list) =
+        domains
+        |> List.groupBy (fun l -> l.ParentDomainId)
+        |> List.choose (fun (key, values) -> key |> Option.map (fun parent -> (parent, values)))
+        |> Map.ofList
 
     let getDomains =
         fun (next: HttpFunc) (ctx: HttpContext) ->
             let database = ctx.GetService<FileBased>()
             let document = database.Read
             let eventStore = ctx.GetService<EventStore>()
-            
-            let domains =
-                eventStore.Get<Aggregates.Domain.Event>()
-                |> List.fold (projectIntoMap domainsProjection) Map.empty
-                |> Map.toList
-                |> List.choose snd
-                |> List.map (Results.includingSubdomainsAndBoundedContexts document)
 
-            json domains next ctx
+            let domains = allDomains eventStore
+            let subdomainsOf = subdomainLookup domains
+
+            let result =
+                domains
+                |> List.map (Results.includingSubdomainsAndBoundedContexts document subdomainsOf)
+
+            json result next ctx
 
     let getSubDomains domainId =
         fun (next: HttpFunc) (ctx: HttpContext) ->
             let database = ctx.GetService<FileBased>()
             let document = database.Read
-            let domains =
-                domainId
-                |> Document.subdomainsOf document.Domains
-                |> List.map (Results.includingSubdomainsAndBoundedContexts document)
+            let eventStore = ctx.GetService<EventStore>()
 
-            json domains next ctx
+            let domains = allDomains eventStore
+            let subdomainsOf = subdomainLookup domains
+
+            let result =
+                domains
+                |> List.filter (fun d -> d.ParentDomainId = Some domainId)
+                |> List.map (Results.includingSubdomainsAndBoundedContexts document subdomainsOf)
+
+            json result next ctx
 
     let getDomain domainId =
         fun (next: HttpFunc) (ctx: HttpContext) ->
             let database = ctx.GetService<FileBased>()
             let document = database.Read
+            let eventStore = ctx.GetService<EventStore>()
+
+            let subdomains = eventStore |> allDomains |> subdomainLookup
 
             let result =
                 domainId
-                |> document.Domains.ById
-                |> Option.map (Results.includingSubdomainsAndBoundedContexts document)
+                |> eventStore.Stream
+                |> project domainsProjection
+                |> Option.map (Results.includingSubdomainsAndBoundedContexts document subdomains)
                 |> Option.map json
                 |> Option.defaultValue (RequestErrors.NOT_FOUND(sprintf "Domain %O not found" domainId))
 
@@ -216,7 +242,8 @@ module Domains =
                                     >=> route "/key"
                                     >=> bindJson (CommandEndpoints.assignKey domainId)
 
-                                    DELETE >=> CommandEndpoints.removeAndReturnId domainId
+                                    DELETE
+                                    >=> CommandEndpoints.removeAndReturnId domainId
 
                                      ]))
                       GET >=> getDomains
