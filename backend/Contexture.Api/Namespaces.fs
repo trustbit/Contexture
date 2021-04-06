@@ -1,7 +1,7 @@
 namespace Contexture.Api
 
 open Contexture.Api.Aggregates
-open Contexture.Api.Aggregates.Namespaces
+open Contexture.Api.Aggregates.Namespace
 open Contexture.Api.Database
 open Contexture.Api.Entities
 open Contexture.Api.Domains
@@ -24,7 +24,7 @@ module Namespaces =
 
     module CommandEndpoints =
         open System
-        open Namespaces
+        open Namespace
         open FileBasedCommandHandlers
         
         let clock = fun () -> DateTime.UtcNow
@@ -34,12 +34,12 @@ module Namespaces =
                 task {
                     let database = ctx.GetService<EventStore>()
 
-                    match Namespaces.handle clock database command with
+                    match Namespace.handle clock database command with
                     | Ok updatedContext ->
                         // for namespaces we don't use redirects ATM
                         let boundedContext =
                             updatedContext
-                            |> ReadModels.Namespace.allNamespacesOf database 
+                            |> ReadModels.Namespace.namespacesOf database 
                         return! json boundedContext next ctx
                     | Error (DomainError error) ->
                         return! RequestErrors.BAD_REQUEST (sprintf "Domain Error %A" error) next ctx
@@ -62,12 +62,11 @@ module Namespaces =
 
         let getNamespaces boundedContextId =
             fun (next: HttpFunc) (ctx: HttpContext) ->
-                let database = ctx.GetService<FileBased>()
+                let database = ctx.GetService<EventStore>()
                 let result =
                     boundedContextId
-                    |> fetchNamespaces database
-                    |> Option.map json
-                    |> Option.defaultValue (RequestErrors.NOT_FOUND "No namespaces for BoundedContext found")
+                    |> ReadModels.Namespace.namespacesOf database 
+                    |> json
 
                 result next ctx
 

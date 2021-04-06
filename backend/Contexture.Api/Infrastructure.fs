@@ -16,7 +16,7 @@ type EventEnvelope<'Event> =
 
 type Subscription<'E> = EventEnvelope<'E> list -> unit
 
-type EventStore(items: Dictionary<EventSource, EventEnvelope<obj> list>,
+type EventStore(items: Dictionary<EventSource * System.Type, EventEnvelope<obj> list>,
                 subscriptions: ConcurrentDictionary<System.Type, Subscription<obj> list>) =
 
     let byEventType =
@@ -52,15 +52,15 @@ type EventStore(items: Dictionary<EventSource, EventEnvelope<obj> list>,
         newItems
         |> List.iter (fun envelope ->
             let source = envelope.Metadata.Source
-
+            let eventType = typedefof<'E>
+            let key = (source,eventType)
             let fullStream =
-                source
+                key
                 |> stream
                 |> fun s -> s @ [ envelope ]
                 |> List.map boxEnvelope
 
-            items.[source] <- fullStream
-            let eventType = typedefof<'E>
+            items.[key] <- fullStream
             let allEvents = getAll eventType
             byEventType.[eventType] <- allEvents @ [ boxEnvelope envelope ])
 
@@ -87,7 +87,7 @@ type EventStore(items: Dictionary<EventSource, EventEnvelope<obj> list>,
     static member Empty =
         EventStore(Dictionary(), ConcurrentDictionary())
 
-    member __.Stream name: EventEnvelope<'E> list = stream name
+    member __.Stream name: EventEnvelope<'E> list = stream (name,typedefof<'E>)
     member __.Append items = lock __ (fun () -> append items)
     member __.Subscribe(subscription: Subscription<'E>) = subscribe subscription
     member __.Get() = get ()

@@ -4,8 +4,6 @@ open System
 open System.IO
 open Contexture.Api.Aggregates
 open Contexture.Api.Database
-open Contexture.Api.Domains
-open Contexture.Api.Entities
 open Contexture.Api.Infrastructure
 open Contexture.Api.FileBasedCommandHandlers
 open Giraffe
@@ -130,6 +128,10 @@ let importFromDocument (store: EventStore) (database: Document) =
     database.BoundedContexts.All
     |> List.map (BoundedContext.asEvents clock)
     |> List.iter store.Append
+    
+    database.BoundedContexts.All
+    |> List.map (Namespace.asEvents clock)
+    |> List.iter store.Append
 
 [<EntryPoint>]
 let main args =
@@ -145,6 +147,7 @@ let main args =
     store.Subscribe (Collaboration.subscription database)
     store.Subscribe (Domain.subscription database)
     store.Subscribe (BoundedContext.subscription database)
+    store.Subscribe (Namespace.subscription database)
 
     host.Run()
     0

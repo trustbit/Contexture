@@ -212,14 +212,14 @@ module FileBasedCommandHandlers =
                     |> Result.map (fun c -> { document with Collaborations = c }, System.Guid.Empty))
                 |> ignore
 
-    module Namespaces =
+    module Namespace =
         open Entities
-        open Namespaces
+        open Namespace
         open BridgeEventSourcingWithFilebasedDatabase
         
         let handle clock (store: EventStore) command =
-            let identity = Namespaces.identify command
-            let streamName = Namespaces.name identity
+            let identity = Namespace.identify command
+            let streamName = Namespace.name identity
 
             let state =
                 streamName
@@ -241,20 +241,22 @@ module FileBasedCommandHandlers =
             | Error e ->
                 e |> DomainError |> Error
 
-        let asEvents clock (boundedContextId: BoundedContextId) (n: Namespace) =
-            { Metadata =
-                  { Source = boundedContextId
-                    RecordedAt = clock () }
-              Event =
-                  NamespaceImported
-                      { NamespaceId = n.Id
-                        BoundedContextId = boundedContextId
-                        Template = None
-                        Name = n.Name
-                        Labels = n.Labels |> List.map (fun l -> { LabelId = l.Id; Name = l.Name; Value = Option.ofObj l.Value })
-                      }
-            }
-            |> List.singleton
+        let asEvents clock (boundedContext: BoundedContext) =
+            boundedContext.Namespaces
+            |> List.map (fun n ->
+                { Metadata =
+                      { Source = boundedContext.Id
+                        RecordedAt = clock () }
+                  Event =
+                      NamespaceImported
+                          { NamespaceId = n.Id
+                            BoundedContextId = boundedContext.Id
+                            Template = None
+                            Name = n.Name
+                            Labels = n.Labels |> List.map (fun l -> { LabelId = l.Id; Name = l.Name; Value = Option.ofObj l.Value })
+                          }
+                }
+            )
 
         let subscription (database: FileBased): Subscription<Event> =
             fun (events: EventEnvelope<Event> list) ->

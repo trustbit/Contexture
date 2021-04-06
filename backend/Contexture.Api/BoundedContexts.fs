@@ -29,7 +29,7 @@ module BoundedContexts =
               Domain: Domain option
               Namespaces: Namespace list }
 
-        let convertBoundedContextWithDomain (findDomain: DomainId -> Domain option) (boundedContext: BoundedContext) =
+        let convertBoundedContextWithDomain (findDomain: DomainId -> Domain option) (findNamespaces: BoundedContextId -> Namespace list ) (boundedContext: BoundedContext) =
             { Id = boundedContext.Id
               ParentDomainId = boundedContext.DomainId
               Key = boundedContext.Key
@@ -42,7 +42,7 @@ module BoundedContexts =
               DomainRoles = boundedContext.DomainRoles
               TechnicalDescription = boundedContext.TechnicalDescription
               Domain = boundedContext.DomainId |> findDomain
-              Namespaces = boundedContext.Namespaces }
+              Namespaces = boundedContext.Id |> findNamespaces }
 
     module CommandEndpoints =
         open System
@@ -108,11 +108,13 @@ module BoundedContexts =
         let getBoundedContexts =
             fun (next: HttpFunc) (ctx: HttpContext) ->
                 let eventStore = ctx.GetService<EventStore>()
-
+                
+                let namespacesOf = Namespace.allNamespacesByContext eventStore
+                
                 let boundedContexts =
                     eventStore
                     |> BoundedContext.allBoundedContexts
-                    |> List.map (Results.convertBoundedContextWithDomain (Domain.buildDomain eventStore))
+                    |> List.map (Results.convertBoundedContextWithDomain (Domain.buildDomain eventStore) namespacesOf)
 
                 json boundedContexts next ctx
 
@@ -120,10 +122,11 @@ module BoundedContexts =
             fun (next: HttpFunc) (ctx: HttpContext) ->
                 let eventStore = ctx.GetService<EventStore>()
 
+                let namespacesOf = Namespace.allNamespacesByContext eventStore
                 let result =
                     contextId
                     |> BoundedContext.buildBoundedContext eventStore
-                    |> Option.map (Results.convertBoundedContextWithDomain (Domain.buildDomain eventStore))
+                    |> Option.map (Results.convertBoundedContextWithDomain (Domain.buildDomain eventStore) namespacesOf)
                     |> Option.map json
                     |> Option.defaultValue (RequestErrors.NOT_FOUND(sprintf "BoundedContext %O not found" contextId))
 

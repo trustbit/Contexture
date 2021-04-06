@@ -124,7 +124,7 @@ module Database =
         { Domains: CollectionOfGuid<Domain>
           BoundedContexts: CollectionOfGuid<BoundedContext>
           Collaborations: CollectionOfGuid<Collaboration>
-          NamespaceTemplates: CollectionOfInt<NamespaceTemplate> }
+          NamespaceTemplates: CollectionOfGuid<NamespaceTemplate> }
 
     module Persistence =
         let read path = path |> File.ReadAllText
@@ -415,7 +415,7 @@ module Database =
                     { Domains = collectionOfGuid root.Domains (fun d -> d.Id)
                       BoundedContexts = collectionOfGuid root.BoundedContexts (fun d -> d.Id)
                       Collaborations = collectionOfGuid root.Collaborations (fun d -> d.Id)
-                      NamespaceTemplates = collectionOfInt root.NamespaceTemplates (fun d -> d.Id) }
+                      NamespaceTemplates = collectionOfGuid root.NamespaceTemplates (fun d -> d.Id) }
 
                 root.Version, document
 

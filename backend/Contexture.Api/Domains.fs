@@ -41,7 +41,7 @@ module Domains =
               BoundedContexts: BoundedContextResult list }
 
 
-        let convertBoundedContext (boundedContext: BoundedContext) =
+        let convertBoundedContext (findNamespaces: BoundedContextId -> Namespace list ) (boundedContext: BoundedContext) =
             { Id = boundedContext.Id
               ParentDomainId = boundedContext.DomainId
               Key = boundedContext.Key
@@ -53,7 +53,7 @@ module Domains =
               Messages = boundedContext.Messages
               DomainRoles = boundedContext.DomainRoles
               TechnicalDescription = boundedContext.TechnicalDescription
-              Namespaces = boundedContext.Namespaces }
+              Namespaces = boundedContext.Id |> findNamespaces }
 
         let convertDomain (domain: Domain) =
             { Id = domain.Id
@@ -66,6 +66,7 @@ module Domains =
 
         let includingSubdomainsAndBoundedContexts (boundedContexts: Map<DomainId, BoundedContext list>)
                                                   (subDomains: Map<DomainId, Domain list>)
+                                                  (findNamespaces: BoundedContextId -> Namespace list )
                                                   (domain: Domain)
                                                   =
             { (domain |> convertDomain) with
@@ -78,7 +79,7 @@ module Domains =
                       boundedContexts
                       |> Map.tryFind domain.Id
                       |> Option.defaultValue []
-                      |> List.map convertBoundedContext }
+                      |> List.map (convertBoundedContext findNamespaces) }
 
     module CommandEndpoints =
         open FileBasedCommandHandlers
@@ -148,10 +149,11 @@ module Domains =
                 let subdomainsOf = Domain.subdomainLookup domains
                 let boundedContexts = BoundedContext.allBoundedContexts eventStore
                 let boundedContextsOf = BoundedContext.boundedContextLookup boundedContexts
+                let namespacesOf = Namespace.allNamespacesByContext eventStore
 
                 let result =
                     domains
-                    |> List.map (Results.includingSubdomainsAndBoundedContexts boundedContextsOf subdomainsOf)
+                    |> List.map (Results.includingSubdomainsAndBoundedContexts boundedContextsOf subdomainsOf namespacesOf)
 
                 json result next ctx
 
@@ -163,11 +165,12 @@ module Domains =
                 let subdomainsOf = Domain.subdomainLookup domains
                 let boundedContexts = BoundedContext.allBoundedContexts eventStore
                 let boundedContextsOf = BoundedContext.boundedContextLookup boundedContexts
+                let namespacesOf = Namespace.allNamespacesByContext eventStore
 
                 let result =
                     domains
                     |> List.filter (fun d -> d.ParentDomainId = Some domainId)
-                    |> List.map (Results.includingSubdomainsAndBoundedContexts boundedContextsOf subdomainsOf)
+                    |> List.map (Results.includingSubdomainsAndBoundedContexts boundedContextsOf subdomainsOf namespacesOf)
 
                 json result next ctx
 
@@ -178,11 +181,12 @@ module Domains =
                 let subdomains = eventStore |> Domain.allDomains |> Domain.subdomainLookup
                 let boundedContexts = BoundedContext.allBoundedContexts eventStore
                 let boundedContextsOf = BoundedContext.boundedContextLookup boundedContexts
+                let namespacesOf = Namespace.allNamespacesByContext eventStore
 
                 let result =
                     domainId
                     |> Domain.buildDomain eventStore
-                    |> Option.map (Results.includingSubdomainsAndBoundedContexts boundedContextsOf subdomains)
+                    |> Option.map (Results.includingSubdomainsAndBoundedContexts boundedContextsOf subdomains namespacesOf)
                     |> Option.map json
                     |> Option.defaultValue (RequestErrors.NOT_FOUND(sprintf "Domain %O not found" domainId))
 
@@ -193,12 +197,13 @@ module Domains =
                 let database = ctx.GetService<EventStore>()
                 let boundedContexts = BoundedContext.allBoundedContexts database
                 let boundedContextsOf = BoundedContext.boundedContextLookup boundedContexts
+                let namespacesOf = Namespace.allNamespacesByContext database
 
                 let boundedContexts =
                     boundedContextsOf
                     |> Map.tryFind domainId
                     |> Option.defaultValue []
-                    |> List.map Results.convertBoundedContext
+                    |> List.map (Results.convertBoundedContext namespacesOf)
 
                 json boundedContexts next ctx
 

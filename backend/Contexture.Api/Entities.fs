@@ -801,7 +801,7 @@ module Aggregates =
                     |> Option.map (fun o -> { o with RelationshipType = None })
                 | ConnectionRemoved _ -> None
 
-    module Namespaces =
+    module Namespace =
         open Entities
 
         type Errors =
