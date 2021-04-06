@@ -76,7 +76,7 @@ module Entities =
           Deployment: Deployment option }
 
 
-    type NamespaceTemplateId = int
+    type NamespaceTemplateId = Guid
     type LabelTemplate = { Name: string }
 
     type NamespaceTemplate =
