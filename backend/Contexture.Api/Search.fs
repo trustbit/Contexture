@@ -1,19 +1,49 @@
 namespace Contexture.Api
 
+open System
 open Contexture.Api
 open Contexture.Api.Aggregates
 open Contexture.Api.Database
 open Microsoft.AspNetCore.Http
+
 open FSharp.Control.Tasks
 
 open Giraffe
+open Microsoft.Extensions.Hosting
+
 
 module Search =
     open Giraffe.ViewEngine
 
+    type Path = string list
+
+    type Asset =
+        | Stylesheet of Path
+        | JavaScript of Path
+
+    type ResolveAsset = Asset -> XmlNode
+
+    module Asset =
+        let js file = JavaScript [ "js"; file ]
+        let css file = Stylesheet [ "css"; file ]
+
+        let resolvePath (environment: IHostEnvironment) (path: Path) =
+            let asString = String.Join("/", path)
+
+            if environment.IsDevelopment()
+            then sprintf "http://localhost:8000/assets/%s" asString
+            else sprintf "/assets/%s" asString
+
+        let resolveAsset resolvePath asset =
+            match asset with
+            | Stylesheet path ->
+                link [ _rel "stylesheet"
+                       _href (resolvePath path) ]
+            | JavaScript path -> script [ _src (resolvePath path) ] []
+
     module Views =
 
-        let headTemplate =
+        let headTemplate resolveAsset =
             head [] [
                 style [] [
                     str "{ padding: 0; margin: 0}"
@@ -22,8 +52,8 @@ module Search =
                 title [] [
                     Text "Contexture - Managing your Domains &amp; Contexts"
                 ]
-                link [ _rel "stylesheet"
-                       _href "https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/css/bootstrap.min.css" ]
+                resolveAsset (Asset.css "contexture.css")
+                resolveAsset (Asset.js "Contexture.js")
             ]
 
         let navTemplate =
@@ -52,25 +82,34 @@ module Search =
 
         let embedElm name =
             script [ _src (sprintf "/js/%s.js" name) ] []
-            
+
         let initElm name node =
             script [] [
-                rawText (sprintf "
+                rawText
+                    (sprintf "
   var app = Elm.%s.init({
     node: document.getElementById('%s'),
     flags: Date.now()
-  }); " name node)
+  }); "               name node)
             ]
-        let index =
-            let searchSnipped =
-                div []
-                    [ embedElm "Page.Search"
-                      div [ _id "search" ][]
-                      initElm "Page.Search" "search"
-                    ]
-                
-            documentTemplate headTemplate (bodyTemplate searchSnipped)
 
+        let index resolveAssets =
+            let searchSnipped =
+                div [] [
+                    div [ _id "search" ] []
+                    initElm "Components.Search" "search"
+                ]
+
+            documentTemplate (headTemplate resolveAssets) (bodyTemplate searchSnipped)
+
+    let indexHandler: HttpHandler =
+        fun (next: HttpFunc) (ctx: HttpContext) ->
+            let pathResolver =
+                Asset.resolvePath (ctx.GetService<IHostEnvironment>())
+
+            let assetsResolver = Asset.resolveAsset pathResolver
+
+            htmlView (Views.index assetsResolver) next ctx
 
     let routes: HttpHandler =
-        subRoute "/reports" (choose [ GET >=> htmlView Views.index ])
+        subRoute "/reports" (choose [ GET >=> indexHandler ])

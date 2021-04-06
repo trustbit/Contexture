@@ -1,4 +1,4 @@
-module Page.Search exposing (main)
+module Components.Search exposing (main)
 import Browser
 import Url
 import Html exposing (Html, div, text)
@@ -49,7 +49,7 @@ update msg model =
 
 view : Model -> Html Msg
 view model =
-    text "Hello world from Elm"
+    text "Hello world from Elm!"
 
 
 subscriptions : Model -> Sub Msg
