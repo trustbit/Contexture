@@ -676,7 +676,6 @@ module Aggregates =
                     state
                     |> Option.map (fun o -> { o with UbiquitousLanguage = c.UbiquitousLanguage  })
 
-
     module Collaboration =
         open Entities
 

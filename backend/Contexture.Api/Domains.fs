@@ -13,6 +13,7 @@ open Giraffe
 
 module Domains =
     open Aggregates.Domain
+    
 
     module Results =
 
@@ -63,7 +64,7 @@ module Domains =
               Subdomains = []
               BoundedContexts = [] }
 
-        let includingSubdomainsAndBoundedContexts (database: Document)
+        let includingSubdomainsAndBoundedContexts (boundedContexts: Map<DomainId, BoundedContext list>)
                                                   (subDomains: Map<DomainId, Domain list>)
                                                   (domain: Domain)
                                                   =
@@ -74,8 +75,9 @@ module Domains =
                       |> Option.defaultValue []
                       |> List.map convertDomain
                   BoundedContexts =
-                      domain.Id
-                      |> Document.boundedContextsOf database.BoundedContexts
+                      boundedContexts
+                      |> Map.tryFind domain.Id
+                      |> Option.defaultValue []
                       |> List.map convertBoundedContext }
 
     module CommandEndpoints =
@@ -135,86 +137,70 @@ module Domains =
                     | Error e -> return! ServerErrors.INTERNAL_ERROR e next ctx
                 }
 
-    let private domainsProjection: Projection<Domain option, Aggregates.Domain.Event> =
-        { Init = None
-          Update = Projections.asDomain }
+    module QueryEndpoints =
+        open Contexture.Api.ReadModels
 
-    let private allDomains (eventStore: EventStore) =
-        eventStore.Get<Aggregates.Domain.Event>()
-        |> List.fold (projectIntoMap domainsProjection) Map.empty
-        |> Map.toList
-        |> List.choose snd
+        let getDomains =
+            fun (next: HttpFunc) (ctx: HttpContext) ->
+                let eventStore = ctx.GetService<EventStore>()
 
-    let private subdomainLookup (domains: Domain list) =
-        domains
-        |> List.groupBy (fun l -> l.ParentDomainId)
-        |> List.choose (fun (key, values) -> key |> Option.map (fun parent -> (parent, values)))
-        |> Map.ofList
-        
-    let buildDomain (eventStore: EventStore) domainId =
-        domainId
-        |> eventStore.Stream
-        |> project domainsProjection
+                let domains = Domain.allDomains eventStore
+                let subdomainsOf = Domain.subdomainLookup domains
+                let boundedContexts = BoundedContext.allBoundedContexts eventStore
+                let boundedContextsOf = BoundedContext.boundedContextLookup boundedContexts
 
-    let getDomains =
-        fun (next: HttpFunc) (ctx: HttpContext) ->
-            let database = ctx.GetService<FileBased>()
-            let document = database.Read
-            let eventStore = ctx.GetService<EventStore>()
+                let result =
+                    domains
+                    |> List.map (Results.includingSubdomainsAndBoundedContexts boundedContextsOf subdomainsOf)
 
-            let domains = allDomains eventStore
-            let subdomainsOf = subdomainLookup domains
+                json result next ctx
 
-            let result =
-                domains
-                |> List.map (Results.includingSubdomainsAndBoundedContexts document subdomainsOf)
+        let getSubDomains domainId =
+            fun (next: HttpFunc) (ctx: HttpContext) ->
+                let eventStore = ctx.GetService<EventStore>()
 
-            json result next ctx
+                let domains = Domain.allDomains eventStore
+                let subdomainsOf = Domain.subdomainLookup domains
+                let boundedContexts = BoundedContext.allBoundedContexts eventStore
+                let boundedContextsOf = BoundedContext.boundedContextLookup boundedContexts
 
-    let getSubDomains domainId =
-        fun (next: HttpFunc) (ctx: HttpContext) ->
-            let database = ctx.GetService<FileBased>()
-            let document = database.Read
-            let eventStore = ctx.GetService<EventStore>()
+                let result =
+                    domains
+                    |> List.filter (fun d -> d.ParentDomainId = Some domainId)
+                    |> List.map (Results.includingSubdomainsAndBoundedContexts boundedContextsOf subdomainsOf)
 
-            let domains = allDomains eventStore
-            let subdomainsOf = subdomainLookup domains
+                json result next ctx
 
-            let result =
-                domains
-                |> List.filter (fun d -> d.ParentDomainId = Some domainId)
-                |> List.map (Results.includingSubdomainsAndBoundedContexts document subdomainsOf)
+        let getDomain domainId =
+            fun (next: HttpFunc) (ctx: HttpContext) ->
+                let eventStore = ctx.GetService<EventStore>()
 
-            json result next ctx
+                let subdomains = eventStore |> Domain.allDomains |> Domain.subdomainLookup
+                let boundedContexts = BoundedContext.allBoundedContexts eventStore
+                let boundedContextsOf = BoundedContext.boundedContextLookup boundedContexts
 
-    let getDomain domainId =
-        fun (next: HttpFunc) (ctx: HttpContext) ->
-            let database = ctx.GetService<FileBased>()
-            let document = database.Read
-            let eventStore = ctx.GetService<EventStore>()
+                let result =
+                    domainId
+                    |> Domain.buildDomain eventStore
+                    |> Option.map (Results.includingSubdomainsAndBoundedContexts boundedContextsOf subdomains)
+                    |> Option.map json
+                    |> Option.defaultValue (RequestErrors.NOT_FOUND(sprintf "Domain %O not found" domainId))
 
-            let subdomains = eventStore |> allDomains |> subdomainLookup
+                result next ctx
 
-            let result =
-                domainId
-                |> buildDomain eventStore
-                |> Option.map (Results.includingSubdomainsAndBoundedContexts document subdomains)
-                |> Option.map json
-                |> Option.defaultValue (RequestErrors.NOT_FOUND(sprintf "Domain %O not found" domainId))
+        let getBoundedContextsOf domainId =
+            fun (next: HttpFunc) (ctx: HttpContext) ->
+                let database = ctx.GetService<EventStore>()
+                let boundedContexts = BoundedContext.allBoundedContexts database
+                let boundedContextsOf = BoundedContext.boundedContextLookup boundedContexts
 
-            result next ctx
+                let boundedContexts =
+                    boundedContextsOf
+                    |> Map.tryFind domainId
+                    |> Option.defaultValue []
+                    |> List.map Results.convertBoundedContext
 
-    let getBoundedContextsOf domainId =
-        fun (next: HttpFunc) (ctx: HttpContext) ->
-            let database = ctx.GetService<FileBased>()
-            let document = database.Read
-
-            let boundedContexts =
-                domainId
-                |> Document.boundedContextsOf document.BoundedContexts
-                |> List.map Results.convertBoundedContext
-
-            json boundedContexts next ctx
+                json boundedContexts next ctx
 
     let routes: HttpHandler =
         subRoute
@@ -222,17 +208,17 @@ module Domains =
             (choose [ subRoutef "/%O" (fun domainId ->
                           (choose [ GET
                                     >=> route "/domains"
-                                    >=> getSubDomains domainId
+                                    >=> QueryEndpoints.getSubDomains domainId
                                     POST
                                     >=> route "/domains"
                                     >=> bindJson (CommandEndpoints.createSubDomain domainId)
                                     GET
                                     >=> routeCi "/boundedContexts"
-                                    >=> getBoundedContextsOf domainId
+                                    >=> QueryEndpoints.getBoundedContextsOf domainId
                                     POST
                                     >=> routeCi "/boundedContexts"
                                     >=> bindJson (CommandEndpoints.newBoundedContextOn domainId)
-                                    GET >=> getDomain domainId
+                                    GET >=> QueryEndpoints.getDomain domainId
                                     POST
                                     >=> route "/rename"
                                     >=> bindJson (CommandEndpoints.rename domainId)
@@ -250,7 +236,7 @@ module Domains =
                                     >=> CommandEndpoints.removeAndReturnId domainId
 
                                      ]))
-                      GET >=> getDomains
+                      GET >=> QueryEndpoints.getDomains
                       POST >=> bindJson CommandEndpoints.createDomain
 
                        ])

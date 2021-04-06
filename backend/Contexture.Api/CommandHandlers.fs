@@ -15,7 +15,7 @@ module FileBasedCommandHandlers =
         | Exception of exn
         | EntityNotFound of 'Id
 
-    module BridgeEventSourcingWithDatabase =
+    module BridgeEventSourcingWithFilebasedDatabase =
         type ChangeOperation<'Item, 'Id> =
             | Add of 'Item
             | Update of 'Item
@@ -49,7 +49,7 @@ module FileBasedCommandHandlers =
     module Domain =
         open Contexture.Api.Aggregates.Domain
         open Contexture.Api.Entities
-        open BridgeEventSourcingWithDatabase
+        open BridgeEventSourcingWithFilebasedDatabase
         
         let handle clock (store: EventStore) command =
             let identity = Domain.identify command
@@ -100,14 +100,10 @@ module FileBasedCommandHandlers =
 
     module BoundedContext =
 
-        open BridgeEventSourcingWithDatabase
+        open BridgeEventSourcingWithFilebasedDatabase
         
         open Contexture.Api.Entities
         open BoundedContext
-        open Contexture.Api.Aggregates
-        
-        
-        
         
         let handle clock (store: EventStore) (command: BoundedContext.Command) =
             let identity = BoundedContext.identify command
@@ -167,7 +163,7 @@ module FileBasedCommandHandlers =
     module Collaboration =
         open Contexture.Api.Entities
         open Collaboration
-        open BridgeEventSourcingWithDatabase
+        open BridgeEventSourcingWithFilebasedDatabase
         
         let handle clock (store: EventStore) command =
             let identity = Collaboration.identify command

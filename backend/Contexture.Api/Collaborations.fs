@@ -4,10 +4,11 @@ open Contexture.Api
 open Contexture.Api.Aggregates
 open Contexture.Api.Aggregates.Collaboration
 open Contexture.Api.Database
+open Contexture.Api.Domains
 open Contexture.Api.Entities
 open Contexture.Api.FileBasedCommandHandlers
 open Contexture.Api.Infrastructure
-open Contexture.Api.Infrastructure.Projections
+
 open Microsoft.AspNetCore.Http
 open FSharp.Control.Tasks
 
@@ -47,40 +48,34 @@ module Collaborations =
                     match Collaboration.handle clock database (RemoveConnection collaborationId) with
                     | Ok collaborationId -> return! json collaborationId next ctx
                     | Error e -> return! ServerErrors.INTERNAL_ERROR e next ctx
-                }            
-
-    let collaborationsProjection: Projection<Collaboration option,Collaboration.Event> =
-        { Init = None
-          Update = Projections.asCollaboration }
-
-    let getCollaborations =
-        fun (next: HttpFunc) (ctx: HttpContext) ->
-            let database = ctx.GetService<EventStore>()
-            let collaborations =
-                database.Get<Collaboration.Event>()
-                |> List.fold (projectIntoMap collaborationsProjection) Map.empty
-                |> Map.toList
-                |> List.choose snd
+                }
                 
-            json collaborations next ctx
+    module QueryEndpoints =
+        open Contexture.Api.ReadModels
+        let getCollaborations =
+            fun (next: HttpFunc) (ctx: HttpContext) ->
+                let database = ctx.GetService<EventStore>()
+                let collaborations =
+                    database |> Collaboration.allCollaborations
+                    
+                json collaborations next ctx
 
-    let getCollaboration collaborationId =
-        fun (next: HttpFunc) (ctx: HttpContext) ->
-            let database = ctx.GetService<EventStore>()
-            let result =
-                collaborationId
-                |> database.Stream
-                |> project collaborationsProjection
-                |> Option.map json
-                |> Option.defaultValue (RequestErrors.NOT_FOUND(sprintf "Collaboration %O not found" collaborationId))
+        let getCollaboration collaborationId =
+            fun (next: HttpFunc) (ctx: HttpContext) ->
+                let database = ctx.GetService<EventStore>()
+                let result =
+                    collaborationId
+                    |> Collaboration.buildCollaboration database
+                    |> Option.map json
+                    |> Option.defaultValue (RequestErrors.NOT_FOUND(sprintf "Collaboration %O not found" collaborationId))
 
-            result next ctx
+                result next ctx
 
     let routes: HttpHandler =
         subRoute
             "/collaborations"
             (choose [ subRoutef "/%O" (fun collaborationId ->
-                          choose [ GET >=> getCollaboration collaborationId
+                          choose [ GET >=> QueryEndpoints.getCollaboration collaborationId
                                    POST
                                    >=> route "/relationship"
                                    >=> bindJson (CommandEndpoints.defineRelationship collaborationId)
@@ -91,4 +86,4 @@ module Collaborations =
                       POST
                       >=> route "/inboundConnection"
                       >=> bindJson CommandEndpoints.inboundConnection
-                      GET >=> getCollaborations ])
+                      GET >=> QueryEndpoints.getCollaborations ])

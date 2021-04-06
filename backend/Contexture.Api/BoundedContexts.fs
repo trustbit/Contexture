@@ -2,17 +2,17 @@ namespace Contexture.Api
 
 open Contexture.Api.Aggregates
 open Contexture.Api.Database
-open Contexture.Api.Entities
 open Contexture.Api.Domains
+open Contexture.Api.Entities
+open Contexture.Api.Aggregates.BoundedContext
 open Contexture.Api.Infrastructure
+open Contexture.Api.Infrastructure.Projections
 open Microsoft.AspNetCore.Http
 open FSharp.Control.Tasks
 
 open Giraffe
 
 module BoundedContexts =
-    open Database
-
     module Results =
         type BoundedContextResult =
             { Id: BoundedContextId
@@ -45,9 +45,8 @@ module BoundedContexts =
               Namespaces = boundedContext.Namespaces }
 
     module CommandEndpoints =
-        open BoundedContext
-        open FileBasedCommandHandlers
         open System
+        open FileBasedCommandHandlers
 
         let clock = fun () -> DateTime.UtcNow
 
@@ -104,39 +103,38 @@ module BoundedContexts =
                     | Error e -> return! ServerErrors.INTERNAL_ERROR e next ctx
                 }
 
-    let getBoundedContexts =
-        fun (next: HttpFunc) (ctx: HttpContext) ->
-            let database = ctx.GetService<FileBased>()
-            let document = database.Read
-            let eventStore = ctx.GetService<EventStore>()
+    module QueryEndpoints =
+        open Contexture.Api.ReadModels
+        let getBoundedContexts =
+            fun (next: HttpFunc) (ctx: HttpContext) ->
+                let eventStore = ctx.GetService<EventStore>()
 
-            let boundedContexts =
-                document.BoundedContexts.All
-                |> List.map (Results.convertBoundedContextWithDomain (Domains.buildDomain eventStore))
+                let boundedContexts =
+                    eventStore
+                    |> BoundedContext.allBoundedContexts
+                    |> List.map (Results.convertBoundedContextWithDomain (Domain.buildDomain eventStore))
 
-            json boundedContexts next ctx
+                json boundedContexts next ctx
 
-    let getBoundedContext contextId =
-        fun (next: HttpFunc) (ctx: HttpContext) ->
-            let database = ctx.GetService<FileBased>()
-            let document = database.Read
-            let eventStore = ctx.GetService<EventStore>()
+        let getBoundedContext contextId =
+            fun (next: HttpFunc) (ctx: HttpContext) ->
+                let eventStore = ctx.GetService<EventStore>()
 
-            let result =
-                contextId
-                |> document.BoundedContexts.ById
-                |> Option.map (Results.convertBoundedContextWithDomain (Domains.buildDomain eventStore))
-                |> Option.map json
-                |> Option.defaultValue (RequestErrors.NOT_FOUND(sprintf "BoundedContext %O not found" contextId))
+                let result =
+                    contextId
+                    |> BoundedContext.buildBoundedContext eventStore
+                    |> Option.map (Results.convertBoundedContextWithDomain (Domain.buildDomain eventStore))
+                    |> Option.map json
+                    |> Option.defaultValue (RequestErrors.NOT_FOUND(sprintf "BoundedContext %O not found" contextId))
 
-            result next ctx
+                result next ctx
 
     let routes: HttpHandler =
         subRouteCi
             "/boundedcontexts"
             (choose [ subRoutef "/%O" (fun contextId ->
                           (choose [ Namespaces.routes contextId
-                                    GET >=> getBoundedContext contextId
+                                    GET >=> QueryEndpoints.getBoundedContext contextId
                                     POST
                                     >=> route "/technical"
                                     >=> bindJson (CommandEndpoints.technical contextId)
@@ -168,4 +166,4 @@ module BoundedContexts =
                                     >=> route "/messages"
                                     >=> bindJson (CommandEndpoints.messages contextId)
                                     DELETE >=> CommandEndpoints.removeAndReturnId contextId ]))
-                      GET >=> getBoundedContexts ])
+                      GET >=> QueryEndpoints.getBoundedContexts ])

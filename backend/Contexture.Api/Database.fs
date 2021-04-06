@@ -126,11 +126,6 @@ module Database =
           Collaborations: CollectionOfGuid<Collaboration>
           NamespaceTemplates: CollectionOfInt<NamespaceTemplate> }
 
-    module Document =
-        let boundedContextsOf (boundedContexts: CollectionOfGuid<BoundedContext>) domainId =
-            boundedContexts.All
-            |> List.where (fun x -> x.DomainId = domainId)
-
     module Persistence =
         let read path = path |> File.ReadAllText
 
