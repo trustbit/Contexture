@@ -47,13 +47,16 @@ module BoundedContexts =
     module CommandEndpoints =
         open BoundedContext
         open FileBasedCommandHandlers
+        open System
+
+        let clock = fun () -> DateTime.UtcNow
 
         let private updateAndReturnBoundedContext command =
             fun (next: HttpFunc) (ctx: HttpContext) ->
                 task {
-                    let database = ctx.GetService<FileBased>()
+                    let database = ctx.GetService<EventStore>()
 
-                    match BoundedContext.handle database command with
+                    match BoundedContext.handle clock database command with
                     | Ok updatedContext ->
                         return! redirectTo false (sprintf "/api/boundedcontexts/%O" updatedContext) next ctx
                     | Error (DomainError EmptyName) ->
@@ -94,9 +97,9 @@ module BoundedContexts =
         let removeAndReturnId contextId =
             fun (next: HttpFunc) (ctx: HttpContext) ->
                 task {
-                    let database = ctx.GetService<FileBased>()
+                    let database = ctx.GetService<EventStore>()
 
-                    match BoundedContext.handle database (RemoveBoundedContext contextId) with
+                    match BoundedContext.handle clock database (RemoveBoundedContext contextId) with
                     | Ok id -> return! json id next ctx
                     | Error e -> return! ServerErrors.INTERNAL_ERROR e next ctx
                 }

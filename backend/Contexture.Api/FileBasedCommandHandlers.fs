@@ -1,9 +1,6 @@
 namespace Contexture.Api
 
 open Contexture.Api
-open Contexture.Api.Aggregates.BoundedContext
-open Contexture.Api.Aggregates.Domain
-open Contexture.Api.Entities
 open Database
 open Contexture.Api.Infrastructure
 
@@ -50,6 +47,8 @@ module FileBasedCommandHandlers =
                 | Error e -> Error e
 
     module Domain =
+        open Contexture.Api.Aggregates.Domain
+        open Contexture.Api.Entities
         open BridgeEventSourcingWithDatabase
         
         let handle clock (store: EventStore) command =
@@ -100,110 +99,73 @@ module FileBasedCommandHandlers =
                 |> ignore
 
     module BoundedContext =
+
+        open BridgeEventSourcingWithDatabase
+        
+        open Contexture.Api.Entities
         open BoundedContext
+        open Contexture.Api.Aggregates
+        
+        
+        
+        
+        let handle clock (store: EventStore) (command: BoundedContext.Command) =
+            let identity = BoundedContext.identify command
+            let streamName = BoundedContext.name identity
 
-        let create (database: FileBased) id domainId (command: CreateBoundedContext) =
-            match newBoundedContext id domainId command.Name with
-            | Ok addNewBoundedContext ->
-                let changed =
-                    database.Change(fun document ->
-                        addNewBoundedContext
-                        |> document.BoundedContexts.Add id
-                        |> Result.map (fun bcs -> { document with BoundedContexts = bcs }, id))
+            let state =
+                streamName
+                |> store.Stream
+                |> List.map (fun e -> e.Event)
+                |> List.fold BoundedContext.State.Fold BoundedContext.State.Initial
 
-                changed
-                |> Result.mapError (fun e ->
-                    match e with
-                    | ChangeError err ->
-                        err |> DomainError
-                    | EntityNotFoundInCollection id ->
-                        id
-                        |> EntityNotFound
-                        |> InfrastructureError
-                    | DuplicateKey id ->
-                        id
-                        |> EntityNotFound
-                        |> InfrastructureError
-                    )
-            | Error domainError -> domainError |> DomainError |> Error
+            match BoundedContext.handle state command with
+            | Ok newEvents ->
+                newEvents
+                |> List.map (fun e ->
+                    { Event = e
+                      Metadata =
+                          { Source = streamName
+                            RecordedAt = clock () } })
+                |> store.Append
 
-        let private updateBoundedContextsIn (document: Document) =
-            Result.map (fun (contexts, item) ->
-                { document with
-                      BoundedContexts = contexts },
-                item)
+                Ok identity
+            | Error e ->
+                e |> DomainError |> Error
 
-        let remove (database: FileBased) contextId =
-            let changed =
+        let asEvents clock (collaboration: BoundedContext) =
+            { Metadata =
+                  { Source = collaboration.Id
+                    RecordedAt = clock () }
+              Event =
+                  BoundedContextImported
+                      { BoundedContextId = collaboration.Id
+                        DomainId = collaboration.DomainId
+                        Description = collaboration.Description
+                        Messages = collaboration.Messages
+                        Classification = collaboration.Classification
+                        DomainRoles = collaboration.DomainRoles
+                        UbiquitousLanguage = collaboration.UbiquitousLanguage
+                        BusinessDecisions = collaboration.BusinessDecisions
+                        Key = collaboration.Key
+                        Name = collaboration.Name
+                        TechnicalDescription = collaboration.TechnicalDescription
+                         }
+            }
+            |> List.singleton
+
+        let subscription (database: FileBased): Subscription<Event> =
+            fun (events: EventEnvelope<Event> list) ->
                 database.Change(fun document ->
-                    contextId
-                    |> document.BoundedContexts.Remove
-                    |> Result.map (fun r -> r,contextId)
-                    |> updateBoundedContextsIn document)
-
-            changed
-            |> Result.map (fun _ -> contextId)
-            |> Result.mapError (fun e ->
-                match e with
-                | ChangeError err ->
-                    err |> DomainError
-                | EntityNotFoundInCollection id ->
-                    id
-                    |> EntityNotFound
-                    |> InfrastructureError
-                | DuplicateKey id ->
-                    id
-                    |> EntityNotFound
-                    |> InfrastructureError
-                )
-
-        let private updateBoundedContext (database: FileBased) contextId update =
-            let changed =
-                database.Change(fun document ->
-                    contextId
-                    |> document.BoundedContexts.Update update
-                    |> Result.map (fun r -> r,contextId)
-                    |> updateBoundedContextsIn document)
-
-            match changed with
-            | Ok _ -> Ok contextId
-            | Error (ChangeError e) -> Error(DomainError e)
-            | Error (EntityNotFoundInCollection id) ->
-                id
-                |> EntityNotFound
-                |> InfrastructureError
-                |> Error
-            | Error (DuplicateKey id) ->
-                id
-                |> EntityNotFound
-                |> InfrastructureError
-                |> Error
-
-        let handle (database: FileBased) (command: Command) =
-            match command with
-            | CreateBoundedContext (id, domainId, createBc) -> create database id domainId createBc
-            | UpdateTechnicalInformation (contextId, technical) ->
-                updateBoundedContext database contextId (updateTechnicalDescription technical)
-            | RenameBoundedContext (contextId, rename) ->
-                updateBoundedContext database contextId (renameBoundedContext rename.Name)
-            | AssignKey (contextId, key) -> updateBoundedContext database contextId (assignKeyToBoundedContext key.Key)
-            | RemoveBoundedContext contextId -> remove database contextId
-            | MoveBoundedContextToDomain (contextId, move) ->
-                updateBoundedContext database contextId (moveBoundedContext move.ParentDomainId)
-            | ReclassifyBoundedContext (contextId, classification) ->
-                updateBoundedContext database contextId (reclassify classification.Classification)
-            | ChangeDescription (contextId, descriptionText) ->
-                updateBoundedContext database contextId (description descriptionText.Description)
-            | UpdateBusinessDecisions (contextId, decisions) ->
-                updateBoundedContext database contextId (updateBusinessDecisions decisions.BusinessDecisions)
-            | UpdateUbiquitousLanguage (contextId, language) ->
-                updateBoundedContext database contextId (updateUbiquitousLanguage language.UbiquitousLanguage)
-            | UpdateDomainRoles (contextId, roles) ->
-                updateBoundedContext database contextId (updateDomainRoles roles.DomainRoles)
-            | UpdateMessages (contextId, roles) ->
-                updateBoundedContext database contextId (updateMessages roles.Messages)
+                    events
+                    |> List.fold
+                        (applyToCollection BoundedContext.Projections.asBoundedContext)
+                           (Ok document.BoundedContexts)
+                    |> Result.map (fun c -> { document with BoundedContexts = c }, System.Guid.Empty))
+                |> ignore
 
     module Collaboration =
+        open Contexture.Api.Entities
         open Collaboration
         open BridgeEventSourcingWithDatabase
         

@@ -313,8 +313,6 @@ module Aggregates =
                       |> Option.filter (String.IsNullOrWhiteSpace >> not) }
             |> Ok
 
-
-
         let handle (state: State) (command: Command) =
             match command with
             | CreateDomain (domainId, createDomain) -> newDomain domainId createDomain.Name None
@@ -326,7 +324,7 @@ module Aggregates =
             | RefineVision (domainId, refineVision) -> refineVisionOfDomain refineVision.Vision domainId
             | AssignKey (domainId, assignKey) -> assignKeyToDomain assignKey.Key domainId
             |> Result.map List.singleton
-            
+
         module Projections =
             let asDomain domain event =
                 match event with
@@ -344,7 +342,7 @@ module Aggregates =
                           ParentDomainId = None
                           Name = c.Name
                           Key = None }
-                 | SubDomainCreated c ->
+                | SubDomainCreated c ->
                     Some
                         { Id = c.DomainId
                           Vision = None
@@ -353,7 +351,9 @@ module Aggregates =
                           Key = None }
                 | CategorizedAsSubdomain c ->
                     domain
-                    |> Option.map (fun o -> { o with ParentDomainId = Some c.ParentDomainId })
+                    |> Option.map (fun o ->
+                        { o with
+                              ParentDomainId = Some c.ParentDomainId })
                 | PromotedToDomain c ->
                     domain
                     |> Option.map (fun o -> { o with ParentDomainId = None })
@@ -411,7 +411,110 @@ module Aggregates =
 
         and UpdateDomainRoles = { DomainRoles: DomainRole list }
 
+        type Event =
+            | BoundedContextImported of BoundedContextImported
+            | BoundedContextCreated of BoundedContextCreated
+            | TechnicalInformationUpdated of TechnicalInformationUpdated
+            | BoundedContextRenamed of BoundedContextRenamed
+            | KeyAssigned of KeyAssigned
+            | BoundedContextRemoved of BoundedContextRemoved
+            | BoundedContextMovedToDomain of BoundedContextMovedToDomain
+            | BoundedContextReclassified of BoundedContextReclassified
+            | DescriptionChanged of DescriptionChanged
+            // TODO: replace with add/remove instead of updateing all
+            | BusinessDecisionsUpdated of BusinessDecisionsUpdated
+            | UbiquitousLanguageUpdated of UbiquitousLanguageUpdated
+            | DomainRolesUpdated of DomainRolesUpdated
+            | MessagesUpdated of MessagesUpdated
+
+        and BoundedContextImported =
+            { BoundedContextId: BoundedContextId
+              DomainId: DomainId
+              Key: string option
+              Name: string
+              Description: string option
+              Classification: StrategicClassification
+              BusinessDecisions: BusinessDecision list
+              UbiquitousLanguage: Map<string, UbiquitousLanguageTerm>
+              Messages: Messages
+              DomainRoles: DomainRole list
+              TechnicalDescription: TechnicalDescription option }
+
+        and BoundedContextCreated =
+            { BoundedContextId: BoundedContextId
+              DomainId: DomainId
+              Name: string }
+
+        and BoundedContextRenamed =
+            { BoundedContextId: BoundedContextId
+              Name: string }
+
+        and BoundedContextRemoved = { BoundedContextId: BoundedContextId }
+
+        and BoundedContextMovedToDomain =
+            { BoundedContextId: BoundedContextId
+              DomainId: DomainId }
+
+        and DescriptionChanged =
+            { BoundedContextId: BoundedContextId
+              Description: string option }
+
+        and KeyAssigned =
+            { BoundedContextId: BoundedContextId
+              Key: string option }
+
+        and TechnicalInformationUpdated =
+            { BoundedContextId: BoundedContextId
+              Tools: Lifecycle option
+              Deployment: Deployment option }
+
+        and BoundedContextReclassified =
+            { BoundedContextId: BoundedContextId
+              Classification: StrategicClassification }
+
+        and BusinessDecisionsUpdated =
+            { BoundedContextId: BoundedContextId
+              BusinessDecisions: BusinessDecision list }
+
+        and UbiquitousLanguageUpdated =
+            { BoundedContextId: BoundedContextId
+              UbiquitousLanguage: Map<string, UbiquitousLanguageTerm> }
+
+        and DomainRolesUpdated =
+            { BoundedContextId: BoundedContextId
+              DomainRoles: DomainRole list }
+
+        and MessagesUpdated =
+            { BoundedContextId: BoundedContextId
+              Messages: Messages }
+
         type Errors = | EmptyName
+
+        let identify =
+            function
+            | CreateBoundedContext (contextId, _, _) -> contextId
+            | RenameBoundedContext (contextId, _) -> contextId
+            | ChangeDescription (contextId, _) -> contextId
+            | RemoveBoundedContext contextId -> contextId
+            | UpdateDomainRoles (contextId, _) -> contextId
+            | UpdateUbiquitousLanguage (contextId, _) -> contextId
+            | UpdateMessages (contextId, _) -> contextId
+            | UpdateBusinessDecisions (contextId, _) -> contextId
+            | ReclassifyBoundedContext (contextId, _) -> contextId
+            | AssignKey (contextId, _) -> contextId
+            | UpdateTechnicalInformation (contextId, _) -> contextId
+            | MoveBoundedContextToDomain (contextId, _) -> contextId
+
+        let name identity = identity
+
+        type State =
+            | Initial
+            | Existing
+            | Deleted
+            static member Fold (state: State) (event: Event) =
+                match event with
+                | BoundedContextRemoved _ -> Deleted
+                | _ -> Existing
 
         let nameValidation name =
             if String.IsNullOrWhiteSpace name then Error EmptyName else Ok name
@@ -420,71 +523,159 @@ module Aggregates =
             name
             |> nameValidation
             |> Result.map (fun name ->
-                { Id = id
-                  Key = None
-                  DomainId = domainId
-                  Name = name
-                  Description = None
-                  Classification = StrategicClassification.Unknown
-                  BusinessDecisions = []
-                  UbiquitousLanguage = Map.empty
-                  Messages = Messages.Empty
-                  DomainRoles = []
-                  TechnicalDescription = None
-                  Namespaces = [] })
+                BoundedContextCreated
+                    { BoundedContextId = id
+                      DomainId = domainId
+                      Name = name })
 
-        let updateTechnicalDescription description context =
-            Ok
-                { context with
-                      TechnicalDescription = Some description }
-
-        let renameBoundedContext potentialName (context: BoundedContext) =
+        let renameBoundedContext potentialName boundedContextId =
             potentialName
             |> nameValidation
-            |> Result.map (fun name -> { context with Name = name })
+            |> Result.map (fun name ->
+                BoundedContextRenamed
+                    { Name = name
+                      BoundedContextId = boundedContextId })
 
-        let assignKeyToBoundedContext key (boundedContext: BoundedContext) =
-            Ok
-                { boundedContext with
-                      Key =
-                          key
-                          |> Option.ofObj
-                          |> Option.filter (String.IsNullOrWhiteSpace >> not) }
+        let assignKeyToBoundedContext key boundedContextId =
+            KeyAssigned
+                { BoundedContextId = boundedContextId
+                  Key =
+                      key
+                      |> Option.ofObj
+                      |> Option.filter (String.IsNullOrWhiteSpace >> not) }
+            |> Ok
 
-        let moveBoundedContext parent (boundedContext: BoundedContext) =
-            Ok
-                { boundedContext with
-                      DomainId = parent }
 
-        let reclassify classification (boundedContext: BoundedContext) =
-            Ok
-                { boundedContext with
-                      Classification = classification }
+        let handle state (command: Command) =
+            match command with
+            | CreateBoundedContext (id, domainId, createBc) -> newBoundedContext id domainId createBc.Name
+            | UpdateTechnicalInformation (contextId, technical) ->
+                TechnicalInformationUpdated
+                    { Tools = technical.Tools
+                      Deployment = technical.Deployment
+                      BoundedContextId = contextId }
+                |> Ok
+            | RenameBoundedContext (contextId, rename) -> renameBoundedContext rename.Name contextId
+            | AssignKey (contextId, key) -> assignKeyToBoundedContext key.Key contextId
+            | RemoveBoundedContext contextId ->
+                BoundedContextRemoved { BoundedContextId = contextId }
+                |> Ok
+            | MoveBoundedContextToDomain (contextId, move) ->
+                BoundedContextMovedToDomain
+                    { DomainId = move.ParentDomainId
+                      BoundedContextId = contextId }
+                |> Ok
+            | ReclassifyBoundedContext (contextId, classification) ->
+                BoundedContextReclassified
+                    { Classification = classification.Classification
+                      BoundedContextId = contextId }
+                |> Ok
+            | ChangeDescription (contextId, descriptionText) ->
+                DescriptionChanged
+                    { Description = descriptionText.Description
+                      BoundedContextId = contextId }
+                |> Ok
+            | UpdateBusinessDecisions (contextId, decisions) ->
+                BusinessDecisionsUpdated
+                    { BusinessDecisions = decisions.BusinessDecisions
+                      BoundedContextId = contextId }
+                |> Ok
+            | UpdateUbiquitousLanguage (contextId, language) ->
+                UbiquitousLanguageUpdated
+                    { UbiquitousLanguage = language.UbiquitousLanguage
+                      BoundedContextId = contextId }
+                |> Ok
+            | UpdateDomainRoles (contextId, roles) ->
+                DomainRolesUpdated
+                    { DomainRoles = roles.DomainRoles
+                      BoundedContextId = contextId }
+                |> Ok
+            | UpdateMessages (contextId, roles) ->
+                MessagesUpdated
+                    { Messages = roles.Messages
+                      BoundedContextId = contextId }
+                |> Ok
+            |> Result.map List.singleton
 
-        let description description (boundedContext: BoundedContext) =
-            Ok
-                { boundedContext with
-                      Description = description }
+        module Projections =
+            let asBoundedContext state event =
+                match event with
+                | BoundedContextImported c ->
+                    match state with
+                    | Some s ->
+                        Some { s with
+                                  Id = c.BoundedContextId
+                                  DomainId = c.DomainId
+                                  Description = c.Description
+                                  Messages = c.Messages
+                                  Classification = c.Classification
+                                  DomainRoles = c.DomainRoles
+                                  UbiquitousLanguage = c.UbiquitousLanguage
+                                  BusinessDecisions = c.BusinessDecisions
+                                  Key = c.Key
+                                  Name = c.Name
+                                  TechnicalDescription = c.TechnicalDescription}
+                    | None ->
+                        Some
+                            { Id = c.BoundedContextId
+                              DomainId = c.DomainId
+                              Description = c.Description
+                              Messages = c.Messages
+                              Classification = c.Classification
+                              DomainRoles = c.DomainRoles
+                              UbiquitousLanguage = c.UbiquitousLanguage
+                              BusinessDecisions = c.BusinessDecisions
+                              Key = c.Key
+                              Name = c.Name
+                              TechnicalDescription = c.TechnicalDescription
+                              Namespaces = [] }
+                | BoundedContextCreated c ->
+                    Some
+                        { Id = c.BoundedContextId
+                          DomainId = c.DomainId
+                          Description = None
+                          Name = c.Name
+                          Key = None
+                          Messages = Messages.Empty
+                          Classification = StrategicClassification.Unknown
+                          DomainRoles = []
+                          BusinessDecisions = []
+                          UbiquitousLanguage = Map.empty
+                          TechnicalDescription = None
+                          Namespaces = [] }
+                | BoundedContextRemoved c ->
+                    None
+                | BoundedContextRenamed c ->
+                    state
+                    |> Option.map (fun o -> { o with Name =c.Name })
+                | BoundedContextMovedToDomain c ->
+                    state
+                    |> Option.map (fun o -> { o with DomainId = c.DomainId })
+                | BoundedContextReclassified c ->
+                    state
+                    |> Option.map (fun o -> { o with Classification = c.Classification })
+                | BusinessDecisionsUpdated c ->
+                    state
+                    |> Option.map (fun o -> { o with BusinessDecisions = c.BusinessDecisions })
+                | DomainRolesUpdated c->
+                    state
+                    |> Option.map (fun o -> { o with DomainRoles = c.DomainRoles})
+                | MessagesUpdated c->
+                    state
+                    |> Option.map (fun o -> { o with Messages = c.Messages })
+                | DescriptionChanged c ->
+                    state
+                    |> Option.map (fun o -> { o with Description = c.Description })
+                | KeyAssigned c ->
+                    state
+                    |> Option.map (fun o -> { o with Key = c.Key })
+                | TechnicalInformationUpdated c ->
+                    state
+                    |> Option.map (fun o -> { o with TechnicalDescription = Some { Tools =c.Tools; Deployment = c.Deployment }  })
+                | UbiquitousLanguageUpdated c ->
+                    state
+                    |> Option.map (fun o -> { o with UbiquitousLanguage = c.UbiquitousLanguage  })
 
-        let updateBusinessDecisions decisions (boundedContext: BoundedContext) =
-            Ok
-                { boundedContext with
-                      BusinessDecisions = decisions }
-
-        let updateUbiquitousLanguage language (boundedContext: BoundedContext) =
-            Ok
-                { boundedContext with
-                      UbiquitousLanguage = language }
-
-        let updateDomainRoles roles (boundedContext: BoundedContext) =
-            Ok
-                { boundedContext with
-                      DomainRoles = roles }
-
-        let updateMessages messages (boundedContext: BoundedContext) =
-            Ok
-                { boundedContext with
-                      Messages = messages }
 
     module Collaboration =
         open Entities

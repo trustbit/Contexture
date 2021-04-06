@@ -5,6 +5,7 @@ open System.IO
 open Contexture.Api.Aggregates
 open Contexture.Api.Database
 open Contexture.Api.Domains
+open Contexture.Api.Entities
 open Contexture.Api.Infrastructure
 open Contexture.Api.FileBasedCommandHandlers
 open Giraffe
@@ -117,12 +118,17 @@ let buildHost args =
         .Build()
 
 let importFromDocument (store: EventStore) (database: Document) =
+    let clock = fun () -> System.DateTime.UtcNow
     database.Collaborations.All
-    |> List.map (Collaboration.asEvents (fun () -> System.DateTime.UtcNow))
+    |> List.map (Collaboration.asEvents clock)
     |> List.iter store.Append
     
     database.Domains.All
-    |> List.map (Domain.asEvents (fun () -> System.DateTime.UtcNow))
+    |> List.map (Domain.asEvents clock)
+    |> List.iter store.Append
+    
+    database.BoundedContexts.All
+    |> List.map (BoundedContext.asEvents clock)
     |> List.iter store.Append
 
 [<EntryPoint>]
@@ -138,6 +144,7 @@ let main args =
     // collaboration subscription is added after initial seeding
     store.Subscribe (Collaboration.subscription database)
     store.Subscribe (Domain.subscription database)
+    store.Subscribe (BoundedContext.subscription database)
 
     host.Run()
     0

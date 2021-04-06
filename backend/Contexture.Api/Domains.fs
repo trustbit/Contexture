@@ -125,9 +125,9 @@ module Domains =
         let newBoundedContextOn domainId (command: CreateBoundedContext) =
             fun (next: HttpFunc) (ctx: HttpContext) ->
                 task {
-                    let database = ctx.GetService<FileBased>()
+                    let database = ctx.GetService<EventStore>()
 
-                    match BoundedContext.handle database (CreateBoundedContext(Guid.NewGuid(), domainId, command)) with
+                    match BoundedContext.handle clock database (CreateBoundedContext(Guid.NewGuid(), domainId, command)) with
                     | Ok addedContext ->
                         return! redirectTo false (sprintf "/api/boundedcontexts/%O" addedContext) next ctx
                     | Error (DomainError Aggregates.BoundedContext.EmptyName) ->
