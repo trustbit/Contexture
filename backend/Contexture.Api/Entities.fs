@@ -603,7 +603,8 @@ module Aggregates =
                 | BoundedContextImported c ->
                     match state with
                     | Some s ->
-                        Some { s with
+                        Some
+                            { s with
                                   Id = c.BoundedContextId
                                   DomainId = c.DomainId
                                   Description = c.Description
@@ -614,7 +615,7 @@ module Aggregates =
                                   BusinessDecisions = c.BusinessDecisions
                                   Key = c.Key
                                   Name = c.Name
-                                  TechnicalDescription = c.TechnicalDescription}
+                                  TechnicalDescription = c.TechnicalDescription }
                     | None ->
                         Some
                             { Id = c.BoundedContextId
@@ -643,24 +644,27 @@ module Aggregates =
                           UbiquitousLanguage = Map.empty
                           TechnicalDescription = None
                           Namespaces = [] }
-                | BoundedContextRemoved c ->
-                    None
+                | BoundedContextRemoved c -> None
                 | BoundedContextRenamed c ->
                     state
-                    |> Option.map (fun o -> { o with Name =c.Name })
+                    |> Option.map (fun o -> { o with Name = c.Name })
                 | BoundedContextMovedToDomain c ->
                     state
                     |> Option.map (fun o -> { o with DomainId = c.DomainId })
                 | BoundedContextReclassified c ->
                     state
-                    |> Option.map (fun o -> { o with Classification = c.Classification })
+                    |> Option.map (fun o ->
+                        { o with
+                              Classification = c.Classification })
                 | BusinessDecisionsUpdated c ->
                     state
-                    |> Option.map (fun o -> { o with BusinessDecisions = c.BusinessDecisions })
-                | DomainRolesUpdated c->
+                    |> Option.map (fun o ->
+                        { o with
+                              BusinessDecisions = c.BusinessDecisions })
+                | DomainRolesUpdated c ->
                     state
-                    |> Option.map (fun o -> { o with DomainRoles = c.DomainRoles})
-                | MessagesUpdated c->
+                    |> Option.map (fun o -> { o with DomainRoles = c.DomainRoles })
+                | MessagesUpdated c ->
                     state
                     |> Option.map (fun o -> { o with Messages = c.Messages })
                 | DescriptionChanged c ->
@@ -671,10 +675,17 @@ module Aggregates =
                     |> Option.map (fun o -> { o with Key = c.Key })
                 | TechnicalInformationUpdated c ->
                     state
-                    |> Option.map (fun o -> { o with TechnicalDescription = Some { Tools =c.Tools; Deployment = c.Deployment }  })
+                    |> Option.map (fun o ->
+                        { o with
+                              TechnicalDescription =
+                                  Some
+                                      { Tools = c.Tools
+                                        Deployment = c.Deployment } })
                 | UbiquitousLanguageUpdated c ->
                     state
-                    |> Option.map (fun o -> { o with UbiquitousLanguage = c.UbiquitousLanguage  })
+                    |> Option.map (fun o ->
+                        { o with
+                              UbiquitousLanguage = c.UbiquitousLanguage })
 
     module Collaboration =
         open Entities
@@ -792,66 +803,199 @@ module Aggregates =
 
     module Namespaces =
         open Entities
-        type Errors = | EmptyName
+
+        type Errors =
+            | EmptyName
+            | NamespaceNameNotUnique
 
         type Command =
             | NewNamespace of BoundedContextId * NamespaceDefinition
             | RemoveNamespace of BoundedContextId * NamespaceId
             | RemoveLabel of BoundedContextId * RemoveLabel
-            | AddLabel of BoundedContextId * NamespaceId * LabelDefinition
+            | AddLabel of BoundedContextId * NamespaceId * NewLabelDefinition
 
         and NamespaceDefinition =
             { Name: string
-              Labels: LabelDefinition list }
+              Labels: NewLabelDefinition list }
 
-        and LabelDefinition = { Name: string; Value: string }
+        and NewLabelDefinition = { Name: string; Value: string }
 
         and RemoveLabel =
             { Namespace: NamespaceId
               Label: LabelId }
 
-        module Label =
-            let create name (value: string) =
+        type Event =
+            | NamespaceImported of NamespaceImported
+            | NamespaceAdded of NamespaceAdded
+            | NamespaceRemoved of NamespaceRemoved
+            | LabelRemoved of LabelRemoved
+            | LabelAdded of LabelAdded
+
+        and NamespaceImported =
+            { NamespaceId: NamespaceId
+              BoundedContextId: BoundedContextId
+              Template: NamespaceTemplateId option
+              Name: string
+              Labels: LabelDefinition list }
+
+        and NamespaceAdded =
+            { NamespaceId: NamespaceId
+              BoundedContextId: BoundedContextId
+              Name: string
+              Labels: LabelDefinition list }
+
+        and NamespaceRemoved = { NamespaceId: NamespaceId }
+
+        and LabelDefinition =
+            { LabelId: LabelId
+              Name: string
+              Value: string option }
+
+        and LabelRemoved =
+            { NamespaceId: NamespaceId
+              LabelId: LabelId }
+
+        and LabelAdded =
+            { LabelId: LabelId
+              NamespaceId: NamespaceId
+              Name: string
+              Value: string option }
+
+        type State =
+            | Namespaces of Map<NamespaceId, string>
+            static member Initial = Namespaces Map.empty
+
+            static member Fold (Namespaces namespaces) (event: Event) =
+                match event with
+                | NamespaceRemoved e ->
+                    namespaces
+                    |> Map.remove e.NamespaceId
+                    |> Namespaces
+                | NamespaceAdded e ->
+                    namespaces
+                    |> Map.add e.NamespaceId e.Name
+                    |> Namespaces
+                | NamespaceImported e ->
+                    namespaces
+                    |> Map.add e.NamespaceId e.Name
+                    |> Namespaces
+                | _ -> Namespaces namespaces
+
+        module LabelDefinition =
+            let create name (value: string): LabelDefinition option =
                 if String.IsNullOrWhiteSpace name then
                     None
                 else
                     Some
-                        { Id = Guid.NewGuid()
+                        { LabelId = Guid.NewGuid()
                           Name = name.Trim()
-                          Value = if not (isNull value) then value.Trim() else null }
+                          Value = if not (isNull value) then value.Trim() |> Some else None }
 
-        let addNewNamespace name labels namespaces =
-            let newLabels =
-                labels
-                |> List.choose (fun label -> Label.create label.Name label.Value)
+        let addNewNamespace boundedContextId name (labels: NewLabelDefinition list) (Namespaces namespaces) =
+            if namespaces
+               |> Map.exists (fun _ name -> name = name) then
+                Error NamespaceNameNotUnique
+            else
+                let newLabels =
+                    labels
+                    |> List.choose (fun label -> LabelDefinition.create label.Name label.Value)
 
-            let newNamespace =
-                { Id = Guid.NewGuid()
-                  Template = None
-                  Name = name
-                  Labels = newLabels }
+                let newNamespace =
+                    NamespaceAdded
+                        { NamespaceId = Guid.NewGuid()
+                          BoundedContextId = boundedContextId
+                          Name = name
+                          Labels = newLabels }
 
-            Ok(namespaces @ [ newNamespace ])
+                Ok newNamespace
 
-        let removeNamespace (namespaceId: NamespaceId) (namespaces: Namespace list) =
-            namespaces
-            |> List.filter (fun n -> n.Id <> namespaceId)
-            |> Ok
-
-        let removeLabel namespaceId labelId (namespaces: Namespace list) =
-            namespaces
-            |> List.map (fun n ->
-                if n.Id = namespaceId then
-                    { n with
-                          Labels = n.Labels |> List.filter (fun l -> l.Id <> labelId) }
-                else
-                    n)
-            |> Ok
-
-        let addLabel namespaceId labelName value (namespaces: Namespace list) =
-            match Label.create labelName value with
+        let addLabel namespaceId labelName value =
+            match LabelDefinition.create labelName value with
             | Some label ->
-                namespaces
-                |> List.map (fun n -> if n.Id = namespaceId then { n with Labels = n.Labels @ [ label ] } else n)
-                |> Ok
+                Ok
+                <| LabelAdded
+                    { NamespaceId = namespaceId
+                      Name = label.Name
+                      Value = label.Value
+                      LabelId = label.LabelId }
             | None -> Error EmptyName
+
+        let identify =
+            function
+            | NewNamespace (boundedContextId, _) -> boundedContextId
+            | RemoveNamespace (boundedContextId, _) -> boundedContextId
+            | AddLabel (boundedContextId, _, _) -> boundedContextId
+            | RemoveLabel (boundedContextId, _) -> boundedContextId
+
+        let name identity = identity
+
+        let handle (state: State) (command: Command) =
+            match command with
+            | NewNamespace (boundedContextId, namespaceCommand) ->
+                addNewNamespace boundedContextId namespaceCommand.Name namespaceCommand.Labels state
+            | RemoveNamespace (_, namespaceId) ->
+                Ok
+                <| NamespaceRemoved { NamespaceId = namespaceId }
+            | AddLabel (_, namespaceId, labelCommand) -> addLabel namespaceId labelCommand.Name labelCommand.Value
+            | RemoveLabel (_, labelCommand) ->
+                Ok
+                <| LabelRemoved
+                    { NamespaceId = labelCommand.Namespace
+                      LabelId = labelCommand.Label }
+            |> Result.map List.singleton
+
+
+        module Projections =
+            let convertLabels (labels: LabelDefinition list): Label list =
+                labels
+                |> List.map (fun l ->
+                    { Name = l.Name
+                      Id = l.LabelId
+                      Value = l.Value |> Option.defaultValue null })
+
+            let asNamespace namespaces event =
+                match event with
+                | NamespaceImported c ->
+                    { Id = c.NamespaceId
+                      Template = c.Template
+                      Name = c.Name
+                      Labels = c.Labels |> convertLabels }
+                    :: namespaces
+                | NamespaceAdded c ->
+                    { Id = c.NamespaceId
+                      Template = None
+                      Name = c.Name
+                      Labels = c.Labels |> convertLabels }
+                    :: namespaces
+                | NamespaceRemoved c ->
+                    namespaces
+                    |> List.filter (fun n -> n.Id <> c.NamespaceId)
+                | LabelAdded c ->
+                    namespaces
+                    |> List.map (fun n ->
+                        if n.Id = c.NamespaceId then
+                            { n with
+                                  Labels =
+                                      { Id = c.LabelId
+                                        Name = c.Name
+                                        Value = c.Value |> Option.defaultValue null }
+                                      :: n.Labels }
+                        else
+                            n)
+                | LabelRemoved c ->
+                    namespaces
+                    |> List.map (fun n ->
+                        if n.Id = c.NamespaceId then
+                            { n with
+                                  Labels =
+                                      n.Labels
+                                      |> List.filter (fun l -> l.Id <> c.LabelId) }
+                        else
+                            n)
+                    
+                    
+            let asNamespaceWithBoundedContext boundedContextOption event =
+                boundedContextOption
+                |> Option.map (fun boundedContext ->
+                    { boundedContext with Namespaces = asNamespace boundedContext.Namespaces event })
+

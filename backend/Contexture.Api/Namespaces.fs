@@ -5,6 +5,7 @@ open Contexture.Api.Aggregates.Namespaces
 open Contexture.Api.Database
 open Contexture.Api.Entities
 open Contexture.Api.Domains
+open Contexture.Api.Infrastructure
 open Microsoft.AspNetCore.Http
 open FSharp.Control.Tasks
 
@@ -22,21 +23,23 @@ module Namespaces =
         )
 
     module CommandEndpoints =
+        open System
         open Namespaces
         open FileBasedCommandHandlers
+        
+        let clock = fun () -> DateTime.UtcNow
 
         let private updateAndReturnNamespaces command =
             fun (next: HttpFunc) (ctx: HttpContext) ->
                 task {
-                    let database = ctx.GetService<FileBased>()
+                    let database = ctx.GetService<EventStore>()
 
-                    match Namespaces.handle database command with
+                    match Namespaces.handle clock database command with
                     | Ok updatedContext ->
                         // for namespaces we don't use redirects ATM
                         let boundedContext =
                             updatedContext
-                            |> fetchNamespaces database 
-                            |> Option.defaultValue []
+                            |> ReadModels.Namespace.allNamespacesOf database 
                         return! json boundedContext next ctx
                     | Error (DomainError error) ->
                         return! RequestErrors.BAD_REQUEST (sprintf "Domain Error %A" error) next ctx
@@ -52,19 +55,21 @@ module Namespaces =
         let removeLabel contextId (command: RemoveLabel) =
             updateAndReturnNamespaces (RemoveLabel(contextId, command))
 
-        let newLabel contextId namespaceId (command: LabelDefinition) =
+        let newLabel contextId namespaceId (command: NewLabelDefinition) =
             updateAndReturnNamespaces (AddLabel(contextId, namespaceId, command))
+            
+    module QueryEndpoints = 
 
-    let getNamespaces boundedContextId =
-        fun (next: HttpFunc) (ctx: HttpContext) ->
-            let database = ctx.GetService<FileBased>()
-            let result =
-                boundedContextId
-                |> fetchNamespaces database
-                |> Option.map json
-                |> Option.defaultValue (RequestErrors.NOT_FOUND "No namespaces for BoundedContext found")
+        let getNamespaces boundedContextId =
+            fun (next: HttpFunc) (ctx: HttpContext) ->
+                let database = ctx.GetService<FileBased>()
+                let result =
+                    boundedContextId
+                    |> fetchNamespaces database
+                    |> Option.map json
+                    |> Option.defaultValue (RequestErrors.NOT_FOUND "No namespaces for BoundedContext found")
 
-            result next ctx
+                result next ctx
 
     let routes boundedContextId: HttpHandler =
         subRouteCi "/namespaces"
@@ -84,6 +89,6 @@ module Namespaces =
                                 >=> bindJson (CommandEndpoints.newLabel boundedContextId namespaceId) ])
                         DELETE
                         >=> CommandEndpoints.removeNamespace boundedContextId namespaceId ]))
-                GET >=> getNamespaces boundedContextId
+                GET >=> QueryEndpoints.getNamespaces boundedContextId
                 POST
                 >=> bindJson (CommandEndpoints.newNamespace boundedContextId) ])

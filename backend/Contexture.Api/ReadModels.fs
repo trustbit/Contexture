@@ -71,3 +71,29 @@ module Collaboration =
         collaborationId
         |> eventStore.Stream
         |> project collaborationsProjection
+        
+        
+module Namespace =
+    open Contexture.Api.Aggregates.Namespaces
+
+    let private namespacesProjection: Projection<Namespace list, Aggregates.Namespaces.Event> =
+        { Init = List.empty
+          Update = Projections.asNamespace }
+
+    let allNamespaces (eventStore: EventStore) =
+        eventStore.Get<Aggregates.Namespaces.Event>()
+        |> List.fold (projectIntoMap namespacesProjection) Map.empty
+        |> Map.toList
+        |> List.collect snd
+    
+    let allNamespacesOf (eventStore: EventStore) boundedContextId =
+        boundedContextId
+        |> eventStore.Stream
+        |> List.fold (projectIntoMap namespacesProjection) Map.empty
+        |> Map.toList
+        |> List.collect snd
+
+    let buildNamespace (eventStore: EventStore) boundedContextId =
+        boundedContextId
+        |> eventStore.Stream
+        |> project namespacesProjection

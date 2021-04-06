@@ -215,60 +215,53 @@ module FileBasedCommandHandlers =
     module Namespaces =
         open Entities
         open Namespaces
+        open BridgeEventSourcingWithFilebasedDatabase
+        
+        let handle clock (store: EventStore) command =
+            let identity = Namespaces.identify command
+            let streamName = Namespaces.name identity
 
-        let private updateBoundedContextsIn (document: Document) =
-            Result.map (fun (contexts, item) ->
-                { document with
-                      BoundedContexts = contexts },
-                item)
+            let state =
+                streamName
+                |> store.Stream
+                |> List.map (fun e -> e.Event)
+                |> List.fold State.Fold State.Initial
 
-        let private updateNamespaces (database: FileBased) contextId update =
-            let updateNamespacesOnly (boundedContext: BoundedContext) =
-                boundedContext.Namespaces
-                |> tryUnbox<Namespace list>
-                |> Option.defaultValue []
-                |> update
-                |> Result.map (fun namespaces ->
-                    { boundedContext with
-                          Namespaces = namespaces })
+            match handle state command with
+            | Ok newEvents ->
+                newEvents
+                |> List.map (fun e ->
+                    { Event = e
+                      Metadata =
+                          { Source = streamName
+                            RecordedAt = clock () } })
+                |> store.Append
 
-            let changed =
+                Ok identity
+            | Error e ->
+                e |> DomainError |> Error
+
+        let asEvents clock (boundedContextId: BoundedContextId) (n: Namespace) =
+            { Metadata =
+                  { Source = boundedContextId
+                    RecordedAt = clock () }
+              Event =
+                  NamespaceImported
+                      { NamespaceId = n.Id
+                        BoundedContextId = boundedContextId
+                        Template = None
+                        Name = n.Name
+                        Labels = n.Labels |> List.map (fun l -> { LabelId = l.Id; Name = l.Name; Value = Option.ofObj l.Value })
+                      }
+            }
+            |> List.singleton
+
+        let subscription (database: FileBased): Subscription<Event> =
+            fun (events: EventEnvelope<Event> list) ->
                 database.Change(fun document ->
-                    contextId
-                    |> document.BoundedContexts.Update updateNamespacesOnly
-                    |> Result.map (fun r -> r,contextId)
-                    |> updateBoundedContextsIn document)
-
-            match changed with
-            | Ok _ -> Ok contextId
-            | Error (ChangeError e) -> Error(DomainError e)
-            | Error (EntityNotFoundInCollection id) ->
-                id
-                |> EntityNotFound
-                |> InfrastructureError
-                |> Error
-            | Error (DuplicateKey id) ->
-                id
-                |> EntityNotFound
-                |> InfrastructureError
-                |> Error
-
-        let handle (database: FileBased) (command: Command) =
-            match command with
-            | NewNamespace (boundedContextId, namespaceCommand) ->
-                updateNamespaces
-                    database
-                    boundedContextId
-                    (addNewNamespace namespaceCommand.Name namespaceCommand.Labels)
-            | RemoveNamespace (boundedContextId, namespaceCommand) ->
-                updateNamespaces database boundedContextId (removeNamespace namespaceCommand)
-            | RemoveLabel (boundedContextId, namespaceCommand) ->
-                updateNamespaces
-                    database
-                    boundedContextId
-                    (removeLabel namespaceCommand.Namespace namespaceCommand.Label)
-            | AddLabel (boundedContextId, namespaceId, namespaceCommand) ->
-                updateNamespaces
-                    database
-                    boundedContextId
-                    (addLabel namespaceId namespaceCommand.Name namespaceCommand.Value)
+                    events
+                    |> List.fold
+                        (applyToCollection Projections.asNamespaceWithBoundedContext)
+                           (Ok document.BoundedContexts)
+                    |> Result.map (fun c -> { document with BoundedContexts = c }, System.Guid.Empty))
+                |> ignore
