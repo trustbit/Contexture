@@ -98,3 +98,35 @@ input:checked + label {
 .form-active {
   background-color: $light;
 }
+
+// added some card styles for are denser look and feel. 
+// Remove once the final design is applied
+.card-deck {
+  .card-body {
+    padding-top: 10px;
+    padding-bottom: 10px;
+  }
+  .card-text {
+    margin-bottom: 8px;
+  }
+  .card-body ~ .card-body {
+    padding-top: 0px;
+  }
+  .card-footer {
+    padding-top: 6px;
+    padding-bottom: 6px;
+  }
+}
+.container > .card {
+  > .card-header {
+    padding-top: 6px;
+    padding-bottom: 6px;
+  }
+  > .card-body {
+    padding-top: 10px;
+    padding-bottom: 0px;
+  }
+  ~ .card {
+    margin-top: 6px;
+  }
+}

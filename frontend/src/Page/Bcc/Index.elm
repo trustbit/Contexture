@@ -308,7 +308,7 @@ viewPillMessage caption value =
 
 urlAsLinkItem caption canBeLink =
   canBeLink
-  |> Maybe.map (\value -> Html.a [ href <| Url.toString value, target "_blank" ] [ text caption] )
+  |> Maybe.map (\value -> Block.link [ href <| Url.toString value, target "_blank" ] [ text caption] )
 
 viewItem : RemoteData.WebData Communication -> Item -> Card.Config Msg
 viewItem communication { context, canvas, technical, namespaces } =
@@ -365,18 +365,18 @@ viewItem communication { context, canvas, technical, namespaces } =
           [ text "Loading communication information"]
 
     technicalLinks =
-      Html.ul [ class "list-inline"]
-        ( [ urlAsLinkItem "Issue Tracker" technical.tools.issueTracker
-          , urlAsLinkItem "Wiki" technical.tools.wiki
-          , urlAsLinkItem "Repository" technical.tools.repository
-          ]
-          |> List.map (\li -> li |> Maybe.map (\item -> Html.li [ class "list-inline-item", class "pr-4" ] [ item ] ) )
-          |> List.concatMap (\val ->
-              case val of
-                Just e -> [ e ]
-                Nothing -> [ ]
-            )
-        )
+      ( [ urlAsLinkItem "Issue Tracker" technical.tools.issueTracker
+        , urlAsLinkItem "Wiki" technical.tools.wiki
+        , urlAsLinkItem "Repository" technical.tools.repository
+        ]
+        
+        |> List.concatMap (\val ->
+            case val of
+              Just e -> [ e ]
+              Nothing -> [ ]
+          )
+      )
+
 
     namespaceBlocks =
       namespaces
@@ -416,9 +416,16 @@ viewItem communication { context, canvas, technical, namespaces } =
       [ Block.custom (div [] dependencies)
       , Block.custom (div [] messages)
       ]
-    |> Card.listGroup namespaceBlocks
-    |> Card.block []
-      [ Block.custom technicalLinks ]
+    |> (\t ->
+        if List.isEmpty namespaceBlocks
+        then t
+        else t |> Card.listGroup namespaceBlocks
+    )
+    |> (\t -> 
+        if List.isEmpty technicalLinks
+        then t
+        else t |> Card.block [] technicalLinks
+    )
     |> Card.footer []
       [ Grid.simpleRow
         [ Grid.col [ Col.md7 ]
