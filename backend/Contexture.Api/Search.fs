@@ -55,7 +55,7 @@ module Search =
                 ]
                 meta [ _charset "UTF-8" ]
                 title [] [
-                    Text "Contexture - Managing your Domains &amp; Contexts"
+                    str "Contexture - Managing your Domains & Contexts"
                 ]
                 resolveAsset (Asset.css "contexture.css")
                 resolveAsset (Asset.js "Contexture.js")
@@ -65,7 +65,7 @@ module Search =
         let navTemplate =
             nav [ _class "navbar navbar-expand-sm navbar-dark bg-primary" ] [
                 a [ _class "navbar-brand"; _href "/" ] [
-                    Text "Contexture"
+                    str "Contexture"
                 ]
                 button [ _class "navbar-toggler navbar-toggler-right"
                          _type "button" ] [
@@ -73,7 +73,10 @@ module Search =
                 ]
                 div [ _class "collapse navbar-collapse" ] [
                     div [ _style "display: flex; width: 100%;" ] [
-                        ul [ _class "navbar-nav mr-auto" ] []
+                        ul [ _class "navbar-nav mr-auto" ] [
+                            li [ _class "navbar-item" ] [ a [_href "/"; _class "nav-link"] [ str "Domains" ]]
+                            li [ _class "navbar-item" ] [ a [_href "/search"; _class "nav-link active"] [ str "Search" ]]
+                        ]
                     ]
                 ]
             ]
@@ -148,4 +151,4 @@ module Search =
             htmlView (Views.index assetsResolver (jsonEncoder.SerializeToString result)) next ctx
 
     let routes: HttpHandler =
-        subRoute "/reports" (choose [ GET >=> indexHandler ])
+        subRoute "/search" (choose [ GET >=> indexHandler ])

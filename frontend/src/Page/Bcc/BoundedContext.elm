@@ -238,6 +238,38 @@ viewItem communication { context, canvas, technical, namespaces } =
     |> Card.listGroup namespaceBlocks
     |> Card.block []
       [ Block.custom technicalLinks ]
+    |> Card.footer []
+      [ Grid.simpleRow
+        [ Grid.col [ Col.md7 ]
+          [ ButtonGroup.linkButtonGroup []
+            [ ButtonGroup.linkButton
+              [ Button.roleLink
+              , Button.attrs
+                [ href
+                  ( context
+                    |> BoundedContext.id
+                    |> Route.BoundedContextCanvas
+                    |> Route.routeToString
+                  )
+                ]
+              ]
+              [ text "Canvas" ]
+            , ButtonGroup.linkButton
+              [ Button.roleLink
+              , Button.attrs
+                [ href
+                  ( context
+                    |> BoundedContext.id
+                    |> Route.TechnicalDescription
+                    |> Route.routeToString
+                  )
+                ]
+              ]
+              [ text "Technical Description" ]
+            ]
+          ]
+        ]
+      ]
       
 
 
