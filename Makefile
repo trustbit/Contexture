@@ -15,9 +15,6 @@ build-app:
 	cd frontend && npm install
 	cd frontend && npm run build
 
-build-app-modules:
-	cd frontend && elm make src/Page/Search.elm --output ../backend/Contexture.Api/wwwroot/js/Page.Search.js
-
 publish-app: build-app
 	mkdir -p artifacts/frontend
 	cd frontend && npm pack
