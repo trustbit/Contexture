@@ -447,7 +447,7 @@ namespaceEncoder model =
 loadNamespaces : Api.Configuration -> BoundedContextId -> Cmd Msg
 loadNamespaces config boundedContextId =
     Http.get
-        { url = Api.boundedContext boundedContextId |> Api.url config |> Url.toString |> (\b -> b ++ "/namespaces")
+        { url = Api.boundedContext boundedContextId |> Api.url config  |> (\b -> b ++ "/namespaces")
         , expect = Http.expectJson NamespacesLoaded (Decode.list namespaceDecoder)
         }
 
@@ -455,7 +455,7 @@ loadNamespaces config boundedContextId =
 addNamespace : Api.Configuration -> BoundedContextId -> CreateNamespace -> Cmd Msg
 addNamespace config boundedContextId namespace =
     Http.post
-        { url = Api.boundedContext boundedContextId |> Api.url config |> Url.toString |> (\b -> b ++ "/namespaces")
+        { url = Api.boundedContext boundedContextId |> Api.url config  |> (\b -> b ++ "/namespaces")
         , body = Http.jsonBody <| namespaceEncoder namespace
         , expect = Http.expectJson NamespaceAdded (Decode.list namespaceDecoder)
         }
@@ -465,7 +465,7 @@ removeNamespace : Api.Configuration -> BoundedContextId -> NamespaceId -> Cmd Ms
 removeNamespace config boundedContextId namespace =
     Http.request
         { method = "DELETE"
-        , url = Api.boundedContext boundedContextId |> Api.url config |> Url.toString |> (\b -> b ++ "/namespaces/" ++ namespace)
+        , url = Api.boundedContext boundedContextId |> Api.url config  |> (\b -> b ++ "/namespaces/" ++ namespace)
         , body = Http.emptyBody
         , expect = Http.expectJson NamespaceRemoved (Decode.list namespaceDecoder)
         , timeout = Nothing
@@ -478,7 +478,7 @@ removeLabelFromNamespace : Api.Configuration -> BoundedContextId -> NamespaceId 
 removeLabelFromNamespace config boundedContextId namespace label =
     Http.request
         { method = "DELETE"
-        , url = Api.boundedContext boundedContextId |> Api.url config |> Url.toString |> (\b -> b ++ "/namespaces/" ++ namespace ++ "/labels/" ++ label)
+        , url = Api.boundedContext boundedContextId |> Api.url config  |> (\b -> b ++ "/namespaces/" ++ namespace ++ "/labels/" ++ label)
         , body = Http.emptyBody
         , expect = Http.expectJson LabelRemoved (Decode.list namespaceDecoder)
         , timeout = Nothing
@@ -490,7 +490,7 @@ removeLabelFromNamespace config boundedContextId namespace label =
 addLabelToNamespace : Api.Configuration -> BoundedContextId -> NamespaceId -> NewLabel -> Cmd Msg
 addLabelToNamespace config boundedContextId namespace label =
     Http.post
-        { url = Api.boundedContext boundedContextId |> Api.url config |> Url.toString |> (\b -> b ++ "/namespaces/" ++ namespace ++ "/labels")
+        { url = Api.boundedContext boundedContextId |> Api.url config  |> (\b -> b ++ "/namespaces/" ++ namespace ++ "/labels")
         , body = Http.jsonBody <| labelEncoder label
         , expect = Http.expectJson LabelAddedToNamespace (Decode.list namespaceDecoder)
         }

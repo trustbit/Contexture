@@ -104,7 +104,7 @@ remove base contextId =
       Http.request
       { method = "DELETE"
       , headers = []
-      , url = contextId |> Api.boundedContext |> Api.url base |> Url.toString
+      , url = contextId |> Api.boundedContext |> Api.url base 
       , body = Http.emptyBody
       , expect = Http.expectWhatever toMsg
       , timeout = Nothing
@@ -120,7 +120,7 @@ move base contextId targetDomain =
       Http.request
       { method = "POST"
       , headers = []
-      , url = contextId |> Api.boundedContext |> Api.url base |> Url.toString |> (\c -> c ++ "/move")
+      , url = contextId |> Api.boundedContext |> Api.url base  |> (\c -> c ++ "/move")
       , body = Http.jsonBody <| Encode.object[ parentDomainIdEncoder targetDomain ]
       , expect = Http.expectWhatever toMsg
       , timeout = Nothing
@@ -140,7 +140,7 @@ assignKey base contextId contextKey =
       Http.request
       { method = "POST"
       , headers = []
-      , url = contextId |> Api.boundedContext |> Api.url base |> Url.toString |> (\c -> c ++ "/key")
+      , url = contextId |> Api.boundedContext |> Api.url base  |> (\c -> c ++ "/key")
       , body = Http.jsonBody <| Encode.object[ ("key", encodedKey) ]
       , expect = Http.expectJson toMsg modelDecoder
       , timeout = Nothing
@@ -155,7 +155,7 @@ newBoundedContext config domainId contextName =
   let
     request toMsg =
       Http.post
-        { url = Api.boundedContexts domainId |> Api.url config |> Url.toString
+        { url = Api.boundedContexts domainId |> Api.url config 
         , body = Http.jsonBody <| Encode.object [ nameFieldEncoder contextName ]
         , expect = Http.expectJson toMsg modelDecoder
         }
@@ -170,7 +170,7 @@ changeName config contextId (Name contextName) =
       Http.request
       { method = "POST"
       , headers = []
-      , url = contextId |> Api.boundedContext |> Api.url config |> Url.toString |> (\c -> c ++ "/rename")
+      , url = contextId |> Api.boundedContext |> Api.url config  |> (\c -> c ++ "/rename")
       , body = Http.jsonBody <| Encode.object [  nameFieldEncoder contextName ]
       , expect = Http.expectJson toMsg modelDecoder
       , timeout = Nothing

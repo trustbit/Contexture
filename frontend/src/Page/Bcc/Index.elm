@@ -609,7 +609,7 @@ loadAll config domain =
       |> JP.optionalAt [ "technicalDescription" ] BoundedContext.Technical.modelDecoder BoundedContext.Technical.noTechnicalDescription
       |> JP.optionalAt [ "namespaces" ] (Decode.list Namespace.namespaceDecoder) []
   in Http.get
-    { url = Api.boundedContexts domain |> Api.url config |> Url.toString
+    { url = Api.boundedContexts domain |> Api.url config 
     , expect = Http.expectJson Loaded (Decode.list decoder)
     }
 
@@ -617,7 +617,7 @@ loadAll config domain =
 loadAllConnections : Api.Configuration -> Cmd Msg
 loadAllConnections config =
   Http.get
-    { url = Api.collaborations |> Api.url config |> Url.toString
+    { url = Api.collaborations |> Api.url config 
     , expect = Http.expectJson CommunicationLoaded (Decode.list Collaboration.decoder)
     }
 
@@ -626,7 +626,7 @@ findAllDomains base =
   let
     request toMsg =
       Http.get
-        { url = Api.domains [] |> Api.url base |> Url.toString
+        { url = Api.domains [] |> Api.url base 
         , expect = Http.expectJson toMsg Domain.domainsDecoder
         }
   in

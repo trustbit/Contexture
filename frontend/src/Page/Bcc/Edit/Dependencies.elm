@@ -1020,20 +1020,20 @@ boundedContextDecoder =
 loadBoundedContexts: Api.Configuration -> Cmd Msg
 loadBoundedContexts config =
   Http.get
-    { url = Api.allBoundedContexts [ Api.Domain ] |> Api.url config |> Url.toString
+    { url = Api.allBoundedContexts [ Api.Domain ] |> Api.url config 
     , expect = Http.expectJson BoundedContextsLoaded (Decode.list boundedContextDecoder)
     }
 
 loadDomains: Api.Configuration -> Cmd Msg
 loadDomains config =
   Http.get
-    { url = Api.domains [] |> Api.url config |> Url.toString
+    { url = Api.domains [] |> Api.url config 
     , expect = Http.expectJson DomainsLoaded (Decode.list domainDecoder)
     }
 
 loadConnections : Api.Configuration -> BoundedContextId -> Cmd Msg
 loadConnections config context =
   Http.get
-    { url = Api.collaborations |> Api.url config |> Url.toString
+    { url = Api.collaborations |> Api.url config 
     , expect = Http.expectJson ConnectionsLoaded (ContextMapping.communicationDecoder (Collaborator.BoundedContext context))
     }

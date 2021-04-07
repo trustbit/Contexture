@@ -417,6 +417,6 @@ viewDomain model =
 loadDomain: Api.Configuration -> DomainId -> Cmd Msg
 loadDomain config domain =
   Http.get
-    { url = Api.domain [] domain |> Api.url config |> Url.toString
+    { url = Api.domain [] domain |> Api.url config 
     , expect = Http.expectJson Loaded Domain.domainDecoder
     }

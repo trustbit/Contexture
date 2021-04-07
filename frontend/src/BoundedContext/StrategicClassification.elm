@@ -145,7 +145,7 @@ reclassify configuration contextId classification =
         request toMsg =
             Http.request
                 { method = "POST"
-                , url = api |> Api.url configuration |> Url.toString |> (\c -> c ++ "/reclassify")
+                , url = api |> Api.url configuration  |> (\c -> c ++ "/reclassify")
                 , body = Http.jsonBody <|
                     Encode.object [ stategicClassificationEncoder classification ]
                 , expect = Http.expectJson toMsg stategicClassificationDecoder

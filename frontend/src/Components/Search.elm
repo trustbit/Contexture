@@ -38,7 +38,7 @@ init flag =
     case flag |> Decode.decodeValue flagsDecoder of
         Ok decoded ->
             decoded.domains
-                |> List.foldl (initModel (Api.config decoded.baseUrl) decoded.collaboration) ( { results = [] }, Cmd.none )
+                |> List.foldl (initModel decoded.apiBase decoded.collaboration) ( { results = [] }, Cmd.none )
 
         Err e ->
             ( { results = [] }, Cmd.none )
@@ -53,7 +53,7 @@ type alias DomainModel =
 type alias Flags =
     { collaboration : Collaborations
     , domains : List DomainModel
-    , baseUrl : Url.Url
+    , apiBase : Api.Configuration
     }
 
 
@@ -71,16 +71,17 @@ domainDecoder =
         (Decode.field "boundedContexts" (Decode.list itemDecoder))
 
 
-baseUrl =
+baseConfiguration =
     Decode.string
         |> Decode.andThen
             (\v ->
                 case v |> Url.fromString of
                     Just url ->
-                        Decode.succeed url
-
+                        url |> Api.config |> Decode.succeed
                     Nothing ->
-                        Decode.fail <| "Could not decode url from " ++ v
+                        if not <| String.isEmpty v
+                        then v |> Api.baseConfig |> Decode.succeed
+                        else Decode.fail <| "Could not decode url from " ++ v
             )
 
 
@@ -88,7 +89,7 @@ flagsDecoder =
     Decode.map3 Flags
         (Decode.field "collaboration" (Decode.list Collaboration.decoder))
         (Decode.field "domains" (Decode.list domainDecoder))
-        (Decode.field "baseUrl" baseUrl)
+        (Decode.field "apiBase" baseConfiguration)
 
 
 type alias Model =

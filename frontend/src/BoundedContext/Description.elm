@@ -26,7 +26,7 @@ update configuration contextId description =
         request toMsg =
             Http.request
                 { method = "POST"
-                , url = api |> Api.url configuration |> Url.toString |> (\c -> c ++ "/description")
+                , url = api |> Api.url configuration  |> (\c -> c ++ "/description")
                 , body = Http.jsonBody <|
                     Encode.object [ descriptionEncoder description] 
                 , expect = Http.expectJson toMsg descriptionDecoder

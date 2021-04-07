@@ -189,13 +189,13 @@ view model =
 loadBoundedContexts: Api.Configuration -> Cmd Msg
 loadBoundedContexts config =
   Http.get
-    { url = Api.allBoundedContexts [] |> Api.url config |> Url.toString
+    { url = Api.allBoundedContexts [] |> Api.url config 
     , expect = Http.expectJson BoundedContextKeysLoaded (Decode.list BoundedContext.modelDecoder)
     }
 
 loadDomains: Api.Configuration -> Cmd Msg
 loadDomains configuration =
   Http.get
-    { url = Api.domains [] |> Api.url configuration |> Url.toString
+    { url = Api.domains [] |> Api.url configuration 
     , expect = Http.expectJson DomainKeysLoaded (Decode.list Domain.domainDecoder)
     }

@@ -27,7 +27,7 @@ module Search =
     type ResolveAsset = Asset -> XmlNode
 
     let resolveBase (environment: IHostEnvironment) =
-        if environment.IsDevelopment() then "http://localhost:8000/" else "/"
+        if environment.IsDevelopment() then "http://localhost:8000" else ""
 
     module Asset =
         let js file = JavaScript [ "js"; file ]
@@ -35,7 +35,7 @@ module Search =
 
         let resolvePath baseUrl (path: Path) =
             let asString = String.Join("/", path)
-            sprintf "%sassets/%s" baseUrl asString
+            sprintf "%s/assets/%s" baseUrl asString
 
 
         let stylesheet path = link [ _rel "stylesheet"; _href path ]
@@ -114,7 +114,8 @@ module Search =
     let indexHandler: HttpHandler =
         fun (next: HttpFunc) (ctx: HttpContext) ->
             let baseUrl =
-                ctx.GetService<IHostEnvironment>() |> resolveBase
+                ctx.GetService<IHostEnvironment>()
+                |> resolveBase
 
             let pathResolver = Asset.resolvePath baseUrl
             let assetsResolver = Asset.resolveAsset pathResolver
@@ -144,7 +145,7 @@ module Search =
             let result =
                 {| Collaboration = collaborations
                    Domains = domainResult
-                   BaseUrl = baseUrl |}
+                   ApiBase = baseUrl |> fun b -> b + "/api" |}
 
             let jsonEncoder = ctx.GetJsonSerializer()
 

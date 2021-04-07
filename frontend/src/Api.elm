@@ -4,7 +4,7 @@ module Api exposing (
   allBoundedContexts, boundedContexts, boundedContext,
   collaborations, collaboration,
   canvas, 
-  url, config)
+  url, config, baseConfig)
 
 import Http
 import Url
@@ -15,7 +15,7 @@ import BoundedContext.BoundedContextId as BoundedContext exposing (BoundedContex
 import ContextMapping.CollaborationId as ContextMapping exposing(CollaborationId)
 
 type Configuration
-  = Configuration Url.Url
+  = Configuration String
 
 type alias PathSegment = String
 
@@ -35,11 +35,16 @@ withQuery segments query =
 
 config : Url.Url -> Configuration
 config base =
+  Configuration (base |> Url.toString)
+
+
+baseConfig : String -> Configuration
+baseConfig base =
   Configuration base
 
-url : Configuration -> Endpoint -> Url.Url
-url (Configuration baseUrl) (Endpoint segments query) =
-  { baseUrl | path = baseUrl.path ++ Url.Builder.absolute segments query }
+url : Configuration -> Endpoint -> String
+url (Configuration basePath) (Endpoint segments query) =
+  basePath ++ (Url.Builder.absolute segments query)
 
 type Include
   = Subdomains

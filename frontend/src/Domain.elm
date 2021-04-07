@@ -112,7 +112,7 @@ newDomain url relation (InternalName theName) toMsg =
         Subdomain subDomainId -> Api.subDomains [] subDomainId
   in
     Http.post
-      { url = api |> Api.url url |> Url.toString
+      { url = api |> Api.url url 
       , body = Http.jsonBody <| Encode.object [ nameFieldEncoder theName ]
       , expect = Http.expectJson toMsg domainDecoder
       }
@@ -124,7 +124,7 @@ renameDomain baseUrl domain (InternalName newName) =
       Http.request
       { method = "POST"
       , headers = []
-      , url = domain |> Api.domain [] |> Api.url baseUrl |> Url.toString |> (\u -> u ++ "/rename")
+      , url = domain |> Api.domain [] |> Api.url baseUrl  |> (\u -> u ++ "/rename")
       , body = Http.jsonBody <|  Encode.object [ nameFieldEncoder newName ]
       , expect = Http.expectJson toMsg domainDecoder
       , timeout = Nothing
@@ -144,7 +144,7 @@ updateVision baseUrl domain theVision =
       Http.request
       { method = "POST"
       , headers = []
-      , url = domain |> Api.domain [] |> Api.url baseUrl |> Url.toString |> (\u -> u ++ "/vision")
+      , url = domain |> Api.domain [] |> Api.url baseUrl  |> (\u -> u ++ "/vision")
       , body = Http.jsonBody <|  Encode.object [ ("vision", encodedVision) ]
       , expect = Http.expectJson toMsg domainDecoder
       , timeout = Nothing
@@ -165,7 +165,7 @@ moveDomain baseUrl domain target =
       Http.request
       { method = "POST"
       , headers = []
-      , url = domain |> Api.domain [] |> Api.url baseUrl |> Url.toString |> (\u -> u ++ "/move")
+      , url = domain |> Api.domain [] |> Api.url baseUrl  |> (\u -> u ++ "/move")
       , body = Http.jsonBody <| Encode.object[ ("parentDomainId", value) ]
       , expect = Http.expectWhatever toMsg
       , timeout = Nothing
@@ -181,7 +181,7 @@ remove base domainId =
       Http.request
       { method = "DELETE"
       , headers = []
-      , url = domainId |> Api.domain [] |> Api.url base |> Url.toString
+      , url = domainId |> Api.domain [] |> Api.url base 
       , body = Http.emptyBody
       , expect = Http.expectWhatever toMsg
       , timeout = Nothing
@@ -201,7 +201,7 @@ assignKey base domainId domainKey =
       Http.request
       { method = "POST"
       , headers = []
-      , url = domainId |> Api.domain [] |> Api.url base |> Url.toString|> (\u -> u ++ "/key")
+      , url = domainId |> Api.domain [] |> Api.url base |> (\u -> u ++ "/key")
       , body = Http.jsonBody <| Encode.object[ ("key", encodedKey) ]
       , expect = Http.expectJson toMsg domainDecoder
       , timeout = Nothing

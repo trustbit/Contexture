@@ -328,6 +328,6 @@ loadCanvas config contextId =
       |> JP.custom BoundedContext.Canvas.modelDecoder
       |> JP.requiredAt [ "domain" ] Domain.domainDecoder
   in Http.get
-    { url = Api.canvas contextId |> Api.url config |> Url.toString
+    { url = Api.canvas contextId |> Api.url config 
     , expect = Http.expectJson Loaded decoder
     }

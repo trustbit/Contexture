@@ -262,7 +262,7 @@ loadTechnical config contextId =
       |> JP.optionalAt [ "technicalDescription"] Technical.modelDecoder Technical.noTechnicalDescription
       |> JP.requiredAt [ "domain" ] Domain.domainDecoder
   in Http.get
-    { url = Api.canvas contextId |> Api.url config |> Url.toString
+    { url = Api.canvas contextId |> Api.url config 
     , expect = Http.expectJson Loaded decoder
     }
 
@@ -275,7 +275,7 @@ saveTechnical config contextId model =
       contextId
       |> Api.boundedContext
       |> Api.url config
-      |> Url.toString
+      
       |> (\url -> url ++ "/technical")
     , body = Http.jsonBody <| Technical.modelEncoder model
     , expect = Http.expectWhatever Saved

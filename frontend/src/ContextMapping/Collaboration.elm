@@ -63,7 +63,7 @@ endCollaboration url collaborationId =
     request toMsg =
       Http.request
       { method = "DELETE"
-      , url = api |> Api.url url |> Url.toString
+      , url = api |> Api.url url 
       , body = Http.emptyBody
       , expect = Http.expectJson toMsg (Decode.succeed collaborationId)
       , timeout = Nothing
@@ -84,7 +84,7 @@ defineInboundCollaboration url context connectionInitiator descriptionText =
 
     request toMsg =
       Http.post
-      { url = api |> Api.url url |> Url.toString |> (\c -> c ++ "/inboundConnection")
+      { url = api |> Api.url url  |> (\c -> c ++ "/inboundConnection")
       , body = Http.jsonBody <|
               modelEncoder
                 connectionInitiator
@@ -107,7 +107,7 @@ defineOutboundCollaboration url context connectionRecipient descriptionText =
 
     request toMsg =
       Http.post
-      { url = api |> Api.url url |> Url.toString |> (\c -> c ++ "/outboundConnection")
+      { url = api |> Api.url url  |> (\c -> c ++ "/outboundConnection")
       , body = Http.jsonBody <|
               modelEncoder
                 connectionInitiator
@@ -129,7 +129,7 @@ defineRelationshipType url collaboration relationshipType =
     request toMsg =
       Http.request
       { method = "POST"
-      , url = api |> Api.url url |> Url.toString |> (\c -> c ++ "/relationship")
+      , url = api |> Api.url url  |> (\c -> c ++ "/relationship")
       , body = Http.jsonBody <|
           Encode.object [ ("relationshipType", RelationshipType.encoder relationshipType) ]
       , expect = Http.expectJson toMsg decoder

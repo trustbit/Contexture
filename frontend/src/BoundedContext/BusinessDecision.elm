@@ -77,7 +77,7 @@ addBusinessDecision configuration contextId decisions decision =
         request toMsg =
           Http.request
             { method = "POST"
-            , url = api |> Api.url configuration |> Url.toString |> (\c -> c ++ "/businessDecisions")
+            , url = api |> Api.url configuration  |> (\c -> c ++ "/businessDecisions")
             , body = Http.jsonBody <|
                 Encode.object [ businessDecisionsEncoder updatedDecisions ]
             , expect = Http.expectJson toMsg businessDecisionsDecoder
@@ -98,7 +98,7 @@ getBusinessDecisions configuration contextId =
     api = Api.boundedContext contextId
     request toMsg =
       Http.get
-        { url = api |> Api.url configuration |> Url.toString
+        { url = api |> Api.url configuration 
         , expect = Http.expectJson toMsg businessDecisionsDecoder
         }
   in
@@ -118,7 +118,7 @@ removeBusinessDecision configuration contextId decisions decision =
     request toMsg =
       Http.request
         { method = "POST"
-        , url = api |> Api.url configuration |> Url.toString |> (\c -> c ++ "/businessDecisions")
+        , url = api |> Api.url configuration  |> (\c -> c ++ "/businessDecisions")
         , body = Http.jsonBody <|
             Encode.object [ businessDecisionsEncoder removedRoles ]
         , expect = Http.expectJson toMsg businessDecisionsDecoder

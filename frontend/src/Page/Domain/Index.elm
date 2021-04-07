@@ -533,7 +533,7 @@ findAllDomains base =
   let
     request toMsg =
       Http.get
-        { url = Api.domains [] |> Api.url base |> Url.toString
+        { url = Api.domains [] |> Api.url base 
         , expect = Http.expectJson toMsg Domain.domainsDecoder
         }
   in
@@ -565,7 +565,7 @@ domainsOf base relation =
         |> JP.optional "boundedContexts" (Decode.list BoundedContext.modelDecoder) []
     request toMsg =
       Http.get
-        { url = api |> Api.url base |> Url.toString
+        { url = api |> Api.url base 
         , expect = Http.expectJson (filter >> toMsg) (Decode.list decoder)
         }
   in

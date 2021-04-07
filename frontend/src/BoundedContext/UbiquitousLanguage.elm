@@ -79,7 +79,7 @@ addLanguageTerm configuration contextId language term =
         request toMsg =
           Http.request
             { method = "POST"
-            , url = api |> Api.url configuration |> Url.toString |> (\c -> c ++ "/ubiquitousLanguage")
+            , url = api |> Api.url configuration  |> (\c -> c ++ "/ubiquitousLanguage")
             , body = Http.jsonBody <|
                 Encode.object [ ubiquitousLanguageEncoder updatedLanguage ]
             , expect = Http.expectJson toMsg ubiquitousLanguageDecoder
@@ -99,7 +99,7 @@ getUbiquitousLanguage configuration contextId =
     api = Api.boundedContext contextId
     request toMsg =
       Http.get
-        { url = api |> Api.url configuration |> Url.toString
+        { url = api |> Api.url configuration 
         , expect = Http.expectJson toMsg ubiquitousLanguageDecoder
         }
   in
@@ -119,7 +119,7 @@ removeLanguageTerm configuration contextId language term =
     request toMsg =
       Http.request
         { method = "POST"
-        , url = api |> Api.url configuration |> Url.toString |> (\c -> c ++ "/ubiquitousLanguage")
+        , url = api |> Api.url configuration  |> (\c -> c ++ "/ubiquitousLanguage")
         , body = Http.jsonBody <|
             Encode.object [ ubiquitousLanguageEncoder removedRoles ]
         , expect = Http.expectJson toMsg ubiquitousLanguageDecoder

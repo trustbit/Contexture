@@ -76,7 +76,7 @@ addDomainRole configuration contextId existingRoles role =
                 request toMsg =
                     Http.request
                         { method = "POST"
-                        , url = api |> Api.url configuration |> Url.toString |> (\c -> c ++ "/domainRoles")
+                        , url = api |> Api.url configuration  |> (\c -> c ++ "/domainRoles")
                         , body = Http.jsonBody <|
                             Encode.object [ domainRolesEncoder updatedRoles ]
                         , expect = Http.expectJson toMsg domainRolesDecoder
@@ -103,7 +103,7 @@ deleteDomainRole configuration contextId existingRoles id =
         request toMsg =
             Http.request
                 { method = "POST"
-                , url = api |> Api.url configuration |> Url.toString |> (\c -> c ++ "/domainRoles")
+                , url = api |> Api.url configuration  |> (\c -> c ++ "/domainRoles")
                 , body = Http.jsonBody <|
                     Encode.object [ domainRolesEncoder removedRoles ]
                 , expect = Http.expectJson toMsg domainRolesDecoder
@@ -120,7 +120,7 @@ getDomainRoles configuration contextId =
         api = Api.boundedContext contextId
         request toMsg =
             Http.get
-                { url = api |> Api.url configuration |> Url.toString
+                { url = api |> Api.url configuration 
                 , expect = Http.expectJson toMsg domainRolesDecoder
                 }
     in
