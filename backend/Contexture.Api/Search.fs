@@ -3,7 +3,10 @@ namespace Contexture.Api
 open System
 open Contexture.Api
 open Contexture.Api.Aggregates
-open Contexture.Api.Database
+open Contexture.Api.BoundedContexts
+open Contexture.Api.ReadModels
+open Contexture.Api.Domains
+open Contexture.Api.Infrastructure
 open Microsoft.AspNetCore.Http
 
 open FSharp.Control.Tasks
@@ -23,27 +26,24 @@ module Search =
 
     type ResolveAsset = Asset -> XmlNode
 
+    let resolveBase (environment: IHostEnvironment) =
+        if environment.IsDevelopment() then "http://localhost:8000/" else "/"
+
     module Asset =
         let js file = JavaScript [ "js"; file ]
         let css file = Stylesheet [ "css"; file ]
 
-        let resolvePath (environment: IHostEnvironment) (path: Path) =
+        let resolvePath baseUrl (path: Path) =
             let asString = String.Join("/", path)
+            sprintf "%sassets/%s" baseUrl asString
 
-            if environment.IsDevelopment()
-            then sprintf "http://localhost:8000/assets/%s" asString
-            else sprintf "/assets/%s" asString
-            
-        let stylesheet path =
-             link [ _rel "stylesheet"
-                    _href path]
-        let javascript path =
-            script [ _src path ] []
+
+        let stylesheet path = link [ _rel "stylesheet"; _href path ]
+        let javascript path = script [ _src path ] []
 
         let resolveAsset resolvePath asset =
             match asset with
-            | Stylesheet path ->
-               stylesheet (resolvePath path) 
+            | Stylesheet path -> stylesheet (resolvePath path)
             | JavaScript path -> javascript (resolvePath path)
 
     module Views =
@@ -89,33 +89,63 @@ module Search =
         let embedElm name =
             script [ _src (sprintf "/js/%s.js" name) ] []
 
-        let initElm name node =
+        let initElm name node flags =
             script [] [
                 rawText
                     (sprintf "
   var app = Elm.%s.init({
     node: document.getElementById('%s'),
-    flags: Date.now()
-  }); "               name node)
+    flags: %s
+  }); "               name node flags)
             ]
 
-        let index resolveAssets =
+        let index resolveAssets flags =
             let searchSnipped =
                 div [] [
                     div [ _id "search" ] []
-                    initElm "Components.Search" "search"
+                    initElm "Components.Search" "search" flags
                 ]
 
             documentTemplate (headTemplate resolveAssets) (bodyTemplate searchSnipped)
 
     let indexHandler: HttpHandler =
         fun (next: HttpFunc) (ctx: HttpContext) ->
-            let pathResolver =
-                Asset.resolvePath (ctx.GetService<IHostEnvironment>())
+            let baseUrl =
+                ctx.GetService<IHostEnvironment>() |> resolveBase
 
+            let pathResolver = Asset.resolvePath baseUrl
             let assetsResolver = Asset.resolveAsset pathResolver
 
-            htmlView (Views.index assetsResolver) next ctx
+            let eventStore = ctx.GetService<EventStore>()
+
+            let domains = Domain.allDomains eventStore
+
+            let boundedContextsOf =
+                BoundedContext.allBoundedContextsByDomain eventStore
+
+            let namespacesOf =
+                Namespace.allNamespacesByContext eventStore
+
+            let collaborations =
+                Collaboration.allCollaborations eventStore
+
+            let domainResult =
+                domains
+                |> List.map (fun d ->
+                    {| Domain = d
+                       BoundedContexts =
+                           d.Id
+                           |> boundedContextsOf
+                           |> List.map (Results.convertBoundedContext namespacesOf) |})
+
+            let result =
+                {| Collaboration = collaborations
+                   Domains = domainResult
+                   BaseUrl = baseUrl |}
+
+            let jsonEncoder = ctx.GetJsonSerializer()
+
+            htmlView (Views.index assetsResolver (jsonEncoder.SerializeToString result)) next ctx
 
     let routes: HttpHandler =
         subRoute "/reports" (choose [ GET >=> indexHandler ])
