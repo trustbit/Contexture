@@ -33,13 +33,18 @@ module Search =
             if environment.IsDevelopment()
             then sprintf "http://localhost:8000/assets/%s" asString
             else sprintf "/assets/%s" asString
+            
+        let stylesheet path =
+             link [ _rel "stylesheet"
+                    _href path]
+        let javascript path =
+            script [ _src path ] []
 
         let resolveAsset resolvePath asset =
             match asset with
             | Stylesheet path ->
-                link [ _rel "stylesheet"
-                       _href (resolvePath path) ]
-            | JavaScript path -> script [ _src (resolvePath path) ] []
+               stylesheet (resolvePath path) 
+            | JavaScript path -> javascript (resolvePath path)
 
     module Views =
 
@@ -54,6 +59,7 @@ module Search =
                 ]
                 resolveAsset (Asset.css "contexture.css")
                 resolveAsset (Asset.js "Contexture.js")
+                Asset.stylesheet "https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/css/bootstrap.min.css"
             ]
 
         let navTemplate =
