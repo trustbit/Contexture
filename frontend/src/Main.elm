@@ -140,9 +140,13 @@ update msg model =
     ( LinkClicked urlRequest, _ ) ->
       case urlRequest of
           Browser.Internal url ->
-              ( model
-              , Nav.pushUrl model.key (Url.toString url)
-              )
+              case Route.parseUrl url of
+                Route.NotFound ->
+                  ( model, Nav.load  ({ url | port_ = model.baseUrl.port_ } |> Url.toString))
+                _ ->
+                  ( model
+                  , Nav.pushUrl model.key (Url.toString url)
+                  )
 
           Browser.External url ->
               ( model
@@ -198,7 +202,10 @@ menu model =
       |> Navbar.withAnimation
       |> Navbar.primary
       |> Navbar.brand [ href "/" ] [ text "Contexture" ]
-      |> Navbar.items []
+      |> Navbar.items 
+        [ Navbar.itemLinkActive [ href "/" ] [ text "Domains"]
+        , Navbar.itemLink [ href "/search"] [ text "Search"] 
+        ]
       |> Navbar.view model.navState
 
 view : Model -> Browser.Document Msg

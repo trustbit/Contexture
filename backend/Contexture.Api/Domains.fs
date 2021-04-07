@@ -64,7 +64,7 @@ module Domains =
               Subdomains = []
               BoundedContexts = [] }
 
-        let includingSubdomainsAndBoundedContexts (boundedContexts: Map<DomainId, BoundedContext list>)
+        let includingSubdomainsAndBoundedContexts (boundedContexts: DomainId -> BoundedContext list)
                                                   (subDomains: Map<DomainId, Domain list>)
                                                   (findNamespaces: BoundedContextId -> Namespace list )
                                                   (domain: Domain)
@@ -76,9 +76,8 @@ module Domains =
                       |> Option.defaultValue []
                       |> List.map convertDomain
                   BoundedContexts =
-                      boundedContexts
-                      |> Map.tryFind domain.Id
-                      |> Option.defaultValue []
+                      domain.Id
+                      |> boundedContexts
                       |> List.map (convertBoundedContext findNamespaces) }
 
     module CommandEndpoints =
@@ -147,8 +146,7 @@ module Domains =
 
                 let domains = Domain.allDomains eventStore
                 let subdomainsOf = Domain.subdomainLookup domains
-                let boundedContexts = BoundedContext.allBoundedContexts eventStore
-                let boundedContextsOf = BoundedContext.boundedContextLookup boundedContexts
+                let boundedContextsOf = BoundedContext.allBoundedContextsByDomain eventStore
                 let namespacesOf = Namespace.allNamespacesByContext eventStore
 
                 let result =
@@ -163,8 +161,7 @@ module Domains =
 
                 let domains = Domain.allDomains eventStore
                 let subdomainsOf = Domain.subdomainLookup domains
-                let boundedContexts = BoundedContext.allBoundedContexts eventStore
-                let boundedContextsOf = BoundedContext.boundedContextLookup boundedContexts
+                let boundedContextsOf = BoundedContext.allBoundedContextsByDomain eventStore
                 let namespacesOf = Namespace.allNamespacesByContext eventStore
 
                 let result =
@@ -179,8 +176,7 @@ module Domains =
                 let eventStore = ctx.GetService<EventStore>()
 
                 let subdomains = eventStore |> Domain.allDomains |> Domain.subdomainLookup
-                let boundedContexts = BoundedContext.allBoundedContexts eventStore
-                let boundedContextsOf = BoundedContext.boundedContextLookup boundedContexts
+                let boundedContextsOf = BoundedContext.allBoundedContextsByDomain eventStore
                 let namespacesOf = Namespace.allNamespacesByContext eventStore
 
                 let result =

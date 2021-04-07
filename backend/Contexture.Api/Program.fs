@@ -42,14 +42,24 @@ let webApp hostFrontend =
                 Collaborations.routes
                 GET >=> route "/all" >=> allRoute
             ])
+        Search.routes
         hostFrontend
         setStatusCode 404 >=> text "Not Found" ]
 
 let frontendHostRoutes (env: IWebHostEnvironment) : HttpHandler =
     if env.IsDevelopment() then
         let skip : HttpFuncResult = System.Threading.Tasks.Task.FromResult None
-        fun (next : HttpFunc) (ctx : HttpContext) ->
-            skip
+        choose [
+            GET >=>
+                fun (next : HttpFunc) (ctx : HttpContext) ->
+                    let urlBuilder =
+                        ctx.GetRequestUrl()
+                        |> UriBuilder
+                    urlBuilder.Port <- 8000
+                    urlBuilder.Scheme <- "http"
+                    redirectTo false (urlBuilder.ToString()) next ctx
+        ]
+     
     else
         choose [
             route "/" >=> htmlFile "wwwroot/index.html"

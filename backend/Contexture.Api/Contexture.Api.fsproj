@@ -23,6 +23,7 @@
     <Compile Include="Namespaces.fs" />
     <Compile Include="BoundedContexts.fs" />
     <Compile Include="Collaborations.fs" />
+    <Compile Include="Search.fs" />
     <Compile Include="Program.fs" />
   </ItemGroup>
   <ItemGroup>

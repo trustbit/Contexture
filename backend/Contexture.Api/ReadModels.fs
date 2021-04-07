@@ -44,10 +44,21 @@ module BoundedContext =
         |> Map.toList
         |> List.choose snd
 
-    let boundedContextLookup (domains: BoundedContext list) =
-        domains
+    let boundedContextLookup (contexts: BoundedContext list) =
+        contexts
         |> List.groupBy (fun l -> l.DomainId)
         |> Map.ofList
+        
+    let allBoundedContextsByDomain (eventStore: EventStore) =
+        let boundedContexts =
+            eventStore
+            |> allBoundedContexts
+            |> boundedContextLookup
+
+        fun domainId ->
+            boundedContexts
+            |> Map.tryFind domainId
+            |> Option.defaultValue []
 
     let buildBoundedContext (eventStore: EventStore) boundedContextId =
         boundedContextId
