@@ -11,8 +11,11 @@ let ``Unversioned JSON deserialization`` () =
     let expectedJson = exampleInputPath |> Persistence.read
     
     let parsedRoot = expectedJson |> Serialization.deserialize
+    
+    Assert.NotEmpty(parsedRoot.Collaborations)
+    Assert.NotEmpty(parsedRoot.Domains)
+    Assert.NotEmpty(parsedRoot.BoundedContexts)
+    Assert.True(parsedRoot.Version.IsSome)
     let resultJson = parsedRoot |> Serialization.serialize
     
-    (@"../../../../../example/restaurant-db-parsed.json", resultJson) ||> Persistence.save
-    
-    ()
+    Assert.NotEmpty resultJson

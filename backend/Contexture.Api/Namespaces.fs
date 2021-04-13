@@ -123,11 +123,9 @@ module Namespaces =
             fun (next: HttpFunc) (ctx: HttpContext) ->
                 let database = ctx.GetService<EventStore>()
 
-                let namespacesByLabel =
-                    database |> ReadModels.Namespace.namespacesByLabel
-
                 let namespaces =
-                    namespacesByLabel
+                    database
+                    |> ReadModels.Namespace.namespacesByLabel
                     |> ReadModels.Namespace.getByLabelName name
                     |> Set.filter (fun { Value = v } -> v = Some value)
                     |> Set.map (fun n -> n.NamespaceId)

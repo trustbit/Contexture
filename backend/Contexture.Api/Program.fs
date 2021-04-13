@@ -96,7 +96,7 @@ let configureJsonSerializer (services: IServiceCollection) =
     |> ignore
 
 
-let configureServices (context: WebHostBuilderContext) (services : IServiceCollection) =
+let configureServices (context: HostBuilderContext) (services : IServiceCollection) =
     services
         .AddOptions<ContextureOptions>()
         .Bind(context.Configuration)
@@ -117,11 +117,11 @@ let configureLogging (builder : ILoggingBuilder) =
 
 let buildHost args =
     Host.CreateDefaultBuilder(args)
+        .ConfigureServices(configureServices)
         .ConfigureWebHostDefaults(
             fun webHostBuilder ->
                 webHostBuilder
                     .Configure(Action<IApplicationBuilder> configureApp)
-                    .ConfigureServices(configureServices)
                     .ConfigureLogging(configureLogging)
                     |> ignore)
         .Build()
