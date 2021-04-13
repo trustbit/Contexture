@@ -834,6 +834,7 @@ module Aggregates =
         and NamespaceImported =
             { NamespaceId: NamespaceId
               BoundedContextId: BoundedContextId
+              NamespaceTemplateId: NamespaceTemplateId option
               Template: NamespaceTemplateId option
               Name: string
               Labels: LabelDefinition list }
@@ -841,6 +842,7 @@ module Aggregates =
         and NamespaceAdded =
             { NamespaceId: NamespaceId
               BoundedContextId: BoundedContextId
+              NamespaceTemplateId: NamespaceTemplateId option
               Name: string
               Labels: LabelDefinition list }
 
@@ -904,6 +906,7 @@ module Aggregates =
                     NamespaceAdded
                         { NamespaceId = Guid.NewGuid()
                           BoundedContextId = boundedContextId
+                          NamespaceTemplateId = None
                           Name = name
                           Labels = newLabels }
 

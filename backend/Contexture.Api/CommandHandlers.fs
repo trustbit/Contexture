@@ -251,6 +251,7 @@ module FileBasedCommandHandlers =
                       NamespaceImported
                           { NamespaceId = n.Id
                             BoundedContextId = boundedContext.Id
+                            NamespaceTemplateId = n.Template
                             Template = None
                             Name = n.Name
                             Labels = n.Labels |> List.map (fun l -> { LabelId = l.Id; Name = l.Name; Value = Option.ofObj l.Value })

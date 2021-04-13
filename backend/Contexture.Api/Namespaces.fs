@@ -78,15 +78,11 @@ module Namespaces =
         type LabelQuery =
             { Name: string option
               Value: string option
-              Namespace: NamespaceId option }
+              NamespaceTemplate: NamespaceTemplateId option }
 
         let getBoundedContextsByLabel (item: LabelQuery) =
             fun (next: HttpFunc) (ctx: HttpContext) ->
                 let database = ctx.GetService<EventStore>()
-
-                let matchesTerm (left: string) (right: string) =
-                    left.Contains(right, StringComparison.OrdinalIgnoreCase)
-                    || right.Contains(left, StringComparison.OrdinalIgnoreCase)
 
                 let namespacesByLabel =
                     database |> ReadModels.Namespace.namespacesByLabel
@@ -95,18 +91,18 @@ module Namespaces =
                     namespacesByLabel
                     |> ReadModels.Namespace.findByLabelName item.Name
                     |> Set.filter
-                        (fun (_, name) ->
-                            match item.Namespace with
-                            | Some n -> name = n
+                        (fun { NamespaceTemplateId = name} ->
+                            match item.NamespaceTemplate with
+                            | Some n -> name = Some n
                             | None -> true)
                     |> Set.filter
-                        (fun (value, _) ->
+                        (fun { Value = value } ->
                             match item.Value with
                             | Some searchTerm ->
                                 value
                                 |> Option.exists (fun v -> v.Contains(searchTerm, StringComparison.OrdinalIgnoreCase))
                             | None -> true)
-                    |> Set.map snd
+                    |> Set.map (fun m -> m.NamespaceId)
 
                 let boundedContextsByNamespace =
                     ReadModels.Namespace.boundedContextByNamespace database
@@ -133,8 +129,8 @@ module Namespaces =
                 let namespaces =
                     namespacesByLabel
                     |> ReadModels.Namespace.getByLabelName name
-                    |> Set.filter (fun (v, _) -> v = Some value)
-                    |> Set.map snd
+                    |> Set.filter (fun { Value = v } -> v = Some value)
+                    |> Set.map (fun n -> n.NamespaceId)
 
                 let boundedContextsByNamespace =
                     ReadModels.Namespace.boundedContextByNamespace database
