@@ -40,6 +40,7 @@ let webApp hostFrontend =
                 Domains.routes
                 BoundedContexts.routes
                 Collaborations.routes
+                Namespaces.routes
                 GET >=> route "/all" >=> allRoute
             ])
         Search.routes

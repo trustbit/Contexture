@@ -136,7 +136,7 @@ module BoundedContexts =
         subRouteCi
             "/boundedcontexts"
             (choose [ subRoutef "/%O" (fun contextId ->
-                          (choose [ Namespaces.routes contextId
+                          (choose [ Namespaces.routesForBoundedContext contextId
                                     GET >=> QueryEndpoints.getBoundedContext contextId
                                     POST
                                     >=> route "/technical"
