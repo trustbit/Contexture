@@ -144,6 +144,10 @@ let importFromDocument (store: EventStore) (database: Document) =
     |> List.map (Namespace.asEvents clock)
     |> List.iter store.Append
 
+    database.NamespaceTemplates.All
+    |> List.map (NamespaceTemplate.asEvents clock)
+    |> List.iter store.Append
+
 [<EntryPoint>]
 let main args =
     let host = buildHost args
@@ -159,6 +163,7 @@ let main args =
     store.Subscribe (Domain.subscription database)
     store.Subscribe (BoundedContext.subscription database)
     store.Subscribe (Namespace.subscription database)
+    store.Subscribe (NamespaceTemplate.subscription database)
 
     host.Run()
     0

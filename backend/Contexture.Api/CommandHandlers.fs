@@ -1,6 +1,7 @@
 namespace Contexture.Api
 
 open Contexture.Api
+open Contexture.Api.Aggregates.NamespaceTemplate.Projections
 open Database
 open Contexture.Api.Infrastructure
 
@@ -252,7 +253,6 @@ module FileBasedCommandHandlers =
                           { NamespaceId = n.Id
                             BoundedContextId = boundedContext.Id
                             NamespaceTemplateId = n.Template
-                            Template = None
                             Name = n.Name
                             Labels = n.Labels |> List.map (fun l -> { LabelId = l.Id; Name = l.Name; Value = Option.ofObj l.Value })
                           }
@@ -267,4 +267,61 @@ module FileBasedCommandHandlers =
                         (applyToCollection Projections.asNamespaceWithBoundedContext)
                            (Ok document.BoundedContexts)
                     |> Result.map (fun c -> { document with BoundedContexts = c }, System.Guid.Empty))
+                |> ignore
+
+    module NamespaceTemplate =
+        open Entities
+        open NamespaceTemplate
+        open BridgeEventSourcingWithFilebasedDatabase
+        
+        let handle clock (store: EventStore) command =
+            let identity = NamespaceTemplate.identify command
+            let streamName = NamespaceTemplate.name identity
+
+            let state =
+                streamName
+                |> store.Stream
+                |> List.map (fun e -> e.Event)
+                |> List.fold State.Fold State.Initial
+
+            match handle state command with
+            | Ok newEvents ->
+                newEvents
+                |> List.map (fun e ->
+                    { Event = e
+                      Metadata =
+                          { Source = streamName
+                            RecordedAt = clock () } })
+                |> store.Append
+
+                Ok identity
+            | Error e ->
+                e |> DomainError |> Error
+
+        let asEvents clock (template: NamespaceTemplate) =
+            { Metadata =
+                  { Source = template.Id
+                    RecordedAt = clock () }
+              Event =
+                  NamespaceTemplateImported
+                      { NamespaceTemplateId = template.Id
+                        Name = template.Name
+                        Description = Option.ofObj template.Description
+                        Labels =
+                            template.Template
+                            |> List.map (fun l ->
+                                { TemplateLabelId = l.Id; Name = l.Name; Description = Option.ofObj l.Description; Placeholder = Option.ofObj l.Placeholder }
+                            )
+                      }
+            }
+            |> List.singleton
+
+        let subscription (database: FileBased): Subscription<Event> =
+            fun (events: EventEnvelope<Event> list) ->
+                database.Change(fun document ->
+                    events
+                    |> List.fold
+                        (applyToCollection Projections.asTemplate)
+                           (Ok document.NamespaceTemplates)
+                    |> Result.map (fun c -> { document with NamespaceTemplates = c }, System.Guid.Empty))
                 |> ignore

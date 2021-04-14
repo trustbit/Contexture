@@ -5,6 +5,7 @@ open System.Text.Encodings.Web
 open System.Text.Json
 open System.Text.Json.Serialization
 
+open Contexture.Api.Aggregates.NamespaceTemplate
 open Contexture.Api.Entities
 
 module Database =
@@ -124,7 +125,7 @@ module Database =
         { Domains: CollectionOfGuid<Domain>
           BoundedContexts: CollectionOfGuid<BoundedContext>
           Collaborations: CollectionOfGuid<Collaboration>
-          NamespaceTemplates: CollectionOfGuid<NamespaceTemplate> }
+          NamespaceTemplates: CollectionOfGuid<Projections.NamespaceTemplate> }
 
     module Persistence =
         let read path = path |> File.ReadAllText
@@ -143,7 +144,7 @@ module Database =
               Domains: Domain list
               BoundedContexts: BoundedContext list
               Collaborations: Collaboration list
-              NamespaceTemplates: NamespaceTemplate list }
+              NamespaceTemplates: Projections.NamespaceTemplate list }
             static member Empty =
                 { Version = None
                   Domains = []
