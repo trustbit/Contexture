@@ -153,6 +153,16 @@ module Namespaces =
                     ReadModels.Namespace.allNamespaces database
 
                 json namespaces next ctx
+                
+        
+        let getAllTemplates =
+            fun (next: HttpFunc) (ctx: HttpContext) ->
+                let database = ctx.GetService<EventStore>()
+
+                let namespaces =
+                    ReadModels.Templates.allTemplates database
+
+                json namespaces next ctx
 
     let routesForBoundedContext boundedContextId : HttpHandler =
         subRouteCi
@@ -184,7 +194,13 @@ module Namespaces =
     let routes : HttpHandler =
         subRouteCi
             "/namespaces"
-            (choose [ GET
+            (choose [ subRoute "/templates"
+                          (choose [
+                            GET
+                            >=> QueryEndpoints.getAllTemplates
+                
+                          ])
+                      GET
                       >=> routef "/boundedContextsWithLabel/%s/%s" QueryEndpoints.getBoundedContextsWithLabel
                       GET
                       >=> route "/boundedContextsWithLabel"

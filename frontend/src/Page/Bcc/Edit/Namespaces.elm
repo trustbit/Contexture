@@ -90,7 +90,7 @@ init config contextId =
       , configuration = config
       , boundedContextId = contextId
       }
-    , loadNamespaces config contextId
+    , Cmd.batch [ loadNamespaces config contextId, loadTemplates config ]
     )
 
 
@@ -107,6 +107,7 @@ initNewNamespace =
 
 type Msg
     = NamespacesLoaded (Api.ApiResponse (List Namespace))
+    | NamespacesTemplatesLoaded (Api.ApiResponse (List NamespaceTemplate))
     | AccordionMsg Accordion.State
     | StartAddingNamespace
     | ChangeNamespace String
@@ -428,6 +429,8 @@ viewNewNamespace model =
         )
 
 
+
+
 labelEncoder : NewLabel -> Encode.Value
 labelEncoder model =
     Encode.object
@@ -449,6 +452,14 @@ loadNamespaces config boundedContextId =
     Http.get
         { url = Api.boundedContext boundedContextId |> Api.url config  |> (\b -> b ++ "/namespaces")
         , expect = Http.expectJson NamespacesLoaded (Decode.list namespaceDecoder)
+        }
+
+
+loadTemplates : Api.Configuration -> Cmd Msg
+loadTemplates config =
+    Http.get
+        { url = Api.namespaceTemplates |> Api.url config
+        , expect = Http.expectJson NamespacesTemplatesLoaded (Decode.list namespaceTemplateDecoder)
         }
 
 

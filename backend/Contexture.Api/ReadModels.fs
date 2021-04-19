@@ -3,6 +3,7 @@ namespace Contexture.Api.ReadModels
 
 open System
 open Contexture.Api
+open Contexture.Api.Aggregates.NamespaceTemplate.Projections
 open Contexture.Api.Infrastructure
 open Contexture.Api.Infrastructure.Projections
 open Entities
@@ -212,3 +213,17 @@ module Namespace =
         |> List.groupBy fst
         |> Map.ofList
         |> Map.map (fun _ v -> v |> List.map snd)
+
+
+module Templates =
+    open Contexture.Api.Aggregates.NamespaceTemplate
+
+    let private projection : Projection<NamespaceTemplate option, Aggregates.NamespaceTemplate.Event> =
+        { Init = None
+          Update = Projections.asTemplate }
+
+    let allTemplates (eventStore: EventStore) =
+        eventStore.Get<Aggregates.NamespaceTemplate.Event>()
+        |> List.fold (projectIntoMap projection) Map.empty
+        |> Map.toList
+        |> List.choose snd

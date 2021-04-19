@@ -3,6 +3,7 @@ module Api exposing (
   domains, domain, subDomains,
   allBoundedContexts, boundedContexts, boundedContext,
   collaborations, collaboration,
+  namespaceTemplates,
   canvas, 
   url, config, baseConfig)
 
@@ -90,6 +91,10 @@ collaboration : CollaborationId -> Endpoint
 collaboration id =
   withoutQuery [ "collaborations", ContextMapping.idToString id]
 
+
+namespaceTemplates : Endpoint
+namespaceTemplates =
+  withoutQuery [ "namespaces", "templates"]
 
 includeInRequest : List Include -> List QueryParameter
 includeInRequest include =
