@@ -40,6 +40,7 @@ let webApp hostFrontend =
                 Domains.routes
                 BoundedContexts.routes
                 Collaborations.routes
+                Namespaces.routes
                 GET >=> route "/all" >=> allRoute
             ])
         Search.routes
@@ -95,7 +96,7 @@ let configureJsonSerializer (services: IServiceCollection) =
     |> ignore
 
 
-let configureServices (context: WebHostBuilderContext) (services : IServiceCollection) =
+let configureServices (context: HostBuilderContext) (services : IServiceCollection) =
     services
         .AddOptions<ContextureOptions>()
         .Bind(context.Configuration)
@@ -116,11 +117,11 @@ let configureLogging (builder : ILoggingBuilder) =
 
 let buildHost args =
     Host.CreateDefaultBuilder(args)
+        .ConfigureServices(configureServices)
         .ConfigureWebHostDefaults(
             fun webHostBuilder ->
                 webHostBuilder
                     .Configure(Action<IApplicationBuilder> configureApp)
-                    .ConfigureServices(configureServices)
                     .ConfigureLogging(configureLogging)
                     |> ignore)
         .Build()
@@ -143,6 +144,10 @@ let importFromDocument (store: EventStore) (database: Document) =
     |> List.map (Namespace.asEvents clock)
     |> List.iter store.Append
 
+    database.NamespaceTemplates.All
+    |> List.map (NamespaceTemplate.asEvents clock)
+    |> List.iter store.Append
+
 [<EntryPoint>]
 let main args =
     let host = buildHost args
@@ -158,6 +163,7 @@ let main args =
     store.Subscribe (Domain.subscription database)
     store.Subscribe (BoundedContext.subscription database)
     store.Subscribe (Namespace.subscription database)
+    store.Subscribe (NamespaceTemplate.subscription database)
 
     host.Run()
     0

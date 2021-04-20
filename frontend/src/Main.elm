@@ -191,7 +191,15 @@ update msg model =
 
 subscriptions : Model -> Sub Msg
 subscriptions model =
-      Navbar.subscriptions model.navState NavMsg
+    List.append
+      [ Navbar.subscriptions model.navState NavMsg ]
+      ( case model.page of
+        Technical t ->
+          [ Page.Bcc.Technical.subscriptions t |> Sub.map TechnicalMsg ]
+        _ ->
+          []
+      )
+    |> Sub.batch
 
 
 -- VIEW
