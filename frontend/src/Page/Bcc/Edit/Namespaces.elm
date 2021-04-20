@@ -4,6 +4,7 @@ module Page.Bcc.Edit.Namespaces exposing
     , init
     , update
     , view
+    , subscriptions
     )
 
 import Api
@@ -35,9 +36,8 @@ import Http
 import Json.Decode as Decode exposing (Decoder)
 import Json.Decode.Pipeline as JP
 import Json.Encode as Encode
-import Page.Bcc.Edit.BusinessDecision exposing (Msg(..))
 import RemoteData exposing (RemoteData)
-import Url
+import Set
 
 
 type alias NewLabel =
@@ -47,10 +47,14 @@ type alias NewLabel =
     , template : Maybe LabelTemplate
     }
 
+type NamespaceNameError
+    = NoName
+    | NameIsNotUnique
+
 
 type alias CreateNamespace =
     { name : String
-    , isValid : Bool
+    , isValid : Maybe NamespaceNameError
     , labels : Array NewLabel
     , template : Maybe NamespaceTemplate
     }
@@ -115,15 +119,15 @@ initLabelFromTemplate template =
 initNewNamespace : CreateNamespace
 initNewNamespace =
     { name = ""
-    , isValid = False
+    , isValid = Just NoName
     , labels = Array.empty
     , template = Nothing
     }
 
-initNewNamespaceFromTemplate : NamespaceTemplate -> CreateNamespace
-initNewNamespaceFromTemplate template =
+initNewNamespaceFromTemplate : (String -> Maybe NamespaceNameError) -> NamespaceTemplate -> CreateNamespace
+initNewNamespaceFromTemplate validateName template =
     { name = template.name
-    , isValid = True
+    , isValid = validateName template.name
     , labels =
         template.template
         |> List.map initLabelFromTemplate
@@ -205,8 +209,30 @@ updateLabelName name label =
         , isValid = not <| String.isEmpty name
     }
 
-updateNamespaceName value namespace =
-    { namespace | name = value, isValid = not <| String.isEmpty value }
+
+namespaceNameShouldNotBeEmpty value =
+    String.isEmpty value
+
+namespaceNameShouldBeUnique namespaces value =
+    namespaces
+    |> RemoteData.withDefault []
+    |> List.map (\n -> n.namespace.name)
+    |> Set.fromList
+    |> Set.map String.toLower
+    |> Set.member (value |> String.toLower)
+
+
+validateNamespaceName namespaces value =
+    if namespaceNameShouldNotBeEmpty value then
+        Just NoName
+    else if namespaceNameShouldBeUnique namespaces value then
+        Just NameIsNotUnique
+    else
+        Nothing
+
+
+updateNamespaceName value validate namespace =
+    { namespace | name = value, isValid = validate value }
 
 update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
@@ -227,7 +253,7 @@ update msg model =
             ( { model
                 | newNamespace =
                     model.newNamespace
-                        |> Maybe.map (updateNamespaceName name)
+                        |> Maybe.map (updateNamespaceName name (validateNamespaceName model.namespaces))
               }
             , Cmd.none
             )
@@ -292,7 +318,7 @@ update msg model =
             ( { model | templates = model.templates |> RemoteData.map (\t -> { t | state = state})}, Cmd.none)
 
         StartAddingNamespaceFromTemplate template ->
-            ( { model | newNamespace = template |> initNewNamespaceFromTemplate |> Just }, Cmd.none)
+            ( { model | newNamespace = template |> initNewNamespaceFromTemplate (validateNamespaceName model.namespaces) |> Just }, Cmd.none)
 
 
 
@@ -401,6 +427,7 @@ view model =
             (case model.namespaces of
                 RemoteData.Success namespaces ->
                     Accordion.config AccordionMsg
+                        |> Accordion.withAnimation
                         |> Accordion.cards
                             (namespaces
                                 |> List.map viewNamespace
@@ -415,13 +442,13 @@ view model =
         |> Card.footer []
             [ case model.newNamespace of
                 Nothing ->
-                    div []
-                        [ Button.button
+                    div [ class "btn-group"]
+                        [ viewTemplateButton model.templates
+                        , Button.button
                             [ Button.primary
                             , Button.onClick StartAddingNamespace
                             ]
                             [ text "Add a new Namespace" ]
-                        , viewTemplateButton model.templates
                         ]
                 Just newNamespace ->
                     viewNewNamespace newNamespace
@@ -476,20 +503,30 @@ viewAddLabel index model =
 
 
 viewNewNamespace model =
-    Form.form [ onSubmit (AddNamespace model) ]
+    let
+        (isValid, description) =
+            case model.isValid of
+                Nothing ->
+                    (True, "")
+                Just NoName ->
+                    (False, "Please enter a namespace name")
+                Just NameIsNotUnique ->
+                    (False, "The namespace name is not unique")
+    in Form.form [ onSubmit (AddNamespace model) ]
         (Form.row []
             [ Form.col []
                 [ Form.label [ for "namespace" ] [ text "Namespace" ]
                 , Input.text
                     [ Input.id "namespace"
                     , Input.placeholder "The name of namespace containing the labels"
+                    , Input.value model.name
                     , Input.onInput ChangeNamespace
-                    , if model.isValid then
+                    , if isValid then
                         Input.success
-
                       else
                         Input.danger
                     ]
+                , Form.invalidFeedback [] [ text description]
                 ]
             ]
             :: (model.labels |> Array.indexedMap viewAddLabel |> Array.toList)
@@ -500,8 +537,8 @@ viewNewNamespace model =
                         [ ButtonGroup.buttonGroup []
                             [ ButtonGroup.button [ Button.secondary, Button.onClick CancelAddingNamespace ] [ text "Cancel" ]
                             , ButtonGroup.button
-                                [ Button.primary, Button.disabled <| not model.isValid, Button.attrs [ type_ "submit" ] ]
-                                [ text "Save new Namespace" ]
+                                [ Button.primary, Button.disabled <| not isValid, Button.attrs [ type_ "submit" ] ]
+                                [ model.template |> Maybe.map (\t -> "Save namespace based on " ++ t.name) |> Maybe.withDefault "Save new Namespace" |> text ]
                             ]
                         ]
                     ]
@@ -509,13 +546,12 @@ viewNewNamespace model =
         )
 
 
-
-
 labelEncoder : NewLabel -> Encode.Value
 labelEncoder model =
     Encode.object
         [ ( "name", Encode.string model.name )
         , ( "value", Encode.string model.value )
+        , ( "template", model.template |> Maybe.map (\t -> Encode.string t.id) |> Maybe.withDefault Encode.null )
         ]
 
 
@@ -524,6 +560,7 @@ namespaceEncoder model =
     Encode.object
         [ ( "name", Encode.string model.name )
         , ( "labels", model.labels |> Array.toList |> Encode.list labelEncoder )
+        , ( "template", model.template |> Maybe.map (\t -> Encode.string t.id) |> Maybe.withDefault Encode.null )
         ]
 
 
@@ -585,3 +622,16 @@ addLabelToNamespace config boundedContextId namespace label =
         , body = Http.jsonBody <| labelEncoder label
         , expect = Http.expectJson LabelAddedToNamespace (Decode.list namespaceDecoder)
         }
+
+
+subscriptions : Model -> Sub Msg
+subscriptions model =
+    List.append
+        [ Accordion.subscriptions model.accordionState AccordionMsg ]
+        ( case model.templates of
+            RemoteData.Success t ->
+                [ Dropdown.subscriptions t.state DropdownMsg ]
+            _ ->
+                []
+        )
+    |> Sub.batch

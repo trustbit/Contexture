@@ -1,4 +1,4 @@
-module Page.Bcc.Technical exposing (Msg, Model, update, view, init)
+module Page.Bcc.Technical exposing (Msg, Model, update, view, init, subscriptions)
 
 import Browser.Navigation as Nav
 
@@ -282,3 +282,9 @@ saveTechnical config contextId model =
     , timeout = Nothing
     , tracker = Nothing
     }
+
+subscriptions : Model -> Sub Msg
+subscriptions model =
+    model.namespaces
+    |> Namespaces.subscriptions
+    |> Sub.map NamespacesMsg
