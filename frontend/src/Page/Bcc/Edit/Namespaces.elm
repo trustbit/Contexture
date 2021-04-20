@@ -54,7 +54,7 @@ type NamespaceNameError
 
 type alias CreateNamespace =
     { name : String
-    , isValid : Maybe NamespaceNameError
+    , value : Result NamespaceNameError String
     , labels : Array NewLabel
     , template : Maybe NamespaceTemplate
     }
@@ -119,15 +119,15 @@ initLabelFromTemplate template =
 initNewNamespace : CreateNamespace
 initNewNamespace =
     { name = ""
-    , isValid = Just NoName
+    , value = Err NoName
     , labels = Array.empty
     , template = Nothing
     }
 
-initNewNamespaceFromTemplate : (String -> Maybe NamespaceNameError) -> NamespaceTemplate -> CreateNamespace
+initNewNamespaceFromTemplate : (String -> Result NamespaceNameError String) -> NamespaceTemplate -> CreateNamespace
 initNewNamespaceFromTemplate validateName template =
     { name = template.name
-    , isValid = validateName template.name
+    , value = validateName template.name
     , labels =
         template.template
         |> List.map initLabelFromTemplate
@@ -222,17 +222,20 @@ namespaceNameShouldBeUnique namespaces value =
     |> Set.member (value |> String.toLower)
 
 
-validateNamespaceName namespaces value =
-    if namespaceNameShouldNotBeEmpty value then
-        Just NoName
-    else if namespaceNameShouldBeUnique namespaces value then
-        Just NameIsNotUnique
-    else
-        Nothing
+parseNamespaceName namespaces value =
+    let
+        trimmed = String.trim value
+    in
+        if namespaceNameShouldNotBeEmpty trimmed then
+            Err NoName
+        else if namespaceNameShouldBeUnique namespaces trimmed then
+            Err NameIsNotUnique
+        else
+            Ok trimmed
 
 
-updateNamespaceName value validate namespace =
-    { namespace | name = value, isValid = validate value }
+updateNamespaceName value parse namespace =
+    { namespace | name = value, value = parse value }
 
 update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
@@ -253,7 +256,7 @@ update msg model =
             ( { model
                 | newNamespace =
                     model.newNamespace
-                        |> Maybe.map (updateNamespaceName name (validateNamespaceName model.namespaces))
+                        |> Maybe.map (updateNamespaceName name (parseNamespaceName model.namespaces))
               }
             , Cmd.none
             )
@@ -318,7 +321,7 @@ update msg model =
             ( { model | templates = model.templates |> RemoteData.map (\t -> { t | state = state})}, Cmd.none)
 
         StartAddingNamespaceFromTemplate template ->
-            ( { model | newNamespace = template |> initNewNamespaceFromTemplate (validateNamespaceName model.namespaces) |> Just }, Cmd.none)
+            ( { model | newNamespace = template |> initNewNamespaceFromTemplate (parseNamespaceName model.namespaces) |> Just }, Cmd.none)
 
 
 
@@ -505,12 +508,12 @@ viewAddLabel index model =
 viewNewNamespace model =
     let
         (isValid, description) =
-            case model.isValid of
-                Nothing ->
+            case model.value of
+                Ok _ ->
                     (True, "")
-                Just NoName ->
+                Err NoName ->
                     (False, "Please enter a namespace name")
-                Just NameIsNotUnique ->
+                Err NameIsNotUnique ->
                     (False, "The namespace name is not unique")
     in Form.form [ onSubmit (AddNamespace model) ]
         (Form.row []
