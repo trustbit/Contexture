@@ -77,13 +77,14 @@ module Entities =
 
 
     type NamespaceTemplateId = Guid
-
+    type TemplateLabelId = Guid
     type LabelId = Guid
 
     type Label =
         { Id: LabelId
           Name: string
-          Value: string }
+          Value: string
+          Template: TemplateLabelId option }
 
     type NamespaceId = Guid
 
@@ -810,9 +811,10 @@ module Aggregates =
 
         and NamespaceDefinition =
             { Name: string
+              Template: NamespaceTemplateId option
               Labels: NewLabelDefinition list }
 
-        and NewLabelDefinition = { Name: string; Value: string }
+        and NewLabelDefinition = { Name: string; Value: string; Template: TemplateLabelId option }
 
         and RemoveLabel =
             { Namespace: NamespaceId
@@ -844,7 +846,8 @@ module Aggregates =
         and LabelDefinition =
             { LabelId: LabelId
               Name: string
-              Value: string option }
+              Value: string option
+              Template: TemplateLabelId option }
 
         and LabelRemoved =
             { NamespaceId: NamespaceId
@@ -877,36 +880,37 @@ module Aggregates =
                 | _ -> Namespaces namespaces
 
         module LabelDefinition =
-            let create name (value: string): LabelDefinition option =
+            let create name (value: string) template: LabelDefinition option =
                 if String.IsNullOrWhiteSpace name then
                     None
                 else
                     Some
                         { LabelId = Guid.NewGuid()
                           Name = name.Trim()
-                          Value = if not (isNull value) then value.Trim() |> Some else None }
+                          Value = if not (isNull value) then value.Trim() |> Some else None
+                          Template = template }
 
-        let addNewNamespace boundedContextId name (labels: NewLabelDefinition list) (Namespaces namespaces) =
+        let addNewNamespace boundedContextId name templateId (labels: NewLabelDefinition list) (Namespaces namespaces) =
             if namespaces
-               |> Map.exists (fun _ name -> name = name) then
+               |> Map.exists (fun _ existingName -> String.Equals (existingName, name,StringComparison.OrdinalIgnoreCase)) then
                 Error NamespaceNameNotUnique
             else
                 let newLabels =
                     labels
-                    |> List.choose (fun label -> LabelDefinition.create label.Name label.Value)
+                    |> List.choose (fun label -> LabelDefinition.create label.Name label.Value label.Template)
 
                 let newNamespace =
                     NamespaceAdded
                         { NamespaceId = Guid.NewGuid()
                           BoundedContextId = boundedContextId
-                          NamespaceTemplateId = None
+                          NamespaceTemplateId = templateId
                           Name = name
                           Labels = newLabels }
 
                 Ok newNamespace
 
         let addLabel namespaceId labelName value =
-            match LabelDefinition.create labelName value with
+            match LabelDefinition.create labelName value None with
             | Some label ->
                 Ok
                 <| LabelAdded
@@ -928,7 +932,7 @@ module Aggregates =
         let handle (state: State) (command: Command) =
             match command with
             | NewNamespace (boundedContextId, namespaceCommand) ->
-                addNewNamespace boundedContextId namespaceCommand.Name namespaceCommand.Labels state
+                addNewNamespace boundedContextId namespaceCommand.Name namespaceCommand.Template namespaceCommand.Labels state
             | RemoveNamespace (_, namespaceId) ->
                 Ok
                 <| NamespaceRemoved { NamespaceId = namespaceId }
@@ -947,7 +951,8 @@ module Aggregates =
                 |> List.map (fun l ->
                     { Name = l.Name
                       Id = l.LabelId
-                      Value = l.Value |> Option.defaultValue null })
+                      Value = l.Value |> Option.defaultValue null
+                      Template = l.Template })
 
             let asNamespace namespaces event =
                 match event with
@@ -974,7 +979,8 @@ module Aggregates =
                                   Labels =
                                       { Id = c.LabelId
                                         Name = c.Name
-                                        Value = c.Value |> Option.defaultValue null }
+                                        Value = c.Value |> Option.defaultValue null
+                                        Template = None }
                                       :: n.Labels }
                         else
                             n)
@@ -998,7 +1004,6 @@ module Aggregates =
     module NamespaceTemplate =
         open Entities
         
-        type TemplateLabelId = Guid
         type Errors =
             | EmptyName
             | NamespaceNameNotUnique

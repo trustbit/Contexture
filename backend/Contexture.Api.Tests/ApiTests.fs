@@ -89,6 +89,13 @@ module Fixtures =
               DomainId = domainId }
         |> Utils.asEvent contextId
 
+
+    let newLabel () =
+        { LabelId = Guid.NewGuid()
+          Name = "label"
+          Value = Some "value"
+          Template = None }
+
 module Namespaces =
 
     [<Fact>]
@@ -111,8 +118,7 @@ module Namespaces =
             //act
             use client = server.GetTestClient()
 
-            let createNamespaceContent =
-                "{
+            let createNamespaceContent = "{
                     \"name\":  \"test\",
                     \"labels\": [
                         { \"name\": \"l1\", \"value\": \"v1\" },
@@ -164,12 +170,12 @@ module Namespaces =
                       NamespaceId = namespaceId
                       NamespaceTemplateId = None
                       Labels =
-                          [ { LabelId = Guid.NewGuid()
-                              Name = "l1"
-                              Value = Some "v1" }
-                            { LabelId = Guid.NewGuid()
-                              Name = "l2"
-                              Value = Some "v2" } ] }
+                          [ { Fixtures.newLabel () with
+                                  Name = "l1"
+                                  Value = Some "v1" }
+                            { Fixtures.newLabel () with
+                                  Name = "l2"
+                                  Value = Some "v2" } ] }
                 |> Utils.asEvent contextId
 
             Utils.append clock eventStore [ added ]
@@ -207,10 +213,7 @@ module Namespaces =
                       Name = "namespace"
                       NamespaceId = namespaceId
                       NamespaceTemplateId = None
-                      Labels =
-                          [ { LabelId = Guid.NewGuid()
-                              Name = "label"
-                              Value = Some "value" } ] }
+                      Labels = [ Fixtures.newLabel () ] }
                 |> Utils.asEvent contextId
 
             Utils.append clock eventStore [ added ]
@@ -225,7 +228,7 @@ module Namespaces =
 
             // assert
             Assert.NotEmpty result
-            Assert.Contains(contextId, result)
+            Assert.Collection(result, (fun x -> Assert.Equal(contextId, x)))
 
             //act - search by value
             use client = server.GetTestClient()
@@ -237,5 +240,66 @@ module Namespaces =
 
             // assert
             Assert.NotEmpty result
-            Assert.Contains(contextId, result)
+            Assert.Collection(result, (fun x -> Assert.Equal(contextId, x)))
+        }
+
+    [<Fact>]
+    let ``Can search for bounded contexts by label and value for a specific template`` () =
+        task {
+            use server = TestHost.runServer ()
+
+            let clock = TestHost.staticClock DateTime.UtcNow
+
+            let eventStore =
+                server.Services.GetRequiredService<EventStore>()
+
+            // arrange
+            let namespaceId = Guid.NewGuid()
+            let contextId = Guid.NewGuid()
+            let otherContextId = Guid.NewGuid()
+            let templateId = Guid.NewGuid()
+
+            let added =
+                NamespaceAdded
+                    { BoundedContextId = contextId
+                      Name = "namespace"
+                      NamespaceId = namespaceId
+                      NamespaceTemplateId = Some templateId
+                      Labels = [ Fixtures.newLabel () ] }
+                |> Utils.asEvent contextId
+
+            let addedOther =
+                NamespaceAdded
+                    { BoundedContextId = otherContextId
+                      Name = "the other namespace"
+                      NamespaceId = Guid.NewGuid()
+                      NamespaceTemplateId = None
+                      Labels = [ Fixtures.newLabel () ] }
+                |> Utils.asEvent otherContextId
+
+            Utils.append clock eventStore [ added; addedOther ]
+
+            //act - search by name
+            use client = server.GetTestClient()
+
+            let! result =
+                Utils.getJson<BoundedContextId array>
+                    client
+                    (sprintf "api/namespaces/boundedContextsWithLabel?name=%s&NamespaceTemplate=%O" "lab" templateId)
+
+            // assert
+            Assert.NotEmpty result
+            Assert.Collection(result, (fun x -> Assert.Equal(contextId, x)))
+
+            //act - search by value
+            use client = server.GetTestClient()
+
+            let! result =
+                Utils.getJson<BoundedContextId array>
+                    client
+                    (sprintf "api/namespaces/boundedContextsWithLabel?value=%s&NamespaceTemplate=%O" "val" templateId)
+
+            // assert
+            Assert.NotEmpty result
+            Assert.Collection(result, (fun x -> Assert.Equal(contextId, x)))
         }

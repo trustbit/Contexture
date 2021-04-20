@@ -254,7 +254,13 @@ module FileBasedCommandHandlers =
                             BoundedContextId = boundedContext.Id
                             NamespaceTemplateId = n.Template
                             Name = n.Name
-                            Labels = n.Labels |> List.map (fun l -> { LabelId = l.Id; Name = l.Name; Value = Option.ofObj l.Value })
+                            Labels =
+                                n.Labels
+                                |> List.map (fun l ->
+                                    { LabelId = l.Id
+                                      Name = l.Name
+                                      Value = Option.ofObj l.Value
+                                      Template = l.Template })
                           }
                 }
             )
