@@ -62,20 +62,6 @@ module Entities =
         { Name: string
           Description: string option }
 
-    type Lifecycle =
-        { IssueTracker: Uri option
-          Wiki: Uri option
-          Repository: Uri option }
-
-    type Deployment =
-        { HealthCheck: Uri option
-          Artifacts: Uri option }
-
-    type TechnicalDescription =
-        { Tools: Lifecycle option
-          Deployment: Deployment option }
-
-
     type NamespaceTemplateId = Guid
     type TemplateLabelId = Guid
     type LabelId = Guid
@@ -109,7 +95,6 @@ module Entities =
           UbiquitousLanguage: Map<string, UbiquitousLanguageTerm>
           Messages: Messages
           DomainRoles: DomainRole list
-          TechnicalDescription: TechnicalDescription option
           Namespaces: Namespace list }
 
     type Domain =
@@ -368,7 +353,6 @@ module Aggregates =
 
         type Command =
             | CreateBoundedContext of BoundedContextId * DomainId * CreateBoundedContext
-            | UpdateTechnicalInformation of BoundedContextId * UpdateTechnicalInformation
             | RenameBoundedContext of BoundedContextId * RenameBoundedContext
             | AssignKey of BoundedContextId * AssignKey
             | RemoveBoundedContext of BoundedContextId
@@ -382,9 +366,6 @@ module Aggregates =
             | UpdateMessages of BoundedContextId * UpdateMessages
 
         and CreateBoundedContext = { Name: string }
-
-        and UpdateTechnicalInformation = TechnicalDescription
-
         and RenameBoundedContext = { Name: string }
 
         and AssignKey = { Key: string }
@@ -409,7 +390,6 @@ module Aggregates =
         type Event =
             | BoundedContextImported of BoundedContextImported
             | BoundedContextCreated of BoundedContextCreated
-            | TechnicalInformationUpdated of TechnicalInformationUpdated
             | BoundedContextRenamed of BoundedContextRenamed
             | KeyAssigned of KeyAssigned
             | BoundedContextRemoved of BoundedContextRemoved
@@ -432,8 +412,7 @@ module Aggregates =
               BusinessDecisions: BusinessDecision list
               UbiquitousLanguage: Map<string, UbiquitousLanguageTerm>
               Messages: Messages
-              DomainRoles: DomainRole list
-              TechnicalDescription: TechnicalDescription option }
+              DomainRoles: DomainRole list }
 
         and BoundedContextCreated =
             { BoundedContextId: BoundedContextId
@@ -457,11 +436,6 @@ module Aggregates =
         and KeyAssigned =
             { BoundedContextId: BoundedContextId
               Key: string option }
-
-        and TechnicalInformationUpdated =
-            { BoundedContextId: BoundedContextId
-              Tools: Lifecycle option
-              Deployment: Deployment option }
 
         and BoundedContextReclassified =
             { BoundedContextId: BoundedContextId
@@ -497,7 +471,6 @@ module Aggregates =
             | UpdateBusinessDecisions (contextId, _) -> contextId
             | ReclassifyBoundedContext (contextId, _) -> contextId
             | AssignKey (contextId, _) -> contextId
-            | UpdateTechnicalInformation (contextId, _) -> contextId
             | MoveBoundedContextToDomain (contextId, _) -> contextId
 
         let name identity = identity
@@ -544,12 +517,6 @@ module Aggregates =
         let handle state (command: Command) =
             match command with
             | CreateBoundedContext (id, domainId, createBc) -> newBoundedContext id domainId createBc.Name
-            | UpdateTechnicalInformation (contextId, technical) ->
-                TechnicalInformationUpdated
-                    { Tools = technical.Tools
-                      Deployment = technical.Deployment
-                      BoundedContextId = contextId }
-                |> Ok
             | RenameBoundedContext (contextId, rename) -> renameBoundedContext rename.Name contextId
             | AssignKey (contextId, key) -> assignKeyToBoundedContext key.Key contextId
             | RemoveBoundedContext contextId ->
@@ -609,8 +576,7 @@ module Aggregates =
                                   UbiquitousLanguage = c.UbiquitousLanguage
                                   BusinessDecisions = c.BusinessDecisions
                                   Key = c.Key
-                                  Name = c.Name
-                                  TechnicalDescription = c.TechnicalDescription }
+                                  Name = c.Name }
                     | None ->
                         Some
                             { Id = c.BoundedContextId
@@ -623,7 +589,6 @@ module Aggregates =
                               BusinessDecisions = c.BusinessDecisions
                               Key = c.Key
                               Name = c.Name
-                              TechnicalDescription = c.TechnicalDescription
                               Namespaces = [] }
                 | BoundedContextCreated c ->
                     Some
@@ -637,7 +602,6 @@ module Aggregates =
                           DomainRoles = []
                           BusinessDecisions = []
                           UbiquitousLanguage = Map.empty
-                          TechnicalDescription = None
                           Namespaces = [] }
                 | BoundedContextRemoved c -> None
                 | BoundedContextRenamed c ->
@@ -668,14 +632,6 @@ module Aggregates =
                 | KeyAssigned c ->
                     state
                     |> Option.map (fun o -> { o with Key = c.Key })
-                | TechnicalInformationUpdated c ->
-                    state
-                    |> Option.map (fun o ->
-                        { o with
-                              TechnicalDescription =
-                                  Some
-                                      { Tools = c.Tools
-                                        Deployment = c.Deployment } })
                 | UbiquitousLanguageUpdated c ->
                     state
                     |> Option.map (fun o ->
@@ -1095,7 +1051,7 @@ module Aggregates =
                           Placeholder = trim placeholder
                         }
 
-        let addNewTemplate name description (labels: AddTemplateLabel list) (Templates templates) =
+        let addNewTemplate id name description (labels: AddTemplateLabel list) (Templates templates) =
             if templates
                |> Map.exists (fun _ name -> name = name) then
                 Error NamespaceNameNotUnique
@@ -1106,7 +1062,7 @@ module Aggregates =
 
                 let newNamespace =
                     NamespaceTemplateAdded
-                        { NamespaceTemplateId = Guid.NewGuid()
+                        { NamespaceTemplateId = id
                           Name = name
                           Description = description
                           Labels = newLabels }
@@ -1136,7 +1092,7 @@ module Aggregates =
         let handle (state: State) (command: Command) =
             match command with
             | NewNamespaceTemplate (id, cmd) ->
-                addNewTemplate cmd.Name cmd.Description cmd.Labels state
+                addNewTemplate id cmd.Name cmd.Description cmd.Labels state
             | RemoveTemplate (id) ->
                 Ok
                 <| NamespaceTemplateRemoved { NamespaceTemplateId = id }

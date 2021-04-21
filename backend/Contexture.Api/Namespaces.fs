@@ -7,8 +7,11 @@ open Contexture.Api.Database
 open Contexture.Api.Entities
 open Contexture.Api.Domains
 open Contexture.Api.Infrastructure
+open Contexture.Api.Views
 open Microsoft.AspNetCore.Http
 open FSharp.Control.Tasks
+
+open Microsoft.Extensions.Hosting
 
 open Giraffe
 
@@ -91,7 +94,7 @@ module Namespaces =
                     namespacesByLabel
                     |> ReadModels.Namespace.findByLabelName item.Name
                     |> Set.filter
-                        (fun { NamespaceTemplateId = name} ->
+                        (fun { NamespaceTemplateId = name } ->
                             match item.NamespaceTemplate with
                             | Some n -> name = Some n
                             | None -> true)
@@ -153,16 +156,126 @@ module Namespaces =
                     ReadModels.Namespace.allNamespaces database
 
                 json namespaces next ctx
-                
-        
-        let getAllTemplates =
-            fun (next: HttpFunc) (ctx: HttpContext) ->
-                let database = ctx.GetService<EventStore>()
 
-                let namespaces =
-                    ReadModels.Templates.allTemplates database
+    module Templates =
+        module CommandEndpoints =
+            open System
+            open NamespaceTemplate
+            open FileBasedCommandHandlers
 
-                json namespaces next ctx
+            let clock = fun () -> DateTime.UtcNow
+
+            let private updateAndReturnTemplate command =
+                fun (next: HttpFunc) (ctx: HttpContext) ->
+                    task {
+                        let database = ctx.GetService<EventStore>()
+
+                        match NamespaceTemplate.handle clock database command with
+                        | Ok updatedTemplate ->
+                            return! redirectTo false (sprintf "/api/namespaces/templates/%O" updatedTemplate) next ctx
+                        | Error (DomainError error) ->
+                            return! RequestErrors.BAD_REQUEST(sprintf "Template Error %A" error) next ctx
+                        | Error e -> return! ServerErrors.INTERNAL_ERROR e next ctx
+                    }
+
+            let newTemplate (command: NamespaceDefinition) =
+                updateAndReturnTemplate (NewNamespaceTemplate(Guid.NewGuid(), command))
+
+            let removeTemplate (command: NamespaceTemplateId) =
+                updateAndReturnTemplate (RemoveTemplate(command))
+
+            let removeLabel templateId labelId =
+                updateAndReturnTemplate (RemoveTemplateLabel(templateId, { Label = labelId }))
+
+            let newLabel templateId (command: AddTemplateLabel) =
+                updateAndReturnTemplate (AddTemplateLabel(templateId, command))
+
+        module QueryEndpoints =
+            let getAllTemplates =
+                fun (next: HttpFunc) (ctx: HttpContext) ->
+                    let database = ctx.GetService<EventStore>()
+
+                    let namespaces =
+                        ReadModels.Templates.allTemplates database
+
+                    json namespaces next ctx
+
+            let getTemplate templateId =
+                fun (next: HttpFunc) (ctx: HttpContext) ->
+                    let database = ctx.GetService<EventStore>()
+
+                    let template =
+                        templateId
+                        |> ReadModels.Templates.buildTemplate database
+                        |> Option.map json
+                        |> Option.defaultValue (RequestErrors.NOT_FOUND(sprintf "template %O not found" templateId))
+
+                    template next ctx
+
+
+    module Views =
+
+        open Layout
+        open Giraffe.ViewEngine
+
+        let breadcrumb (domain: Domain) =
+            div [ _class "row" ] [
+                div [ _class "col" ] [
+                    a [ attr "role" "button"
+                        _class "btn btn-link"
+                        _href $"/domain/{domain.Id}" ] [
+                        str $"Back to Domain '{domain.Name}'"
+                    ]
+                ]
+            ]
+
+        let index serialize resolveAssets (boundedContextId: BoundedContextId) (domain: Domain) baseUrl =
+            let namespaceSnippet =
+                let flags =
+                    {| ApiBase = baseUrl
+                       BoundedContextId = boundedContextId |}
+
+                div [] [
+                    div [ _id "namespaces" ] []
+                    initElm serialize "Components.ManageNamespaces" "namespaces" flags
+                ]
+
+            let content =
+                div [ _class "container" ] [
+                    breadcrumb domain
+                    namespaceSnippet
+                ]
+
+            documentTemplate (headTemplate resolveAssets) (bodyTemplate content)
+
+    let index boundedContextId =
+        fun (next: HttpFunc) (ctx: HttpContext) ->
+            let basePath =
+                ctx.GetService<IHostEnvironment>()
+                |> BasePaths.resolve
+
+            let pathResolver = Asset.resolvePath basePath.AssetBase
+            let assetsResolver = Asset.resolveAsset pathResolver
+
+            let eventStore = ctx.GetService<EventStore>()
+
+            let domainOption =
+                boundedContextId
+                |> ReadModels.BoundedContext.buildBoundedContext eventStore
+                |> Option.map (fun bc -> bc.DomainId)
+                |> Option.bind (ReadModels.Domain.buildDomain eventStore)
+
+            match domainOption with
+            | Some domain ->
+                let jsonEncoder = ctx.GetJsonSerializer()
+
+                let baseApi = basePath.ApiBase + "/api"
+
+                htmlView
+                    (Views.index jsonEncoder.SerializeToString assetsResolver boundedContextId domain baseApi)
+                    next
+                    ctx
+            | None -> RequestErrors.NOT_FOUND "Unknown" next ctx
 
     let routesForBoundedContext boundedContextId : HttpHandler =
         subRouteCi
@@ -194,12 +307,24 @@ module Namespaces =
     let routes : HttpHandler =
         subRouteCi
             "/namespaces"
-            (choose [ subRoute "/templates"
-                          (choose [
-                            GET
-                            >=> QueryEndpoints.getAllTemplates
-                
-                          ])
+            (choose [ subRoute
+                          "/templates"
+                          (choose [ subRoutef
+                                        "/%O"
+                                        (fun templateId ->
+                                            choose [ DELETE
+                                                     >=> routef
+                                                             "/labels/%O"
+                                                             (Templates.CommandEndpoints.removeLabel templateId)
+                                                     POST
+                                                     >=> bindModel None (Templates.CommandEndpoints.newLabel templateId)
+                                                     GET
+                                                     >=> Templates.QueryEndpoints.getTemplate templateId
+                                                     DELETE
+                                                     >=> Templates.CommandEndpoints.removeTemplate templateId ])
+                                    GET >=> Templates.QueryEndpoints.getAllTemplates
+                                    POST
+                                    >=> bindModel None Templates.CommandEndpoints.newTemplate ])
                       GET
                       >=> routef "/boundedContextsWithLabel/%s/%s" QueryEndpoints.getBoundedContextsWithLabel
                       GET

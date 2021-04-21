@@ -19,6 +19,7 @@
     <Compile Include="Infrastructure.fs" />
     <Compile Include="CommandHandlers.fs" />
     <Compile Include="ReadModels.fs" />
+    <Compile Include="Views.fs" />
     <Compile Include="Domains.fs" />
     <Compile Include="Namespaces.fs" />
     <Compile Include="BoundedContexts.fs" />

@@ -18,7 +18,6 @@ import Api
 import Page.Domain.Index
 import Page.Domain.Edit
 import Page.Bcc.CanvasV3 as CanvasV3
-import Page.Bcc.Technical
 
 -- MAIN
 
@@ -50,7 +49,6 @@ type Page
   | Domains Page.Domain.Index.Model
   | DomainsEdit Page.Domain.Edit.Model
   | BoundedContextCanvas CanvasV3.Model
-  | Technical Page.Bcc.Technical.Model
 
 type alias Model =
   { key : Nav.Key
@@ -82,13 +80,8 @@ initCurrentPage ( model, existingCmds ) =
               ( pageModel, pageCmds ) = CanvasV3.init model.key (Api.config model.baseUrl) id
             in
               ( BoundedContextCanvas pageModel, Cmd.map BccMsg pageCmds )
-          Route.TechnicalDescription id ->
-            let
-              ( pageModel, pageCmds ) = Page.Bcc.Technical.init model.key (Api.config model.baseUrl) id
-            in
-              ( Technical pageModel, Cmd.map TechnicalMsg pageCmds )
-
-
+          _ ->
+            ( NotFoundPage, Cmd.none )
     in
     ( { model | page = currentPage }
     , Cmd.batch [ existingCmds, mappedPageCmds ]
@@ -132,7 +125,6 @@ type Msg
   | DomainMsg Page.Domain.Index.Msg
   | DomainEditMsg Page.Domain.Edit.Msg
   | BccMsg CanvasV3.Msg
-  | TechnicalMsg Page.Bcc.Technical.Msg
 
 update : Msg -> Model -> (Model, Cmd Msg)
 update msg model =
@@ -177,12 +169,6 @@ update msg model =
         (mo, msg2) = CanvasV3.update m bccModel
       in
         ({ model | page = BoundedContextCanvas mo}, Cmd.map BccMsg msg2)
-    (TechnicalMsg m, Technical technicalModel) ->
-      let
-        (updatedModel, technicalMsg) = Page.Bcc.Technical.update m technicalModel
-      in
-        ({ model | page = Technical updatedModel}, Cmd.map TechnicalMsg technicalMsg)
-
     (_, _) ->
       Debug.log ("Main: " ++ Debug.toString msg ++ " " ++ Debug.toString model)
       (model, Cmd.none)
@@ -194,8 +180,6 @@ subscriptions model =
     List.append
       [ Navbar.subscriptions model.navState NavMsg ]
       ( case model.page of
-        Technical t ->
-          [ Page.Bcc.Technical.subscriptions t |> Sub.map TechnicalMsg ]
         _ ->
           []
       )
@@ -227,8 +211,6 @@ view model =
           Page.Domain.Index.view o |> Html.map DomainMsg
         DomainsEdit o ->
           Page.Domain.Edit.view o |> Html.map DomainEditMsg
-        Technical t ->
-          Page.Bcc.Technical.view t |> Html.map TechnicalMsg
         NotFoundPage ->
           text "Not Found"
   in

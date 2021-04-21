@@ -4,7 +4,6 @@ import Api exposing (boundedContexts)
 import BoundedContext exposing (BoundedContext)
 import BoundedContext.Canvas
 import BoundedContext.Namespace as Namespace
-import BoundedContext.Technical
 import Browser
 import ContextMapping.Collaboration as Collaboration exposing (Collaborations)
 import Domain exposing (Domain)
@@ -61,7 +60,6 @@ itemDecoder =
     Decode.succeed BoundedContext.Item
         |> JP.custom BoundedContext.modelDecoder
         |> JP.custom BoundedContext.Canvas.modelDecoder
-        |> JP.optionalAt [ "technicalDescription" ] BoundedContext.Technical.modelDecoder BoundedContext.Technical.noTechnicalDescription
         |> JP.optionalAt [ "namespaces" ] (Decode.list Namespace.namespaceDecoder) []
 
 

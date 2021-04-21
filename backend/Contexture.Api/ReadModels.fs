@@ -227,3 +227,8 @@ module Templates =
         |> List.fold (projectIntoMap projection) Map.empty
         |> Map.toList
         |> List.choose snd
+
+    let buildTemplate (eventStore: EventStore) templateId =
+        templateId
+        |> eventStore.Stream
+        |> project projection

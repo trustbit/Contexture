@@ -38,6 +38,7 @@ import Json.Decode.Pipeline as JP
 import Json.Encode as Encode
 import RemoteData exposing (RemoteData)
 import Set
+import Url
 
 
 type alias NewLabel =
@@ -237,6 +238,7 @@ parseNamespaceName namespaces value =
 updateNamespaceName value parse namespace =
     { namespace | name = value, value = parse value }
 
+
 update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
     case msg of
@@ -323,6 +325,12 @@ update msg model =
         StartAddingNamespaceFromTemplate template ->
             ( { model | newNamespace = template |> initNewNamespaceFromTemplate (parseNamespaceName model.namespaces) |> Just }, Cmd.none)
 
+viewLabelAsLink value =
+    case Url.fromString value of
+        Just link ->
+           Button.linkButton [ Button.attrs [ link |> Url.toString |> href, target "_blank"], Button.small ] [ 0x0001F517 |>Char.fromCode  |>  String.fromChar |> Html.text]
+        Nothing ->
+            text ""
 
 
 viewAddLabelToExistingNamespace namespace model =
@@ -345,6 +353,7 @@ viewAddLabelToExistingNamespace namespace model =
                 [ Form.label [] [ text "Value" ]
                 , Input.text [ Input.placeholder "Label value", Input.value model.value, Input.onInput (UpdateLabelValueForExistingNamespace namespace) ]
                 ]
+            , Form.col [ Col.sm1, Col.bottomSm  ] [ viewLabelAsLink model.value ]
             , Form.col [ Col.bottomSm ]
                 [ ButtonGroup.buttonGroup []
                     [ ButtonGroup.button [ Button.secondary, Button.onClick (CancelAddingLabelToExistingNamespace namespace), Button.attrs [ type_ "button" ] ] [ text "Cancel" ]
@@ -362,7 +371,9 @@ viewLabel namespace model =
         Form.row []
             [ Form.colLabel [] [ text model.name ]
             , Form.col []
-                [ Input.text [ Input.disabled True, Input.value model.value ] ]
+                [ Input.text [ Input.disabled True, Input.value model.value ]
+                ]
+            , Form.col [ Col.sm1 ] [ viewLabelAsLink model.value ]
             , Form.col [ Col.bottomSm ]
                 [ Button.button [ Button.secondary, Button.onClick (RemoveLabelFromNamespace namespace model.id) ] [ text "X" ] ]
             ]
@@ -370,17 +381,20 @@ viewLabel namespace model =
 
 viewTemplateButton model =
     case model of
-        RemoteData.Success { state, namespaces} ->
-            Dropdown.dropdown
-                state
-                { options = [ ]
-                , toggleMsg = DropdownMsg
-                , toggleButton =
-                    Dropdown.toggle [ Button.primary ] [ text "Add from Template" ]
-                , items =
-                    namespaces
-                    |> List.map (\n ->  Dropdown.buttonItem [ onClick (StartAddingNamespaceFromTemplate n), n.description |> Maybe.withDefault "Add from Template" |> title  ] [ text n.name ])
-                }
+        RemoteData.Success { state, namespaces } ->
+            if not( List.isEmpty namespaces) then
+                Dropdown.dropdown
+                    state
+                    { options = [ ]
+                    , toggleMsg = DropdownMsg
+                    , toggleButton =
+                        Dropdown.toggle [ Button.secondary ] [ text "Add Namespace from Template" ]
+                    , items =
+                        namespaces
+                        |> List.map (\n ->  Dropdown.buttonItem [ onClick (StartAddingNamespaceFromTemplate n), n.description |> Maybe.withDefault "Add from Template" |> title  ] [ text n.name ])
+                    }
+            else
+                text ""
         _ -> text ""
 
 
@@ -393,30 +407,29 @@ viewNamespace { namespace, addLabel } =
         , blocks =
             [ Accordion.block []
                 (namespace.labels |> List.map (viewLabel namespace.id))
-            , Accordion.block []
-                (case addLabel of
+            , Accordion.block [] 
+                ( case addLabel of
                     Just label ->
                         [ Block.custom <| viewAddLabelToExistingNamespace namespace.id label ]
-
                     Nothing ->
                         []
                 )
             , Accordion.block []
-                [ Block.custom <|
-                    Grid.row []
-                        [ Grid.col []
-                            [ Button.button
-                                [ Button.primary, Button.onClick (AddingLabelToExistingNamespace namespace.id) ]
-                                [ text "Add Label" ]
+                    [ Block.custom <|
+                        Grid.row []
+                            [ Grid.col []
+                                [ Button.button
+                                    [ Button.primary, Button.onClick (AddingLabelToExistingNamespace namespace.id) ]
+                                    [ text "Add Label" ]
+                                ]
+                            , Grid.col [ Col.textAlign Text.alignSmRight ]
+                                [ Button.button
+                                    [ Button.secondary, Button.onClick (RemoveNamespace namespace.id), Button.attrs [ class "align-sm-right" ] ]
+                                    [ text "Remove Namespace" ]
+                                ]
                             ]
-                        , Grid.col [ Col.textAlign Text.alignSmRight ]
-                            [ Button.button
-                                [ Button.secondary, Button.onClick (RemoveNamespace namespace.id), Button.attrs [ class "align-sm-right" ] ]
-                                [ text "Remove Namespace" ]
-                            ]
-                        ]
-                ]
-            ]
+                    ]
+                ]            
         }
 
 
@@ -425,6 +438,7 @@ view model =
     Card.config [ Card.attrs [ class "mb-3", class "shadow" ] ]
         |> Card.block []
             [ Block.titleH4 [] [ text "Namespaces" ]
+            , Block.text [] [ text "Use namespaces with labels to add semi-structured information about the bounded context."]
             ]
         |> Card.block []
             (case model.namespaces of
@@ -446,12 +460,12 @@ view model =
             [ case model.newNamespace of
                 Nothing ->
                     div [ class "btn-group"]
-                        [ viewTemplateButton model.templates
-                        , Button.button
+                        [ Button.button
                             [ Button.primary
                             , Button.onClick StartAddingNamespace
                             ]
                             [ text "Add a new Namespace" ]
+                        , viewTemplateButton model.templates
                         ]
                 Just newNamespace ->
                     viewNewNamespace newNamespace
@@ -480,6 +494,7 @@ viewAddLabel index model =
                     [ Form.label [] [ text "Value" ]
                     , Input.text [ Input.placeholder "Label value", Input.value model.value, Input.onInput (UpdateLabelValue index) ]
                     ]
+                , Form.col [ Col.sm1, Col.bottomSm  ] [ viewLabelAsLink model.value ]
                 , Form.col [ Col.bottomSm ]
                     [ Button.button [ Button.roleLink, Button.onClick (RemoveLabel index), Button.attrs [ type_ "button" ] ] [ text "X" ] ]
                 ]
@@ -500,6 +515,7 @@ viewAddLabel index model =
                         , Input.onInput (UpdateLabelValue index)
                         ]
                     ]
+                , Form.col [ Col.sm1, Col.topSm  ] [ viewLabelAsLink model.value ]
                 , Form.col [ Col.topSm ]
                     [ Button.button [ Button.roleLink, Button.onClick (RemoveLabel index), Button.attrs [ type_ "button" ] ] [ text "X" ] ]
                 ]

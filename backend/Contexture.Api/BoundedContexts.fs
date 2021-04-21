@@ -25,8 +25,7 @@ module BoundedContexts =
               UbiquitousLanguage: Map<string, UbiquitousLanguageTerm>
               Messages: Messages
               DomainRoles: DomainRole list
-              TechnicalDescription: TechnicalDescription option
-              Domain: Domain option
+              Domain: Domain
               Namespaces: Namespace list }
 
         let convertBoundedContextWithDomain (findDomain: DomainId -> Domain option) (findNamespaces: BoundedContextId -> Namespace list ) (boundedContext: BoundedContext) =
@@ -40,8 +39,7 @@ module BoundedContexts =
               UbiquitousLanguage = boundedContext.UbiquitousLanguage
               Messages = boundedContext.Messages
               DomainRoles = boundedContext.DomainRoles
-              TechnicalDescription = boundedContext.TechnicalDescription
-              Domain = boundedContext.DomainId |> findDomain
+              Domain = boundedContext.DomainId |> findDomain |> Option.get
               Namespaces = boundedContext.Id |> findNamespaces }
 
     module CommandEndpoints =
@@ -62,9 +60,6 @@ module BoundedContexts =
                         return! RequestErrors.BAD_REQUEST "Name must not be empty" next ctx
                     | Error e -> return! ServerErrors.INTERNAL_ERROR e next ctx
                 }
-
-        let technical contextId (command: UpdateTechnicalInformation) =
-            updateAndReturnBoundedContext (UpdateTechnicalInformation(contextId, command))
 
         let rename contextId (command: RenameBoundedContext) =
             updateAndReturnBoundedContext (RenameBoundedContext(contextId, command))
@@ -138,9 +133,6 @@ module BoundedContexts =
             (choose [ subRoutef "/%O" (fun contextId ->
                           (choose [ Namespaces.routesForBoundedContext contextId
                                     GET >=> QueryEndpoints.getBoundedContext contextId
-                                    POST
-                                    >=> route "/technical"
-                                    >=> bindJson (CommandEndpoints.technical contextId)
                                     POST
                                     >=> route "/rename"
                                     >=> bindJson (CommandEndpoints.rename contextId)

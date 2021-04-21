@@ -28,7 +28,6 @@ module Domains =
               UbiquitousLanguage: Map<string, UbiquitousLanguageTerm>
               Messages: Messages
               DomainRoles: DomainRole list
-              TechnicalDescription: TechnicalDescription option
               Namespaces: Namespace list }
 
         type DomainResult =
@@ -52,7 +51,6 @@ module Domains =
               UbiquitousLanguage = boundedContext.UbiquitousLanguage
               Messages = boundedContext.Messages
               DomainRoles = boundedContext.DomainRoles
-              TechnicalDescription = boundedContext.TechnicalDescription
               Namespaces = boundedContext.Id |> findNamespaces }
 
         let convertDomain (domain: Domain) =
