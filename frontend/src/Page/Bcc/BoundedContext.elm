@@ -117,11 +117,6 @@ init config domain items collaborations =
 type Msg
     = NoOp
 
-
-urlAsLinkItem caption canBeLink =
-  canBeLink
-  |> Maybe.map (\value -> Block.link [ href <| Url.toString value, target "_blank" ] [ text caption] )
-
 viewLabelAsBadge label =
   let
     caption = label.name ++ " | " ++ label.value
@@ -200,19 +195,6 @@ viewItem communication { context, canvas, technical, namespaces } =
             |> viewPillMessage "Outbound Communication"
         )
 
-    technicalLinks =
-        ( [ urlAsLinkItem "Issue Tracker" technical.tools.issueTracker
-          , urlAsLinkItem "Wiki" technical.tools.wiki
-          , urlAsLinkItem "Repository" technical.tools.repository
-          ]
-
-          |> List.concatMap (\val ->
-              case val of
-                Just e -> [ e ]
-                Nothing -> [ ]
-            )
-        )
-
     namespaceBlocks =
       namespaces
       |> List.map (\namespace ->
@@ -249,11 +231,6 @@ viewItem communication { context, canvas, technical, namespaces } =
         if List.isEmpty namespaceBlocks
         then t
         else t |> Card.listGroup namespaceBlocks
-    )
-    |> (\t ->
-        if List.isEmpty technicalLinks
-        then t
-        else t |> Card.block [] technicalLinks
     )
     |> Card.footer []
       [ Grid.simpleRow

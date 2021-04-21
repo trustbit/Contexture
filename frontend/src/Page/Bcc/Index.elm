@@ -306,9 +306,6 @@ viewPillMessage caption value =
   ]
   else []
 
-urlAsLinkItem caption canBeLink =
-  canBeLink
-  |> Maybe.map (\value -> Block.link [ href <| Url.toString value, target "_blank" ] [ text caption] )
 
 viewLabelAsBadge label =
   let
@@ -327,6 +324,7 @@ viewLabelAsBadge label =
           Nothing ->
             text caption
       ]
+
 
 viewItem : RemoteData.WebData Communication -> Item -> Card.Config Msg
 viewItem communication { context, canvas, technical, namespaces } =
@@ -382,20 +380,6 @@ viewItem communication { context, canvas, technical, namespaces } =
         _ ->
           [ text "Loading communication information"]
 
-    technicalLinks =
-      ( [ urlAsLinkItem "Issue Tracker" technical.tools.issueTracker
-        , urlAsLinkItem "Wiki" technical.tools.wiki
-        , urlAsLinkItem "Repository" technical.tools.repository
-        ]
-
-        |> List.concatMap (\val ->
-            case val of
-              Just e -> [ e ]
-              Nothing -> [ ]
-          )
-      )
-
-
     namespaceBlocks =
       namespaces
       |> List.map (\namespace ->
@@ -432,11 +416,6 @@ viewItem communication { context, canvas, technical, namespaces } =
         if List.isEmpty namespaceBlocks
         then t
         else t |> Card.listGroup namespaceBlocks
-    )
-    |> (\t ->
-        if List.isEmpty technicalLinks
-        then t
-        else t |> Card.block [] technicalLinks
     )
     |> Card.footer []
       [ Grid.simpleRow
