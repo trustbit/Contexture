@@ -44,7 +44,7 @@ let webApp hostFrontend =
                 GET >=> route "/all" >=> allRoute
             ])
         Search.routes
-        GET >=> routef "/boundedContext/%O/technical" Namespaces.index
+        GET >=> routef "/boundedContext/%O/namespaces" Namespaces.index
         hostFrontend
         setStatusCode 404 >=> text "Not Found" ]
 

@@ -252,12 +252,12 @@ viewItem communication { context, canvas, namespaces } =
                 [ href
                   ( context
                     |> BoundedContext.id
-                    |> Route.TechnicalDescription
+                    |> Route.Namespaces
                     |> Route.routeToString
                   )
                 ]
               ]
-              [ text "Technical Description" ]
+              [ text "Namespaces" ]
             ]
           ]
         ]

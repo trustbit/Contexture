@@ -381,17 +381,20 @@ viewLabel namespace model =
 
 viewTemplateButton model =
     case model of
-        RemoteData.Success { state, namespaces} ->
-            Dropdown.dropdown
-                state
-                { options = [ ]
-                , toggleMsg = DropdownMsg
-                , toggleButton =
-                    Dropdown.toggle [ Button.secondary ] [ text "Add Namespace from Template" ]
-                , items =
-                    namespaces
-                    |> List.map (\n ->  Dropdown.buttonItem [ onClick (StartAddingNamespaceFromTemplate n), n.description |> Maybe.withDefault "Add from Template" |> title  ] [ text n.name ])
-                }
+        RemoteData.Success { state, namespaces } ->
+            if not( List.isEmpty namespaces) then
+                Dropdown.dropdown
+                    state
+                    { options = [ ]
+                    , toggleMsg = DropdownMsg
+                    , toggleButton =
+                        Dropdown.toggle [ Button.secondary ] [ text "Add Namespace from Template" ]
+                    , items =
+                        namespaces
+                        |> List.map (\n ->  Dropdown.buttonItem [ onClick (StartAddingNamespaceFromTemplate n), n.description |> Maybe.withDefault "Add from Template" |> title  ] [ text n.name ])
+                    }
+            else
+                text ""
         _ -> text ""
 
 
@@ -435,7 +438,7 @@ view model =
     Card.config [ Card.attrs [ class "mb-3", class "shadow" ] ]
         |> Card.block []
             [ Block.titleH4 [] [ text "Namespaces" ]
-            , Block.text [] [ text "Add semi-structured information about the bounded context."]
+            , Block.text [] [ text "Use namespaces with labels to add semi-structured information about the bounded context."]
             ]
         |> Card.block []
             (case model.namespaces of

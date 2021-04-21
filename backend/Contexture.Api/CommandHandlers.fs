@@ -145,9 +145,7 @@ module FileBasedCommandHandlers =
                         UbiquitousLanguage = collaboration.UbiquitousLanguage
                         BusinessDecisions = collaboration.BusinessDecisions
                         Key = collaboration.Key
-                        Name = collaboration.Name
-                        TechnicalDescription = collaboration.TechnicalDescription
-                         }
+                        Name = collaboration.Name }
             }
             |> List.singleton
 

@@ -61,9 +61,6 @@ module BoundedContexts =
                     | Error e -> return! ServerErrors.INTERNAL_ERROR e next ctx
                 }
 
-        let technical contextId (command: UpdateTechnicalInformation) =
-            updateAndReturnBoundedContext (UpdateTechnicalInformation(contextId, command))
-
         let rename contextId (command: RenameBoundedContext) =
             updateAndReturnBoundedContext (RenameBoundedContext(contextId, command))
 
@@ -136,9 +133,6 @@ module BoundedContexts =
             (choose [ subRoutef "/%O" (fun contextId ->
                           (choose [ Namespaces.routesForBoundedContext contextId
                                     GET >=> QueryEndpoints.getBoundedContext contextId
-                                    POST
-                                    >=> route "/technical"
-                                    >=> bindJson (CommandEndpoints.technical contextId)
                                     POST
                                     >=> route "/rename"
                                     >=> bindJson (CommandEndpoints.rename contextId)

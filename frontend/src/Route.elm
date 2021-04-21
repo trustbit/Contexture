@@ -12,7 +12,7 @@ type Route
     | Home
     | Domain DomainId
     | BoundedContextCanvas BoundedContextId
-    | TechnicalDescription BoundedContextId
+    | Namespaces BoundedContextId
 
 parseUrl : Url -> Route
 parseUrl url =
@@ -51,5 +51,5 @@ routeToString route =
             "/domain/" ++ Domain.idToString id
         BoundedContextCanvas contextId ->
             "/boundedContext/" ++ BoundedContext.idToString contextId ++ "/canvas"
-        TechnicalDescription contextId ->
-            "/boundedContext/" ++ BoundedContext.idToString contextId ++ "/technical"
+        Namespaces contextId ->
+            "/boundedContext/" ++ BoundedContext.idToString contextId ++ "/namespaces"
