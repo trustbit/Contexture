@@ -44,7 +44,6 @@ import Domain.DomainId exposing (DomainId)
 import BoundedContext as BoundedContext exposing (BoundedContext)
 import BoundedContext.BoundedContextId as BoundedContextId exposing (BoundedContextId)
 import BoundedContext.Canvas exposing (BoundedContextCanvas)
-import BoundedContext.Technical exposing (TechnicalDescription)
 import BoundedContext.StrategicClassification as StrategicClassification
 import ContextMapping.Collaboration as Collaboration
 import ContextMapping.Collaborator as Collaborator
@@ -54,7 +53,6 @@ import List
 type alias Item =
   { context : BoundedContext
   , canvas : BoundedContextCanvas
-  , technical : TechnicalDescription
   , namespaces : List Namespace
   }
 
@@ -148,7 +146,7 @@ viewPillMessage caption value =
 
 
 viewItem : Communication -> Item -> Card.Config Msg
-viewItem communication { context, canvas, technical, namespaces } =
+viewItem communication { context, canvas, namespaces } =
   let
     domainBadge =
       case canvas.classification.domain |> Maybe.map StrategicClassification.domainDescription of

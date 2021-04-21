@@ -14,7 +14,7 @@ type Asset =
 type ResolveAsset = Asset -> XmlNode
 
 module Asset =
-    open Microsoft.Extensions.Hosting
+    
     let js file = JavaScript [ "js"; file ]
     let css file = Stylesheet [ "css"; file ]
 
@@ -29,13 +29,17 @@ module Asset =
     let resolveAsset resolvePath asset =
         match asset with
         | Stylesheet path -> stylesheet (resolvePath path)
-        | JavaScript path -> javascript (resolvePath path)
+        | JavaScript path -> javascript (resolvePath path) 
 
-    let resolveBase (environment: IHostEnvironment) =
+module BasePaths =
+    open Microsoft.Extensions.Hosting
+    type BasePath =  { AssetBase: string ; ApiBase: string }
+    
+    let resolve (environment: IHostEnvironment) =
         if environment.IsDevelopment() then
-            "http://localhost:8000"
+            { AssetBase = "http://localhost:8000"; ApiBase = "http://localhost:5000" }
         else
-            ""
+            { AssetBase = ""; ApiBase = "" }
 
 module Layout =
     let headTemplate resolveAsset =
@@ -88,12 +92,12 @@ module Layout =
 
     let documentTemplate (head: XmlNode) (body: XmlNode) = html [] [ head; body ]
 
-    let initElm name node flags =
+    let initElm (serializeFlags: 'flag -> string) name node (flags: 'flag) =
         script [] [
             rawText
                 $"
 var app = Elm.%s{name}.init({{
     node: document.getElementById('%s{node}'),
-    flags: %s{flags}
+    flags: %s{serializeFlags flags}
 }}); "
         ]

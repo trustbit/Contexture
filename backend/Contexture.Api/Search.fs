@@ -23,22 +23,22 @@ module Search =
         open Layout
         open Giraffe.ViewEngine
         
-        let index resolveAssets flags =
+        let index jsonEncoder resolveAssets flags =
             let searchSnipped =
                 div [] [
                     div [ _id "search" ] []
-                    initElm "Components.Search" "search" flags
+                    initElm jsonEncoder "Components.Search" "search" flags
                 ]
 
             documentTemplate (headTemplate resolveAssets) (bodyTemplate searchSnipped)
 
     let indexHandler: HttpHandler =
         fun (next: HttpFunc) (ctx: HttpContext) ->
-            let baseUrl =
+            let basePath =
                 ctx.GetService<IHostEnvironment>()
-                |> Asset.resolveBase
+                |> BasePaths.resolve
 
-            let pathResolver = Asset.resolvePath baseUrl
+            let pathResolver = Asset.resolvePath basePath.AssetBase
             let assetsResolver = Asset.resolveAsset pathResolver
 
             let eventStore = ctx.GetService<EventStore>()
@@ -66,11 +66,11 @@ module Search =
             let result =
                 {| Collaboration = collaborations
                    Domains = domainResult
-                   ApiBase = baseUrl |> fun b -> b + "/api" |}
+                   ApiBase = basePath.ApiBase + "/api" |}
 
             let jsonEncoder = ctx.GetJsonSerializer()
 
-            htmlView (Views.index assetsResolver (jsonEncoder.SerializeToString result)) next ctx
+            htmlView (Views.index jsonEncoder.SerializeToString assetsResolver result) next ctx
 
     let routes: HttpHandler =
         subRoute "/search" (choose [ GET >=> indexHandler ])

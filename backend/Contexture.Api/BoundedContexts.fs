@@ -25,8 +25,7 @@ module BoundedContexts =
               UbiquitousLanguage: Map<string, UbiquitousLanguageTerm>
               Messages: Messages
               DomainRoles: DomainRole list
-              TechnicalDescription: TechnicalDescription option
-              Domain: Domain option
+              Domain: Domain
               Namespaces: Namespace list }
 
         let convertBoundedContextWithDomain (findDomain: DomainId -> Domain option) (findNamespaces: BoundedContextId -> Namespace list ) (boundedContext: BoundedContext) =
@@ -40,8 +39,7 @@ module BoundedContexts =
               UbiquitousLanguage = boundedContext.UbiquitousLanguage
               Messages = boundedContext.Messages
               DomainRoles = boundedContext.DomainRoles
-              TechnicalDescription = boundedContext.TechnicalDescription
-              Domain = boundedContext.DomainId |> findDomain
+              Domain = boundedContext.DomainId |> findDomain |> Option.get
               Namespaces = boundedContext.Id |> findNamespaces }
 
     module CommandEndpoints =

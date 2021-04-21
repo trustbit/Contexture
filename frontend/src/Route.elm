@@ -6,7 +6,6 @@ import Url.Parser exposing (..)
 
 import Domain.DomainId as Domain exposing (DomainId)
 import BoundedContext.BoundedContextId as BoundedContext exposing (BoundedContextId)
-import BoundedContext.Technical exposing (TechnicalDescription)
 
 type Route
     = NotFound
@@ -29,7 +28,6 @@ matchRoute =
         [ map Home top
         , map Domain (s "domain" </> Domain.idParser)
         , map BoundedContextCanvas (s "boundedContext" </> BoundedContext.idParser </> s "canvas")
-        , map TechnicalDescription (s "boundedContext" </> BoundedContext.idParser </> s "technical")
         ]
 
 pushUrl : Route -> Nav.Key -> Cmd msg

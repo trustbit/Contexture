@@ -387,7 +387,7 @@ viewTemplateButton model =
                 { options = [ ]
                 , toggleMsg = DropdownMsg
                 , toggleButton =
-                    Dropdown.toggle [ Button.primary ] [ text "Add from Template" ]
+                    Dropdown.toggle [ Button.secondary ] [ text "Add Namespace from Template" ]
                 , items =
                     namespaces
                     |> List.map (\n ->  Dropdown.buttonItem [ onClick (StartAddingNamespaceFromTemplate n), n.description |> Maybe.withDefault "Add from Template" |> title  ] [ text n.name ])
@@ -404,30 +404,29 @@ viewNamespace { namespace, addLabel } =
         , blocks =
             [ Accordion.block []
                 (namespace.labels |> List.map (viewLabel namespace.id))
-            , Accordion.block []
-                (case addLabel of
+            , Accordion.block [] 
+                ( case addLabel of
                     Just label ->
                         [ Block.custom <| viewAddLabelToExistingNamespace namespace.id label ]
-
                     Nothing ->
                         []
                 )
             , Accordion.block []
-                [ Block.custom <|
-                    Grid.row []
-                        [ Grid.col []
-                            [ Button.button
-                                [ Button.primary, Button.onClick (AddingLabelToExistingNamespace namespace.id) ]
-                                [ text "Add Label" ]
+                    [ Block.custom <|
+                        Grid.row []
+                            [ Grid.col []
+                                [ Button.button
+                                    [ Button.primary, Button.onClick (AddingLabelToExistingNamespace namespace.id) ]
+                                    [ text "Add Label" ]
+                                ]
+                            , Grid.col [ Col.textAlign Text.alignSmRight ]
+                                [ Button.button
+                                    [ Button.secondary, Button.onClick (RemoveNamespace namespace.id), Button.attrs [ class "align-sm-right" ] ]
+                                    [ text "Remove Namespace" ]
+                                ]
                             ]
-                        , Grid.col [ Col.textAlign Text.alignSmRight ]
-                            [ Button.button
-                                [ Button.secondary, Button.onClick (RemoveNamespace namespace.id), Button.attrs [ class "align-sm-right" ] ]
-                                [ text "Remove Namespace" ]
-                            ]
-                        ]
-                ]
-            ]
+                    ]
+                ]            
         }
 
 
@@ -436,6 +435,7 @@ view model =
     Card.config [ Card.attrs [ class "mb-3", class "shadow" ] ]
         |> Card.block []
             [ Block.titleH4 [] [ text "Namespaces" ]
+            , Block.text [] [ text "Add semi-structured information about the bounded context."]
             ]
         |> Card.block []
             (case model.namespaces of
@@ -457,12 +457,12 @@ view model =
             [ case model.newNamespace of
                 Nothing ->
                     div [ class "btn-group"]
-                        [ viewTemplateButton model.templates
-                        , Button.button
+                        [ Button.button
                             [ Button.primary
                             , Button.onClick StartAddingNamespace
                             ]
                             [ text "Add a new Namespace" ]
+                        , viewTemplateButton model.templates
                         ]
                 Just newNamespace ->
                     viewNewNamespace newNamespace

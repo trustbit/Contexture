@@ -45,7 +45,6 @@ import Domain.DomainId exposing (DomainId)
 import BoundedContext as BoundedContext exposing (BoundedContext)
 import BoundedContext.BoundedContextId as BoundedContextId exposing (BoundedContextId)
 import BoundedContext.Canvas exposing (BoundedContextCanvas)
-import BoundedContext.Technical exposing (TechnicalDescription)
 import BoundedContext.StrategicClassification as StrategicClassification
 import ContextMapping.Collaboration as Collaboration
 import ContextMapping.Collaborator as Collaborator
@@ -57,7 +56,6 @@ import List
 type alias Item =
   { context : BoundedContext
   , canvas : BoundedContextCanvas
-  , technical : TechnicalDescription
   , namespaces : List Namespace
   }
 
@@ -327,7 +325,7 @@ viewLabelAsBadge label =
 
 
 viewItem : RemoteData.WebData Communication -> Item -> Card.Config Msg
-viewItem communication { context, canvas, technical, namespaces } =
+viewItem communication { context, canvas, namespaces } =
   let
     domainBadge =
       case canvas.classification.domain |> Maybe.map StrategicClassification.domainDescription of
@@ -604,7 +602,6 @@ loadAll config domain =
       Decode.succeed Item
       |> JP.custom BoundedContext.modelDecoder
       |> JP.custom BoundedContext.Canvas.modelDecoder
-      |> JP.optionalAt [ "technicalDescription" ] BoundedContext.Technical.modelDecoder BoundedContext.Technical.noTechnicalDescription
       |> JP.optionalAt [ "namespaces" ] (Decode.list Namespace.namespaceDecoder) []
   in Http.get
     { url = Api.boundedContexts domain |> Api.url config
