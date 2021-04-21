@@ -1051,7 +1051,7 @@ module Aggregates =
                           Placeholder = trim placeholder
                         }
 
-        let addNewTemplate name description (labels: AddTemplateLabel list) (Templates templates) =
+        let addNewTemplate id name description (labels: AddTemplateLabel list) (Templates templates) =
             if templates
                |> Map.exists (fun _ name -> name = name) then
                 Error NamespaceNameNotUnique
@@ -1062,7 +1062,7 @@ module Aggregates =
 
                 let newNamespace =
                     NamespaceTemplateAdded
-                        { NamespaceTemplateId = Guid.NewGuid()
+                        { NamespaceTemplateId = id
                           Name = name
                           Description = description
                           Labels = newLabels }
@@ -1092,7 +1092,7 @@ module Aggregates =
         let handle (state: State) (command: Command) =
             match command with
             | NewNamespaceTemplate (id, cmd) ->
-                addNewTemplate cmd.Name cmd.Description cmd.Labels state
+                addNewTemplate id cmd.Name cmd.Description cmd.Labels state
             | RemoveTemplate (id) ->
                 Ok
                 <| NamespaceTemplateRemoved { NamespaceTemplateId = id }

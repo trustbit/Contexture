@@ -36,7 +36,7 @@ The Contexture server implements a simple storage backend that exposes a file sy
 ### Run the backend
 
 Contexture server will listen on port `5000` per default and use `data/db.json` as default database file.
-If you want to have the server listening on any other port, set the environment variable `ASPNETCORE_URLS=http://*:8080` to the desired port. 
+If you want to have the server listening on any other port, set the environment variable `ASPNETCORE_URLS=http://*:8080` to the desired port.
 To choose a different database file configure the `DatabasePath` configuration via an environment variable.
 Note: you might need to exclude launch-profiles on start via `--no-launch-profile`.
 
@@ -62,6 +62,33 @@ ASPNETCORE_URLS=http://*:8080 DATABASEPATH=data/mydb.json dotnet Contexture.Api.
 
 - `cors` is configured to allow all origins
 - no logging built in
+- no UI for Namespace-template administration.
+  Use the following `curl` commands to manage templates:
+    - get templates
+
+        curl http://localhost:5000/api/namespaces/templates
+
+    - create a template
+
+        curl -X POST \
+            -H "Content-Type: application/json" \
+            -d '{ "name":"barfoo", "description":"my awesome namespace", "labels": [ { "name": "first label", "description":"some description", "placeholder": "some placeholder value"}]}' \
+            http://localhost:5000/api/namespaces/templates
+
+    - add a label template to an existing namespace
+
+        curl -X POST \
+            -H "Content-Type: application/json" \
+            -d '{ "name":"barfoo", "description":"some description", "placeholder": "some placeholder value"}' \
+            http://localhost:5000/api/namespaces/templates/<template-id>
+
+    - delete a label from a template
+
+        curl -X DELETE http://localhost:5000/api/namespaces/templates/<template-id>/labels/<label-id>
+
+    - delete a namespace
+
+        curl -X DELETE http://localhost:5000/api/namespaces/templates/<template-id>
 
 ## Contexture frontend application
 
