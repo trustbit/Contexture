@@ -157,15 +157,60 @@ module Namespaces =
 
                 json namespaces next ctx
 
+    module Templates =
+        module CommandEndpoints =
+            open System
+            open NamespaceTemplate
+            open FileBasedCommandHandlers
 
-        let getAllTemplates =
-            fun (next: HttpFunc) (ctx: HttpContext) ->
-                let database = ctx.GetService<EventStore>()
+            let clock = fun () -> DateTime.UtcNow
 
-                let namespaces =
-                    ReadModels.Templates.allTemplates database
+            let private updateAndReturnTemplate command =
+                fun (next: HttpFunc) (ctx: HttpContext) ->
+                    task {
+                        let database = ctx.GetService<EventStore>()
 
-                json namespaces next ctx
+                        match NamespaceTemplate.handle clock database command with
+                        | Ok updatedTemplate ->
+                            return! redirectTo false (sprintf "/api/namespaces/templates/%O" updatedTemplate) next ctx
+                        | Error (DomainError error) ->
+                            return! RequestErrors.BAD_REQUEST(sprintf "Template Error %A" error) next ctx
+                        | Error e -> return! ServerErrors.INTERNAL_ERROR e next ctx
+                    }
+
+            let newTemplate (command: NamespaceDefinition) =
+                updateAndReturnTemplate (NewNamespaceTemplate(Guid.NewGuid(), command))
+
+            let removeTemplate (command: NamespaceTemplateId) =
+                updateAndReturnTemplate (RemoveTemplate(command))
+
+            let removeLabel templateId labelId =
+                updateAndReturnTemplate (RemoveTemplateLabel(templateId, { Label = labelId }))
+
+            let newLabel templateId (command: AddTemplateLabel) =
+                updateAndReturnTemplate (AddTemplateLabel(templateId, command))
+
+        module QueryEndpoints =
+            let getAllTemplates =
+                fun (next: HttpFunc) (ctx: HttpContext) ->
+                    let database = ctx.GetService<EventStore>()
+
+                    let namespaces =
+                        ReadModels.Templates.allTemplates database
+
+                    json namespaces next ctx
+
+            let getTemplate templateId =
+                fun (next: HttpFunc) (ctx: HttpContext) ->
+                    let database = ctx.GetService<EventStore>()
+
+                    let template =
+                        templateId
+                        |> ReadModels.Templates.buildTemplate database
+                        |> Option.map json
+                        |> Option.defaultValue (RequestErrors.NOT_FOUND(sprintf "template %O not found" templateId))
+
+                    template next ctx
 
 
     module Views =
@@ -264,9 +309,22 @@ module Namespaces =
             "/namespaces"
             (choose [ subRoute
                           "/templates"
-                          (choose [ GET >=> QueryEndpoints.getAllTemplates
-
-                                     ])
+                          (choose [ subRoutef
+                                        "/%O"
+                                        (fun templateId ->
+                                            choose [ DELETE
+                                                     >=> routef
+                                                             "/labels/%O"
+                                                             (Templates.CommandEndpoints.removeLabel templateId)
+                                                     POST
+                                                     >=> bindModel None (Templates.CommandEndpoints.newLabel templateId)
+                                                     GET
+                                                     >=> Templates.QueryEndpoints.getTemplate templateId
+                                                     DELETE
+                                                     >=> Templates.CommandEndpoints.removeTemplate templateId ])
+                                    GET >=> Templates.QueryEndpoints.getAllTemplates
+                                    POST
+                                    >=> bindModel None Templates.CommandEndpoints.newTemplate ])
                       GET
                       >=> routef "/boundedContextsWithLabel/%s/%s" QueryEndpoints.getBoundedContextsWithLabel
                       GET
