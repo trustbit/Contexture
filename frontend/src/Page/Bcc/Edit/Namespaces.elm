@@ -38,6 +38,7 @@ import Json.Decode.Pipeline as JP
 import Json.Encode as Encode
 import RemoteData exposing (RemoteData)
 import Set
+import Url
 
 
 type alias NewLabel =
@@ -237,6 +238,7 @@ parseNamespaceName namespaces value =
 updateNamespaceName value parse namespace =
     { namespace | name = value, value = parse value }
 
+
 update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
     case msg of
@@ -323,6 +325,12 @@ update msg model =
         StartAddingNamespaceFromTemplate template ->
             ( { model | newNamespace = template |> initNewNamespaceFromTemplate (parseNamespaceName model.namespaces) |> Just }, Cmd.none)
 
+viewLabelAsLink value =
+    case Url.fromString value of
+        Just link ->
+           Button.linkButton [ Button.attrs [ link |> Url.toString |> href, target "_blank"], Button.small ] [ 0x0001F517 |>Char.fromCode  |>  String.fromChar |> Html.text]
+        Nothing ->
+            text ""
 
 
 viewAddLabelToExistingNamespace namespace model =
@@ -345,6 +353,7 @@ viewAddLabelToExistingNamespace namespace model =
                 [ Form.label [] [ text "Value" ]
                 , Input.text [ Input.placeholder "Label value", Input.value model.value, Input.onInput (UpdateLabelValueForExistingNamespace namespace) ]
                 ]
+            , Form.col [ Col.sm1, Col.bottomSm  ] [ viewLabelAsLink model.value ]
             , Form.col [ Col.bottomSm ]
                 [ ButtonGroup.buttonGroup []
                     [ ButtonGroup.button [ Button.secondary, Button.onClick (CancelAddingLabelToExistingNamespace namespace), Button.attrs [ type_ "button" ] ] [ text "Cancel" ]
@@ -362,7 +371,9 @@ viewLabel namespace model =
         Form.row []
             [ Form.colLabel [] [ text model.name ]
             , Form.col []
-                [ Input.text [ Input.disabled True, Input.value model.value ] ]
+                [ Input.text [ Input.disabled True, Input.value model.value ]
+                ]
+            , Form.col [ Col.sm1 ] [ viewLabelAsLink model.value ]
             , Form.col [ Col.bottomSm ]
                 [ Button.button [ Button.secondary, Button.onClick (RemoveLabelFromNamespace namespace model.id) ] [ text "X" ] ]
             ]
@@ -480,6 +491,7 @@ viewAddLabel index model =
                     [ Form.label [] [ text "Value" ]
                     , Input.text [ Input.placeholder "Label value", Input.value model.value, Input.onInput (UpdateLabelValue index) ]
                     ]
+                , Form.col [ Col.sm1, Col.bottomSm  ] [ viewLabelAsLink model.value ]
                 , Form.col [ Col.bottomSm ]
                     [ Button.button [ Button.roleLink, Button.onClick (RemoveLabel index), Button.attrs [ type_ "button" ] ] [ text "X" ] ]
                 ]
@@ -500,6 +512,7 @@ viewAddLabel index model =
                         , Input.onInput (UpdateLabelValue index)
                         ]
                     ]
+                , Form.col [ Col.sm1, Col.topSm  ] [ viewLabelAsLink model.value ]
                 , Form.col [ Col.topSm ]
                     [ Button.button [ Button.roleLink, Button.onClick (RemoveLabel index), Button.attrs [ type_ "button" ] ] [ text "X" ] ]
                 ]

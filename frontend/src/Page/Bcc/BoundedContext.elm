@@ -102,7 +102,7 @@ initCommunication connections =
             ) (Dict.empty, Dict.empty)
     in
        { initiators = bcInitiators, recipients = bcRecipients }
-       
+
 init : Api.Configuration -> Domain -> List Item -> Collaboration.Collaborations -> (Model, Cmd Msg)
 init config domain items collaborations =
   ( { contextItems = items
@@ -116,12 +116,29 @@ init config domain items collaborations =
 
 type Msg
     = NoOp
-    
+
 
 urlAsLinkItem caption canBeLink =
   canBeLink
   |> Maybe.map (\value -> Block.link [ href <| Url.toString value, target "_blank" ] [ text caption] )
 
+viewLabelAsBadge label =
+  let
+    caption = label.name ++ " | " ++ label.value
+  in
+    Badge.badgeInfo
+      [ Spacing.ml1
+      , title <| "The label '" ++ label.name ++ "' has the value '" ++ label.value ++ "'"
+      ]
+      [ case Url.fromString label.value of
+          Just link ->
+            Html.span []
+              [ text caption
+              , Html.a [ link |> Url.toString |> href, target "_blank", Spacing.ml1 ] [ 0x0001F517 |> Char.fromCode  |> String.fromChar |> Html.text ]
+              ]
+          Nothing ->
+            text caption
+      ]
 
 viewPillMessage : String -> Int -> List (Html msg)
 viewPillMessage caption value =
@@ -182,13 +199,13 @@ viewItem communication { context, canvas, technical, namespaces } =
             |> Maybe.withDefault 0
             |> viewPillMessage "Outbound Communication"
         )
-       
+
     technicalLinks =
         ( [ urlAsLinkItem "Issue Tracker" technical.tools.issueTracker
           , urlAsLinkItem "Wiki" technical.tools.wiki
           , urlAsLinkItem "Repository" technical.tools.repository
           ]
-          
+
           |> List.concatMap (\val ->
               case val of
                 Just e -> [ e ]
@@ -206,13 +223,7 @@ viewItem communication { context, canvas, technical, namespaces } =
             ]
           , div [] (
               namespace.labels
-              |> List.map(\label ->
-                Badge.badgeInfo
-                  [ Spacing.ml1
-                  , title <| "The label '" ++ label.name ++ "' has the value '" ++ label.value ++ "'"
-                  ]
-                  [ text <| label.name ++ ": " ++ label.value ]
-              )
+              |> List.map viewLabelAsBadge
             )
           ]
       )
@@ -239,7 +250,7 @@ viewItem communication { context, canvas, technical, namespaces } =
         then t
         else t |> Card.listGroup namespaceBlocks
     )
-    |> (\t -> 
+    |> (\t ->
         if List.isEmpty technicalLinks
         then t
         else t |> Card.block [] technicalLinks
@@ -276,7 +287,7 @@ viewItem communication { context, canvas, technical, namespaces } =
           ]
         ]
       ]
-      
+
 
 
 view : Model -> Html Msg
@@ -293,9 +304,9 @@ view { communication, contextItems, domain } =
         contextCount = contextItems |> List.length |> String.fromInt
     in
         Card.config []
-        |> Card.headerH5 [] 
+        |> Card.headerH5 []
             [ text <| "Bounded Contexts of '" ++ (domain |> Domain.name) ++ "' (" ++ contextCount ++ ")" ]
         |> Card.block []
             [ Block.custom cards ]
         |> Card.view
-        
+

@@ -499,5 +499,63 @@
       "relationship": null,
       "id": 12
     }
+  ],
+  "namespaceTemplates": [
+    {
+      "id": "fecc6764-6528-5345-92e2-41cc50fb1512",
+      "name": "Team",
+      "description": "Name the members of your team in different roles",
+      "template": [
+        {
+          "name": "Architect",
+          "description": "Responsible for designing solutions",
+          "placeholder": "A name like 'Karl Gustaf Maier'",
+          "id": "fecc6764-6528-5345-92e2-41cc50fb1513"
+        },
+        {
+          "name": "Tester",
+          "description": "The person who is assuring the quality of the solution",
+          "placeholder": "A name like 'Karl Friedrich Sattman'",
+          "id": "fecc6764-6528-5345-92e2-41cc50fb1514"
+        },
+        {
+          "name": "Coder",
+          "description": "Developing the solution",
+          "placeholder": "A name like 'Karl der Grosse'",
+          "id": "fecc6764-6528-5345-92e2-41cc50fb1515"
+        },
+        {
+          "name": "Product Owner",
+          "description": "Driving the direction of the solution",
+          "placeholder": "A name like 'Karoline Huber'",
+          "id": "fecc6764-6528-5345-92e2-41cc50fb1516"
+        }
+      ]
+    },
+    {
+      "id": "fecc6764-6528-5345-92e2-41cc50fb1517",
+      "name": "Lifecycle Tools",
+      "description": "List links to tools which manage the development effort and lifecycle",
+      "template": [
+        {
+          "name": "Issue Tracker",
+          "description": "A link to the issue tracker",
+          "placeholder": "http://issuetracker.mycompany.com",
+          "id": "fecc6764-6528-5345-92e2-41cc50fb1518"
+        },
+        {
+          "name": "Wiki",
+          "description": "A link to the wiki or documentation",
+          "placeholder": "http://wiki.mycompany.com",
+          "id": "fecc6764-6528-5345-92e2-41cc50fb1519"
+        },
+        {
+          "name": "Repository",
+          "description": "A link to the source code repository",
+          "placeholder": "http://code.mycompany.com",
+          "id": "fecc6764-6528-5345-92e2-41cc50fb1520"
+        }
+      ]
+    }
   ]
 }

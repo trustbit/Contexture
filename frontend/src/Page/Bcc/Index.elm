@@ -310,6 +310,24 @@ urlAsLinkItem caption canBeLink =
   canBeLink
   |> Maybe.map (\value -> Block.link [ href <| Url.toString value, target "_blank" ] [ text caption] )
 
+viewLabelAsBadge label =
+  let
+    caption = label.name ++ " | " ++ label.value
+  in
+    Badge.badgeInfo
+      [ Spacing.ml1
+      , title <| "The label '" ++ label.name ++ "' has the value '" ++ label.value ++ "'"
+      ]
+      [ case Url.fromString label.value of
+          Just link ->
+            Html.span []
+              [ text caption
+              , Html.a [ link |> Url.toString |> href, target "_blank", Spacing.ml1 ] [ 0x0001F517 |> Char.fromCode  |> String.fromChar |> Html.text ]
+              ]
+          Nothing ->
+            text caption
+      ]
+
 viewItem : RemoteData.WebData Communication -> Item -> Card.Config Msg
 viewItem communication { context, canvas, technical, namespaces } =
   let
@@ -369,7 +387,7 @@ viewItem communication { context, canvas, technical, namespaces } =
         , urlAsLinkItem "Wiki" technical.tools.wiki
         , urlAsLinkItem "Repository" technical.tools.repository
         ]
-        
+
         |> List.concatMap (\val ->
             case val of
               Just e -> [ e ]
@@ -388,13 +406,7 @@ viewItem communication { context, canvas, technical, namespaces } =
             ]
           , div [] (
               namespace.labels
-              |> List.map(\label ->
-                Badge.badgeInfo
-                  [ Spacing.ml1
-                  , title <| "The label '" ++ label.name ++ "' has the value '" ++ label.value ++ "'"
-                  ]
-                  [ text <| label.name ++ ": " ++ label.value ]
-              )
+              |> List.map viewLabelAsBadge
             )
           ]
       )
@@ -421,7 +433,7 @@ viewItem communication { context, canvas, technical, namespaces } =
         then t
         else t |> Card.listGroup namespaceBlocks
     )
-    |> (\t -> 
+    |> (\t ->
         if List.isEmpty technicalLinks
         then t
         else t |> Card.block [] technicalLinks
@@ -616,7 +628,7 @@ loadAll config domain =
       |> JP.optionalAt [ "technicalDescription" ] BoundedContext.Technical.modelDecoder BoundedContext.Technical.noTechnicalDescription
       |> JP.optionalAt [ "namespaces" ] (Decode.list Namespace.namespaceDecoder) []
   in Http.get
-    { url = Api.boundedContexts domain |> Api.url config 
+    { url = Api.boundedContexts domain |> Api.url config
     , expect = Http.expectJson Loaded (Decode.list decoder)
     }
 
@@ -624,7 +636,7 @@ loadAll config domain =
 loadAllConnections : Api.Configuration -> Cmd Msg
 loadAllConnections config =
   Http.get
-    { url = Api.collaborations |> Api.url config 
+    { url = Api.collaborations |> Api.url config
     , expect = Http.expectJson CommunicationLoaded (Decode.list Collaboration.decoder)
     }
 
@@ -633,7 +645,7 @@ findAllDomains base =
   let
     request toMsg =
       Http.get
-        { url = Api.domains [] |> Api.url base 
+        { url = Api.domains [] |> Api.url base
         , expect = Http.expectJson toMsg Domain.domainsDecoder
         }
   in
