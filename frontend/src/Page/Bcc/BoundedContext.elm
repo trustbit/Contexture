@@ -48,6 +48,9 @@ import BoundedContext.StrategicClassification as StrategicClassification
 import ContextMapping.Collaboration as Collaboration
 import ContextMapping.Collaborator as Collaborator
 import BoundedContext.Namespace as Namespace exposing (Namespace)
+
+import Page.Bcc.BoundedContextCard as BoundedContextCard
+
 import List
 
 type alias Item =
@@ -65,8 +68,7 @@ type alias Communication =
 type alias Model =
   { config : Api.Configuration
   , domain : Domain
-  , contextItems : List Item
-  , communication : Communication
+  , contextItems : List BoundedContextCard.Model
   }
 
 
@@ -79,17 +81,17 @@ initCommunication connections =
     let
         updateCollaborationLookup selectCollaborator dictionary collaboration =
             case selectCollaborator collaboration of
-            Collaborator.BoundedContext bcId ->
-                let
-                    items =
-                        dictionary
-                        |> dictBcGet bcId
-                        |> Maybe.withDefault []
-                        |> List.append (List.singleton collaboration)
-                in
-                    dictionary |> dictBcInsert bcId items
-            _ ->
-                dictionary
+              Collaborator.BoundedContext bcId ->
+                  let
+                      items =
+                          dictionary
+                          |> dictBcGet bcId
+                          |> Maybe.withDefault []
+                          |> List.append (List.singleton collaboration)
+                  in
+                      dictionary |> dictBcInsert bcId items
+              _ ->
+                  dictionary
 
         (bcInitiators, bcRecipients) =
             connections
@@ -103,175 +105,28 @@ initCommunication connections =
 
 init : Api.Configuration -> Domain -> List Item -> Collaboration.Collaborations -> (Model, Cmd Msg)
 init config domain items collaborations =
-  ( { contextItems = items
-    , config = config
-    , domain = domain
-    , communication = initCommunication collaborations
-    }
-  , Cmd.none
-  )
+  let
+    communication = initCommunication collaborations
+  in 
+    ( { contextItems = items |> List.map (BoundedContextCard.init communication)
+      , config = config
+      , domain = domain
+      }
+    , Cmd.none
+    )
 
 
 type Msg
     = NoOp
 
-viewLabelAsBadge label =
-  let
-    caption = label.name ++ " | " ++ label.value
-  in
-    Badge.badgeInfo
-      [ Spacing.ml1
-      , title <| "The label '" ++ label.name ++ "' has the value '" ++ label.value ++ "'"
-      ]
-      [ case Url.fromString label.value of
-          Just link ->
-            Html.span []
-              [ text caption
-              , Html.a [ link |> Url.toString |> href, target "_blank", Spacing.ml1 ] [ 0x0001F517 |> Char.fromCode  |> String.fromChar |> Html.text ]
-              ]
-          Nothing ->
-            text caption
-      ]
-
-viewPillMessage : String -> Int -> List (Html msg)
-viewPillMessage caption value =
-  if value > 0 then
-  [ Grid.simpleRow
-    [ Grid.col [] [text caption]
-    , Grid.col []
-      [ Badge.pillWarning [] [ text (value |> String.fromInt)] ]
-    ]
-  ]
-  else []
-
-
-viewItem : Communication -> Item -> Card.Config Msg
-viewItem communication { context, canvas, namespaces } =
-  let
-    domainBadge =
-      case canvas.classification.domain |> Maybe.map StrategicClassification.domainDescription of
-        Just domain -> [ Badge.badgePrimary [ title domain.description ] [ text domain.name ] ]
-        Nothing -> []
-    businessBadges =
-      canvas.classification.business
-      |> List.map StrategicClassification.businessDescription
-      |> List.map (\b -> Badge.badgeSecondary [ title b.description ] [ text b.name ])
-    evolutionBadge =
-      case canvas.classification.evolution |> Maybe.map StrategicClassification.evolutionDescription of
-        Just evolution -> [ Badge.badgeInfo [ title evolution.description ] [ text evolution.name ] ]
-        Nothing -> []
-    badges =
-      List.concat
-        [ domainBadge
-        , businessBadges
-        , evolutionBadge
-        ]
-
-    messages =
-      [ canvas.messages.commandsHandled, canvas.messages.eventsHandled, canvas.messages.queriesHandled ]
-      |> List.map Set.size
-      |> List.sum
-      |> viewPillMessage "Handled Messages"
-      |> List.append
-        ( [ canvas.messages.commandsSent, canvas.messages.eventsPublished, canvas.messages.queriesInvoked]
-          |> List.map Set.size
-          |> List.sum
-          |> viewPillMessage "Published Messages"
-        )
-
-    dependencies =
-        communication.initiators
-        |> dictBcGet (context |> BoundedContext.id)
-        |> Maybe.map (List.length)
-        |> Maybe.withDefault 0
-        |> viewPillMessage "Inbound Communication"
-        |> List.append
-        ( communication.recipients
-            |> dictBcGet (context |> BoundedContext.id)
-            |> Maybe.map (List.length)
-            |> Maybe.withDefault 0
-            |> viewPillMessage "Outbound Communication"
-        )
-
-    namespaceBlocks =
-      namespaces
-      |> List.map (\namespace ->
-        ListGroup.li []
-          [ Html.h6 []
-            [ text namespace.name
-            , Html.small [ class "text-muted"] [ text " Namespace" ]
-            ]
-          , div [] (
-              namespace.labels
-              |> List.map viewLabelAsBadge
-            )
-          ]
-      )
-
-  in
-  Card.config [ Card.attrs [ class "mb-3", class "shadow" ] ]
-    |> Card.block []
-      [ Block.titleH4 []
-        [ text (context |> BoundedContext.name)
-        , Html.small [ class "text-muted", class "float-right" ]
-          [ text (context |> BoundedContext.key |> Maybe.map Key.toString |> Maybe.withDefault "") ]
-        ]
-      , if String.length canvas.description > 0
-        then Block.text [ class "text-muted"] [ text canvas.description  ]
-        else Block.text [class "text-muted", class "text-center" ] [ Html.i [] [ text "No description :-(" ] ]
-      , Block.custom (div [] badges)
-      ]
-    |> Card.block []
-      [ Block.custom (div [] dependencies)
-      , Block.custom (div [] messages)
-      ]
-    |> (\t ->
-        if List.isEmpty namespaceBlocks
-        then t
-        else t |> Card.listGroup namespaceBlocks
-    )
-    |> Card.footer []
-      [ Grid.simpleRow
-        [ Grid.col [ Col.md7 ]
-          [ ButtonGroup.linkButtonGroup []
-            [ ButtonGroup.linkButton
-              [ Button.roleLink
-              , Button.attrs
-                [ href
-                  ( context
-                    |> BoundedContext.id
-                    |> Route.BoundedContextCanvas
-                    |> Route.routeToString
-                  )
-                ]
-              ]
-              [ text "Canvas" ]
-            , ButtonGroup.linkButton
-              [ Button.roleLink
-              , Button.attrs
-                [ href
-                  ( context
-                    |> BoundedContext.id
-                    |> Route.Namespaces
-                    |> Route.routeToString
-                  )
-                ]
-              ]
-              [ text "Namespaces" ]
-            ]
-          ]
-        ]
-      ]
-
-
 
 view : Model -> Html Msg
-view { communication, contextItems, domain } =
+view { contextItems, domain } =
     let
         cards =
             contextItems
-            |> List.sortBy (\{ context } -> context |> BoundedContext.name)
-            |> List.map (viewItem communication)
+            |> List.sortBy (\{ contextItem } -> contextItem.context |> BoundedContext.name)
+            |> List.map (BoundedContextCard.view) 
             |> chunksOfLeft 2
             |> List.map Card.deck
             |> div []
@@ -284,4 +139,5 @@ view { communication, contextItems, domain } =
         |> Card.block []
             [ Block.custom cards ]
         |> Card.view
+        |> Html.map (\_ -> NoOp)
 

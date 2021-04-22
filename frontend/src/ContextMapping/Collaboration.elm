@@ -1,11 +1,11 @@
 module ContextMapping.Collaboration exposing (
-    Collaboration, Collaborations, CollaborationType(..), Communication,
-    noCollaborations, noCommunication,
+    Collaboration, Collaborations, 
+    noCollaborations,
     defineInboundCollaboration, defineOutboundCollaboration, defineRelationshipType,
     endCollaboration,
-    isCollaborator,
+    areCollaborating,
     relationship, description, initiator, recipient, id, otherCollaborator,
-    decoder, communicationDecoder)
+    decoder)
 
 import Json.Encode as Encode
 import Json.Decode as Decode exposing (Decoder)
@@ -34,25 +34,13 @@ type alias CollaborationInternal =
     , recipient : Collaborator
     , relationship : Maybe RelationshipType
     }
+
+
 type alias Collaborations = List Collaboration
 
-type alias Communication =
-  { inbound : List Collaboration
-  , outbound : List Collaboration
-  }
-
-type CollaborationType
-  = Inbound Collaboration
-  | Outbound Collaboration
 
 noCollaborations : Collaborations
 noCollaborations = []
-
-noCommunication : Communication
-noCommunication =
-  { inbound = []
-  , outbound = []
-  }
 
 endCollaboration : Api.Configuration -> CollaborationId -> ApiResult CollaborationId msg
 endCollaboration url collaborationId =
@@ -141,25 +129,9 @@ defineRelationshipType url collaboration relationshipType =
     request
 
 
-isInboundCollaboratoration : Collaborator -> Collaboration -> Bool
-isInboundCollaboratoration collaborator (Collaboration collaboration) =
-  collaboration.recipient == collaborator
-
-
 areCollaborating : Collaborator -> Collaboration -> Bool
 areCollaborating collaborator (Collaboration collaboration) =
   collaboration.initiator == collaborator || collaboration.recipient == collaborator
-
-
-isCollaborator : Collaborator -> Collaboration -> Maybe CollaborationType
-isCollaborator collaborator collaboration =
-  case (areCollaborating collaborator collaboration, isInboundCollaboratoration collaborator collaboration) of
-    (True, True) ->
-      Just <| Inbound collaboration
-    (True, False) ->
-      Just <| Outbound collaboration
-    _ ->
-      Nothing
 
 
 id : Collaboration -> CollaborationId
@@ -208,27 +180,6 @@ decoder =
     |> JP.required "recipient" Collaborator.decoder
     |> JP.optional "relationshipType" (Decode.nullable RelationshipType.decoder) Nothing
   ) |> Decode.map Collaboration
-
-communicationDecoder : Collaborator -> Decoder Communication
-communicationDecoder collaborator =
-  ( Decode.list decoder )
-  |> Decode.map(\collaborations ->
-      let
-          (inbound, outbound) =
-            collaborations
-            |> List.filterMap (isCollaborator collaborator)
-            |> List.foldl(\c (inbounds,outbounds) ->
-                case c of
-                  Inbound inboundColl ->
-                    (inboundColl :: inbounds,outbounds)
-                  Outbound outboundColl ->
-                    (inbounds,outboundColl :: outbounds)
-              ) ([],[])
-      in
-         { inbound = inbound
-          , outbound = outbound
-          }
-    )
 
 
 modelEncoder : Collaborator -> Collaborator -> Maybe String -> Maybe RelationshipType -> Encode.Value
