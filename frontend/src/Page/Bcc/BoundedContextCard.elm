@@ -7,10 +7,6 @@ import Html.Events exposing (onClick)
 import Bootstrap.Grid as Grid
 import Bootstrap.Grid.Row as Row
 import Bootstrap.Grid.Col as Col
-import Bootstrap.Form as Form
-import Bootstrap.Form.Fieldset as Fieldset
-import Bootstrap.Form.Input as Input
-import Bootstrap.Form.InputGroup as InputGroup
 import Bootstrap.Button as Button
 import Bootstrap.ButtonGroup as ButtonGroup
 import Bootstrap.Utilities.Border as Border
@@ -18,30 +14,22 @@ import Bootstrap.Card as Card
 import Bootstrap.Card.Block as Block
 import Bootstrap.ListGroup as ListGroup
 import Bootstrap.Badge as Badge
-import Bootstrap.Modal as Modal
 import Bootstrap.Utilities.Spacing as Spacing
 import Bootstrap.Text as Text
 
 import Url
-import Http
-import RemoteData
 import Set
-import Dict as Dict exposing (Dict)
+import List
 
 import Route
-import Api exposing (ApiResponse, ApiResult)
 
 import Key
-import Domain exposing (Domain)
-import Domain.DomainId exposing (DomainId)
 import BoundedContext as BoundedContext exposing (BoundedContext)
-import BoundedContext.BoundedContextId as BoundedContextId exposing (BoundedContextId)
 import BoundedContext.Canvas exposing (BoundedContextCanvas)
 import BoundedContext.StrategicClassification as StrategicClassification
-import ContextMapping.Collaboration as Collaboration
-import ContextMapping.Collaborator as Collaborator
+import ContextMapping.Communication as Communication exposing(Communication)
 import BoundedContext.Namespace as Namespace exposing (Namespace)
-import List
+
 
 type alias Item =
   { context : BoundedContext
@@ -50,19 +38,10 @@ type alias Item =
   }
 
 
-type alias Communication =
-  { initiators : Dict String Collaboration.Collaborations
-  , recipients : Dict String Collaboration.Collaborations
-  }
-
 type alias Model =
   { contextItem : Item
   , communication : Communication
   }
-
-
-dictBcGet id = Dict.get (BoundedContextId.value id)
-dictBcInsert id = Dict.insert (BoundedContextId.value id)
 
 
 init : Communication -> Item -> Model
@@ -71,7 +50,7 @@ init communications item =
   , communication = communications
   }
 
-
+viewLabelAsBadge : Namespace.Label -> Html Never
 viewLabelAsBadge label =
   let
     caption = label.name ++ " | " ++ label.value
@@ -89,6 +68,7 @@ viewLabelAsBadge label =
           Nothing ->
             text caption
       ]
+
 
 viewPillMessage : String -> Int -> List (Html msg)
 viewPillMessage caption value =
@@ -137,16 +117,14 @@ viewItem communication { context, canvas, namespaces } =
         )
 
     dependencies =
-        communication.initiators
-        |> dictBcGet (context |> BoundedContext.id)
-        |> Maybe.map (List.length)
-        |> Maybe.withDefault 0
+        communication
+        |> Communication.inboundCollaborators
+        |> List.length
         |> viewPillMessage "Inbound Communication"
         |> List.append
-        ( communication.recipients
-            |> dictBcGet (context |> BoundedContext.id)
-            |> Maybe.map (List.length)
-            |> Maybe.withDefault 0
+        ( communication
+            |> Communication.outboundCollaborators
+            |> List.length
             |> viewPillMessage "Outbound Communication"
         )
 
@@ -219,7 +197,6 @@ viewItem communication { context, canvas, namespaces } =
           ]
         ]
       ]
-
 
 
 view : Model -> Card.Config Never

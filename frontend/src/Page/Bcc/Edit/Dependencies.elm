@@ -1012,5 +1012,5 @@ loadConnections : Api.Configuration -> BoundedContextId -> Cmd Msg
 loadConnections config context =
   Http.get
     { url = Api.collaborations |> Api.url config 
-    , expect = Http.expectJson ConnectionsLoaded (Communication.communicationDecoder (Collaborator.BoundedContext context))
+    , expect = Http.expectJson ConnectionsLoaded (Communication.decoder (Collaborator.BoundedContext context))
     }

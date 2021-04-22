@@ -47,6 +47,7 @@ import BoundedContext.Canvas exposing (BoundedContextCanvas)
 import BoundedContext.StrategicClassification as StrategicClassification
 import ContextMapping.Collaboration as Collaboration
 import ContextMapping.Collaborator as Collaborator
+import ContextMapping.Communication as Communication
 import BoundedContext.Namespace as Namespace exposing (Namespace)
 
 import Page.Bcc.BoundedContextCard as BoundedContextCard
@@ -60,11 +61,6 @@ type alias Item =
   }
 
 
-type alias Communication =
-  { initiators : Dict String Collaboration.Collaborations
-  , recipients : Dict String Collaboration.Collaborations
-  }
-
 type alias Model =
   { config : Api.Configuration
   , domain : Domain
@@ -72,43 +68,23 @@ type alias Model =
   }
 
 
-dictBcGet id = Dict.get (BoundedContextId.value id)
-dictBcInsert id = Dict.insert (BoundedContextId.value id)
-
-
-initCommunication : Collaboration.Collaborations -> Communication
-initCommunication connections =
-    let
-        updateCollaborationLookup selectCollaborator dictionary collaboration =
-            case selectCollaborator collaboration of
-              Collaborator.BoundedContext bcId ->
-                  let
-                      items =
-                          dictionary
-                          |> dictBcGet bcId
-                          |> Maybe.withDefault []
-                          |> List.append (List.singleton collaboration)
-                  in
-                      dictionary |> dictBcInsert bcId items
-              _ ->
-                  dictionary
-
-        (bcInitiators, bcRecipients) =
-            connections
-            |> List.foldl(\collaboration (initiators, recipients) ->
-                ( updateCollaborationLookup Collaboration.initiator initiators collaboration
-                , updateCollaborationLookup Collaboration.recipient recipients collaboration
-                )
-            ) (Dict.empty, Dict.empty)
-    in
-       { initiators = bcInitiators, recipients = bcRecipients }
-
 init : Api.Configuration -> Domain -> List Item -> Collaboration.Collaborations -> (Model, Cmd Msg)
 init config domain items collaborations =
   let
-    communication = initCommunication collaborations
+    communication = Communication.asCommunication collaborations
+    communicationFor { context} =
+        communication 
+        |> Communication.communicationFor (
+          context
+          |> BoundedContext.id
+          |> Collaborator.BoundedContext
+        )
   in 
-    ( { contextItems = items |> List.map (BoundedContextCard.init communication)
+    ( { contextItems =
+          items
+          |> List.map (\i -> 
+            BoundedContextCard.init (communicationFor i) i
+            )
       , config = config
       , domain = domain
       }
