@@ -41,7 +41,7 @@ import Maybe
 import Page.Bcc.Edit.CollaboratorSelection as CollaboratorSelection
 import ContextMapping.CollaborationId as ContextMapping exposing(CollaborationId)
 import ContextMapping.Collaborator as Collaborator exposing(Collaborator)
-import ContextMapping.Communication as Communication exposing(Communication)
+import ContextMapping.Communication as Communication exposing(ScopedCommunication)
 import ContextMapping.RelationshipType as RelationshipType exposing(..)
 import ContextMapping.Collaboration as ContextMapping exposing (..)
 import BoundedContext.BoundedContextId as BoundedContext exposing(BoundedContextId)
@@ -84,7 +84,7 @@ type alias Model =
   , newCollaborations : Maybe AddCollaboration
   , defineRelationship : Maybe DefineRelationshipType
   , availableDependencies : List CollaboratorSelection.CollaboratorReference
-  , communication : Communication
+  , communication : ScopedCommunication
   }
 
 
@@ -127,7 +127,7 @@ init config context =
     { config = config
     , boundedContextId = context |> BoundedContext.id
     , availableDependencies = []
-    , communication = Communication.noCommunication
+    , communication = Communication.noCommunication (context |> BoundedContext.id |> Collaborator.BoundedContext)
     , newCollaborations = Nothing
     , defineRelationship = Nothing
     }
@@ -147,7 +147,7 @@ type AddCollaborationMsg
 type Msg
   = BoundedContextsLoaded (Api.ApiResponse (List CollaboratorSelection.BoundedContextDependency))
   | DomainsLoaded (Api.ApiResponse (List CollaboratorSelection.DomainDependency))
-  | ConnectionsLoaded (Api.ApiResponse Communication)
+  | ConnectionsLoaded (Api.ApiResponse ScopedCommunication)
 
   | StartAddingConnection
   | AddCollaborationMsg AddCollaborationMsg
@@ -204,7 +204,7 @@ updateRelationshipEdit model =
       { model | relationship = Nothing }
 
 
-updateCollaboration : Communication -> AddCollaborationMsg -> AddCollaboration -> (AddCollaboration, Cmd AddCollaborationMsg)
+updateCollaboration : ScopedCommunication -> AddCollaborationMsg -> AddCollaboration -> (AddCollaboration, Cmd AddCollaborationMsg)
 updateCollaboration communication msg model =
   case msg of
     CollaboratorSelection bcMsg ->

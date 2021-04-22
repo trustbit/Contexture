@@ -27,7 +27,7 @@ import Key
 import BoundedContext as BoundedContext exposing (BoundedContext)
 import BoundedContext.Canvas exposing (BoundedContextCanvas)
 import BoundedContext.StrategicClassification as StrategicClassification
-import ContextMapping.Communication as Communication exposing(Communication)
+import ContextMapping.Communication as Communication exposing(ScopedCommunication)
 import BoundedContext.Namespace as Namespace exposing (Namespace)
 
 
@@ -40,11 +40,11 @@ type alias Item =
 
 type alias Model =
   { contextItem : Item
-  , communication : Communication
+  , communication : ScopedCommunication
   }
 
 
-init : Communication -> Item -> Model
+init : ScopedCommunication -> Item -> Model
 init communications item =
   { contextItem = item
   , communication = communications
@@ -82,7 +82,7 @@ viewPillMessage caption value =
   else []
 
 
-viewItem : Communication -> Item -> Card.Config Never
+viewItem : ScopedCommunication -> Item -> Card.Config Never
 viewItem communication { context, canvas, namespaces } =
   let
     domainBadge =

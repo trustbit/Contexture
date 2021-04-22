@@ -1,5 +1,5 @@
 module ContextMapping.Communication exposing (
-    CollaborationType(..), Communication, CommunicationType(..),
+    CollaborationType(..), Communication, CommunicationType(..),ScopedCommunication,
     noCommunication, isCommunicating,
     decoder,asCommunication,communicationFor,
     inboundCollaborators,outboundCollaborators,
@@ -39,32 +39,36 @@ type Communication =
     Communication CommunicationInternal
 
 
+type ScopedCommunication = 
+    ScopedCommunication Collaborator CommunicationInternal
+
+
 type alias CommunicationLookup = Dict String (List Collaboration)
 
 
-noCommunication : Communication
-noCommunication =
-    Communication
-        { inbound = Dict.empty
-        , outbound = Dict.empty
-        }
+noCommunication : Collaborator -> ScopedCommunication
+noCommunication collaborator =
+    { inbound = Dict.empty
+    , outbound = Dict.empty
+    }
+    |> ScopedCommunication collaborator
 
 
-inboundCollaborators : Communication -> List Collaboration
-inboundCollaborators (Communication communication) =
+inboundCollaborators : ScopedCommunication -> List Collaboration
+inboundCollaborators (ScopedCommunication _ communication) =
     communication.inbound
     |> Dict.values
     |> List.concat
 
 
-outboundCollaborators : Communication -> List Collaboration
-outboundCollaborators (Communication communication) =
+outboundCollaborators : ScopedCommunication -> List Collaboration
+outboundCollaborators (ScopedCommunication _ communication) =
     communication.outbound
     |> Dict.values
     |> List.concat
 
 
-isCommunicating : Collaborator -> Communication -> CommunicationType
+isCommunicating : Collaborator -> ScopedCommunication -> CommunicationType
 isCommunicating collaborator communication =
     let
         isInboundCollaborator =
@@ -89,23 +93,24 @@ isCommunicating collaborator communication =
                 NoCommunication
 
 
-appendCollaborator : CollaborationType Collaboration -> Communication -> Communication
-appendCollaborator collaboration (Communication communication) =
-    Communication <|
+appendCollaborator : CollaborationType Collaboration -> ScopedCommunication -> ScopedCommunication
+appendCollaborator collaboration (ScopedCommunication scope communication) =
+    ScopedCommunication scope <|
         case collaboration of
             IsInbound c ->
                 { communication | inbound = dictAppend (Collaboration.recipient c) c communication.inbound }
             IsOutbound c ->
                 { communication | outbound = dictAppend (Collaboration.initiator c) c communication.outbound }
+    
 
 removeCollaboration collaborationId collaborations =
     collaborations
     |> List.filter (\v -> (v |> Collaboration.id) /= collaborationId)
 
 
-removeCollaborator : CollaborationType CollaborationId -> Communication -> Communication
-removeCollaborator collaborator (Communication communication) =
-    Communication <|
+removeCollaborator : CollaborationType CollaborationId -> ScopedCommunication -> ScopedCommunication
+removeCollaborator collaborator (ScopedCommunication scope communication) =
+    ScopedCommunication scope <|
         case collaborator of
             IsInbound c ->
                 { communication
@@ -121,17 +126,17 @@ removeCollaborator collaborator (Communication communication) =
                 }
 
 
-merge : Communication -> Communication -> Communication
-merge (Communication first) (Communication second) =
-    Communication
+merge : ScopedCommunication -> ScopedCommunication -> ScopedCommunication
+merge (ScopedCommunication scope first) (ScopedCommunication _ second) =
+    ScopedCommunication scope
         { inbound = dictMerge first.inbound second.inbound
         , outbound = dictMerge first.outbound second.outbound
         }
 
 
-update : (Collaboration -> Collaboration) -> Communication -> Communication
-update updater (Communication communication) =
-    Communication
+update : (Collaboration -> Collaboration) -> ScopedCommunication -> ScopedCommunication
+update updater (ScopedCommunication scope communication) =
+    ScopedCommunication scope
         { communication
         | inbound = communication.inbound |> Dict.map (\_ v -> List.map updater v)
         , outbound = communication.outbound |> Dict.map (\_ v -> List.map updater v)
@@ -200,17 +205,18 @@ asCommunication connections =
        Communication { inbound = inboundCollaboration, outbound = outboundCollaboration }
 
 
-communicationFor : Collaborator -> Communication -> Communication
+communicationFor : Collaborator -> Communication -> ScopedCommunication
 communicationFor collaborator (Communication communication) =
     let
         key = collaboratorAsString collaborator
-    in Communication <|
+    in 
         { inbound = Dict.filter (\k _ -> k == key) communication.inbound
         , outbound = Dict.filter (\k _ -> k == key) communication.outbound
         }
+        |> ScopedCommunication collaborator
 
 
-decoder : Collaborator -> Decoder Communication
+decoder : Collaborator -> Decoder ScopedCommunication
 decoder collaborator =
   ( Decode.list Collaboration.decoder )
   |> Decode.map(\collaborations ->
