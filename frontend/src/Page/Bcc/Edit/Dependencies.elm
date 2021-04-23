@@ -41,6 +41,7 @@ import Maybe
 import Page.Bcc.Edit.CollaboratorSelection as CollaboratorSelection
 import ContextMapping.CollaborationId as ContextMapping exposing(CollaborationId)
 import ContextMapping.Collaborator as Collaborator exposing(Collaborator)
+import ContextMapping.Communication as Communication exposing(ScopedCommunication)
 import ContextMapping.RelationshipType as RelationshipType exposing(..)
 import ContextMapping.Collaboration as ContextMapping exposing (..)
 import BoundedContext.BoundedContextId as BoundedContext exposing(BoundedContextId)
@@ -83,7 +84,7 @@ type alias Model =
   , newCollaborations : Maybe AddCollaboration
   , defineRelationship : Maybe DefineRelationshipType
   , availableDependencies : List CollaboratorSelection.CollaboratorReference
-  , communication : ContextMapping.Communication
+  , communication : ScopedCommunication
   }
 
 
@@ -126,7 +127,7 @@ init config context =
     { config = config
     , boundedContextId = context |> BoundedContext.id
     , availableDependencies = []
-    , communication = ContextMapping.noCommunication
+    , communication = Communication.noCommunication (context |> BoundedContext.id |> Collaborator.BoundedContext)
     , newCollaborations = Nothing
     , defineRelationship = Nothing
     }
@@ -146,7 +147,7 @@ type AddCollaborationMsg
 type Msg
   = BoundedContextsLoaded (Api.ApiResponse (List CollaboratorSelection.BoundedContextDependency))
   | DomainsLoaded (Api.ApiResponse (List CollaboratorSelection.DomainDependency))
-  | ConnectionsLoaded (Api.ApiResponse Communication)
+  | ConnectionsLoaded (Api.ApiResponse ScopedCommunication)
 
   | StartAddingConnection
   | AddCollaborationMsg AddCollaborationMsg
@@ -203,25 +204,23 @@ updateRelationshipEdit model =
       { model | relationship = Nothing }
 
 
-updateCollaboration : Communication -> AddCollaborationMsg -> AddCollaboration -> (AddCollaboration, Cmd AddCollaborationMsg)
+updateCollaboration : ScopedCommunication -> AddCollaborationMsg -> AddCollaboration -> (AddCollaboration, Cmd AddCollaborationMsg)
 updateCollaboration communication msg model =
   case msg of
     CollaboratorSelection bcMsg ->
       let
         (updated, cmd) = CollaboratorSelection.update bcMsg model.selectedCollaborator
-        isInboundCollaborator collaborator = communication.inbound |> List.map ContextMapping.initiator |> List.member collaborator
-        isOutboundCollaborator collaborator = communication.outbound |> List.map ContextMapping.recipient |> List.member collaborator
         collaboratorError =
           case updated.collaborator of
             Just collaborator ->
-              case ( isInboundCollaborator collaborator, isOutboundCollaborator collaborator ) of
-                (True, True) ->
+              case communication |> Communication.isCommunicating collaborator of
+                Communication.InboundAndOutbound _ _ ->
                   Just IsAlreadyAddedOnBoth
-                (True, False) ->
+                Communication.Inbound _ ->
                   Just IsAlreadyAddedOnInbound
-                (False, True) ->
+                Communication.Outbound _ ->
                   Just IsAlreadyAddedOnOutbound
-                (False, False) ->
+                Communication.NoCommunication ->
                   Nothing
             Nothing ->
               Just NothingSelected
@@ -247,12 +246,7 @@ update msg model =
       , Cmd.none
       )
     ConnectionsLoaded (Ok communication) ->
-      ( { model
-        | communication =
-          { inbound = List.append model.communication.inbound communication.inbound
-          , outbound = List.append model.communication.outbound communication.outbound
-          }
-        }
+      ( { model | communication = Communication.merge model.communication communication }
       , Cmd.none
       )
 
@@ -277,13 +271,13 @@ update msg model =
 
     InboundConnectionAdded (Ok result) ->
       ( model
-       |> updateCommunication (\c -> { c | inbound = result :: c.inbound } )
+       |> updateCommunication (Communication.appendCollaborator (Communication.IsInbound result))
        |> (\m -> { m | newCollaborations = Nothing } )
       , Cmd.none
       )
     OutboundConnectionAdded (Ok result) ->
       ( model
-        |> updateCommunication (\c -> { c | outbound = result :: c.outbound } )
+        |> updateCommunication (Communication.appendCollaborator (Communication.IsOutbound result))
         |> (\m -> { m | newCollaborations = Nothing } )
       , Cmd.none
       )
@@ -297,23 +291,11 @@ update msg model =
       ( model, ContextMapping.endCollaboration model.config (ContextMapping.id coll) OutboundConnectionRemoved )
 
     InboundConnectionRemoved (Ok result) ->
-      ( model |> updateCommunication
-          (\c ->
-            { c | inbound =
-              c.inbound
-              |> List.filter (\i -> (i |> ContextMapping.id) /= result)
-            }
-          )
+      ( model |> updateCommunication (Communication.removeCollaborator (Communication.IsInbound result))
       , Cmd.none
       )
     OutboundConnectionRemoved (Ok result) ->
-      ( model |> updateCommunication
-          (\c ->
-            { c | outbound =
-              c.outbound
-              |> List.filter (\i -> (i |> ContextMapping.id) /= result)
-            }
-          )
+       ( model |> updateCommunication (Communication.removeCollaborator (Communication.IsOutbound result))
       , Cmd.none
       )
 
@@ -345,12 +327,7 @@ update msg model =
           else c
       in
         ( { model | defineRelationship = Nothing }
-          |> updateCommunication (\c ->
-            { c
-            | inbound = c.inbound |> List.map updateCollaborationType
-            , outbound = c.outbound |> List.map updateCollaborationType
-            }
-          )
+          |> updateCommunication (Communication.update updateCollaborationType)
         , Cmd.none
         )
 
@@ -854,7 +831,7 @@ viewAddConnection adding =
       |> Card.view
 
 
-viewCollaborations : ResolveCollaboratorCaption -> Bool -> List Collaboration -> Html Msg
+viewCollaborations : ResolveCollaboratorCaption -> Bool -> Communication.BoundCommunication -> Html Msg
 viewCollaborations resolveCaption isInbound collaborations =
   let
     resolveCollaborator =
@@ -930,6 +907,7 @@ viewCollaborations resolveCaption isInbound collaborations =
         [ class "text-center", Spacing.p2 ]
         [ Html.strong [] [ text (if isInbound then "Inbound Connection" else "Outbound Connection") ] ]
       , collaborations
+        |> Communication.collaborators
         |> List.foldl viewCollaboration cardConfig
         |> Card.view
       ]
@@ -971,12 +949,12 @@ viewDefineRelationship resolveCaption defineRelationship =
     Nothing ->
       text ""
 
-viewConnections getCollaboratorCaption { inbound, outbound} =
+viewConnections getCollaboratorCaption communication =
   Grid.row []
     [ Grid.col []
-      [ viewCollaborations getCollaboratorCaption True inbound ]
+      [ viewCollaborations getCollaboratorCaption True (communication |> Communication.inboundCommunication)  ]
     , Grid.col []
-      [ viewCollaborations getCollaboratorCaption False outbound ]
+      [ viewCollaborations getCollaboratorCaption False (communication |> Communication.outboundCommunication) ]
     ]
 
 
@@ -1035,5 +1013,5 @@ loadConnections : Api.Configuration -> BoundedContextId -> Cmd Msg
 loadConnections config context =
   Http.get
     { url = Api.collaborations |> Api.url config 
-    , expect = Http.expectJson ConnectionsLoaded (ContextMapping.communicationDecoder (Collaborator.BoundedContext context))
+    , expect = Http.expectJson ConnectionsLoaded (Communication.decoder (Collaborator.BoundedContext context))
     }

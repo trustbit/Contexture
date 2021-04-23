@@ -8,7 +8,7 @@
     "css:build": "npm-run-all css:compile css:prefix",
     "elm:reload": "nodetouch src/dummy.elm",
     "elm:build": "elm make src/Main.elm src/Components/ManageNamespaces.elm src/Components/Search.elm --output=assets/js/Contexture.js",
-    "elm:start": "elm-live src/Main.elm src/Components/ManageNamespaces.elm src/Components/Search.elm --open --pushstate -- --output=assets/js/Contexture.js",
+    "elm:start": "elm-live src/Main.elm src/Components/ManageNamespaces.elm src/Components/Search.elm --open --pushstate -- --output=assets/js/Contexture.js  --debug",
     "build": "npm-run-all css:build elm:build",
     "watch": "nodemon -e scss -x \"npm-run-all css:compile-dev elm:reload\"",
     "start": "npm-run-all -p elm:start watch"

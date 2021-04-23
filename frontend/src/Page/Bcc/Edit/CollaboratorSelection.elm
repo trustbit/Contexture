@@ -341,7 +341,7 @@ view model =
 type alias LabelAndDescription = (String, String)
 
 collaboratorCaption : List CollaboratorReference -> Collaborator -> LabelAndDescription
-collaboratorCaption items collaborator=
+collaboratorCaption items collaborator =
   case collaborator of
     Collaborator.BoundedContext bc ->
       items
