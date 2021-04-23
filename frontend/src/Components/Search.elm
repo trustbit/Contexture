@@ -11,7 +11,7 @@ import Html exposing (Html, div, text)
 import Html.Attributes exposing (..)
 import Json.Decode as Decode
 import Json.Decode.Pipeline as JP
-import Page.Bcc.BoundedContext as BoundedContext
+import Page.Bcc.BoundedContextsOfDomain as BoundedContext
 import Url
 
 

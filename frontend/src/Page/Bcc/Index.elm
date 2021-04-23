@@ -3,7 +3,6 @@ module Page.Bcc.Index exposing (Msg, Model, update, view, init)
 import Browser.Navigation as Nav
 
 import Json.Decode as Decode
-import Json.Decode.Pipeline as JP
 
 import Html exposing (Html, button, div, text)
 import Html.Attributes exposing (..)
@@ -33,21 +32,17 @@ import List.Split exposing (chunksOfLeft)
 import Url
 import Http
 import RemoteData
-import Set
-import Dict as Dict exposing (Dict)
 
 import Route
 import Api exposing (ApiResponse, ApiResult)
 
-import Key
 import Domain exposing (Domain)
 import Domain.DomainId exposing (DomainId)
 import BoundedContext as BoundedContext exposing (BoundedContext)
 import BoundedContext.BoundedContextId as BoundedContextId exposing (BoundedContextId)
-import BoundedContext.Canvas exposing (BoundedContextCanvas)
+
 import ContextMapping.Collaboration as Collaboration
 import ContextMapping.Collaborator as Collaborator
-import BoundedContext.Namespace as Namespace exposing (Namespace)
 import Page.Bcc.BoundedContextCard as BoundedContextCard
 import ContextMapping.Communication as Communication
 import List
@@ -379,6 +374,7 @@ filterAutocomplete minChars query items =
         |> List.filter (\i -> i |> Domain.name |> containsLowerString)
         |> Just
 
+
 selectConfig : Autocomplete.Config Msg Domain.Domain
 selectConfig =
     Autocomplete.newConfig
@@ -395,6 +391,7 @@ selectConfig =
         |> Autocomplete.withNotFoundClass "text-danger"
         |> Autocomplete.withHighlightedItemClass "bg-white"
         |> Autocomplete.withPrompt "Search for a domain"
+
 
 viewMove : MoveContextModel -> Html Msg
 viewMove model =
@@ -441,6 +438,7 @@ viewMove model =
         [ text "Move context to domain" ]
       ]
     |> Modal.view model.modalVisibility
+
 
 view : Model -> List (Html Msg)
 view model =

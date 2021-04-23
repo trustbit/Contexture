@@ -1,4 +1,4 @@
-module Page.Bcc.BoundedContext exposing (..)
+module Page.Bcc.BoundedContextsOfDomain exposing (..)
 
 
 import Json.Decode as Decode
