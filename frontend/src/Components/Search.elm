@@ -1,7 +1,7 @@
 module Components.Search exposing (main)
 
 import Api exposing (boundedContexts)
-import BoundedContext exposing (BoundedContext)
+import Page.Bcc.BoundedContextCard as BoundedContextCard
 import BoundedContext.Canvas
 import BoundedContext.Namespace as Namespace
 import Browser
@@ -45,7 +45,7 @@ init flag =
 
 type alias DomainModel =
     { domain : Domain
-    , boundedContexts : List BoundedContext.Item
+    , boundedContexts : List BoundedContextCard.Item
     }
 
 
@@ -56,17 +56,10 @@ type alias Flags =
     }
 
 
-itemDecoder =
-    Decode.succeed BoundedContext.Item
-        |> JP.custom BoundedContext.modelDecoder
-        |> JP.custom BoundedContext.Canvas.modelDecoder
-        |> JP.optionalAt [ "namespaces" ] (Decode.list Namespace.namespaceDecoder) []
-
-
 domainDecoder =
     Decode.map2 DomainModel
         (Decode.field "domain" Domain.domainDecoder)
-        (Decode.field "boundedContexts" (Decode.list itemDecoder))
+        (Decode.field "boundedContexts" (Decode.list BoundedContextCard.decoder))
 
 
 baseConfiguration =

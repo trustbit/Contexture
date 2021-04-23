@@ -42,7 +42,6 @@ import Key
 import Domain exposing (Domain)
 import Domain.DomainId exposing (DomainId)
 import BoundedContext as BoundedContext exposing (BoundedContext)
-import BoundedContext.BoundedContextId as BoundedContextId exposing (BoundedContextId)
 import BoundedContext.Canvas exposing (BoundedContextCanvas)
 import BoundedContext.StrategicClassification as StrategicClassification
 import ContextMapping.Collaboration as Collaboration
@@ -54,13 +53,6 @@ import Page.Bcc.BoundedContextCard as BoundedContextCard
 
 import List
 
-type alias Item =
-  { context : BoundedContext
-  , canvas : BoundedContextCanvas
-  , namespaces : List Namespace
-  }
-
-
 type alias Model =
   { config : Api.Configuration
   , domain : Domain
@@ -68,7 +60,7 @@ type alias Model =
   }
 
 
-init : Api.Configuration -> Domain -> List Item -> Collaboration.Collaborations -> (Model, Cmd Msg)
+init : Api.Configuration -> Domain -> List BoundedContextCard.Item -> Collaboration.Collaborations -> (Model, Cmd Msg)
 init config domain items collaborations =
   let
     communication = Communication.asCommunication collaborations
@@ -96,13 +88,51 @@ type Msg
     = NoOp
 
 
+viewWithActions : BoundedContextCard.Model -> Card.Config Never
+viewWithActions model  =
+  model
+  |> BoundedContextCard.view
+  |> Card.footer []
+  [ Grid.simpleRow
+    [ Grid.col [ Col.md7 ]
+      [ ButtonGroup.linkButtonGroup []
+        [ ButtonGroup.linkButton
+          [ Button.roleLink
+          , Button.attrs
+            [ href
+              ( model.contextItem.context
+                |> BoundedContext.id
+                |> Route.BoundedContextCanvas
+                |> Route.routeToString
+              )
+            ]
+          ]
+          [ text "Canvas" ]
+        , ButtonGroup.linkButton
+          [ Button.roleLink
+          , Button.attrs
+            [ href
+              ( model.contextItem.context
+                |> BoundedContext.id
+                |> Route.Namespaces
+                |> Route.routeToString
+              )
+            ]
+          ]
+          [ text "Namespaces" ]
+        ]
+      ]
+    ]
+  ]
+
+
 view : Model -> Html Msg
 view { contextItems, domain } =
     let
         cards =
             contextItems
             |> List.sortBy (\{ contextItem } -> contextItem.context |> BoundedContext.name)
-            |> List.map (BoundedContextCard.view) 
+            |> List.map viewWithActions
             |> chunksOfLeft 2
             |> List.map Card.deck
             |> div []

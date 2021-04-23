@@ -45,19 +45,14 @@ import Domain.DomainId exposing (DomainId)
 import BoundedContext as BoundedContext exposing (BoundedContext)
 import BoundedContext.BoundedContextId as BoundedContextId exposing (BoundedContextId)
 import BoundedContext.Canvas exposing (BoundedContextCanvas)
-import BoundedContext.StrategicClassification as StrategicClassification
 import ContextMapping.Collaboration as Collaboration
 import ContextMapping.Collaborator as Collaborator
 import BoundedContext.Namespace as Namespace exposing (Namespace)
+import Page.Bcc.BoundedContextCard as BoundedContextCard
+import ContextMapping.Communication as Communication
 import List
 
 -- MODEL
-
-type alias Item =
-  { context : BoundedContext
-  , canvas : BoundedContextCanvas
-  , namespaces : List Namespace
-  }
 
 type alias MoveContextModel =
   { context : BoundedContext
@@ -72,10 +67,6 @@ type alias DeleteBoundedContextModel =
   , modalVisibility : Modal.Visibility
   }
 
-type alias Communication =
-  { initiators : Dict String Collaboration.Collaborations
-  , recipients : Dict String Collaboration.Collaborations
-  }
 
 type alias Model =
   { navKey : Nav.Key
@@ -84,8 +75,9 @@ type alias Model =
   , domain : DomainId
   , deleteContext : Maybe DeleteBoundedContextModel
   , moveContext : Maybe MoveContextModel
-  , contextItems : RemoteData.WebData (List Item)
-  , communication : RemoteData.WebData Communication
+  , contextItems : RemoteData.WebData (List BoundedContextCard.Item)
+  , communication : RemoteData.WebData Communication.Communication
+  , contextModels :  RemoteData.WebData (List BoundedContextCard.Model)
   }
 
 initMoveContext : BoundedContext -> MoveContextModel
@@ -107,6 +99,7 @@ init config key domain =
     , moveContext = Nothing
     , boundedContextName = ""
     , communication = RemoteData.Loading
+    , contextModels = RemoteData.NotAsked
     }
   , Cmd.batch
     [ loadAll config domain
@@ -116,15 +109,12 @@ init config key domain =
 
 -- UPDATE
 
-dictBcGet id = Dict.get (BoundedContextId.value id)
-dictBcInsert id = Dict.insert (BoundedContextId.value id)
-
 type Msg
-  = Loaded (Result Http.Error (List Item))
+  = Loaded (ApiResponse (List BoundedContextCard.Item))
   | CommunicationLoaded (ApiResponse Collaboration.Collaborations)
   | SetName String
   | CreateBoundedContext
-  | Created (Result Http.Error BoundedContext.BoundedContext)
+  | Created (ApiResponse BoundedContext.BoundedContext)
   | ShouldDelete BoundedContext
   | CancelDelete
   | DeleteContext BoundedContextId
@@ -144,45 +134,39 @@ updateMove model updateFunction =
   in
     { model | moveContext = move}
 
+updateModel : Model -> Model
+updateModel model =
+  { model
+  | contextModels =
+      RemoteData.map2
+        (\items communication ->
+          items |> List.map(\item -> BoundedContextCard.init (Communication.communicationFor (item.context |> BoundedContext.id |> Collaborator.BoundedContext) communication) item)
+        )
+        model.contextItems
+        model.communication
+  }
+
 update : Msg -> Model -> (Model, Cmd Msg)
 update msg model =
   case msg of
-    Loaded (Ok items) ->
-      ({ model | contextItems = RemoteData.Success items }, Cmd.none)
+    Loaded items ->
+      ( updateModel
+          { model
+          | contextItems = items |> RemoteData.fromResult
+          }
+      , Cmd.none
+      )
 
-    Loaded (Err e) ->
-      ({ model | contextItems = RemoteData.Failure e }, Cmd.none)
-
-    CommunicationLoaded (Ok connections) ->
-      let
-        updateCollaborationLookup selectCollaborator dictionary collaboration =
-          case selectCollaborator collaboration of
-            Collaborator.BoundedContext bcId ->
-              let
-                items =
-                  dictionary
-                  |> dictBcGet bcId
-                  |> Maybe.withDefault []
-                  |> List.append (List.singleton collaboration)
-              in
-                dictionary |> dictBcInsert bcId items
-            _ ->
-              dictionary
-
-        (bcInitiators, bcRecipients) =
-          connections
-          |> List.foldl(\collaboration (initiators, recipients) ->
-              ( updateCollaborationLookup Collaboration.initiator initiators collaboration
-              , updateCollaborationLookup Collaboration.recipient recipients collaboration
-              )
-            ) (Dict.empty, Dict.empty)
-      in
-        ( { model | communication = RemoteData.Success { initiators = bcInitiators, recipients = bcRecipients }}
-        , Cmd.none
-        )
-
-    CommunicationLoaded (Err e) ->
-      ({ model |  communication = RemoteData.Failure e }, Cmd.none)
+    CommunicationLoaded collaborations ->
+      ( updateModel
+          { model
+          | communication =
+              collaborations
+              |> RemoteData.fromResult
+              |> RemoteData.map Communication.asCommunication
+          }
+      , Cmd.none
+      )
 
     SetName name ->
       ({ model | boundedContextName = name}, Cmd.none)
@@ -293,129 +277,12 @@ viewDelete model =
     , Button.button [ Button.primary, Button.onClick (model.boundedContext |> BoundedContext.id |> DeleteContext ) ] [ text "Delete Bounded Context" ] ]
   |> Modal.view model.modalVisibility
 
-viewPillMessage : String -> Int -> List (Html msg)
-viewPillMessage caption value =
-  if value > 0 then
-  [ Grid.simpleRow
-    [ Grid.col [] [text caption]
-    , Grid.col []
-      [ Badge.pillWarning [] [ text (value |> String.fromInt)] ]
-    ]
-  ]
-  else []
 
-
-viewLabelAsBadge label =
-  let
-    caption = label.name ++ " | " ++ label.value
-  in
-    Badge.badgeInfo
-      [ Spacing.ml1
-      , title <| "The label '" ++ label.name ++ "' has the value '" ++ label.value ++ "'"
-      ]
-      [ case Url.fromString label.value of
-          Just link ->
-            Html.span []
-              [ text caption
-              , Html.a [ link |> Url.toString |> href, target "_blank", Spacing.ml1 ] [ 0x0001F517 |> Char.fromCode  |> String.fromChar |> Html.text ]
-              ]
-          Nothing ->
-            text caption
-      ]
-
-
-viewItem : RemoteData.WebData Communication -> Item -> Card.Config Msg
-viewItem communication { context, canvas, namespaces } =
-  let
-    domainBadge =
-      case canvas.classification.domain |> Maybe.map StrategicClassification.domainDescription of
-        Just domain -> [ Badge.badgePrimary [ title domain.description ] [ text domain.name ] ]
-        Nothing -> []
-    businessBadges =
-      canvas.classification.business
-      |> List.map StrategicClassification.businessDescription
-      |> List.map (\b -> Badge.badgeSecondary [ title b.description ] [ text b.name ])
-    evolutionBadge =
-      case canvas.classification.evolution |> Maybe.map StrategicClassification.evolutionDescription of
-        Just evolution -> [ Badge.badgeInfo [ title evolution.description ] [ text evolution.name ] ]
-        Nothing -> []
-    badges =
-      List.concat
-        [ domainBadge
-        , businessBadges
-        , evolutionBadge
-        ]
-
-    messages =
-      [ canvas.messages.commandsHandled, canvas.messages.eventsHandled, canvas.messages.queriesHandled ]
-      |> List.map Set.size
-      |> List.sum
-      |> viewPillMessage "Handled Messages"
-      |> List.append
-        ( [ canvas.messages.commandsSent, canvas.messages.eventsPublished, canvas.messages.queriesInvoked]
-          |> List.map Set.size
-          |> List.sum
-          |> viewPillMessage "Published Messages"
-        )
-
-    dependencies =
-      case communication of
-        RemoteData.Success { initiators, recipients } ->
-          initiators
-          |> dictBcGet (context |> BoundedContext.id)
-          |> Maybe.map (List.length)
-          |> Maybe.withDefault 0
-          |> viewPillMessage "Inbound Communication"
-          |> List.append
-            ( recipients
-              |> dictBcGet (context |> BoundedContext.id)
-              |> Maybe.map (List.length)
-              |> Maybe.withDefault 0
-              |> viewPillMessage "Outbound Communication"
-            )
-        RemoteData.Failure e ->
-          [ text <| "Could not load communication: " ++ (Debug.toString e)]
-        _ ->
-          [ text "Loading communication information"]
-
-    namespaceBlocks =
-      namespaces
-      |> List.map (\namespace ->
-        ListGroup.li []
-          [ Html.h6 []
-            [ text namespace.name
-            , Html.small [ class "text-muted"] [ text " Namespace" ]
-            ]
-          , div [] (
-              namespace.labels
-              |> List.map viewLabelAsBadge
-            )
-          ]
-      )
-
-  in
-  Card.config [ Card.attrs [ class "mb-3", class "shadow" ] ]
-    |> Card.block []
-      [ Block.titleH4 []
-        [ text (context |> BoundedContext.name)
-        , Html.small [ class "text-muted", class "float-right" ]
-          [ text (context |> BoundedContext.key |> Maybe.map Key.toString |> Maybe.withDefault "") ]
-        ]
-      , if String.length canvas.description > 0
-        then Block.text [ class "text-muted"] [ text canvas.description  ]
-        else Block.text [class "text-muted", class "text-center" ] [ Html.i [] [ text "No description :-(" ] ]
-      , Block.custom (div [] badges)
-      ]
-    |> Card.block []
-      [ Block.custom (div [] dependencies)
-      , Block.custom (div [] messages)
-      ]
-    |> (\t ->
-        if List.isEmpty namespaceBlocks
-        then t
-        else t |> Card.listGroup namespaceBlocks
-    )
-    |> Card.footer []
+viewWithActions : BoundedContextCard.Model -> Card.Config Msg
+viewWithActions model  =
+  model
+  |> BoundedContextCard.view
+  |> Card.footer []
       [ Grid.simpleRow
         [ Grid.col [ Col.md7 ]
           [ ButtonGroup.linkButtonGroup []
@@ -423,7 +290,7 @@ viewItem communication { context, canvas, namespaces } =
               [ Button.roleLink
               , Button.attrs
                 [ href
-                  ( context
+                  ( model.contextItem.context
                     |> BoundedContext.id
                     |> Route.BoundedContextCanvas
                     |> Route.routeToString
@@ -435,7 +302,7 @@ viewItem communication { context, canvas, namespaces } =
               [ Button.roleLink
               , Button.attrs
                 [ href
-                  ( context
+                  ( model.contextItem.context
                     |> BoundedContext.id
                     |> Route.Namespaces
                     |> Route.routeToString
@@ -449,11 +316,11 @@ viewItem communication { context, canvas, namespaces } =
           [ ButtonGroup.buttonGroup [ ButtonGroup.small, ButtonGroup.attrs [ class "mt-auto", class "mb-auto" ] ]
             [ ButtonGroup.button
               [ Button.secondary
-              , Button.onClick (StartToMoveContext context) ]
+              , Button.onClick (StartToMoveContext model.contextItem.context) ]
               [ text "Move Context"]
             , ButtonGroup.button
               [ Button.secondary
-              , Button.onClick (ShouldDelete context)
+              , Button.onClick (ShouldDelete model.contextItem.context)
               -- , Button.attrs [ Spacing.ml2 ]
               ]
               [ text "Delete" ]
@@ -462,8 +329,9 @@ viewItem communication { context, canvas, namespaces } =
         ]
       ]
 
-viewLoaded : RemoteData.WebData Communication -> String -> List Item  -> List(Html Msg)
-viewLoaded communication name items =
+
+viewLoaded : String -> List BoundedContextCard.Model  -> List(Html Msg)
+viewLoaded name items =
   if List.isEmpty items then
     [ Grid.row [ Row.attrs [ Spacing.pt3 ] ]
       [ Grid.col [ ]
@@ -480,8 +348,8 @@ viewLoaded communication name items =
     let
       cards =
         items
-        |> List.sortBy (\{ context } -> context |> BoundedContext.name)
-        |> List.map (viewItem communication)
+        |> List.sortBy (\{ contextItem } -> contextItem.context |> BoundedContext.name)
+        |> List.map viewWithActions
         |> chunksOfLeft 2
         |> List.map Card.deck
         |> div []
@@ -576,10 +444,10 @@ viewMove model =
 
 view : Model -> List (Html Msg)
 view model =
-  case model.contextItems of
+  case model.contextModels of
     RemoteData.Success contexts ->
       contexts
-      |> viewLoaded model.communication model.boundedContextName
+      |> viewLoaded model.boundedContextName
       |> List.append
         ( [ model.deleteContext
             |> Maybe.map viewDelete
@@ -597,15 +465,9 @@ view model =
 
 loadAll : Api.Configuration -> DomainId -> Cmd Msg
 loadAll config domain =
-  let
-    decoder =
-      Decode.succeed Item
-      |> JP.custom BoundedContext.modelDecoder
-      |> JP.custom BoundedContext.Canvas.modelDecoder
-      |> JP.optionalAt [ "namespaces" ] (Decode.list Namespace.namespaceDecoder) []
-  in Http.get
+  Http.get
     { url = Api.boundedContexts domain |> Api.url config
-    , expect = Http.expectJson Loaded (Decode.list decoder)
+    , expect = Http.expectJson Loaded (Decode.list BoundedContextCard.decoder)
     }
 
 

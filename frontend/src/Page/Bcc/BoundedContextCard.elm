@@ -1,4 +1,7 @@
-module Page.Bcc.BoundedContextCard exposing (init,Model,Item,view)
+module Page.Bcc.BoundedContextCard exposing (init,Model,Item,view,decoder)
+
+import Json.Decode as Decode
+import Json.Decode.Pipeline as JP
 
 import Html exposing (Html, button, div, text)
 import Html.Attributes exposing (..)
@@ -43,6 +46,11 @@ type alias Model =
   , communication : ScopedCommunication
   }
 
+decoder =
+    Decode.succeed Item
+        |> JP.custom BoundedContext.modelDecoder
+        |> JP.custom BoundedContext.Canvas.modelDecoder
+        |> JP.optionalAt [ "namespaces" ] (Decode.list Namespace.namespaceDecoder) []
 
 init : ScopedCommunication -> Item -> Model
 init communications item =
@@ -50,7 +58,7 @@ init communications item =
   , communication = communications
   }
 
-viewLabelAsBadge : Namespace.Label -> Html Never
+viewLabelAsBadge : Namespace.Label -> Html msg
 viewLabelAsBadge label =
   let
     caption = label.name ++ " | " ++ label.value
@@ -82,7 +90,7 @@ viewPillMessage caption value =
   else []
 
 
-viewItem : ScopedCommunication -> Item -> Card.Config Never
+viewItem : ScopedCommunication -> Item -> Card.Config msg
 viewItem communication { context, canvas, namespaces } =
   let
     domainBadge =
@@ -167,40 +175,9 @@ viewItem communication { context, canvas, namespaces } =
         then t
         else t |> Card.listGroup namespaceBlocks
     )
-    |> Card.footer []
-      [ Grid.simpleRow
-        [ Grid.col [ Col.md7 ]
-          [ ButtonGroup.linkButtonGroup []
-            [ ButtonGroup.linkButton
-              [ Button.roleLink
-              , Button.attrs
-                [ href
-                  ( context
-                    |> BoundedContext.id
-                    |> Route.BoundedContextCanvas
-                    |> Route.routeToString
-                  )
-                ]
-              ]
-              [ text "Canvas" ]
-            , ButtonGroup.linkButton
-              [ Button.roleLink
-              , Button.attrs
-                [ href
-                  ( context
-                    |> BoundedContext.id
-                    |> Route.Namespaces
-                    |> Route.routeToString
-                  )
-                ]
-              ]
-              [ text "Namespaces" ]
-            ]
-          ]
-        ]
-      ]
+    
 
 
-view : Model -> Card.Config Never
+view : Model -> Card.Config msg
 view { communication, contextItem } =
   viewItem communication contextItem
