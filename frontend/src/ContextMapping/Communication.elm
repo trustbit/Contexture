@@ -1,8 +1,8 @@
 module ContextMapping.Communication exposing (
-    CollaborationType(..), Communication, CommunicationType(..),ScopedCommunication,
+    CollaborationType(..), Communication, CommunicationType(..),ScopedCommunication,BoundCommunication,
     noCommunication, isCommunicating,
     decoder,asCommunication,communicationFor,
-    inboundCollaborators,outboundCollaborators,
+    inboundCommunication,outboundCommunication,collaborators,
     appendCollaborator,removeCollaborator,merge, update
     )
 
@@ -34,9 +34,11 @@ type CollaborationType t
   = IsInbound t
   | IsOutbound t
 
-
 type Communication =
     Communication CommunicationInternal
+
+type BoundCommunication =
+    Communication2 Collaborator (List Collaboration)
 
 
 type ScopedCommunication = 
@@ -54,18 +56,25 @@ noCommunication collaborator =
     |> ScopedCommunication collaborator
 
 
-inboundCollaborators : ScopedCommunication -> List Collaboration
-inboundCollaborators (ScopedCommunication _ communication) =
+collaborators : BoundCommunication -> List Collaboration
+collaborators (Communication2 _ communicationCollaborators) = 
+    communicationCollaborators
+
+
+inboundCommunication : ScopedCommunication -> BoundCommunication
+inboundCommunication (ScopedCommunication scope communication) =
     communication.inbound
     |> Dict.values
     |> List.concat
+    |> Communication2 scope
 
 
-outboundCollaborators : ScopedCommunication -> List Collaboration
-outboundCollaborators (ScopedCommunication _ communication) =
+outboundCommunication : ScopedCommunication -> BoundCommunication
+outboundCommunication (ScopedCommunication scope communication) =
     communication.outbound
     |> Dict.values
     |> List.concat
+    |> Communication2 scope
 
 
 isCommunicating : Collaborator -> ScopedCommunication -> CommunicationType
@@ -73,12 +82,14 @@ isCommunicating collaborator communication =
     let
         isInboundCollaborator =
             communication
-            |> inboundCollaborators
+            |> inboundCommunication
+            |> collaborators
             |> List.filter (\c -> Collaboration.initiator c == collaborator)
             |> List.head
         isOutboundCollaborator =
             communication
-            |> outboundCollaborators
+            |> outboundCommunication
+            |> collaborators
             |> List.filter (\c -> Collaboration.recipient c == collaborator)
             |> List.head
     in

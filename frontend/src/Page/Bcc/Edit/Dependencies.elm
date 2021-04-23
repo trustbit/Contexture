@@ -831,7 +831,7 @@ viewAddConnection adding =
       |> Card.view
 
 
-viewCollaborations : ResolveCollaboratorCaption -> Bool -> List Collaboration -> Html Msg
+viewCollaborations : ResolveCollaboratorCaption -> Bool -> Communication.BoundCommunication -> Html Msg
 viewCollaborations resolveCaption isInbound collaborations =
   let
     resolveCollaborator =
@@ -907,6 +907,7 @@ viewCollaborations resolveCaption isInbound collaborations =
         [ class "text-center", Spacing.p2 ]
         [ Html.strong [] [ text (if isInbound then "Inbound Connection" else "Outbound Connection") ] ]
       , collaborations
+        |> Communication.collaborators
         |> List.foldl viewCollaboration cardConfig
         |> Card.view
       ]
@@ -951,9 +952,9 @@ viewDefineRelationship resolveCaption defineRelationship =
 viewConnections getCollaboratorCaption communication =
   Grid.row []
     [ Grid.col []
-      [ viewCollaborations getCollaboratorCaption True (communication |> Communication.inboundCollaborators)  ]
+      [ viewCollaborations getCollaboratorCaption True (communication |> Communication.inboundCommunication)  ]
     , Grid.col []
-      [ viewCollaborations getCollaboratorCaption False (communication |> Communication.outboundCollaborators) ]
+      [ viewCollaborations getCollaboratorCaption False (communication |> Communication.outboundCommunication) ]
     ]
 
 

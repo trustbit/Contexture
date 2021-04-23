@@ -118,12 +118,14 @@ viewItem communication { context, canvas, namespaces } =
 
     dependencies =
         communication
-        |> Communication.inboundCollaborators
+        |> Communication.inboundCommunication
+        |> Communication.collaborators
         |> List.length
         |> viewPillMessage "Inbound Communication"
         |> List.append
         ( communication
-            |> Communication.outboundCollaborators
+            |> Communication.outboundCommunication
+            |> Communication.collaborators
             |> List.length
             |> viewPillMessage "Outbound Communication"
         )
