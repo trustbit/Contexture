@@ -39,8 +39,6 @@ module TestHost =
             .ConfigureLogging(configureLogging)
             .Build()
 
-
-
     let runServer testConfiguration =
         let host =
             createHost testConfiguration Contexture.Api.App.configureServices Contexture.Api.App.configureApp
@@ -50,16 +48,6 @@ module TestHost =
 
     let staticClock time = fun () -> time
 
-
-type Given = EventEnvelope list
-
-module Given =
-
-    let noEvents = []
-    let anEvent event = [ event ]
-    let andOneEvent event given = given @ [ event ]
-    let andEvents events given = given @ events
-
 module Prepare =
     let private registerGiven givens =
         fun (services: IServiceCollection) ->
@@ -67,6 +55,9 @@ module Prepare =
             |> ignore
 
     let private toGiven clock events = events |> List.map (fun e -> e clock)
+
+    let buildServerGiven given =
+        given |> registerGiven |> TestHost.runServer
 
     type TestEnvironment(server: IHost) =
         let client = lazy (server.GetTestClient())
@@ -83,14 +74,19 @@ module Prepare =
                 if client.IsValueCreated then
                     client.Value.Dispose()
 
-    let buildServerGiven given =
-        given |> registerGiven |> TestHost.runServer
-
     let withGiven clock givenBuilders =
         let server =
             givenBuilders |> toGiven clock |> buildServerGiven
 
         new TestEnvironment(server)
+
+type Given = EventEnvelope list
+
+module Given =
+    let noEvents = []
+    let anEvent event = [ event ]
+    let andOneEvent event given = given @ [ event ]
+    let andEvents events given = given @ events
 
 module When =
     open System.Net.Http.Json
@@ -108,6 +104,8 @@ module When =
             return result
         }
 
+type Then = Assert
+
 module Utils =
     let asEvent id event =
         fun clock ->
@@ -117,26 +115,33 @@ module Utils =
 
     let singleEvent<'e> (eventStore: EventStore) : EventEnvelope<'e> =
         let events = eventStore.Get<'e>()
-        Assert.Single events
+        Then.Single events
 
 module Fixtures =
-    let newDomain domainId =
+    let domainCreated domainId =
         DomainCreated { DomainId = domainId; Name = "" }
         |> Utils.asEvent domainId
 
-    let newBoundedContext domainId contextId =
+    let boundedContextCreated domainId contextId =
         BoundedContextCreated
             { BoundedContextId = contextId
               Name = ""
               DomainId = domainId }
         |> Utils.asEvent contextId
 
-
     let newLabel () =
         { LabelId = Guid.NewGuid()
           Name = "label"
           Value = Some "value"
           Template = None }
+
+
+    let namespaceDefinition contextId namespaceId =
+        { BoundedContextId = contextId
+          Name = "namespace"
+          NamespaceId = namespaceId
+          NamespaceTemplateId = None
+          Labels = [ newLabel () ] }
 
 module Namespaces =
 
@@ -150,8 +155,8 @@ module Namespaces =
 
             let given =
                 Given.noEvents
-                |> Given.andOneEvent (Fixtures.newDomain domainId)
-                |> Given.andOneEvent (Fixtures.newBoundedContext domainId contextId)
+                |> Given.andOneEvent (Fixtures.domainCreated domainId)
+                |> Given.andOneEvent (Fixtures.boundedContextCreated domainId contextId)
 
             use testEnvironment = Prepare.withGiven clock given
 
@@ -176,16 +181,16 @@ module Namespaces =
 
             match event.Event with
             | NamespaceAdded n ->
-                Assert.Equal("test", n.Name)
+                Then.Equal("test", n.Name)
 
-                Assert.Collection(
+                Then.Collection(
                     n.Labels,
                     (fun (l: LabelDefinition) ->
-                        Assert.Equal("l1", l.Name)
-                        Assert.Equal(Some "v1", l.Value)),
+                        Then.Equal("l1", l.Name)
+                        Then.Equal(Some "v1", l.Value)),
                     (fun (l: LabelDefinition) ->
-                        Assert.Equal("l2", l.Name)
-                        Assert.Equal(Some "v2", l.Value))
+                        Then.Equal("l2", l.Name)
+                        Then.Equal(Some "v2", l.Value))
                 )
             | e -> raise (XunitException $"Unexpected event: %O{e}")
         }
@@ -214,23 +219,20 @@ module BoundedContextSearch =
 
             let added =
                 NamespaceAdded
-                    { BoundedContextId = contextId
-                      Name = "namespace"
-                      NamespaceId = namespaceId
-                      NamespaceTemplateId = None
-                      Labels =
-                          [ { Fixtures.newLabel () with
-                                  Name = "l1"
-                                  Value = Some "v1" }
-                            { Fixtures.newLabel () with
-                                  Name = "l2"
-                                  Value = Some "v2" } ] }
+                    { Fixtures.namespaceDefinition contextId namespaceId with
+                          Labels =
+                              [ { Fixtures.newLabel () with
+                                      Name = "l1"
+                                      Value = Some "v1" }
+                                { Fixtures.newLabel () with
+                                      Name = "l2"
+                                      Value = Some "v2" } ] }
                 |> Utils.asEvent contextId
 
             let given =
                 Given.noEvents
-                |> Given.andOneEvent (Fixtures.newDomain domainId)
-                |> Given.andOneEvent (Fixtures.newBoundedContext domainId contextId)
+                |> Given.andOneEvent (Fixtures.domainCreated domainId)
+                |> Given.andOneEvent (Fixtures.boundedContextCreated domainId contextId)
                 |> Given.andOneEvent added
 
             use testEnvironment = Prepare.withGiven clock given
@@ -241,8 +243,8 @@ module BoundedContextSearch =
                 |> When.gettingJson<{| Id: BoundedContextId |} array> (sprintf "api/boundedContexts/%s/%s" "l1" "v1")
 
             // assert
-            Assert.NotEmpty result
-            Assert.Contains(contextId, result |> Array.map (fun i -> i.Id))
+            Then.NotEmpty result
+            Then.Contains(contextId, result |> Array.map (fun i -> i.Id))
         }
 
     [<Fact>]
@@ -256,18 +258,13 @@ module BoundedContextSearch =
             let domainId = Guid.NewGuid()
 
             let namespaceAdded =
-                NamespaceAdded
-                    { BoundedContextId = contextId
-                      Name = "namespace"
-                      NamespaceId = namespaceId
-                      NamespaceTemplateId = None
-                      Labels = [ Fixtures.newLabel () ] }
+                NamespaceAdded(Fixtures.namespaceDefinition contextId namespaceId)
                 |> Utils.asEvent contextId
 
             let given =
                 Given.noEvents
-                |> Given.andOneEvent (Fixtures.newDomain domainId)
-                |> Given.andOneEvent (Fixtures.newBoundedContext domainId contextId)
+                |> Given.andOneEvent (Fixtures.domainCreated domainId)
+                |> Given.andOneEvent (Fixtures.boundedContextCreated domainId contextId)
                 |> Given.andOneEvent namespaceAdded
 
             use testEnvironment = Prepare.withGiven clock given
@@ -276,15 +273,15 @@ module BoundedContextSearch =
             let! result = testEnvironment |> When.searchingFor $"name=lab"
 
             // assert
-            Assert.NotEmpty result
-            Assert.Collection(result, (fun x -> Assert.Equal(contextId, x)))
+            Then.NotEmpty result
+            Then.Collection(result, (fun x -> Then.Equal(contextId, x)))
 
             //act - search by value
             let! result = testEnvironment |> When.searchingFor "value=val"
 
             // assert
-            Assert.NotEmpty result
-            Assert.Collection(result, (fun x -> Assert.Equal(contextId, x)))
+            Then.NotEmpty result
+            Then.Collection(result, (fun x -> Then.Equal(contextId, x)))
         }
 
     [<Fact>]
@@ -301,26 +298,21 @@ module BoundedContextSearch =
 
             let added =
                 NamespaceAdded
-                    { BoundedContextId = contextId
-                      Name = "namespace"
-                      NamespaceId = namespaceId
-                      NamespaceTemplateId = Some templateId
-                      Labels = [ Fixtures.newLabel () ] }
+                    { Fixtures.namespaceDefinition contextId namespaceId with
+                          NamespaceTemplateId = Some templateId }
                 |> Utils.asEvent contextId
 
             let addedOther =
                 NamespaceAdded
-                    { BoundedContextId = otherContextId
-                      Name = "the other namespace"
-                      NamespaceId = Guid.NewGuid()
-                      NamespaceTemplateId = None
-                      Labels = [ Fixtures.newLabel () ] }
+                    { Fixtures.namespaceDefinition otherContextId (Guid.NewGuid()) with
+                          Name = "the other namespace"
+                          NamespaceTemplateId = None }
                 |> Utils.asEvent otherContextId
 
             let given =
                 Given.noEvents
-                |> Given.andOneEvent (Fixtures.newDomain domainId)
-                |> Given.andOneEvent (Fixtures.newBoundedContext domainId contextId)
+                |> Given.andOneEvent (Fixtures.domainCreated domainId)
+                |> Given.andOneEvent (Fixtures.boundedContextCreated domainId contextId)
                 |> Given.andOneEvent added
                 |> Given.andOneEvent addedOther
 
@@ -332,8 +324,8 @@ module BoundedContextSearch =
                 |> When.searchingFor $"name=lab&NamespaceTemplate=%O{templateId}"
 
             // assert
-            Assert.NotEmpty result
-            Assert.Collection(result, (fun x -> Assert.Equal(contextId, x)))
+            Then.NotEmpty result
+            Then.Collection(result, (fun x -> Then.Equal(contextId, x)))
 
             //act - search by value
             let! result =
@@ -341,6 +333,6 @@ module BoundedContextSearch =
                 |> When.searchingFor $"value=val&NamespaceTemplate=%O{templateId}"
 
             // assert
-            Assert.NotEmpty result
-            Assert.Collection(result, (fun x -> Assert.Equal(contextId, x)))
+            Then.NotEmpty result
+            Then.Collection(result, (fun x -> Then.Equal(contextId, x)))
         }

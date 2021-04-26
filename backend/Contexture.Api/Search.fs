@@ -18,7 +18,6 @@ open Microsoft.Extensions.Hosting
 
 
 module Search =
-    
 
     module Views =
         
