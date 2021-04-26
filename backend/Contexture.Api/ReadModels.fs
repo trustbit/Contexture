@@ -96,13 +96,23 @@ module Namespace =
 
     let private namespacesProjection : Projection<Namespace list, Aggregates.Namespace.Event> =
         { Init = List.empty
+          Update = Projections.asNamespaces }
+        
+    let private namespaceProjection : Projection<Namespace option, Aggregates.Namespace.Event> =
+        { Init = None
           Update = Projections.asNamespace }
-
-    let allNamespaces (eventStore: EventStore) =
+        
+    let namespaceLookup (eventStore: EventStore) : Map<NamespaceId,Namespace>=
         eventStore.Get<Aggregates.Namespace.Event>()
-        |> List.fold (projectIntoMap namespacesProjection) Map.empty
+        |> List.fold (projectIntoMap namespaceProjection) Map.empty
+        |> Map.filter (fun _ v -> Option.isSome v)
+        |> Map.map (fun _ v -> Option.get v)
+        
+    let allNamespaces (eventStore: EventStore) =
+        eventStore
+        |> namespaceLookup
         |> Map.toList
-        |> List.collect snd
+        |> List.map snd
 
     let namespacesOf (eventStore: EventStore) boundedContextId =
         boundedContextId
@@ -121,11 +131,10 @@ module Namespace =
             |> Map.tryFind contextId
             |> Option.defaultValue []
 
-    let buildNamespace (eventStore: EventStore) boundedContextId =
+    let buildNamespaces (eventStore: EventStore) boundedContextId =
         boundedContextId
         |> eventStore.Stream
-        |> project namespacesProjection
-        
+        |> project namespacesProjection       
     
     type NamespaceModel = {
         Value: string option
@@ -147,22 +156,6 @@ module Namespace =
         labels
         |> Map.map (fun _ (values: Set<NamespaceModel>) -> values |> Set.filter (fun { NamespaceId = n } -> n <> namespaceId))
 
-    
-    let projectLabelNameToNamespaceId state eventEnvelope =
-        match eventEnvelope.Event with
-        | NamespaceAdded n ->
-            n.Labels
-            |> List.map (fun l -> l.Name, { Value = l.Value; NamespaceId = n.NamespaceId; NamespaceTemplateId = n.NamespaceTemplateId})
-            |> List.fold append state
-        | NamespaceImported n ->
-            n.Labels
-            |> List.map (fun l -> l.Name,  { Value = l.Value; NamespaceId = n.NamespaceId; NamespaceTemplateId = n.NamespaceTemplateId})
-            |> List.fold append state
-        | LabelAdded l -> append state (l.Name, { Value = l.Value; NamespaceId = l.NamespaceId; NamespaceTemplateId = None})
-        | LabelRemoved l -> remove state l.NamespaceId
-        | NamespaceRemoved n -> remove state n.NamespaceId
-
-
     let projectNamespaceIdToBoundedContextId state eventEnvelope =
         match eventEnvelope.Event with
         | NamespaceAdded n -> state |> Map.add n.NamespaceId n.BoundedContextId
@@ -170,12 +163,56 @@ module Namespace =
         | NamespaceRemoved n -> state |> Map.remove n.NamespaceId
         | LabelAdded l -> state
         | LabelRemoved l -> state
+        
+    module FindNamespace =        
+        let private projectNamespaceNameToNamespaceId state eventEnvelope =
+            let append v namespaces =
+                namespaces
+                |> Option.defaultValue Set.empty
+                |> Set.add v
+                |> Some
 
-    type NamespacesByLabel = Map<string, Set<NamespaceModel>>
+            match eventEnvelope.Event with
+            | NamespaceAdded n -> state |> Map.change (n.Name.ToLowerInvariant()) (append n.NamespaceId)
+            | NamespaceImported n -> state |> Map.change (n.Name.ToLowerInvariant()) (append n.NamespaceId)
+            | NamespaceRemoved n -> state |> Map.filter (fun _ v ->
+                v
+                |> Set.remove n.NamespaceId
+                |> Set.isEmpty
+                |> not
+                )
+            | LabelAdded l -> state
+            | LabelRemoved l -> state
 
-    let namespacesByLabel (eventStore: EventStore) : NamespacesByLabel =
-        eventStore.Get<Aggregates.Namespace.Event>()
-        |> List.fold projectLabelNameToNamespaceId Map.empty
+        let byNamespaceName (eventStore: EventStore) =
+            let namespaces =
+                eventStore.Get<Aggregates.Namespace.Event>()
+                |> List.fold projectNamespaceNameToNamespaceId Map.empty
+            fun (name: string) ->
+                namespaces
+                |> Map.tryFind (name.ToLowerInvariant())
+                |> Option.defaultValue Set.empty
+                
+                
+        let projectLabelNameToNamespace state eventEnvelope =
+            match eventEnvelope.Event with
+            | NamespaceAdded n ->
+                n.Labels
+                |> List.map (fun l -> l.Name, { Value = l.Value; NamespaceId = n.NamespaceId; NamespaceTemplateId = n.NamespaceTemplateId})
+                |> List.fold append state
+            | NamespaceImported n ->
+                n.Labels
+                |> List.map (fun l -> l.Name,  { Value = l.Value; NamespaceId = n.NamespaceId; NamespaceTemplateId = n.NamespaceTemplateId})
+                |> List.fold append state
+            | LabelAdded l -> append state (l.Name, { Value = l.Value; NamespaceId = l.NamespaceId; NamespaceTemplateId = None})
+            | LabelRemoved l -> remove state l.NamespaceId
+            | NamespaceRemoved n -> remove state n.NamespaceId
+
+        type NamespacesByLabel = Map<string, Set<NamespaceModel>>
+
+        let namespacesByLabel (eventStore: EventStore) : NamespacesByLabel =
+            eventStore.Get<Aggregates.Namespace.Event>()
+            |> List.fold projectLabelNameToNamespace Map.empty
 
     let getByLabelName (labelName: string) namespaces =
         let searchedKey = labelName.ToLowerInvariant()
@@ -219,7 +256,8 @@ module Namespace =
         |> List.groupBy fst
         |> Map.ofList
         |> Map.map (fun _ v -> v |> List.map snd)
-
+        
+   
 
 module Templates =
     open Contexture.Api.Aggregates.NamespaceTemplate
