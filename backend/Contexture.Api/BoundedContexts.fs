@@ -131,11 +131,11 @@ module BoundedContexts =
                         |> Option.map(ReadModels.Namespace.FindNamespace.byNamespaceName database)
 
                     let namespacesByLabel =
-                        database |> ReadModels.Namespace.FindNamespace.namespacesByLabel
+                        database |> ReadModels.Namespace.FindNamespace.byLabel
 
                     let namespaces =
                         namespacesByLabel
-                        |> ReadModels.Namespace.findByLabelName item.Name
+                        |> ReadModels.Namespace.FindNamespace.ByLabel.findByLabelName item.Name
                         |> Set.filter
                             (fun { NamespaceTemplateId = template } ->
                                 match item.NamespaceTemplate with
@@ -156,7 +156,7 @@ module BoundedContexts =
                         |> Set.map (fun m -> m.NamespaceId)
 
                     let boundedContextsByNamespace =
-                        ReadModels.Namespace.boundedContextByNamespace database
+                        ReadModels.Namespace.FindBoundedContexts.byNamespace database
 
                     let boundedContextIds =
                         namespaces
@@ -176,13 +176,13 @@ module BoundedContexts =
 
                     let namespaces =
                         database
-                        |> ReadModels.Namespace.FindNamespace.namespacesByLabel
-                        |> ReadModels.Namespace.getByLabelName name
+                        |> ReadModels.Namespace.FindNamespace.byLabel
+                        |> ReadModels.Namespace.FindNamespace.ByLabel.getByLabelName name
                         |> Set.filter (fun { Value = v } -> v = Some value)
                         |> Set.map (fun n -> n.NamespaceId)
 
                     let boundedContextsByNamespace =
-                        ReadModels.Namespace.boundedContextByNamespace database
+                        ReadModels.Namespace.FindBoundedContexts.byNamespace database
 
                     let boundedContextIds =
                         namespaces
