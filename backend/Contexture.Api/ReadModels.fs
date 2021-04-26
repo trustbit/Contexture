@@ -40,13 +40,19 @@ module BoundedContext =
         { Init = None
           Update = Projections.asBoundedContext }
 
-    let allBoundedContexts (eventStore: EventStore) =
+    let boundedContextLookup (eventStore: EventStore) : Map<BoundedContextId,BoundedContext>=
         eventStore.Get<Aggregates.BoundedContext.Event>()
         |> List.fold (projectIntoMap boundedContextProjection) Map.empty
+        |> Map.filter (fun _ v -> Option.isSome v)
+        |> Map.map (fun _ v -> Option.get v)
+        
+    let allBoundedContexts (eventStore: EventStore) =
+        eventStore
+        |> boundedContextLookup
         |> Map.toList
-        |> List.choose snd
+        |> List.map snd
 
-    let boundedContextLookup (contexts: BoundedContext list) =
+    let boundedContextsByDomainLookup (contexts: BoundedContext list) =
         contexts
         |> List.groupBy (fun l -> l.DomainId)
         |> Map.ofList
@@ -55,7 +61,7 @@ module BoundedContext =
         let boundedContexts =
             eventStore
             |> allBoundedContexts
-            |> boundedContextLookup
+            |> boundedContextsByDomainLookup
 
         fun domainId ->
             boundedContexts

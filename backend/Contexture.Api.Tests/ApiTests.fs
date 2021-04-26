@@ -19,11 +19,14 @@ open Xunit
 open FSharp.Control.Tasks
 open Xunit.Sdk
 
+type Given = EventEnvelope list
+
+
 module TestHost =
     let configureLogging (builder: ILoggingBuilder) =
         builder.AddConsole().AddDebug() |> ignore
 
-    let createHost configureServices configure =
+    let createHost configureTest configureServices configure =
         Host
             .CreateDefaultBuilder()
             .UseContentRoot(Directory.GetCurrentDirectory())
@@ -33,14 +36,21 @@ module TestHost =
                 webHost
                     .Configure(Action<_> configure)
                     .UseTestServer()
+                    .ConfigureTestServices(Action<_> configureTest)
                     .ConfigureLogging(configureLogging)
                 |> ignore)
             .ConfigureLogging(configureLogging)
             .Build()
 
-    let runServer () =
+    let withGiven givens =
+        fun (services: IServiceCollection) ->
+            services.AddSingleton<EventStore>(EventStore.With givens)
+            |> ignore
+
+
+    let runServer (given: Given) =
         let host =
-            createHost Contexture.Api.App.configureServices Contexture.Api.App.configureApp
+            createHost (withGiven given) Contexture.Api.App.configureServices Contexture.Api.App.configureApp
 
         host.Start()
         host
@@ -54,12 +64,12 @@ module Utils =
         fun clock ->
             { Event = event
               Metadata = { Source = id; RecordedAt = clock () } }
+            |> EventEnvelope.box
 
-    let append clock (eventStore: EventStore) =
-        fun events ->
-            events
-            |> List.map (fun e -> e clock)
-            |> eventStore.Append
+    let append clock events (given: Given) =
+        events
+        |> List.map (fun e -> e clock)
+        |> List.append given
 
     let postJson (client: HttpClient) (url: string) (jsonContent: string) =
         task {
@@ -101,19 +111,19 @@ module Namespaces =
     [<Fact>]
     let ``Can create a new namespace`` () =
         task {
-            use server = TestHost.runServer ()
-
-            let clock = TestHost.staticClock DateTime.UtcNow
-
-            let eventStore =
-                server.Services.GetRequiredService<EventStore>()
-
             // arrange
+            let clock = TestHost.staticClock DateTime.UtcNow
             let domainId = Guid.NewGuid()
             let contextId = Guid.NewGuid()
 
-            Utils.append clock eventStore [ Fixtures.newDomain domainId ]
-            Utils.append clock eventStore [ Fixtures.newBoundedContext domainId contextId ]
+            let append = Utils.append clock
+
+            let given =
+                []
+                |> append [ Fixtures.newDomain domainId ]
+                |> append [ Fixtures.newBoundedContext domainId contextId ]
+
+            use server = TestHost.runServer given
 
             //act
             use client = server.GetTestClient()
@@ -130,6 +140,9 @@ module Namespaces =
                 Utils.postJson client (sprintf "api/boundedContexts/%O/namespaces" contextId) createNamespaceContent
 
             // assert
+            let eventStore =
+                server.Services.GetRequiredService<EventStore>()
+
             let event =
                 Utils.singleEvent<Namespace.Event> eventStore
 
@@ -149,19 +162,27 @@ module Namespaces =
             | e -> raise (XunitException $"Unexpected event: %O{e}")
         }
 
+module BoundedContextSearch =
+
+    let searchFor queryParameter client =
+        task {
+            let! result =
+                Utils.getJson<{| Id: BoundedContextId |} array> client $"api/boundedContexts?%s{queryParameter}"
+
+            return result |> Array.map (fun i -> i.Id)
+        }
+
+
     [<Fact>]
     let ``Can list bounded contexts by label and value`` () =
         task {
-            use server = TestHost.runServer ()
-
             let clock = TestHost.staticClock DateTime.UtcNow
-
-            let eventStore =
-                server.Services.GetRequiredService<EventStore>()
+            let append = Utils.append clock
 
             // arrange
             let namespaceId = Guid.NewGuid()
             let contextId = Guid.NewGuid()
+            let domainId = Guid.NewGuid()
 
             let added =
                 NamespaceAdded
@@ -178,36 +199,37 @@ module Namespaces =
                                   Value = Some "v2" } ] }
                 |> Utils.asEvent contextId
 
-            Utils.append clock eventStore [ added ]
+            let given =
+                []
+                |> append [ Fixtures.newDomain domainId ]
+                |> append [ Fixtures.newBoundedContext domainId contextId ]
+                |> append [ added ]
+
+            use server = TestHost.runServer given
 
             //act
             use client = server.GetTestClient()
 
             let! result =
-                Utils.getJson<BoundedContextId array>
-                    client
-                    (sprintf "api/namespaces/boundedContextsWithLabel/%s/%s" "l1" "v1")
+                Utils.getJson<{| Id: BoundedContextId |} array> client (sprintf "api/boundedContexts/%s/%s" "l1" "v1")
 
             // assert
             Assert.NotEmpty result
-            Assert.Contains(contextId, result)
+            Assert.Contains(contextId, result |> Array.map (fun i -> i.Id))
         }
 
     [<Fact>]
     let ``Can search for bounded contexts by label and value`` () =
         task {
-            use server = TestHost.runServer ()
-
             let clock = TestHost.staticClock DateTime.UtcNow
-
-            let eventStore =
-                server.Services.GetRequiredService<EventStore>()
+            let append = Utils.append clock
 
             // arrange
             let namespaceId = Guid.NewGuid()
             let contextId = Guid.NewGuid()
+            let domainId = Guid.NewGuid()
 
-            let added =
+            let namespaceAdded =
                 NamespaceAdded
                     { BoundedContextId = contextId
                       Name = "namespace"
@@ -216,15 +238,18 @@ module Namespaces =
                       Labels = [ Fixtures.newLabel () ] }
                 |> Utils.asEvent contextId
 
-            Utils.append clock eventStore [ added ]
+            let given =
+                []
+                |> append [ Fixtures.newDomain domainId ]
+                |> append [ Fixtures.newBoundedContext domainId contextId ]
+                |> append [ namespaceAdded ]
+
+            use server = TestHost.runServer given
 
             //act - search by name
             use client = server.GetTestClient()
 
-            let! result =
-                Utils.getJson<BoundedContextId array>
-                    client
-                    (sprintf "api/namespaces/boundedContextsWithLabel?name=%s" "lab")
+            let! result = client |> searchFor $"name=lab"
 
             // assert
             Assert.NotEmpty result
@@ -233,10 +258,7 @@ module Namespaces =
             //act - search by value
             use client = server.GetTestClient()
 
-            let! result =
-                Utils.getJson<BoundedContextId array>
-                    client
-                    (sprintf "api/namespaces/boundedContextsWithLabel?value=%s" "val")
+            let! result = client |> searchFor "value=val"
 
             // assert
             Assert.NotEmpty result
@@ -246,18 +268,15 @@ module Namespaces =
     [<Fact>]
     let ``Can search for bounded contexts by label and value for a specific template`` () =
         task {
-            use server = TestHost.runServer ()
-
             let clock = TestHost.staticClock DateTime.UtcNow
-
-            let eventStore =
-                server.Services.GetRequiredService<EventStore>()
+            let append = Utils.append clock
 
             // arrange
             let namespaceId = Guid.NewGuid()
             let contextId = Guid.NewGuid()
             let otherContextId = Guid.NewGuid()
             let templateId = Guid.NewGuid()
+            let domainId = Guid.NewGuid()
 
             let added =
                 NamespaceAdded
@@ -277,15 +296,21 @@ module Namespaces =
                       Labels = [ Fixtures.newLabel () ] }
                 |> Utils.asEvent otherContextId
 
-            Utils.append clock eventStore [ added; addedOther ]
+            let given =
+                []
+                |> append [ Fixtures.newDomain domainId ]
+                |> append [ Fixtures.newBoundedContext domainId contextId ]
+                |> append [ added ]
+                |> append [ addedOther ]
+
+            use server = TestHost.runServer given
 
             //act - search by name
             use client = server.GetTestClient()
 
             let! result =
-                Utils.getJson<BoundedContextId array>
-                    client
-                    (sprintf "api/namespaces/boundedContextsWithLabel?name=%s&NamespaceTemplate=%O" "lab" templateId)
+                client
+                |> searchFor $"name=lab&NamespaceTemplate=%O{templateId}"
 
             // assert
             Assert.NotEmpty result
@@ -295,9 +320,8 @@ module Namespaces =
             use client = server.GetTestClient()
 
             let! result =
-                Utils.getJson<BoundedContextId array>
-                    client
-                    (sprintf "api/namespaces/boundedContextsWithLabel?value=%s&NamespaceTemplate=%O" "val" templateId)
+                client
+                |> searchFor $"value=val&NamespaceTemplate=%O{templateId}"
 
             // assert
             Assert.NotEmpty result
