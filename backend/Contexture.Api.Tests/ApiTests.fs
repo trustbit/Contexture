@@ -217,7 +217,7 @@ module BoundedContextSearch =
             let contextId = Guid.NewGuid()
             let domainId = Guid.NewGuid()
 
-            let added =
+            let namespaceAdded =
                 NamespaceAdded
                     { Fixtures.namespaceDefinition contextId namespaceId with
                           Labels =
@@ -233,7 +233,7 @@ module BoundedContextSearch =
                 Given.noEvents
                 |> Given.andOneEvent (Fixtures.domainCreated domainId)
                 |> Given.andOneEvent (Fixtures.boundedContextCreated domainId contextId)
-                |> Given.andOneEvent added
+                |> Given.andOneEvent namespaceAdded
 
             use testEnvironment = Prepare.withGiven clock given
 
@@ -270,14 +270,14 @@ module BoundedContextSearch =
             use testEnvironment = Prepare.withGiven clock given
 
             //act - search by name
-            let! result = testEnvironment |> When.searchingFor $"name=lab"
+            let! result = testEnvironment |> When.searchingFor $"Label.name=lab"
 
             // assert
             Then.NotEmpty result
             Then.Collection(result, (fun x -> Then.Equal(contextId, x)))
 
             //act - search by value
-            let! result = testEnvironment |> When.searchingFor "value=val"
+            let! result = testEnvironment |> When.searchingFor "Label.value=val"
 
             // assert
             Then.NotEmpty result
@@ -297,14 +297,14 @@ module BoundedContextSearch =
             let domainId = Guid.NewGuid()
             let name = "myname"
 
-            let added =
+            let namespaceAdded =
                 NamespaceAdded
                     { Fixtures.namespaceDefinition contextId namespaceId with
                         Name = name
                         NamespaceTemplateId = Some templateId }
                 |> Utils.asEvent contextId
 
-            let addedOther =
+            let otherNamespaceAdded =
                 NamespaceAdded
                     { Fixtures.namespaceDefinition otherContextId (Guid.NewGuid()) with
                           Name = "the other namespace"
@@ -316,15 +316,15 @@ module BoundedContextSearch =
                 |> Given.andOneEvent (Fixtures.domainCreated domainId)
                 |> Given.andOneEvent (Fixtures.boundedContextCreated domainId otherContextId)
                 |> Given.andOneEvent (Fixtures.boundedContextCreated domainId contextId)
-                |> Given.andOneEvent added
-                |> Given.andOneEvent addedOther
+                |> Given.andOneEvent namespaceAdded
+                |> Given.andOneEvent otherNamespaceAdded
 
             use testEnvironment = Prepare.withGiven clock given
 
             //act - search by name
             let! result =
                 testEnvironment
-                |> When.searchingFor $"name=lab&NamespaceTemplate=%O{templateId}"
+                |> When.searchingFor $"Label.name=lab&Namespace.Template=%O{templateId}"
 
             // assert
             Then.NotEmpty result
@@ -333,7 +333,7 @@ module BoundedContextSearch =
             //act - search by value
             let! result =
                 testEnvironment
-                |> When.searchingFor $"value=val&NamespaceTemplate=%O{templateId}"
+                |> When.searchingFor $"Label.value=val&Namespace.Template=%O{templateId}"
 
             // assert
             Then.NotEmpty result
@@ -342,7 +342,7 @@ module BoundedContextSearch =
             // act - search by namespace name
             let! result =
                 testEnvironment
-                |> When.searchingFor $"value=val&Namespace=%s{name}"
+                |> When.searchingFor $"Label.value=val&Namespace.Name=%s{name}"
 
             // assert
             Then.NotEmpty result

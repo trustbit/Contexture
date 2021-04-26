@@ -116,18 +116,28 @@ module BoundedContexts =
         
         module Search =
             [<CLIMutable>]
-            type LabelQuery =
-                { Name: string option
-                  Value: string option
-                  NamespaceTemplate: NamespaceTemplateId option
-                  Namespace: string option }
+            type LabelQuery = {
+                Name: string option
+                Value: string option
+            }
+            [<CLIMutable>]
+            type NamespaceQuery = {
+                Template: NamespaceTemplateId option
+                Name: string option
+            }
+            [<CLIMutable>]
+            type Query =
+                {
+                  Label: LabelQuery option
+                  Namespace: NamespaceQuery option }
 
-            let getBoundedContextsByLabel (item: LabelQuery) =
+            let getBoundedContextsByLabel (item: Query) =
                 fun (next: HttpFunc) (ctx: HttpContext) ->
                     let database = ctx.GetService<EventStore>()
                     
                     let relevantNamespaceIds =
                         item.Namespace
+                        |> Option.bind (fun n -> n.Name)
                         |> Option.map(ReadModels.Namespace.FindNamespace.byNamespaceName database)
 
                     let namespacesByLabel =
@@ -135,10 +145,10 @@ module BoundedContexts =
 
                     let namespaces =
                         namespacesByLabel
-                        |> ReadModels.Namespace.FindNamespace.ByLabel.findByLabelName item.Name
+                        |> ReadModels.Namespace.FindNamespace.ByLabel.findByLabelName (item.Label |> Option.bind (fun l -> l.Name))
                         |> Set.filter
                             (fun { NamespaceTemplateId = template } ->
-                                match item.NamespaceTemplate with
+                                match item.Namespace |> Option.bind (fun i -> i.Template) with
                                 | Some n -> template = Some n
                                 | None -> true
                                 )
@@ -148,7 +158,7 @@ module BoundedContexts =
                             | None -> true)
                         |> Set.filter
                             (fun { Value = value } ->
-                                match item.Value with
+                                match item.Label |> Option.bind (fun i -> i.Value) with
                                 | Some searchTerm ->
                                     value
                                     |> Option.exists (fun v -> v.Contains(searchTerm, StringComparison.OrdinalIgnoreCase))
@@ -259,7 +269,7 @@ module BoundedContexts =
                       >=> routef "/%s/%s" QueryEndpoints.Search.getBoundedContextsWithLabel
                       GET >=>
                         (choose [
-                          bindQuery<QueryEndpoints.Search.LabelQuery> None QueryEndpoints.Search.getBoundedContextsByLabel
+                          bindQuery<QueryEndpoints.Search.Query> None QueryEndpoints.Search.getBoundedContextsByLabel
                           QueryEndpoints.getBoundedContexts
                           ])
                       ])
