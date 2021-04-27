@@ -53,7 +53,7 @@ type Page
 type alias Model =
   { key : Nav.Key
   , route : Route
-  , navState: Navbar.State
+  , navState : Navbar.State
   , baseUrl : Url.Url
   , page : Page }
 
@@ -102,19 +102,28 @@ initWithDerivedUrl : () -> Url.Url -> Nav.Key -> (Model, Cmd Msg)
 initWithDerivedUrl _ url key =
   init { baseUrl = deriveBaseUrl url} url key
 
+hostShouldHandleNotFound : Url.Url -> Url.Url -> Cmd msg 
+hostShouldHandleNotFound baseUrl url =
+  Nav.load  ({ url | port_ = baseUrl.port_ } |> Url.toString)
+
+
 init : Flags -> Url.Url -> Nav.Key -> (Model, Cmd Msg)
 init flag url key =
   let
-    (navState, navCmd) = Navbar.initialState NavMsg
-    model =
-        { route = Route.parseUrl url
-        , page = NotFoundPage
-        , navState = navState
-        , key = key
-        , baseUrl = flag.baseUrl
-        }
+      (navState, navCmd) = Navbar.initialState NavMsg
+      model =
+          { route = Route.parseUrl url
+          , page = NotFoundPage
+          , navState = navState
+          , key = key
+          , baseUrl = flag.baseUrl
+          }
   in
-    initCurrentPage ( model, navCmd )
+    case model.route of
+      Route.NotFound ->
+        (model, hostShouldHandleNotFound model.baseUrl url)
+      _ ->
+        initCurrentPage ( model, navCmd )
 
 -- UPDATE
 
@@ -132,9 +141,9 @@ update msg model =
     ( LinkClicked urlRequest, _ ) ->
       case urlRequest of
           Browser.Internal url ->
-              case Route.parseUrl url of
+              case Route.parseUrl (Debug.log "Internal URL" url) of
                 Route.NotFound ->
-                  ( model, Nav.load  ({ url | port_ = model.baseUrl.port_ } |> Url.toString))
+                  ( model, hostShouldHandleNotFound model.baseUrl url)
                 _ ->
                   ( model
                   , Nav.pushUrl model.key (Url.toString url)
@@ -142,7 +151,7 @@ update msg model =
 
           Browser.External url ->
               ( model
-              , Nav.load url
+              , Nav.load (Debug.log "External URL" url)
               )
     ( UrlChanged url, _ ) ->
       let
@@ -193,10 +202,10 @@ menu model =
   Navbar.config NavMsg
       |> Navbar.withAnimation
       |> Navbar.primary
-      |> Navbar.brand [ href "/" ] [ text "Contexture" ]
+      |> Navbar.brand [ href (Route.routeToString <| Route.Home)] [ text "Contexture" ]
       |> Navbar.items 
-        [ Navbar.itemLinkActive [ href "/" ] [ text "Domains"]
-        , Navbar.itemLink [ href "/search"] [ text "Search"] 
+        [ Navbar.itemLinkActive [ href (Route.routeToString <| Route.Home) ] [ text "Domains"]
+        , Navbar.itemLink [ href (Route.routeToString <| Route.Search [])] [ text "Search"] 
         ]
       |> Navbar.view model.navState
 

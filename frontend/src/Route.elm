@@ -6,6 +6,7 @@ import Url.Parser exposing (..)
 
 import Domain.DomainId as Domain exposing (DomainId)
 import BoundedContext.BoundedContextId as BoundedContext exposing (BoundedContextId)
+import Url.Builder exposing (QueryParameter)
 
 type Route
     = NotFound
@@ -13,6 +14,7 @@ type Route
     | Domain DomainId
     | BoundedContextCanvas BoundedContextId
     | Namespaces BoundedContextId
+    | Search (List QueryParameter)
 
 parseUrl : Url -> Route
 parseUrl url =
@@ -53,3 +55,5 @@ routeToString route =
             "/boundedContext/" ++ BoundedContext.idToString contextId ++ "/canvas"
         Namespaces contextId ->
             "/boundedContext/" ++ BoundedContext.idToString contextId ++ "/namespaces"
+        Search queryParameters ->
+            Url.Builder.absolute [ "search" ] queryParameters

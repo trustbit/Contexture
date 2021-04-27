@@ -55,19 +55,14 @@ module Search =
             let collaborations =
                 Collaboration.allCollaborations eventStore
 
-            let domainResult =
-                domains
-                |> List.map (fun d ->
-                    {| Domain = d
-                       BoundedContexts =
-                           d.Id
-                           |> boundedContextsOf
-                           |> List.map (Results.convertBoundedContext namespacesOf) |})
-
             let result =
                 {| Collaboration = collaborations
-                   Domains = domainResult
-                   ApiBase = basePath.ApiBase + "/api" |}
+                   Domains = domains
+                   ApiBase = basePath.ApiBase + "/api"
+                   InitialQuery =
+                       ctx.Request.Query
+                       |> Seq.map (fun q -> {| Name = q.Key; Value = q.Value |> Seq.tryHead |})
+                |}
 
             let jsonEncoder = ctx.GetJsonSerializer()
 

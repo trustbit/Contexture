@@ -32,6 +32,7 @@ import BoundedContext.Canvas exposing (BoundedContextCanvas)
 import BoundedContext.StrategicClassification as StrategicClassification
 import ContextMapping.Communication as Communication exposing(ScopedCommunication)
 import BoundedContext.Namespace as Namespace exposing (Namespace)
+import Url.Builder
 
 
 type alias Item =
@@ -58,24 +59,42 @@ init communications item =
   , communication = communications
   }
 
+
 viewLabelAsBadge : Namespace.Label -> Html msg
 viewLabelAsBadge label =
-  let
-    caption = label.name ++ " | " ++ label.value
-  in
-    Badge.badgeInfo
-      [ Spacing.ml1
-      , title <| "The label '" ++ label.name ++ "' has the value '" ++ label.value ++ "'"
-      ]
-      [ case Url.fromString label.value of
-          Just link ->
-            Html.span []
-              [ text caption
-              , Html.a [ link |> Url.toString |> href, target "_blank", Spacing.ml1 ] [ 0x0001F517 |> Char.fromCode  |> String.fromChar |> Html.text ]
-              ]
-          Nothing ->
-            text caption
-      ]
+  case Url.fromString label.value of
+    Just link ->
+      Html.a
+        [ title <| "The label '" ++ label.name ++ "' is a link and has the value '" ++ label.value ++ "'"
+        , class "badge badge-info"
+        , link |> Url.toString |> href, target "_blank"
+        , Spacing.ml1
+        ]
+        [ text label.name
+        , Html.span [ Spacing.ml1 ] [0x0001F517 |> Char.fromCode  |> String.fromChar |> Html.text]
+        ]
+    Nothing ->
+        Badge.badgeInfo
+          [ Spacing.ml1
+          , title <| "The label '" ++ label.name ++ "' has the value '" ++ label.value ++ "'"
+          ]
+          [ Html.span []
+            [ text <| label.name ++ " | "
+            , Html.a
+              [ href (
+                  Route.routeToString <|
+                    Route.Search
+                      [ Url.Builder.string "Label.Name" label.name
+                      , Url.Builder.string "Label.Value" label.value
+                      ]
+                    )
+                , target "_blank"
+                , style "color" "white"
+                , style "text-decoration" "underline"
+                ]
+                [ text label.value]
+            ]
+          ]
 
 
 viewPillMessage : String -> Int -> List (Html msg)
@@ -175,7 +194,7 @@ viewItem communication { context, canvas, namespaces } =
         then t
         else t |> Card.listGroup namespaceBlocks
     )
-    
+
 
 
 view : Model -> Card.Config msg
