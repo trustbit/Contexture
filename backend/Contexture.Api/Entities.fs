@@ -909,8 +909,44 @@ module Aggregates =
                       Id = l.LabelId
                       Value = l.Value |> Option.defaultValue null
                       Template = l.Template })
+                
+            let asNamespace namespaceOption event =
+                match event with
+                | NamespaceImported c ->
+                    Some {
+                      Id = c.NamespaceId
+                      Template = c.NamespaceTemplateId
+                      Name = c.Name
+                      Labels = c.Labels |> convertLabels }
+                | NamespaceAdded c ->
+                    Some {
+                      Id = c.NamespaceId
+                      Template = None
+                      Name = c.Name
+                      Labels = c.Labels |> convertLabels }
+                | NamespaceRemoved c ->
+                    None
+                | LabelAdded c ->
+                    namespaceOption
+                    |> Option.map (fun n ->
+                        { n with
+                              Labels =
+                                  { Id = c.LabelId
+                                    Name = c.Name
+                                    Value = c.Value |> Option.defaultValue null
+                                    Template = None }
+                                  :: n.Labels }
+                    )
+                | LabelRemoved c ->
+                    namespaceOption
+                    |> Option.map (fun n ->
+                        { n with
+                              Labels =
+                                  n.Labels
+                                  |> List.filter (fun l -> l.Id <> c.LabelId) }
+                    )
 
-            let asNamespace namespaces event =
+            let asNamespaces namespaces event =
                 match event with
                 | NamespaceImported c ->
                     { Id = c.NamespaceId
@@ -955,7 +991,7 @@ module Aggregates =
             let asNamespaceWithBoundedContext boundedContextOption event =
                 boundedContextOption
                 |> Option.map (fun boundedContext ->
-                    { boundedContext with Namespaces = asNamespace boundedContext.Namespaces event })
+                    { boundedContext with Namespaces = asNamespaces boundedContext.Namespaces event })
 
     module NamespaceTemplate =
         open Entities

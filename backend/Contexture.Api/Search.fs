@@ -4,6 +4,7 @@ open System
 open Contexture.Api
 open Contexture.Api.Aggregates
 open Contexture.Api.BoundedContexts
+open Contexture.Api.Entities
 open Contexture.Api.ReadModels
 open Contexture.Api.Domains
 open Contexture.Api.Infrastructure

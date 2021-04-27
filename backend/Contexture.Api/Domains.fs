@@ -190,7 +190,7 @@ module Domains =
             fun (next: HttpFunc) (ctx: HttpContext) ->
                 let database = ctx.GetService<EventStore>()
                 let boundedContexts = BoundedContext.allBoundedContexts database
-                let boundedContextsOf = BoundedContext.boundedContextLookup boundedContexts
+                let boundedContextsOf = BoundedContext.boundedContextsByDomainLookup boundedContexts
                 let namespacesOf = Namespace.allNamespacesByContext database
 
                 let boundedContexts =
