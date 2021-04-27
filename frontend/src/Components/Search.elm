@@ -4,6 +4,9 @@ import Url
 import Http
 import RemoteData
 
+import Bootstrap.Grid as Grid
+import Bootstrap.Grid.Row as Row
+import Bootstrap.Grid.Col as Col
 
 import Api as Api
 import Page.Bcc.BoundedContextCard as BoundedContextCard
@@ -75,12 +78,20 @@ init flag =
                 , collaboration = decoded.collaboration
                 , items = RemoteData.Loading
                 , models = RemoteData.Loading
+                , query = decoded.initialQuery
                 }
             , findAll decoded.apiBase decoded.initialQuery
             )
 
         Err e ->
-            ( { configuration = Api.baseConfig "", domains = [], collaboration = [], items = RemoteData.Failure <| Http.BadBody (Debug.toString e), models = RemoteData.Failure <| Http.BadBody (Debug.toString e) }
+            ( Debug.log "Error on initializing"
+                { configuration = Api.baseConfig ""
+                , domains = []
+                , query = []
+                , collaboration = []
+                , items = RemoteData.Failure <| Http.BadBody (Debug.toString e)
+                , models = RemoteData.Failure <| Http.BadBody (Debug.toString e)
+                }
             , Cmd.none
             )
 
@@ -91,6 +102,7 @@ type alias Flags =
     , apiBase : Api.Configuration
     , initialQuery : List QueryParameter
     }
+
 
 baseConfiguration =
     Decode.string
@@ -106,7 +118,7 @@ baseConfiguration =
             )
 
 queryDecoder =
-    Decode.map2 Url.Builder.string
+    Decode.map2 QueryParameter
         (Decode.field "name" Decode.string)
         (Decode.field "value" Decode.string)
 
@@ -118,6 +130,12 @@ flagsDecoder =
         (Decode.field "apiBase" baseConfiguration)
         (Decode.field "initialQuery" (Decode.list queryDecoder))
 
+type alias QueryParameter =
+    { name : String
+    , value : String
+    }
+
+
 
 type alias Model =
     { configuration : Api.Configuration
@@ -125,6 +143,7 @@ type alias Model =
     , collaboration : Collaborations
     , items : RemoteData.WebData (List BoundedContextCard.Item)
     , models : RemoteData.WebData (List BoundedContext.Model)
+    , query : List QueryParameter
     }
 
 
@@ -154,19 +173,35 @@ update msg model =
             ( updateModels { model | items = RemoteData.fromResult found }, Cmd.none)
 
 
-viewItems : List BoundedContext.Model -> Html Msg
+viewItems : List BoundedContext.Model -> List (Html Msg)
 viewItems items =
     items
     |> List.map BoundedContext.view
     |> List.map (Html.map BoundedContextMsg)
-    |> div [ class "container" ]
+
+
+viewFilter : List QueryParameter -> Html Msg
+viewFilter query =
+    if not <| List.isEmpty query then
+        Grid.simpleRow
+            [ Grid.col []
+                [ Html.h6[] [text "Filter parameters"]
+                , Html.ul []
+                    (query |> List.map (\q -> Html.li [] [ text <| q.name ++ ": " ++ q.value ]))
+                ]
+            ]
+    else
+        Grid.simpleRow []
 
 
 view : Model -> Html Msg
 view model =
     case model.models of
         RemoteData.Success items ->
-            viewItems items
+            Grid.container [ ]
+                ( viewFilter model.query
+                :: viewItems items
+                )
         e ->
             text <| "Could not load data: " ++ (Debug.toString e)
 
@@ -179,6 +214,6 @@ subscriptions model =
 findAll : Api.Configuration -> List QueryParameter -> Cmd Msg
 findAll config query =
   Http.get
-    { url = Api.allBoundedContexts [] |> Api.urlWithQueryParameters config query
+    { url = Api.allBoundedContexts [] |> Api.urlWithQueryParameters config (query |> List.map (\q -> Url.Builder.string q.name q.value))
     , expect = Http.expectJson BoundedContextsFound (Decode.list BoundedContextCard.decoder)
     }
