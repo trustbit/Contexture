@@ -5,7 +5,8 @@ module Api exposing (
   collaborations, collaboration,
   namespaceTemplates,
   canvas, 
-  url, config, baseConfig)
+  url, urlWithQueryParameters,
+  config, baseConfig)
 
 import Http
 import Url
@@ -46,6 +47,12 @@ baseConfig base =
 url : Configuration -> Endpoint -> String
 url (Configuration basePath) (Endpoint segments query) =
   basePath ++ (Url.Builder.absolute segments query)
+
+
+urlWithQueryParameters : Configuration -> List QueryParameter -> Endpoint -> String
+urlWithQueryParameters (Configuration basePath) additionalQueries (Endpoint segments query) =
+  basePath ++ (Url.Builder.absolute segments (query ++ additionalQueries))
+
 
 type Include
   = Subdomains
