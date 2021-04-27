@@ -7,6 +7,9 @@ import RemoteData
 
 import Api as Api
 import Page.Bcc.BoundedContextCard as BoundedContextCard
+import BoundedContext as BoundedContext
+import BoundedContext.BoundedContextId as BoundedContextId
+import Domain.DomainId as DomainId
 import BoundedContext.Canvas
 import BoundedContext.Namespace as Namespace
 import Browser
@@ -21,6 +24,7 @@ import Url
 import Url.Builder exposing (QueryParameter)
 import Url.Parser
 import Url.Parser.Query
+import Dict
 
 
 main =
@@ -32,9 +36,32 @@ main =
         }
 
 
-initModel : Api.Configuration -> Collaboration.Collaborations -> List BoundedContextCard.Item -> Domain -> BoundedContext.Model
-initModel config collaboration items domainModel =
-    BoundedContext.init config domainModel items collaboration
+initModel : Api.Configuration -> Collaboration.Collaborations -> List BoundedContextCard.Item -> List Domain -> List BoundedContext.Model
+initModel config collaboration items domains =
+    let
+        groupItemsByDomainId item grouping =
+            grouping
+            |> Dict.update
+                (item.context |> BoundedContext.domain |> DomainId.idToString)
+                (\maybeContexts ->
+                    case maybeContexts of
+                        Just boundedContexts ->
+                            Just (item :: boundedContexts)
+                        Nothing ->
+                            Just (List.singleton item)
+                )
+        boundedContextsPerDomain =
+            items
+            |> List.foldl groupItemsByDomainId Dict.empty
+
+        getContexts domain =
+            boundedContextsPerDomain
+            |> Dict.get (domain |> Domain.id |> DomainId.idToString)
+            |> Maybe.withDefault []
+
+    in
+        domains
+        |> List.map (\domain -> BoundedContext.init config domain (getContexts domain) collaboration)
 
 
 init : Decode.Value -> ( Model, Cmd Msg )
@@ -104,9 +131,7 @@ updateModels model =
     | models =
         model.items
         |> RemoteData.map (\items ->
-            model.domains
-            |> List.map (initModel model.configuration model.collaboration items
-            )
+            initModel model.configuration model.collaboration items model.domains
         )
     }
 
