@@ -62,6 +62,7 @@ initModel config collaboration items domains =
     in
         domains
         |> List.map (\domain -> BoundedContext.init config domain (getContexts domain) collaboration)
+        |> List.filter(\i -> not <| List.isEmpty i.contextItems)
 
 
 init : Decode.Value -> ( Model, Cmd Msg )
