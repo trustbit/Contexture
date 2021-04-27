@@ -75,7 +75,7 @@ init flag =
                 , items = RemoteData.Loading
                 , models = RemoteData.Loading
                 }
-            , findAll decoded.apiBase []
+            , findAll decoded.apiBase decoded.initialQuery
             )
 
         Err e ->
@@ -88,6 +88,7 @@ type alias Flags =
     { collaboration : Collaborations
     , domains : List Domain
     , apiBase : Api.Configuration
+    , initialQuery : List QueryParameter
     }
 
 baseConfiguration =
@@ -103,12 +104,18 @@ baseConfiguration =
                         else Decode.fail <| "Could not decode url from " ++ v
             )
 
+queryDecoder =
+    Decode.map2 Url.Builder.string
+        (Decode.field "name" Decode.string)
+        (Decode.field "value" Decode.string)
+
 
 flagsDecoder =
-    Decode.map3 Flags
+    Decode.map4 Flags
         (Decode.field "collaboration" (Decode.list Collaboration.decoder))
         (Decode.field "domains" (Decode.list Domain.domainDecoder))
         (Decode.field "apiBase" baseConfiguration)
+        (Decode.field "initialQuery" (Decode.list queryDecoder))
 
 
 type alias Model =

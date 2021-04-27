@@ -58,7 +58,11 @@ module Search =
             let result =
                 {| Collaboration = collaborations
                    Domains = domains
-                   ApiBase = basePath.ApiBase + "/api" |}
+                   ApiBase = basePath.ApiBase + "/api"
+                   InitialQuery =
+                       ctx.Request.Query
+                       |> Seq.map (fun q -> {| Name = q.Key; Value = q.Value |> Seq.tryHead |})
+                |}
 
             let jsonEncoder = ctx.GetJsonSerializer()
 
