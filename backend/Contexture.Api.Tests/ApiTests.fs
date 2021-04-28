@@ -195,7 +195,7 @@ module Namespaces =
             | e -> raise (XunitException $"Unexpected event: %O{e}")
         }
 
-module BoundedContextSearch =
+module BoundedContexts =
 
     module When =
         let searchingFor queryParameter (environment: Prepare.TestEnvironment) =
@@ -206,6 +206,58 @@ module BoundedContextSearch =
 
                 return result |> Array.map (fun i -> i.Id)
             }
+
+    [<Fact>]
+    let ``Can list all bounded contexts`` () =
+        task {
+            let clock = TestHost.staticClock DateTime.UtcNow
+
+            // arrange
+            let contextId = Guid.NewGuid()
+            let domainId = Guid.NewGuid()
+
+            let given =
+                Given.noEvents
+                |> Given.andOneEvent (Fixtures.domainCreated domainId)
+                |> Given.andOneEvent (Fixtures.boundedContextCreated domainId contextId)
+
+            use testEnvironment = Prepare.withGiven clock given
+
+            //act
+            let! result =
+                testEnvironment
+                |> When.gettingJson<{| Id: BoundedContextId |} array> (sprintf "api/boundedContexts")
+
+            // assert
+            Then.NotEmpty result
+            Then.Contains(contextId, result |> Array.map (fun i -> i.Id))
+        }
+
+    [<Fact>]
+    let ``Can still list bounded contexts when attaching a random query string`` () =
+        task {
+            let clock = TestHost.staticClock DateTime.UtcNow
+
+            // arrange
+            let contextId = Guid.NewGuid()
+            let domainId = Guid.NewGuid()
+
+            let given =
+                Given.noEvents
+                |> Given.andOneEvent (Fixtures.domainCreated domainId)
+                |> Given.andOneEvent (Fixtures.boundedContextCreated domainId contextId)
+
+            use testEnvironment = Prepare.withGiven clock given
+
+            //act
+            let! result =
+                testEnvironment
+                |> When.gettingJson<{| Id: BoundedContextId |} array> (sprintf "api/boundedContexts?bar.foo=baz")
+
+            // assert
+            Then.NotEmpty result
+            Then.Contains(contextId, result |> Array.map (fun i -> i.Id))
+        }
 
     [<Fact>]
     let ``Can list bounded contexts by label and value`` () =
@@ -270,14 +322,18 @@ module BoundedContextSearch =
             use testEnvironment = Prepare.withGiven clock given
 
             //act - search by name
-            let! result = testEnvironment |> When.searchingFor $"Label.name=lab"
+            let! result =
+                testEnvironment
+                |> When.searchingFor $"Label.name=lab"
 
             // assert
             Then.NotEmpty result
             Then.Collection(result, (fun x -> Then.Equal(contextId, x)))
 
             //act - search by value
-            let! result = testEnvironment |> When.searchingFor "Label.value=val"
+            let! result =
+                testEnvironment
+                |> When.searchingFor "Label.value=val"
 
             // assert
             Then.NotEmpty result
@@ -300,8 +356,8 @@ module BoundedContextSearch =
             let namespaceAdded =
                 NamespaceAdded
                     { Fixtures.namespaceDefinition contextId namespaceId with
-                        Name = name
-                        NamespaceTemplateId = Some templateId }
+                          Name = name
+                          NamespaceTemplateId = Some templateId }
                 |> Utils.asEvent contextId
 
             let otherNamespaceAdded =

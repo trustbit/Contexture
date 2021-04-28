@@ -136,7 +136,7 @@ module Namespace =
         |> eventStore.Stream
         |> project namespacesProjection
 
-    type NamespaceModel =
+    type LabelAndNamespaceModel =
         { Value: string option
           NamespaceId: NamespaceId
           NamespaceTemplateId: NamespaceTemplateId option }
@@ -152,36 +152,60 @@ module Namespace =
                 | Some values -> values |> Set.add value |> Some
                 | None -> value |> Set.singleton |> Some)
 
+        let remove extractNamespace namespaceId items =
+            items
+            |> Map.map
+                (fun _ (values: Set<_>) ->
+                    values
+                    |> Set.filter (fun n -> extractNamespace n <> namespaceId))
+
+        type NamespaceModel =
+            { NamespaceId: NamespaceId
+              NamespaceTemplateId: NamespaceTemplateId option }
+
+        type NamespaceFinder = Map<string, Set<NamespaceModel>>
+
         let private projectNamespaceNameToNamespaceId state eventEnvelope =
             match eventEnvelope.Event with
-            | NamespaceAdded n -> appendToSet state (n.Name, n.NamespaceId)
-            | NamespaceImported n -> appendToSet state (n.Name, n.NamespaceId)
+            | NamespaceAdded n ->
+                appendToSet
+                    state
+                    (n.Name,
+                     { NamespaceId = n.NamespaceId
+                       NamespaceTemplateId = n.NamespaceTemplateId })
+            | NamespaceImported n ->
+                appendToSet
+                    state
+                    (n.Name,
+                     { NamespaceId = n.NamespaceId
+                       NamespaceTemplateId = n.NamespaceTemplateId })
             | NamespaceRemoved n ->
                 state
-                |> Map.filter
-                    (fun _ v ->
-                        v
-                        |> Set.remove n.NamespaceId
-                        |> Set.isEmpty
-                        |> not)
+                |> remove (fun i -> i.NamespaceId) n.NamespaceId
             | LabelAdded l -> state
             | LabelRemoved l -> state
 
-        let byNamespaceName (eventStore: EventStore) =
-            let namespaces =
-                eventStore.Get<Aggregates.Namespace.Event>()
-                |> List.fold projectNamespaceNameToNamespaceId Map.empty
+        let findNamespaces (eventStore: EventStore) : NamespaceFinder =
+            eventStore.Get<Aggregates.Namespace.Event>()
+            |> List.fold projectNamespaceNameToNamespaceId Map.empty
 
-            fun (name: string) ->
-                namespaces
-                |> Map.tryFind (name.ToLowerInvariant())
-                |> Option.defaultValue Set.empty
+        let byNamespaceName (namespaces: NamespaceFinder) (name: string) =
+            namespaces
+            |> Map.tryFind (name.ToLowerInvariant())
+            |> Option.defaultValue Set.empty
+
+        let byNamespaceTemplate (namespaces: NamespaceFinder) (templateId: NamespaceTemplateId) =
+            namespaces
+            |> Map.toList
+            |> List.map snd
+            |> Set.unionMany
+            |> Set.filter (fun m -> m.NamespaceTemplateId = Some templateId)
 
         let private projectLabelNameToNamespace state eventEnvelope =
             let remove labels namespaceId =
                 labels
                 |> Map.map
-                    (fun _ (values: Set<NamespaceModel>) ->
+                    (fun _ (values: Set<LabelAndNamespaceModel>) ->
                         values
                         |> Set.filter (fun { NamespaceId = n } -> n <> namespaceId))
 
@@ -214,7 +238,7 @@ module Namespace =
             | LabelRemoved l -> remove state l.NamespaceId
             | NamespaceRemoved n -> remove state n.NamespaceId
 
-        type NamespacesByLabel = Map<string, Set<NamespaceModel>>
+        type NamespacesByLabel = Map<string, Set<LabelAndNamespaceModel>>
 
         let byLabel (eventStore: EventStore) : NamespacesByLabel =
             eventStore.Get<Aggregates.Namespace.Event>()
