@@ -144,16 +144,16 @@ module BoundedContexts =
 
 
             let findRelevantNamespaces (database: EventStore) (item: NamespaceQuery) =
-                let namespaces =
-                    ReadModels.Namespace.FindNamespace.findNamespaces database
+                let availableNamespaces =
+                    ReadModels.Namespace.Find.namespaces database
 
                 let namespacesByName =
                     item.Name
-                    |> Option.map (ReadModels.Namespace.FindNamespace.byNamespaceName namespaces)
+                    |> Option.map (ReadModels.Namespace.Find.Namespaces.byName availableNamespaces)
 
                 let namespacesByTemplate =
                     item.Template
-                    |> Option.map (ReadModels.Namespace.FindNamespace.byNamespaceTemplate namespaces)
+                    |> Option.map (ReadModels.Namespace.Find.Namespaces.byTemplate availableNamespaces)
 
                 let relevantNamespaces =
                     match namespacesByName, namespacesByTemplate with
@@ -167,10 +167,10 @@ module BoundedContexts =
             let findRelevantLabels (database: EventStore) (item: LabelQuery) =
                 let namespacesByLabel =
                     database
-                    |> ReadModels.Namespace.FindNamespace.byLabel
+                    |> ReadModels.Namespace.Find.labels
 
                 namespacesByLabel
-                |> ReadModels.Namespace.FindNamespace.ByLabel.findByLabelName item.Name
+                |> ReadModels.Namespace.Find.Labels.byLabelName item.Name
                 |> Set.filter
                     (fun { Value = value } ->
                         match item.Value with
@@ -203,7 +203,7 @@ module BoundedContexts =
                         | None, None -> Set.empty
 
                     let boundedContextsByNamespace =
-                        ReadModels.Namespace.FindBoundedContexts.byNamespace database
+                        ReadModels.Namespace.Find.BoundedContexts.byNamespace database
 
                     let boundedContextIds =
                         namespacesIds
@@ -223,13 +223,13 @@ module BoundedContexts =
 
                     let namespaces =
                         database
-                        |> ReadModels.Namespace.FindNamespace.byLabel
-                        |> ReadModels.Namespace.FindNamespace.ByLabel.getByLabelName name
+                        |> ReadModels.Namespace.Find.labels
+                        |> ReadModels.Namespace.Find.Labels.getByLabelName name
                         |> Set.filter (fun { Value = v } -> v = Some value)
                         |> Set.map (fun n -> n.NamespaceId)
 
                     let boundedContextsByNamespace =
-                        ReadModels.Namespace.FindBoundedContexts.byNamespace database
+                        ReadModels.Namespace.Find.BoundedContexts.byNamespace database
 
                     let boundedContextIds =
                         namespaces
