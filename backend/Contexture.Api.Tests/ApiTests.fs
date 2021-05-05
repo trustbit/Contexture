@@ -292,54 +292,6 @@ module BoundedContexts =
             Then.Contains(contextId, result |> Array.map (fun i -> i.Id))
         }
 
-    [<Fact>]
-    let ``Can list bounded contexts by label and value`` () =
-        task {
-            let clock = FixedTimeEnvironment.FromSystemClock()
-
-            // arrange
-            let namespaceId = Guid.NewGuid()
-            let contextId = Guid.NewGuid()
-            let domainId = Guid.NewGuid()
-
-            let namespaceAdded =
-                NamespaceAdded
-                    { Fixtures.namespaceDefinition contextId namespaceId with
-                          Labels =
-                              [ { Fixtures.newLabel () with
-                                      Name = "l1"
-                                      Value = Some "v1" }
-                                { Fixtures.newLabel () with
-                                      Name = "l2"
-                                      Value = Some "v2" } ] }
-                |> Utils.asEvent contextId
-
-            let given =
-                Given.noEvents
-                |> Given.andOneEvent (
-                    domainId
-                    |> Fixtures.domainDefinition
-                    |> Fixtures.domainCreated
-                )
-                |> Given.andOneEvent (
-                    contextId
-                    |> Fixtures.boundedContextDefinition domainId
-                    |> Fixtures.boundedContextCreated
-                )
-                |> Given.andOneEvent namespaceAdded
-
-            use testEnvironment = Prepare.withGiven clock given
-
-            //act
-            let! result =
-                testEnvironment
-                |> When.gettingJson<{| Id: BoundedContextId |} array> (sprintf "api/boundedContexts/%s/%s" "l1" "v1")
-
-            // assert
-            Then.NotEmpty result
-            Then.Contains(contextId, result |> Array.map (fun i -> i.Id))
-        }
-
     [<Theory>]
     [<InlineData("Label.name", "label")>]
     [<InlineData("Label.value", "value")>]

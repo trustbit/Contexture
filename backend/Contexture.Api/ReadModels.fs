@@ -290,15 +290,6 @@ module Namespace =
                     state
                     |> removeFromSet (fun n -> n.NamespaceId) n.NamespaceId
 
-            let getByLabelName (labelName: string) (namespaces: NamespacesByLabel) =
-                let searchedKey = labelName.ToLowerInvariant()
-
-                namespaces
-                |> Map.filter (fun k _ -> k = searchedKey)
-                |> Map.toList
-                |> List.map snd
-                |> Set.unionMany
-
             let byLabelName (phrase: SearchPhrase option) (namespaces: NamespacesByLabel) =
                 let matchesKey (key: string) =
                     let term = SearchTerm.fromInput key |> Option.get
