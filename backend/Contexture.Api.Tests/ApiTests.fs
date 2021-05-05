@@ -13,6 +13,7 @@ open Contexture.Api.Infrastructure
 open Xunit
 open FSharp.Control.Tasks
 open Xunit.Sdk
+open Contexture.Api.Tests.EnvironmentSimulation
 
 type Given = EventEnvelope list
 
@@ -26,13 +27,13 @@ module When =
     open System.Net.Http.Json
     open TestHost
 
-    let postingJson (url: string) (jsonContent: string) (environment: TestEnvironment) =
+    let postingJson (url: string) (jsonContent: string) (environment: TestHostEnvironment) =
         task {
             let! result = environment.Client.PostAsync(url, new StringContent(jsonContent))
             return result.EnsureSuccessStatusCode()
         }
 
-    let gettingJson<'t> (url: string) (environment: TestEnvironment) =
+    let gettingJson<'t> (url: string) (environment: TestHostEnvironment) =
         task {
             let! result = environment.Client.GetFromJsonAsync<'t>(url)
             return result
@@ -42,9 +43,9 @@ type Then = Assert
 
 module Utils =
     let asEvent id event =
-        fun clock ->
+        fun (environment: ISimulateEnvironment)  ->
             { Event = event
-              Metadata = { Source = id; RecordedAt = clock () } }
+              Metadata = { Source = id; RecordedAt = environment.Time () } }
             |> EventEnvelope.box
 
     let singleEvent<'e> (eventStore: EventStore) : EventEnvelope<'e> =
@@ -86,7 +87,7 @@ module Fixtures =
         |> Utils.asEvent definition.BoundedContextId
 
     module RandomDomainAndBoundedContextAndNamespace =
-        let given =
+        let given () =
             let namespaceId = Guid.NewGuid()
             let contextId = Guid.NewGuid()
             let domainId = Guid.NewGuid()
@@ -132,7 +133,7 @@ module Namespaces =
     let ``Can create a new namespace`` () =
         task {
             // arrange
-            let clock = TestHost.staticClock DateTime.UtcNow
+            let clock = FixedTimeEnvironment.FromSystemClock()
             let domainId = Guid.NewGuid()
             let contextId = Guid.NewGuid()
 
@@ -190,7 +191,7 @@ module BoundedContexts =
 
     module When =
         open TestHost
-        let searchingFor queryParameter (environment: TestEnvironment) =
+        let searchingFor queryParameter (environment: TestHostEnvironment) =
             task {
                 let! result =
                     environment
@@ -202,7 +203,7 @@ module BoundedContexts =
     [<Fact>]
     let ``Can list all bounded contexts`` () =
         task {
-            let clock = TestHost.staticClock DateTime.UtcNow
+            let clock = FixedTimeEnvironment.FromSystemClock()
 
             // arrange
             let contextId = Guid.NewGuid()
@@ -236,7 +237,7 @@ module BoundedContexts =
     [<Fact>]
     let ``Can still list bounded contexts when attaching a random query string`` () =
         task {
-            let clock = TestHost.staticClock DateTime.UtcNow
+            let clock = FixedTimeEnvironment.FromSystemClock()
 
             // arrange
             let contextId = Guid.NewGuid()
@@ -271,7 +272,7 @@ module BoundedContexts =
     [<Fact>]
     let ``Can still list bounded contexts when attaching a query string`` () =
         task {
-            let clock = TestHost.staticClock DateTime.UtcNow
+            let clock = FixedTimeEnvironment.FromSystemClock()
 
             // arrange
             let contextId = Guid.NewGuid()
@@ -308,7 +309,7 @@ module BoundedContexts =
     [<Fact>]
     let ``Can list bounded contexts by label and value`` () =
         task {
-            let clock = TestHost.staticClock DateTime.UtcNow
+            let clock = FixedTimeEnvironment.FromSystemClock()
 
             // arrange
             let namespaceId = Guid.NewGuid()
@@ -362,7 +363,7 @@ module BoundedContexts =
             parameterValue: string
         ) =
         task {
-            let clock = TestHost.staticClock DateTime.UtcNow
+            let clock = FixedTimeEnvironment.FromSystemClock()
 
             // arrange
             let namespaceId = Guid.NewGuid()
@@ -405,7 +406,7 @@ module BoundedContexts =
         open Fixtures
 
         let prepare given =
-            let clock = TestHost.staticClock DateTime.UtcNow
+            let clock = FixedTimeEnvironment.FromSystemClock()
             Prepare.withGiven clock given
 
 
@@ -470,7 +471,7 @@ module BoundedContexts =
     [<Fact>]
     let ``Can search for bounded contexts by label and value for a specific template`` () =
         task {
-            let clock = TestHost.staticClock DateTime.UtcNow
+            let clock = FixedTimeEnvironment.FromSystemClock()
 
             // arrange
             let namespaceId = Guid.NewGuid()

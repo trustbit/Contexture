@@ -30,16 +30,14 @@ module TestHost =
             .ConfigureLogging(configureLogging)
             .Build()
 
-    let runServer testConfiguration =
+    let runServer environmentSimulation testConfiguration =
         let host =
             createHost testConfiguration Contexture.Api.App.configureServices Contexture.Api.App.configureApp
 
         host.Start()
         host
 
-    let staticClock time = fun () -> time
-
-    type TestEnvironment(server: IHost) =
+    type TestHostEnvironment(server: IHost) =
         let client = lazy (server.GetTestClient())
         member __.Server = server
         member __.Client = client.Value
@@ -54,8 +52,7 @@ module TestHost =
                 if client.IsValueCreated then
                     client.Value.Dispose()
 
-    let asEnvironment server = new TestEnvironment(server)
-
+    let asTestHost server = new TestHostEnvironment(server)
 
 module Prepare =
 
@@ -66,16 +63,17 @@ module Prepare =
             services.AddSingleton<EventStore>(EventStore.With givens)
             |> ignore
 
-    let private buildEvents clock events = events |> List.map (fun e -> e clock)
+    let private buildEvents environment events = events |> List.map (fun e -> e environment)
 
     let buildServerWithEvents events =
-        events |> registerEvents |> TestHost.runServer
+        events |> registerEvents
 
-    let withGiven clock eventBuilders =
-        let environment =
+    let withGiven environment eventBuilders =
+        let testHost =
             eventBuilders
-            |> buildEvents clock
+            |> buildEvents environment
             |> buildServerWithEvents
-            |> TestHost.asEnvironment
+            |> TestHost.runServer environment
+            |> TestHost.asTestHost
 
-        environment
+        testHost
