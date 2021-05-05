@@ -270,43 +270,6 @@ module BoundedContexts =
         }
 
     [<Fact>]
-    let ``Can still list bounded contexts when attaching a query string`` () =
-        task {
-            let clock = FixedTimeEnvironment.FromSystemClock()
-
-            // arrange
-            let contextId = Guid.NewGuid()
-            let domainId = Guid.NewGuid()
-
-            let given =
-                Given.noEvents
-                |> Given.andOneEvent (
-                    domainId
-                    |> Fixtures.domainDefinition
-                    |> Fixtures.domainCreated
-                )
-                |> Given.andOneEvent (
-                    contextId
-                    |> Fixtures.boundedContextDefinition domainId
-                    |> Fixtures.boundedContextCreated
-                )
-
-
-            use testEnvironment = Prepare.withGiven clock given
-
-            //act
-            let! result =
-                testEnvironment
-                |> When.gettingJson<{| Id: BoundedContextId |} array> (
-                    sprintf "api/boundedContexts?bar.foo=like|baz&foo=bar,baz,blub&bar=*test*"
-                )
-
-            // assert
-            Then.NotEmpty result
-            Then.Contains(contextId, result |> Array.map (fun i -> i.Id))
-        }
-
-    [<Fact>]
     let ``Can list bounded contexts by label and value`` () =
         task {
             let clock = FixedTimeEnvironment.FromSystemClock()
