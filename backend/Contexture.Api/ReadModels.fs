@@ -204,6 +204,19 @@ module Namespace =
                 (fun _ (values: Set<_>) ->
                     values
                     |> Set.filter (fun n -> extractNamespace n <> namespaceId))
+                
+        let private findByKey keyPhrase items =
+            let matchesKey (key: string) =
+                let term = SearchTerm.fromInput key |> Option.get
+                match keyPhrase with
+                | Some searchTerm -> SearchPhrase.matches searchTerm term
+                | None -> true
+
+            items
+            |> Map.filter (fun k _ -> matchesKey k)
+            |> Map.toList
+            |> List.map snd
+            |> Set.unionMany
 
         module Namespaces =
             type NamespaceModel =
@@ -232,10 +245,9 @@ module Namespace =
                 | LabelAdded l -> state
                 | LabelRemoved l -> state
 
-            let byName (namespaces: NamespaceFinder) (name: string) =
+            let byName (namespaces: NamespaceFinder) (name: SearchPhrase option) =
                 namespaces
-                |> Map.tryFind (name.ToLowerInvariant())
-                |> Option.defaultValue Set.empty
+                |> findByKey name
 
             let byTemplate (namespaces: NamespaceFinder) (templateId: NamespaceTemplateId) =
                 namespaces
@@ -291,17 +303,8 @@ module Namespace =
                     |> removeFromSet (fun n -> n.NamespaceId) n.NamespaceId
 
             let byLabelName (phrase: SearchPhrase option) (namespaces: NamespacesByLabel) =
-                let matchesKey (key: string) =
-                    let term = SearchTerm.fromInput key |> Option.get
-                    match phrase with
-                    | Some searchTerm -> SearchPhrase.matches searchTerm term
-                    | None -> true
-
                 namespaces
-                |> Map.filter (fun k _ -> matchesKey k)
-                |> Map.toList
-                |> List.map snd
-                |> Set.unionMany
+                |> findByKey phrase
 
         let labels (eventStore: EventStore) : Labels.NamespacesByLabel =
             eventStore.Get<Aggregates.Namespace.Event>()

@@ -55,7 +55,8 @@ module Utils =
         Then.Single events
 
 module Fixtures =
-    let domainDefinition domainId : DomainCreated = { DomainId = domainId; Name = "" }
+    let domainDefinition domainId : DomainCreated =
+        { DomainId = domainId; Name = "domain" }
 
     let domainCreated definition =
         DomainCreated definition
@@ -63,7 +64,7 @@ module Fixtures =
 
     let boundedContextDefinition domainId contextId =
         { BoundedContextId = contextId
-          Name = ""
+          Name = "bounded-context"
           DomainId = domainId }
 
     let boundedContextCreated definition =
@@ -147,7 +148,6 @@ module Fixtures =
                 |> namespaceDefinition contextId
                 |> namespaceAdded
             )
-
 
 module Namespaces =
 
@@ -295,6 +295,7 @@ module BoundedContexts =
     [<Theory>]
     [<InlineData("Label.name", "label")>]
     [<InlineData("Label.value", "value")>]
+    [<InlineData("Namespace.name", "namespace")>]
     let ``Can find the bounded context when searching with a single, exact parameter``
         (
             parameterName: string,
@@ -302,11 +303,15 @@ module BoundedContexts =
         ) =
         task {
             let clock = FixedTimeEnvironment.FromSystemClock()
-            
-            let searchedBoundedContext = Fixtures.DomainWithBoundedContextAndNamespace.given ()
-            let randomBoundedContext = Fixtures.RandomDomainAndBoundedContextAndNamespace.given clock
-            
-            let given = searchedBoundedContext @ randomBoundedContext
+
+            let searchedBoundedContext =
+                Fixtures.DomainWithBoundedContextAndNamespace.given ()
+
+            let randomBoundedContext =
+                Fixtures.RandomDomainAndBoundedContextAndNamespace.given clock
+
+            let given =
+                searchedBoundedContext @ randomBoundedContext
 
             use testEnvironment = Prepare.withGiven clock given
 
@@ -320,13 +325,18 @@ module BoundedContexts =
             Then.Collection(result, (fun x -> Then.Equal(Fixtures.DomainWithBoundedContextAndNamespace.contextId, x)))
         }
 
-    module ``Search bounded contexts with a single string based parameter`` =
+    module ``When searching bounded contexts with a single string based parameter`` =
         open Fixtures
 
         let prepareTestEnvironment searchedBoundedContext =
             let simulation = FixedTimeEnvironment.FromSystemClock()
-            let randomBoundedContext = Fixtures.RandomDomainAndBoundedContextAndNamespace.given simulation
-            let given = searchedBoundedContext @ randomBoundedContext
+
+            let randomBoundedContext =
+                Fixtures.RandomDomainAndBoundedContextAndNamespace.given simulation
+
+            let given =
+                searchedBoundedContext @ randomBoundedContext
+
             Prepare.withGiven simulation given
 
         module When =
@@ -334,17 +344,21 @@ module BoundedContexts =
                 testEnvironment
                 |> When.searchingFor $"Label.Name=%s{query}"
 
+            let searchingTheNamespaceName query testEnvironment =
+                testEnvironment
+                |> When.searchingFor $"Namespace.Name=%s{query}"
+
         module Then =
             let itShouldContainOnlyTheBoundedContext result =
                 Then.NotEmpty result
                 Then.Collection(result, (fun x -> Then.Equal(DomainWithBoundedContextAndNamespace.contextId, x)))
 
         [<Fact>]
-        let ``Is possible by using 'lab*' as StartsWith`` () =
+        let ``it is possible to find label names by using 'lab*' as StartsWith`` () =
             task {
                 use testEnvironment =
-                    prepareTestEnvironment
-                    <| DomainWithBoundedContextAndNamespace.given ()
+                    DomainWithBoundedContextAndNamespace.given ()
+                    |> prepareTestEnvironment
 
                 //act
                 let! result =
@@ -356,11 +370,11 @@ module BoundedContexts =
             }
 
         [<Fact>]
-        let ``Is possible by using '*bel' as EndsWith`` () =
+        let ``it is possible to find label names by using '*bel' as EndsWith`` () =
             task {
                 use testEnvironment =
-                    prepareTestEnvironment
-                    <| DomainWithBoundedContextAndNamespace.given ()
+                    DomainWithBoundedContextAndNamespace.given ()
+                    |> prepareTestEnvironment
 
                 //act
                 let! result =
@@ -372,16 +386,31 @@ module BoundedContexts =
             }
 
         [<Fact>]
-        let ``Is possible by using '*abe*' as Contains`` () =
+        let ``it is possible to find label names by using '*abe*' as Contains`` () =
             task {
                 use testEnvironment =
-                    prepareTestEnvironment
-                    <| DomainWithBoundedContextAndNamespace.given ()
+                    DomainWithBoundedContextAndNamespace.given ()
+                    |> prepareTestEnvironment
 
                 //act
                 let! result =
                     testEnvironment
                     |> When.searchingTheLabelName "*abe*"
+
+                result
+                |> Then.itShouldContainOnlyTheBoundedContext
+            }
+
+        [<Fact>]
+        let ``it is possible to find namespace names by using '*amespac*' as Contains`` () =
+            task {
+                use testEnvironment =
+                    DomainWithBoundedContextAndNamespace.given ()
+                    |> prepareTestEnvironment
+
+                let! result =
+                    testEnvironment
+                    |> When.searchingTheNamespaceName "*amespac*"
 
                 result
                 |> Then.itShouldContainOnlyTheBoundedContext

@@ -126,9 +126,9 @@ module BoundedContexts =
                 json boundedContexts next ctx
 
         module Search =
-            
-            
-            
+
+
+
             [<CLIMutable>]
             type LabelQuery =
                 { Name: string option
@@ -160,6 +160,7 @@ module BoundedContexts =
 
                 let namespacesByName =
                     item.Name
+                    |> Option.map SearchPhrase.fromInput
                     |> Option.map (ReadModels.Namespace.Find.Namespaces.byName availableNamespaces)
 
                 let namespacesByTemplate =
@@ -177,8 +178,7 @@ module BoundedContexts =
 
             let findRelevantLabels (database: EventStore) (item: LabelQuery) =
                 let namespacesByLabel =
-                    database
-                    |> ReadModels.Namespace.Find.labels
+                    database |> ReadModels.Namespace.Find.labels
 
                 namespacesByLabel
                 |> ReadModels.Namespace.Find.Labels.byLabelName (item.Name |> Option.bind SearchPhrase.fromInput)
