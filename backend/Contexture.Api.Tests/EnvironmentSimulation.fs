@@ -43,3 +43,5 @@ module Identifiers =
     let sequentialGuidString number = sprintf "00000000-6c78-4f2e-0000-%012i" number
     let sequentialGuid = sequentialGuidString >> Guid
     let guid (env: ISimulateEnvironment) = env.NextId() |> sequentialGuid
+    let nameWithGuid prefix (env: ISimulateEnvironment) =
+        $"%s{prefix}-%O{guid env}"

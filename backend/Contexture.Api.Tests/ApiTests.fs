@@ -43,9 +43,11 @@ type Then = Assert
 
 module Utils =
     let asEvent id event =
-        fun (environment: ISimulateEnvironment)  ->
+        fun (environment: ISimulateEnvironment) ->
             { Event = event
-              Metadata = { Source = id; RecordedAt = environment.Time () } }
+              Metadata =
+                  { Source = id
+                    RecordedAt = environment.Time() } }
             |> EventEnvelope.box
 
     let singleEvent<'e> (eventStore: EventStore) : EventEnvelope<'e> =
@@ -87,25 +89,45 @@ module Fixtures =
         |> Utils.asEvent definition.BoundedContextId
 
     module RandomDomainAndBoundedContextAndNamespace =
-        let given () =
-            let namespaceId = Guid.NewGuid()
-            let contextId = Guid.NewGuid()
-            let domainId = Guid.NewGuid()
+        let given environment =
+            let namespaceId = environment |> Identifiers.guid
+            let contextId = environment |> Identifiers.guid
+            let domainId = environment |> Identifiers.guid
 
             Given.noEvents
             |> Given.andOneEvent (
                 { domainDefinition domainId with
-                      Name = $"random-domain-name-%O{Guid.NewGuid()}" }
+                      Name =
+                          environment
+                          |> Identifiers.nameWithGuid "random-domain-name" }
                 |> domainCreated
             )
             |> Given.andOneEvent (
                 { boundedContextDefinition domainId contextId with
-                      Name = $"random-context-name-%O{Guid.NewGuid()}" }
+                      Name =
+                          environment
+                          |> Identifiers.nameWithGuid "random-context-name" }
                 |> boundedContextCreated
             )
-    //            |> Given.andOneEvent (
-//                { BoundedContextId = namespaceId
-//                  Name = "random-namespace-name-%" })
+            |> Given.andOneEvent (
+                { BoundedContextId = namespaceId
+                  Name =
+                      environment
+                      |> Identifiers.nameWithGuid "random-namespace-name"
+                  NamespaceId = namespaceId
+                  NamespaceTemplateId = None
+                  Labels =
+                      [ { LabelId = environment |> Identifiers.guid
+                          Name =
+                              environment
+                              |> Identifiers.nameWithGuid "random-label-name"
+                          Value =
+                              environment
+                              |> Identifiers.nameWithGuid "random-label-value"
+                              |> Some
+                          Template = None } ] }
+                |> namespaceAdded
+            )
 
     module DomainWithBoundedContextAndNamespace =
         let namespaceId = Guid.NewGuid()
@@ -191,6 +213,7 @@ module BoundedContexts =
 
     module When =
         open TestHost
+
         let searchingFor queryParameter (environment: TestHostEnvironment) =
             task {
                 let! result =
@@ -327,29 +350,11 @@ module BoundedContexts =
         ) =
         task {
             let clock = FixedTimeEnvironment.FromSystemClock()
-
-            // arrange
-            let namespaceId = Guid.NewGuid()
-            let contextId = Guid.NewGuid()
-            let domainId = Guid.NewGuid()
-
-            let namespaceAdded =
-                NamespaceAdded(Fixtures.namespaceDefinition contextId namespaceId)
-                |> Utils.asEvent contextId
-
-            let given =
-                Given.noEvents
-                |> Given.andOneEvent (
-                    domainId
-                    |> Fixtures.domainDefinition
-                    |> Fixtures.domainCreated
-                )
-                |> Given.andOneEvent (
-                    contextId
-                    |> Fixtures.boundedContextDefinition domainId
-                    |> Fixtures.boundedContextCreated
-                )
-                |> Given.andOneEvent namespaceAdded
+            
+            let searchedBoundedContext = Fixtures.DomainWithBoundedContextAndNamespace.given ()
+            let randomBoundedContext = Fixtures.RandomDomainAndBoundedContextAndNamespace.given clock
+            
+            let given = searchedBoundedContext @ randomBoundedContext
 
             use testEnvironment = Prepare.withGiven clock given
 
@@ -360,18 +365,17 @@ module BoundedContexts =
 
             // assert
             Then.NotEmpty result
-            Then.Collection(result, (fun x -> Then.Equal(contextId, x)))
+            Then.Collection(result, (fun x -> Then.Equal(Fixtures.DomainWithBoundedContextAndNamespace.contextId, x)))
         }
-
-
 
     module ``Search bounded contexts with a single string based parameter`` =
         open Fixtures
 
-        let prepare given =
-            let clock = FixedTimeEnvironment.FromSystemClock()
-            Prepare.withGiven clock given
-
+        let prepareTestEnvironment searchedBoundedContext =
+            let simulation = FixedTimeEnvironment.FromSystemClock()
+            let randomBoundedContext = Fixtures.RandomDomainAndBoundedContextAndNamespace.given simulation
+            let given = searchedBoundedContext @ randomBoundedContext
+            Prepare.withGiven simulation given
 
         module When =
             let searchingTheLabelName query testEnvironment =
@@ -387,7 +391,7 @@ module BoundedContexts =
         let ``Is possible by using 'lab*' as StartsWith`` () =
             task {
                 use testEnvironment =
-                    prepare
+                    prepareTestEnvironment
                     <| DomainWithBoundedContextAndNamespace.given ()
 
                 //act
@@ -403,7 +407,7 @@ module BoundedContexts =
         let ``Is possible by using '*bel' as EndsWith`` () =
             task {
                 use testEnvironment =
-                    prepare
+                    prepareTestEnvironment
                     <| DomainWithBoundedContextAndNamespace.given ()
 
                 //act
@@ -419,7 +423,7 @@ module BoundedContexts =
         let ``Is possible by using '*abe*' as Contains`` () =
             task {
                 use testEnvironment =
-                    prepare
+                    prepareTestEnvironment
                     <| DomainWithBoundedContextAndNamespace.given ()
 
                 //act
