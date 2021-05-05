@@ -10,76 +10,9 @@ open Contexture.Api.Aggregates.Domain
 open Contexture.Api.Aggregates.Namespace
 open Contexture.Api.Entities
 open Contexture.Api.Infrastructure
-open Microsoft.AspNetCore.Hosting
-open Microsoft.Extensions.Hosting
-open Microsoft.Extensions.Http
-open Microsoft.Extensions.DependencyInjection
-open Microsoft.AspNetCore.TestHost
-open Microsoft.Extensions.Logging
 open Xunit
 open FSharp.Control.Tasks
 open Xunit.Sdk
-
-module TestHost =
-    let configureLogging (builder: ILoggingBuilder) =
-        builder.AddConsole().AddDebug() |> ignore
-
-    let createHost configureTest configureServices configure =
-        Host
-            .CreateDefaultBuilder()
-            .UseContentRoot(Directory.GetCurrentDirectory())
-            .UseEnvironment("Tests")
-            .ConfigureServices(Action<_, _> configureServices)
-            .ConfigureWebHostDefaults(fun (webHost: IWebHostBuilder) ->
-                webHost
-                    .Configure(Action<_> configure)
-                    .UseTestServer()
-                    .ConfigureTestServices(Action<_> configureTest)
-                    .ConfigureLogging(configureLogging)
-                |> ignore)
-            .ConfigureLogging(configureLogging)
-            .Build()
-
-    let runServer testConfiguration =
-        let host =
-            createHost testConfiguration Contexture.Api.App.configureServices Contexture.Api.App.configureApp
-
-        host.Start()
-        host
-
-    let staticClock time = fun () -> time
-
-module Prepare =
-    let private registerGiven givens =
-        fun (services: IServiceCollection) ->
-            services.AddSingleton<EventStore>(EventStore.With givens)
-            |> ignore
-
-    let private toGiven clock events = events |> List.map (fun e -> e clock)
-
-    let buildServerGiven given =
-        given |> registerGiven |> TestHost.runServer
-
-    type TestEnvironment(server: IHost) =
-        let client = lazy (server.GetTestClient())
-        member __.Server = server
-        member __.Client = client.Value
-
-        member __.GetService<'Service>() =
-            server.Services.GetRequiredService<'Service>()
-
-        interface IDisposable with
-            member __.Dispose() =
-                server.Dispose()
-
-                if client.IsValueCreated then
-                    client.Value.Dispose()
-
-    let withGiven clock givenBuilders =
-        let server =
-            givenBuilders |> toGiven clock |> buildServerGiven
-
-        new TestEnvironment(server)
 
 type Given = EventEnvelope list
 
@@ -91,7 +24,7 @@ module Given =
 
 module When =
     open System.Net.Http.Json
-    open Prepare
+    open TestHost
 
     let postingJson (url: string) (jsonContent: string) (environment: TestEnvironment) =
         task {
@@ -256,7 +189,8 @@ module Namespaces =
 module BoundedContexts =
 
     module When =
-        let searchingFor queryParameter (environment: Prepare.TestEnvironment) =
+        open TestHost
+        let searchingFor queryParameter (environment: TestEnvironment) =
             task {
                 let! result =
                     environment
