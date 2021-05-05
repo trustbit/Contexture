@@ -139,12 +139,61 @@ module Namespace =
 
 
     module Find =
+        type Operator =
+            | Equals
+            | StartsWith
+            | Contains
+            | EndsWith
+        
+        type SearchPhrase =
+            private SearchPhrase of Operator * string
+            
+            
+        type SearchTerm =
+            private SearchTerm of string
+            
+        module SearchTerm =
+            let fromInput (term: string) =
+                term
+                |> Option.ofObj
+                |> Option.filter(not<<String.IsNullOrWhiteSpace)
+                |> Option.map (fun s -> s.Trim())
+                |> Option.map SearchTerm
+                
+            let value (SearchTerm term) = term
+            
+        module SearchPhrase =
+            
+            let private operatorAndPhrase (phrase: string) =
+                match phrase.StartsWith "*", phrase.EndsWith "*" with
+                | true, true -> // *phrase*
+                    Contains, phrase.Trim '*'
+                | true, false -> // *phrase
+                    EndsWith, phrase.TrimStart '*'
+                | false, true -> // phrase*
+                    StartsWith, phrase.TrimEnd '*'
+                | false, false -> // phrase
+                    Equals, phrase
+            
+            let fromInput (phrase: string) =
+                phrase
+                |> Option.ofObj
+                |> Option.filter(not<<String.IsNullOrWhiteSpace)
+                |> Option.map (fun s -> s.Trim())
+                |> Option.map operatorAndPhrase
+                |> Option.map SearchPhrase
+                
+            let matches (SearchPhrase (operator, phrase)) (SearchTerm value) =
+                match operator with
+                | Equals -> String.Equals (phrase, value, StringComparison.OrdinalIgnoreCase)
+                | StartsWith -> value.StartsWith (phrase, StringComparison.OrdinalIgnoreCase)
+                | EndsWith -> value.EndsWith (phrase, StringComparison.OrdinalIgnoreCase)
+                | Contains -> value.Contains (phrase, StringComparison.OrdinalIgnoreCase)
+                
         let private appendToSet labels (name: string, value) =
-            let key = name.ToLowerInvariant()
-
             labels
             |> Map.change
-                key
+                name
                 (function
                 | Some values -> values |> Set.add value |> Some
                 | None -> value |> Set.singleton |> Some)
@@ -250,14 +299,11 @@ module Namespace =
                 |> List.map snd
                 |> Set.unionMany
 
-            let byLabelName (labelName: string option) (namespaces: NamespacesByLabel) =
-                let searchedKey =
-                    labelName
-                    |> Option.map (fun o -> o.ToLowerInvariant())
-
+            let byLabelName (phrase: SearchPhrase option) (namespaces: NamespacesByLabel) =
                 let matchesKey (key: string) =
-                    match searchedKey with
-                    | Some searchTerm -> key.Contains(searchTerm, StringComparison.OrdinalIgnoreCase)
+                    let term = SearchTerm.fromInput key |> Option.get
+                    match phrase with
+                    | Some searchTerm -> SearchPhrase.matches searchTerm term
                     | None -> true
 
                 namespaces

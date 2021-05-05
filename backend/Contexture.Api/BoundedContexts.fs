@@ -8,6 +8,7 @@ open Contexture.Api.Entities
 open Contexture.Api.Aggregates.BoundedContext
 open Contexture.Api.Infrastructure
 open Contexture.Api.Infrastructure.Projections
+open Contexture.Api.ReadModels.Namespace.Find
 open Microsoft.AspNetCore.Http
 open FSharp.Control.Tasks
 
@@ -29,7 +30,11 @@ module BoundedContexts =
               Domain: Domain
               Namespaces: Namespace list }
 
-        let convertBoundedContextWithDomain (findDomain: DomainId -> Domain option) (findNamespaces: BoundedContextId -> Namespace list ) (boundedContext: BoundedContext) =
+        let convertBoundedContextWithDomain
+            (findDomain: DomainId -> Domain option)
+            (findNamespaces: BoundedContextId -> Namespace list)
+            (boundedContext: BoundedContext)
+            =
             { Id = boundedContext.Id
               ParentDomainId = boundedContext.DomainId
               Key = boundedContext.Key
@@ -40,7 +45,10 @@ module BoundedContexts =
               UbiquitousLanguage = boundedContext.UbiquitousLanguage
               Messages = boundedContext.Messages
               DomainRoles = boundedContext.DomainRoles
-              Domain = boundedContext.DomainId |> findDomain |> Option.get
+              Domain =
+                  boundedContext.DomainId
+                  |> findDomain
+                  |> Option.get
               Namespaces = boundedContext.Id |> findNamespaces }
 
     module CommandEndpoints =
@@ -118,6 +126,9 @@ module BoundedContexts =
                 json boundedContexts next ctx
 
         module Search =
+            
+            
+            
             [<CLIMutable>]
             type LabelQuery =
                 { Name: string option
@@ -170,13 +181,15 @@ module BoundedContexts =
                     |> ReadModels.Namespace.Find.labels
 
                 namespacesByLabel
-                |> ReadModels.Namespace.Find.Labels.byLabelName item.Name
+                |> ReadModels.Namespace.Find.Labels.byLabelName (item.Name |> Option.bind SearchPhrase.fromInput)
                 |> Set.filter
                     (fun { Value = value } ->
-                        match item.Value with
+                        match item.Value |> Option.bind SearchPhrase.fromInput with
                         | Some searchTerm ->
                             value
-                            |> Option.exists (fun v -> v.Contains(searchTerm, StringComparison.OrdinalIgnoreCase))
+                            |> Option.bind SearchTerm.fromInput
+                            |> Option.map (SearchPhrase.matches searchTerm)
+                            |> Option.defaultValue false
                         | None -> true)
 
             let getBoundedContextsByLabel (item: Query) =
