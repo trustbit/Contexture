@@ -190,20 +190,20 @@ module Namespace =
                 | EndsWith -> value.EndsWith (phrase, StringComparison.OrdinalIgnoreCase)
                 | Contains -> value.Contains (phrase, StringComparison.OrdinalIgnoreCase)
                 
-        let private appendToSet labels (name: string, value) =
-            labels
+        let private appendToSet items (key: string, value) =
+            items
             |> Map.change
-                name
+                key
                 (function
                 | Some values -> values |> Set.add value |> Some
                 | None -> value |> Set.singleton |> Some)
 
-        let private removeFromSet extractNamespace namespaceId items =
+        let private removeFromSet findValue value items =
             items
             |> Map.map
                 (fun _ (values: Set<_>) ->
                     values
-                    |> Set.filter (fun n -> extractNamespace n <> namespaceId))
+                    |> Set.filter (fun n -> findValue n <> value))
                 
         let private findByKey keyPhrase items =
             let matchesKey (key: string) =
@@ -310,6 +310,68 @@ module Namespace =
             eventStore.Get<Aggregates.Namespace.Event>()
             |> List.fold Labels.projectLabelNameToNamespace Map.empty
 
+        module Domains =
+            open Contexture.Api.Aggregates.Domain
+            type DomainByKeyAndNameModel =
+                { ByKey : Map<string,DomainId>
+                  ByName: Map<string,Set<DomainId>> }
+                with static member Empty = { ByKey = Map.empty; ByName = Map.empty }
+
+            let projectToDomain state eventEnvelope =
+                let addKey canBeKey domain byKey =
+                    match canBeKey with
+                    | Some key -> byKey |> Map.add key domain
+                    | None -> byKey
+                let append key value items =
+                    appendToSet items (key, value)
+                match eventEnvelope.Event with
+                | SubDomainCreated n ->
+                    { state with
+                        ByName = state.ByName |> append n.Name n.DomainId }
+                | DomainCreated n ->
+                    { state with
+                        ByName = state.ByName |> append n.Name n.DomainId }
+                | KeyAssigned k ->
+                    { state with
+                        ByKey =
+                            state.ByKey
+                            |> Map.filter(fun _ v -> v <> k.DomainId)
+                            |> addKey k.Key k.DomainId
+                    }
+                | DomainImported n ->
+                    { state with
+                        ByName = appendToSet state.ByName (n.Name, n.DomainId)
+                        ByKey = state.ByKey |> addKey n.Key n.DomainId
+                        }
+                | DomainRenamed l ->
+                    { state with
+                        ByName =
+                            state.ByName
+                            |> removeFromSet id l.DomainId
+                            |> append l.Name l.DomainId
+                         }
+                | DomainRemoved l ->
+                    { state with
+                        ByName =
+                            state.ByName
+                            |> removeFromSet id l.DomainId
+                        ByKey =
+                            state.ByKey
+                            |> Map.filter (fun _ v -> v <> l.DomainId)
+                    }
+                | CategorizedAsSubdomain _
+                | PromotedToDomain _
+                | VisionRefined _ ->
+                    state
+
+            let byName (phrase: SearchPhrase option) (model: DomainByKeyAndNameModel) =
+                model.ByName
+                |> findByKey phrase
+                
+        let domains (eventStore: EventStore) : Domains.DomainByKeyAndNameModel =
+            eventStore.Get<Aggregates.Domain.Event>()
+            |> List.fold Domains.projectToDomain Domains.DomainByKeyAndNameModel.Empty
+        
         module BoundedContexts =
             let private projectNamespaceIdToBoundedContextId state eventEnvelope =
                 match eventEnvelope.Event with

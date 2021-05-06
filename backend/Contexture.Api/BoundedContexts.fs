@@ -127,8 +127,6 @@ module BoundedContexts =
 
         module Search =
 
-
-
             [<CLIMutable>]
             type LabelQuery =
                 { Name: string option
@@ -142,17 +140,21 @@ module BoundedContexts =
                 member this.IsActive = this.Name.IsSome || this.Template.IsSome
 
             [<CLIMutable>]
+            type DomainQuery =
+                { Name: string option }
+                member this.IsActive = this.Name.IsSome
+
+            [<CLIMutable>]
             type Query =
                 { Label: LabelQuery option
-                  Namespace: NamespaceQuery option }
+                  Namespace: NamespaceQuery option
+                  Domain: DomainQuery option }
                 member this.IsActive =
-                    this.Label
-                    |> Option.map (fun l -> l.IsActive)
-                    |> Option.defaultValue false
-                    || this.Namespace
-                       |> Option.map (fun n -> n.IsActive)
-                       |> Option.defaultValue false
-
+                    [ this.Label |> Option.map (fun l -> l.IsActive)
+                      this.Namespace |> Option.map (fun n -> n.IsActive)
+                      this.Domain |> Option.map (fun n -> n.IsActive) ]
+                    |> List.map (Option.defaultValue false)
+                    |> List.exists id
 
             let findRelevantNamespaces (database: EventStore) (item: NamespaceQuery) =
                 let availableNamespaces =
@@ -192,7 +194,14 @@ module BoundedContexts =
                             |> Option.defaultValue false
                         | None -> true)
 
-            let getBoundedContextsByLabel (item: Query) =
+            let findRelevantDomains (database: EventStore) (item: DomainQuery) =
+                let findDomains =
+                    database |> ReadModels.Namespace.Find.domains
+
+                findDomains
+                |> ReadModels.Namespace.Find.Domains.byName (item.Name |> Option.bind SearchPhrase.fromInput)
+
+            let getBoundedContextsByQuery (item: Query) =
                 fun (next: HttpFunc) (ctx: HttpContext) ->
                     let database = ctx.GetService<EventStore>()
 
@@ -215,8 +224,17 @@ module BoundedContexts =
                         | None, Some labels -> labels |> Set.map (fun n -> n.NamespaceId)
                         | None, None -> Set.empty
 
+                    let domainIds =
+                        item.Domain
+                        |> Option.map (findRelevantDomains database)
+                        |> Option.defaultValue Set.empty
+
                     let boundedContextsByNamespace =
                         ReadModels.Namespace.Find.BoundedContexts.byNamespace database
+
+                    let boundedContextsByDomain =
+                        database
+                        |> ReadModels.BoundedContext.allBoundedContextsByDomain
 
                     let boundedContextIds =
                         namespacesIds
@@ -226,6 +244,15 @@ module BoundedContexts =
                             >> Set.ofList
                         )
                         |> Set.unionMany
+                        |> Set.union (
+                            domainIds
+                            |> Set.map (
+                                boundedContextsByDomain
+                                >> List.map (fun b -> b.Id)
+                                >> Set.ofList
+                            )
+                            |> Set.unionMany
+                        )
                         |> Set.toList
 
                     mapToBoundedContext database boundedContextIds next ctx
@@ -247,7 +274,7 @@ module BoundedContexts =
                 let nextHandler =
                     if ctx.Request.QueryString.HasValue then
                         match ctx.TryBindQueryString<Search.Query>() with
-                        | Ok query when query.IsActive -> Search.getBoundedContextsByLabel query
+                        | Ok query when query.IsActive -> Search.getBoundedContextsByQuery query
                         | _ -> getBoundedContexts
                     else
                         getBoundedContexts

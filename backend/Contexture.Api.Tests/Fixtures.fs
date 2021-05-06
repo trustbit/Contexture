@@ -15,7 +15,7 @@ module Fixtures =
         let Name = "domain"
 
         let definition domainId : DomainCreated =
-            { DomainId = domainId; Name = "domain" }
+            { DomainId = domainId; Name = Name }
 
         let domainCreated definition =
             DomainCreated definition

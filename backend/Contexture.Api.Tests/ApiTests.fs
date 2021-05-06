@@ -130,6 +130,7 @@ module BoundedContexts =
     [<InlineData("Label.value", "John Doe")>]
     [<InlineData("Namespace.name", "Team")>]
     [<InlineData("Namespace.template", "A9F5D70E-B947-40B6-B7BE-4AC45CFE7F34")>]
+    [<InlineData("Domain.name", "domain")>]
     let ``Can find the bounded context when searching with a single, exact parameter``
         (
             parameterName: string,

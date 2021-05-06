@@ -205,7 +205,7 @@ module Aggregates =
               ParentDomainId: DomainId
               Name: String }
 
-        and DomainRenamed = { DomainId: DomainId; Name: String }
+        and DomainRenamed = { DomainId: DomainId; Name: String; OldName: string }
 
         and CategorizedAsSubdomain =
             { DomainId: DomainId
@@ -223,7 +223,9 @@ module Aggregates =
             { DomainId: DomainId
               Key: string option }
 
-        type Errors = | EmptyName
+        type Errors =
+            | EmptyName
+            | DomainAlreadyDeleted
 
         let nameValidation name =
             if String.IsNullOrWhiteSpace name then Error EmptyName else Ok name
@@ -242,12 +244,15 @@ module Aggregates =
 
         type State =
             | Initial
-            | Existing
+            | Existing of name: string
             | Deleted
             static member Fold (state: State) (event: Event) =
                 match event with
                 | DomainRemoved _ -> Deleted
-                | _ -> Existing
+                | DomainImported n -> Existing n.Name
+                | DomainCreated n -> Existing n.Name
+                | SubDomainCreated n -> Existing n.Name
+                | _ -> state
 
         let newDomain id name parentDomain =
             name
@@ -279,10 +284,19 @@ module Aggregates =
                       |> Option.filter (String.IsNullOrWhiteSpace >> not) }
             |> Ok
 
-        let renameDomain potentialName domainId =
-            potentialName
-            |> nameValidation
-            |> Result.map (fun name -> DomainRenamed { DomainId = domainId; Name = name })
+        let renameDomain potentialName domainId state =
+            match state with
+            | Existing name ->
+                potentialName
+                |> nameValidation
+                |> Result.map (fun name ->
+                    DomainRenamed {
+                        DomainId = domainId
+                        Name = name
+                        OldName = name
+                    })
+            | _ ->
+                Error DomainAlreadyDeleted 
 
         let assignKeyToDomain key domainId =
             KeyAssigned
@@ -300,7 +314,7 @@ module Aggregates =
                 newDomain domainId createDomain.Name (Some subdomainId)
             | RemoveDomain domainId -> Ok <| DomainRemoved { DomainId = domainId }
             | MoveDomain (domainId, move) -> moveDomain move.ParentDomainId domainId
-            | RenameDomain (domainId, rename) -> renameDomain rename.Name domainId
+            | RenameDomain (domainId, rename) -> renameDomain rename.Name domainId state
             | RefineVision (domainId, refineVision) -> refineVisionOfDomain refineVision.Vision domainId
             | AssignKey (domainId, assignKey) -> assignKeyToDomain assignKey.Key domainId
             |> Result.map List.singleton
