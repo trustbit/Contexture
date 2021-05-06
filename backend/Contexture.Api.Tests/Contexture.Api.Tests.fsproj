@@ -10,7 +10,8 @@
     <ItemGroup>
         <Compile Include="Tests.fs" />
         <Compile Include="EnvironmentSimulation.fs" />
-        <Compile Include="TestHost.fs" />
+        <Compile Include="TestUtils.fs" />
+        <Compile Include="Fixtures.fs" />
         <Compile Include="ApiTests.fs" />
     </ItemGroup>
 

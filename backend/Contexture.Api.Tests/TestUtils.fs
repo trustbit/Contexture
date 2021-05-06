@@ -10,6 +10,8 @@ open Microsoft.AspNetCore.TestHost
 open Microsoft.Extensions.Logging
 open FSharp.Control.Tasks
 
+open Contexture.Api.Infrastructure
+
 module TestHost =
     let configureLogging (builder: ILoggingBuilder) =
         builder.AddConsole().AddDebug() |> ignore
@@ -63,10 +65,10 @@ module Prepare =
             services.AddSingleton<EventStore>(EventStore.With givens)
             |> ignore
 
-    let private buildEvents environment events = events |> List.map (fun e -> e environment)
+    let private buildEvents environment events =
+        events |> List.map (fun e -> e environment)
 
-    let buildServerWithEvents events =
-        events |> registerEvents
+    let buildServerWithEvents events = events |> registerEvents
 
     let withGiven environment eventBuilders =
         let testHost =
@@ -77,3 +79,48 @@ module Prepare =
             |> TestHost.asTestHost
 
         testHost
+
+
+type Given = EventEnvelope list
+
+module Given =
+    let noEvents = []
+    let anEvent event = [ event ]
+    let andOneEvent event given = given @ [ event ]
+    let andEvents events given = given @ events
+
+module When =
+    open System.Net.Http.Json
+    open System.Net.Http
+
+    open TestHost
+
+    let postingJson (url: string) (jsonContent: string) (environment: TestHostEnvironment) =
+        task {
+            let! result = environment.Client.PostAsync(url, new StringContent(jsonContent))
+            return result.EnsureSuccessStatusCode()
+        }
+
+    let gettingJson<'t> (url: string) (environment: TestHostEnvironment) =
+        task {
+            let! result = environment.Client.GetFromJsonAsync<'t>(url)
+            return result
+        }
+
+type Then = Xunit.Assert
+
+module Utils =
+    open Contexture.Api.Tests.EnvironmentSimulation
+    open Xunit
+
+    let asEvent id event =
+        fun (environment: ISimulateEnvironment) ->
+            { Event = event
+              Metadata =
+                  { Source = id
+                    RecordedAt = environment.Time() } }
+            |> EventEnvelope.box
+
+    let singleEvent<'e> (eventStore: EventStore) : EventEnvelope<'e> =
+        let events = eventStore.Get<'e>()
+        Then.Single events
