@@ -146,8 +146,7 @@ module Namespace =
             | EndsWith
         
         type SearchPhrase =
-            private SearchPhrase of Operator * string
-            
+            private SearchPhrase of Operator * string  
             
         type SearchTerm =
             private SearchTerm of string
