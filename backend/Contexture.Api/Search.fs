@@ -46,12 +46,6 @@ module Search =
 
             let domains = Domain.allDomains eventStore
 
-            let boundedContextsOf =
-                BoundedContext.allBoundedContextsByDomain eventStore
-
-            let namespacesOf =
-                Namespace.allNamespacesByContext eventStore
-
             let collaborations =
                 Collaboration.allCollaborations eventStore
 

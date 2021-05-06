@@ -23,6 +23,7 @@
     <Compile Include="Views.fs" />
     <Compile Include="Domains.fs" />
     <Compile Include="Namespaces.fs" />
+    <Compile Include="SearchHandler.fs" />
     <Compile Include="BoundedContexts.fs" />
     <Compile Include="Collaborations.fs" />
     <Compile Include="Search.fs" />
