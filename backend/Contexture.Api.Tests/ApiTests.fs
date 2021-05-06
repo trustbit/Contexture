@@ -20,8 +20,8 @@ module Namespaces =
         task {
             // arrange
             let environment = FixedTimeEnvironment.FromSystemClock()
-            let domainId = environment |> Identifiers.guid
-            let contextId = environment |> Identifiers.guid
+            let domainId = environment |> PseudoRandom.guid
+            let contextId = environment |> PseudoRandom.guid
 
             let given =
                 Fixtures.Builders.givenADomainWithOneBoundedContext domainId contextId
@@ -83,8 +83,8 @@ module BoundedContexts =
             let environment = FixedTimeEnvironment.FromSystemClock()
 
             // arrange
-            let contextId = environment |> Identifiers.guid
-            let domainId = environment |> Identifiers.guid
+            let contextId = environment |> PseudoRandom.guid
+            let domainId = environment |> PseudoRandom.guid
 
             let given =
                 Fixtures.Builders.givenADomainWithOneBoundedContext domainId contextId
@@ -107,8 +107,8 @@ module BoundedContexts =
             let environment = FixedTimeEnvironment.FromSystemClock()
 
             // arrange
-            let contextId = environment |> Identifiers.guid
-            let domainId = environment |> Identifiers.guid
+            let contextId = environment |> PseudoRandom.guid
+            let domainId = environment |> PseudoRandom.guid
 
             let given =
                 Fixtures.Builders.givenADomainWithOneBoundedContext domainId contextId
@@ -141,9 +141,9 @@ module BoundedContexts =
             let namespaceTemplateId =
                 Guid("A9F5D70E-B947-40B6-B7BE-4AC45CFE7F34")
 
-            let namespaceId = simulation |> Identifiers.guid
-            let contextId = simulation |> Identifiers.guid
-            let domainId = simulation |> Identifiers.guid
+            let namespaceId = simulation |> PseudoRandom.guid
+            let contextId = simulation |> PseudoRandom.guid
+            let domainId = simulation |> PseudoRandom.guid
 
             let searchedBoundedContext =
                 Fixtures.Builders.givenADomainWithOneBoundedContext domainId contextId
@@ -201,9 +201,9 @@ module BoundedContexts =
         type ``with a single string based parameter``() =
             let simulation = FixedTimeEnvironment.FromSystemClock()
 
-            let namespaceId = simulation |> Identifiers.guid
-            let contextId = simulation |> Identifiers.guid
-            let domainId = simulation |> Identifiers.guid
+            let namespaceId = simulation |> PseudoRandom.guid
+            let contextId = simulation |> PseudoRandom.guid
+            let domainId = simulation |> PseudoRandom.guid
 
             [<Fact>]
             member __.``it is possible to find label names by using 'arch*' as StartsWith``() =

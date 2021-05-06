@@ -71,38 +71,38 @@ module Fixtures =
     
     module Builders =
         let givenARandomDomainWithBoundedContextAndNamespace environment =
-            let namespaceId = environment |> Identifiers.guid
-            let contextId = environment |> Identifiers.guid
-            let domainId = environment |> Identifiers.guid
+            let namespaceId = environment |> PseudoRandom.guid
+            let contextId = environment |> PseudoRandom.guid
+            let domainId = environment |> PseudoRandom.guid
 
             Given.noEvents
             |> Given.andOneEvent (
                 { Domain.definition domainId with
                       Name =
                           environment
-                          |> Identifiers.nameWithGuid "random-domain-name" }
+                          |> PseudoRandom.nameWithGuid "random-domain-name" }
                 |> Domain.domainCreated
             )
             |> Given.andOneEvent (
                 { BoundedContext.definition domainId contextId with
                       Name =
                           environment
-                          |> Identifiers.nameWithGuid "random-context-name" }
+                          |> PseudoRandom.nameWithGuid "random-context-name" }
                 |> BoundedContext.boundedContextCreated
             )
             |> Given.andOneEvent (
                 { Namespace.definition contextId namespaceId with
                       Name =
                           environment
-                          |> Identifiers.nameWithGuid "random-namespace-name"
+                          |> PseudoRandom.nameWithGuid "random-namespace-name"
                       Labels =
-                          [ { LabelId = environment |> Identifiers.guid
+                          [ { LabelId = environment |> PseudoRandom.guid
                               Name =
                                   environment
-                                  |> Identifiers.nameWithGuid "random-label-name"
+                                  |> PseudoRandom.nameWithGuid "random-label-name"
                               Value =
                                   environment
-                                  |> Identifiers.nameWithGuid "random-label-value"
+                                  |> PseudoRandom.nameWithGuid "random-label-value"
                                   |> Some
                               Template = None } ] }
                 |> Namespace.namespaceAdded

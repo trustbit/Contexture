@@ -39,7 +39,8 @@ type FixedTimeEnvironment(now: DateTime, seed: int) =
         member __.Time() = now
 
 
-module Identifiers =
+[<RequireQualifiedAccess>]
+module PseudoRandom =
     let sequentialGuidString number = sprintf "00000000-6c78-4f2e-0000-%012i" number
     let sequentialGuid = sequentialGuidString >> Guid
     let guid (env: ISimulateEnvironment) = env.NextId() |> sequentialGuid
