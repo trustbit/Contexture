@@ -1,147 +1,17 @@
 module Contexture.Api.Tests.ApiTests
 
 open System
-open System.IO
-open System.Net.Http
+
 open Contexture.Api.Aggregates
 open Contexture.Api.Aggregates.BoundedContext
 open Contexture.Api.Aggregates.Domain
 open Contexture.Api.Aggregates.Namespace
 open Contexture.Api.Entities
 open Contexture.Api.Infrastructure
-open Microsoft.AspNetCore.Hosting
-open Microsoft.Extensions.Hosting
-open Microsoft.Extensions.Http
-open Microsoft.Extensions.DependencyInjection
-open Microsoft.AspNetCore.TestHost
-open Microsoft.Extensions.Logging
 open Xunit
 open FSharp.Control.Tasks
 open Xunit.Sdk
-
-module TestHost =
-    let configureLogging (builder: ILoggingBuilder) =
-        builder.AddConsole().AddDebug() |> ignore
-
-    let createHost configureTest configureServices configure =
-        Host
-            .CreateDefaultBuilder()
-            .UseContentRoot(Directory.GetCurrentDirectory())
-            .UseEnvironment("Tests")
-            .ConfigureServices(Action<_, _> configureServices)
-            .ConfigureWebHostDefaults(fun (webHost: IWebHostBuilder) ->
-                webHost
-                    .Configure(Action<_> configure)
-                    .UseTestServer()
-                    .ConfigureTestServices(Action<_> configureTest)
-                    .ConfigureLogging(configureLogging)
-                |> ignore)
-            .ConfigureLogging(configureLogging)
-            .Build()
-
-    let runServer testConfiguration =
-        let host =
-            createHost testConfiguration Contexture.Api.App.configureServices Contexture.Api.App.configureApp
-
-        host.Start()
-        host
-
-    let staticClock time = fun () -> time
-
-module Prepare =
-    let private registerGiven givens =
-        fun (services: IServiceCollection) ->
-            services.AddSingleton<EventStore>(EventStore.With givens)
-            |> ignore
-
-    let private toGiven clock events = events |> List.map (fun e -> e clock)
-
-    let buildServerGiven given =
-        given |> registerGiven |> TestHost.runServer
-
-    type TestEnvironment(server: IHost) =
-        let client = lazy (server.GetTestClient())
-        member __.Server = server
-        member __.Client = client.Value
-
-        member __.GetService<'Service>() =
-            server.Services.GetRequiredService<'Service>()
-
-        interface IDisposable with
-            member __.Dispose() =
-                server.Dispose()
-
-                if client.IsValueCreated then
-                    client.Value.Dispose()
-
-    let withGiven clock givenBuilders =
-        let server =
-            givenBuilders |> toGiven clock |> buildServerGiven
-
-        new TestEnvironment(server)
-
-type Given = EventEnvelope list
-
-module Given =
-    let noEvents = []
-    let anEvent event = [ event ]
-    let andOneEvent event given = given @ [ event ]
-    let andEvents events given = given @ events
-
-module When =
-    open System.Net.Http.Json
-    open Prepare
-
-    let postingJson (url: string) (jsonContent: string) (environment: TestEnvironment) =
-        task {
-            let! result = environment.Client.PostAsync(url, new StringContent(jsonContent))
-            return result.EnsureSuccessStatusCode()
-        }
-
-    let gettingJson<'t> (url: string) (environment: TestEnvironment) =
-        task {
-            let! result = environment.Client.GetFromJsonAsync<'t>(url)
-            return result
-        }
-
-type Then = Assert
-
-module Utils =
-    let asEvent id event =
-        fun clock ->
-            { Event = event
-              Metadata = { Source = id; RecordedAt = clock () } }
-            |> EventEnvelope.box
-
-    let singleEvent<'e> (eventStore: EventStore) : EventEnvelope<'e> =
-        let events = eventStore.Get<'e>()
-        Then.Single events
-
-module Fixtures =
-    let domainCreated domainId =
-        DomainCreated { DomainId = domainId; Name = "" }
-        |> Utils.asEvent domainId
-
-    let boundedContextCreated domainId contextId =
-        BoundedContextCreated
-            { BoundedContextId = contextId
-              Name = ""
-              DomainId = domainId }
-        |> Utils.asEvent contextId
-
-    let newLabel () =
-        { LabelId = Guid.NewGuid()
-          Name = "label"
-          Value = Some "value"
-          Template = None }
-
-
-    let namespaceDefinition contextId namespaceId =
-        { BoundedContextId = contextId
-          Name = "namespace"
-          NamespaceId = namespaceId
-          NamespaceTemplateId = None
-          Labels = [ newLabel () ] }
+open Contexture.Api.Tests.EnvironmentSimulation
 
 module Namespaces =
 
@@ -149,16 +19,14 @@ module Namespaces =
     let ``Can create a new namespace`` () =
         task {
             // arrange
-            let clock = TestHost.staticClock DateTime.UtcNow
-            let domainId = Guid.NewGuid()
-            let contextId = Guid.NewGuid()
+            let environment = FixedTimeEnvironment.FromSystemClock()
+            let domainId = environment |> PseudoRandom.guid
+            let contextId = environment |> PseudoRandom.guid
 
             let given =
-                Given.noEvents
-                |> Given.andOneEvent (Fixtures.domainCreated domainId)
-                |> Given.andOneEvent (Fixtures.boundedContextCreated domainId contextId)
+                Fixtures.Builders.givenADomainWithOneBoundedContext domainId contextId
 
-            use testEnvironment = Prepare.withGiven clock given
+            use testEnvironment = Prepare.withGiven environment given
 
             //act
             let createNamespaceContent = "{
@@ -198,7 +66,9 @@ module Namespaces =
 module BoundedContexts =
 
     module When =
-        let searchingFor queryParameter (environment: Prepare.TestEnvironment) =
+        open TestHost
+
+        let searchingFor queryParameter (environment: TestHostEnvironment) =
             task {
                 let! result =
                     environment
@@ -210,18 +80,16 @@ module BoundedContexts =
     [<Fact>]
     let ``Can list all bounded contexts`` () =
         task {
-            let clock = TestHost.staticClock DateTime.UtcNow
+            let environment = FixedTimeEnvironment.FromSystemClock()
 
             // arrange
-            let contextId = Guid.NewGuid()
-            let domainId = Guid.NewGuid()
+            let contextId = environment |> PseudoRandom.guid
+            let domainId = environment |> PseudoRandom.guid
 
             let given =
-                Given.noEvents
-                |> Given.andOneEvent (Fixtures.domainCreated domainId)
-                |> Given.andOneEvent (Fixtures.boundedContextCreated domainId contextId)
+                Fixtures.Builders.givenADomainWithOneBoundedContext domainId contextId
 
-            use testEnvironment = Prepare.withGiven clock given
+            use testEnvironment = Prepare.withGiven environment given
 
             //act
             let! result =
@@ -236,18 +104,16 @@ module BoundedContexts =
     [<Fact>]
     let ``Can still list bounded contexts when attaching a random query string`` () =
         task {
-            let clock = TestHost.staticClock DateTime.UtcNow
+            let environment = FixedTimeEnvironment.FromSystemClock()
 
             // arrange
-            let contextId = Guid.NewGuid()
-            let domainId = Guid.NewGuid()
+            let contextId = environment |> PseudoRandom.guid
+            let domainId = environment |> PseudoRandom.guid
 
             let given =
-                Given.noEvents
-                |> Given.andOneEvent (Fixtures.domainCreated domainId)
-                |> Given.andOneEvent (Fixtures.boundedContextCreated domainId contextId)
+                Fixtures.Builders.givenADomainWithOneBoundedContext domainId contextId
 
-            use testEnvironment = Prepare.withGiven clock given
+            use testEnvironment = Prepare.withGiven environment given
 
             //act
             let! result =
@@ -259,91 +125,157 @@ module BoundedContexts =
             Then.Contains(contextId, result |> Array.map (fun i -> i.Id))
         }
 
-    [<Fact>]
-    let ``Can list bounded contexts by label and value`` () =
+    [<Theory>]
+    [<InlineData("Label.name", "Architect")>]
+    [<InlineData("Label.value", "John Doe")>]
+    [<InlineData("Namespace.name", "Team")>]
+    [<InlineData("Namespace.template", "A9F5D70E-B947-40B6-B7BE-4AC45CFE7F34")>]
+    [<InlineData("Domain.name", "domain")>]
+    [<InlineData("Domain.key", "DO-1")>]
+    [<InlineData("BoundedContext.name", "bounded-context")>]
+    [<InlineData("BoundedContext.key", "BC-1")>]
+    let ``Can find the bounded context when searching with a single, exact parameter``
+        (
+            parameterName: string,
+            parameterValue: string
+        ) =
         task {
-            let clock = TestHost.staticClock DateTime.UtcNow
+            let simulation = FixedTimeEnvironment.FromSystemClock()
 
-            // arrange
-            let namespaceId = Guid.NewGuid()
-            let contextId = Guid.NewGuid()
-            let domainId = Guid.NewGuid()
+            let namespaceTemplateId =
+                Guid("A9F5D70E-B947-40B6-B7BE-4AC45CFE7F34")
 
-            let namespaceAdded =
-                NamespaceAdded
-                    { Fixtures.namespaceDefinition contextId namespaceId with
-                          Labels =
-                              [ { Fixtures.newLabel () with
-                                      Name = "l1"
-                                      Value = Some "v1" }
-                                { Fixtures.newLabel () with
-                                      Name = "l2"
-                                      Value = Some "v2" } ] }
-                |> Utils.asEvent contextId
+            let namespaceId = simulation |> PseudoRandom.guid
+            let contextId = simulation |> PseudoRandom.guid
+            let domainId = simulation |> PseudoRandom.guid
+
+            let searchedBoundedContext =
+                Fixtures.Builders.givenADomainWithOneBoundedContext domainId contextId
+                |> Given.andOneEvent (
+                    { Fixtures.Namespace.definition contextId namespaceId with
+                          NamespaceTemplateId = Some namespaceTemplateId }
+                    |> Fixtures.Namespace.appendLabel (Fixtures.Label.newLabel (Guid.NewGuid()))
+                    |> Fixtures.Namespace.namespaceAdded
+                )
+
+            let randomBoundedContext =
+                Fixtures.Builders.givenARandomDomainWithBoundedContextAndNamespace simulation
 
             let given =
-                Given.noEvents
-                |> Given.andOneEvent (Fixtures.domainCreated domainId)
-                |> Given.andOneEvent (Fixtures.boundedContextCreated domainId contextId)
-                |> Given.andOneEvent namespaceAdded
+                searchedBoundedContext @ randomBoundedContext
 
-            use testEnvironment = Prepare.withGiven clock given
+            use testEnvironment = Prepare.withGiven simulation given
 
             //act
             let! result =
                 testEnvironment
-                |> When.gettingJson<{| Id: BoundedContextId |} array> (sprintf "api/boundedContexts/%s/%s" "l1" "v1")
+                |> When.searchingFor $"%s{parameterName}=%s{parameterValue}"
 
             // assert
             Then.NotEmpty result
-            Then.Contains(contextId, result |> Array.map (fun i -> i.Id))
+            Then.Collection(result, (fun x -> Then.Equal(contextId, x)))
         }
 
-    [<Fact>]
-    let ``Can search for bounded contexts by label and value`` () =
-        task {
-            let clock = TestHost.staticClock DateTime.UtcNow
+    module ``When searching for bounded contexts`` =
+        open Fixtures
 
-            // arrange
-            let namespaceId = Guid.NewGuid()
-            let contextId = Guid.NewGuid()
-            let domainId = Guid.NewGuid()
+        module When =
+            let searchingTheLabelName query testEnvironment =
+                testEnvironment
+                |> When.searchingFor $"Label.Name=%s{query}"
 
-            let namespaceAdded =
-                NamespaceAdded(Fixtures.namespaceDefinition contextId namespaceId)
-                |> Utils.asEvent contextId
+            let searchingTheNamespaceName query testEnvironment =
+                testEnvironment
+                |> When.searchingFor $"Namespace.Name=%s{query}"
+
+        module Then =
+            let itShouldContainOnlyTheBoundedContext (contextId: BoundedContextId) result =
+                Then.NotEmpty result
+                Then.Collection(result, (fun x -> Then.Equal(contextId, x)))
+
+        let prepareTestEnvironment simulation searchedBoundedContext =
+            let randomBoundedContext =
+                Fixtures.Builders.givenARandomDomainWithBoundedContextAndNamespace simulation
 
             let given =
-                Given.noEvents
-                |> Given.andOneEvent (Fixtures.domainCreated domainId)
-                |> Given.andOneEvent (Fixtures.boundedContextCreated domainId contextId)
-                |> Given.andOneEvent namespaceAdded
+                searchedBoundedContext @ randomBoundedContext
 
-            use testEnvironment = Prepare.withGiven clock given
+            Prepare.withGiven simulation given
 
-            //act - search by name
-            let! result =
-                testEnvironment
-                |> When.searchingFor $"Label.name=lab"
+        type ``with a single string based parameter``() =
+            let simulation = FixedTimeEnvironment.FromSystemClock()
 
-            // assert
-            Then.NotEmpty result
-            Then.Collection(result, (fun x -> Then.Equal(contextId, x)))
+            let namespaceId = simulation |> PseudoRandom.guid
+            let contextId = simulation |> PseudoRandom.guid
+            let domainId = simulation |> PseudoRandom.guid
 
-            //act - search by value
-            let! result =
-                testEnvironment
-                |> When.searchingFor "Label.value=val"
+            [<Fact>]
+            member __.``it is possible to find label names by using 'arch*' as StartsWith``() =
+                task {
+                    use testEnvironment =
+                        Builders.givenADomainWithOneBoundedContextAndOneNamespace domainId contextId namespaceId
+                        |> prepareTestEnvironment simulation
 
-            // assert
-            Then.NotEmpty result
-            Then.Collection(result, (fun x -> Then.Equal(contextId, x)))
-        }
+                    //act
+                    let! result =
+                        testEnvironment
+                        |> When.searchingTheLabelName "arch*"
+
+                    result
+                    |> Then.itShouldContainOnlyTheBoundedContext contextId
+                }
+
+            [<Fact>]
+            member __.``it is possible to find label names by using '*tect' as EndsWith``() =
+                task {
+                    use testEnvironment =
+                        Builders.givenADomainWithOneBoundedContextAndOneNamespace domainId contextId namespaceId
+                        |> prepareTestEnvironment simulation
+
+                    //act
+                    let! result =
+                        testEnvironment
+                        |> When.searchingTheLabelName "*tect"
+
+                    result
+                    |> Then.itShouldContainOnlyTheBoundedContext contextId
+                }
+
+            [<Fact>]
+            member __.``it is possible to find label names by using '*rchitec*' as Contains``() =
+                task {
+                    use testEnvironment =
+                        Builders.givenADomainWithOneBoundedContextAndOneNamespace domainId contextId namespaceId
+                        |> prepareTestEnvironment simulation
+
+                    //act
+                    let! result =
+                        testEnvironment
+                        |> When.searchingTheLabelName "*rchitec*"
+
+                    result
+                    |> Then.itShouldContainOnlyTheBoundedContext contextId
+                }
+
+            [<Fact>]
+            member __.``it is possible to find namespace names by using '*ea*' as Contains``() =
+                task {
+                    use testEnvironment =
+                        Builders.givenADomainWithOneBoundedContextAndOneNamespace domainId contextId namespaceId
+                        |> prepareTestEnvironment simulation
+
+                    let! result =
+                        testEnvironment
+                        |> When.searchingTheNamespaceName "*ea*"
+
+                    result
+                    |> Then.itShouldContainOnlyTheBoundedContext contextId
+                }
 
     [<Fact>]
     let ``Can search for bounded contexts by label and value for a specific template`` () =
         task {
-            let clock = TestHost.staticClock DateTime.UtcNow
+            let environment = FixedTimeEnvironment.FromSystemClock()
 
             // arrange
             let namespaceId = Guid.NewGuid()
@@ -354,33 +286,37 @@ module BoundedContexts =
             let name = "myname"
 
             let namespaceAdded =
-                NamespaceAdded
-                    { Fixtures.namespaceDefinition contextId namespaceId with
-                          Name = name
-                          NamespaceTemplateId = Some templateId }
-                |> Utils.asEvent contextId
+                { Fixtures.Namespace.definition contextId namespaceId with
+                      Name = name
+                      NamespaceTemplateId = Some templateId }
+                |> Fixtures.Namespace.appendLabel (Fixtures.Label.newLabel (Guid.NewGuid()))
+                |> Fixtures.Namespace.namespaceAdded
 
             let otherNamespaceAdded =
-                NamespaceAdded
-                    { Fixtures.namespaceDefinition otherContextId (Guid.NewGuid()) with
-                          Name = "the other namespace"
-                          NamespaceTemplateId = None }
-                |> Utils.asEvent otherContextId
+
+                { Fixtures.Namespace.definition otherContextId (Guid.NewGuid()) with
+                      Name = "the other namespace"
+                      NamespaceTemplateId = None }
+                |> Fixtures.Namespace.appendLabel (Fixtures.Label.newLabel (Guid.NewGuid()))
+                |> Fixtures.Namespace.namespaceAdded
 
             let given =
-                Given.noEvents
-                |> Given.andOneEvent (Fixtures.domainCreated domainId)
-                |> Given.andOneEvent (Fixtures.boundedContextCreated domainId otherContextId)
-                |> Given.andOneEvent (Fixtures.boundedContextCreated domainId contextId)
+                Fixtures.Builders.givenADomainWithOneBoundedContext domainId contextId
+                |> Given.andOneEvent (
+                    otherContextId
+                    |> Fixtures.BoundedContext.definition domainId
+                    |> Fixtures.BoundedContext.boundedContextCreated
+                )
+
                 |> Given.andOneEvent namespaceAdded
                 |> Given.andOneEvent otherNamespaceAdded
 
-            use testEnvironment = Prepare.withGiven clock given
+            use testEnvironment = Prepare.withGiven environment given
 
             //act - search by name
             let! result =
                 testEnvironment
-                |> When.searchingFor $"Label.name=lab&Namespace.Template=%O{templateId}"
+                |> When.searchingFor $"Label.name=arch*&Namespace.Template=%O{templateId}"
 
             // assert
             Then.NotEmpty result
@@ -389,7 +325,7 @@ module BoundedContexts =
             //act - search by value
             let! result =
                 testEnvironment
-                |> When.searchingFor $"Label.value=val&Namespace.Template=%O{templateId}"
+                |> When.searchingFor $"Label.value=Joh*&Namespace.Template=%O{templateId}"
 
             // assert
             Then.NotEmpty result
@@ -398,7 +334,7 @@ module BoundedContexts =
             // act - search by namespace name
             let! result =
                 testEnvironment
-                |> When.searchingFor $"Label.value=val&Namespace.Name=%s{name}"
+                |> When.searchingFor $"Label.value=Joh*&Namespace.Name=%s{name}"
 
             // assert
             Then.NotEmpty result

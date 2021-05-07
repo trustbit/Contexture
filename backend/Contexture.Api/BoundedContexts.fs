@@ -7,7 +7,6 @@ open Contexture.Api.Domains
 open Contexture.Api.Entities
 open Contexture.Api.Aggregates.BoundedContext
 open Contexture.Api.Infrastructure
-open Contexture.Api.Infrastructure.Projections
 open Microsoft.AspNetCore.Http
 open FSharp.Control.Tasks
 
@@ -29,7 +28,11 @@ module BoundedContexts =
               Domain: Domain
               Namespaces: Namespace list }
 
-        let convertBoundedContextWithDomain (findDomain: DomainId -> Domain option) (findNamespaces: BoundedContextId -> Namespace list ) (boundedContext: BoundedContext) =
+        let convertBoundedContextWithDomain
+            (findDomain: DomainId -> Domain option)
+            (findNamespaces: BoundedContextId -> Namespace list)
+            (boundedContext: BoundedContext)
+            =
             { Id = boundedContext.Id
               ParentDomainId = boundedContext.DomainId
               Key = boundedContext.Key
@@ -40,7 +43,10 @@ module BoundedContexts =
               UbiquitousLanguage = boundedContext.UbiquitousLanguage
               Messages = boundedContext.Messages
               DomainRoles = boundedContext.DomainRoles
-              Domain = boundedContext.DomainId |> findDomain |> Option.get
+              Domain =
+                  boundedContext.DomainId
+                  |> findDomain
+                  |> Option.get
               Namespaces = boundedContext.Id |> findNamespaces }
 
     module CommandEndpoints =
@@ -117,131 +123,70 @@ module BoundedContexts =
 
                 json boundedContexts next ctx
 
-        module Search =
-            [<CLIMutable>]
-            type LabelQuery =
-                { Name: string option
-                  Value: string option }
-                member this.IsActive = this.Name.IsSome || this.Value.IsSome
+        [<CLIMutable>]
+        type Query =
+            { Label: SearchFor.NamespaceId.LabelQuery option
+              Namespace: SearchFor.NamespaceId.NamespaceQuery option
+              Domain: SearchFor.DomainId.DomainQuery option
+              BoundedContext : SearchFor.BoundedContextId.BoundedContextQuery option }
+            member this.IsActive =
+                [ this.Label |> Option.map (fun l -> l.IsActive)
+                  this.Namespace |> Option.map (fun n -> n.IsActive)
+                  this.Domain |> Option.map (fun n -> n.IsActive)
+                  this.BoundedContext |> Option.map (fun n -> n.IsActive) ]
+                |> List.map (Option.defaultValue false)
+                |> List.exists id
 
-            [<CLIMutable>]
-            type NamespaceQuery =
-                { Template: NamespaceTemplateId option
-                  Name: string option }
-                member this.IsActive = this.Name.IsSome || this.Template.IsSome
+        let getBoundedContextsByQuery (item: Query) =
+            fun (next: HttpFunc) (ctx: HttpContext) ->
+                let database = ctx.GetService<EventStore>()
 
-            [<CLIMutable>]
-            type Query =
-                { Label: LabelQuery option
-                  Namespace: NamespaceQuery option }
-                member this.IsActive =
-                    this.Label
-                    |> Option.map (fun l -> l.IsActive)
-                    |> Option.defaultValue false
-                    || this.Namespace
-                       |> Option.map (fun n -> n.IsActive)
-                       |> Option.defaultValue false
+                let namespaceIds =
+                    SearchFor.NamespaceId.find database item.Namespace item.Label
 
+                let domainIds =
+                    SearchFor.DomainId.findRelevantDomains database item.Domain
+                    
+                let boundedContextIdsFromSearch =
+                    SearchFor.BoundedContextId.findRelevantBoundedContexts database item.BoundedContext
 
-            let findRelevantNamespaces (database: EventStore) (item: NamespaceQuery) =
-                let availableNamespaces =
-                    ReadModels.Namespace.Find.namespaces database
+                let boundedContextsByNamespace =
+                    Namespace.BoundedContexts.byNamespace database
 
-                let namespacesByName =
-                    item.Name
-                    |> Option.map (ReadModels.Namespace.Find.Namespaces.byName availableNamespaces)
-
-                let namespacesByTemplate =
-                    item.Template
-                    |> Option.map (ReadModels.Namespace.Find.Namespaces.byTemplate availableNamespaces)
-
-                let relevantNamespaces =
-                    match namespacesByName, namespacesByTemplate with
-                    | Some byName, Some byTemplate -> Set.intersect byName byTemplate
-                    | Some byName, None -> byName
-                    | None, Some byTemplate -> byTemplate
-                    | None, None -> Set.empty
-
-                relevantNamespaces
-
-            let findRelevantLabels (database: EventStore) (item: LabelQuery) =
-                let namespacesByLabel =
+                let boundedContextsByDomain =
                     database
-                    |> ReadModels.Namespace.Find.labels
+                    |> ReadModels.BoundedContext.allBoundedContextsByDomain
 
-                namespacesByLabel
-                |> ReadModels.Namespace.Find.Labels.byLabelName item.Name
-                |> Set.filter
-                    (fun { Value = value } ->
-                        match item.Value with
-                        | Some searchTerm ->
-                            value
-                            |> Option.exists (fun v -> v.Contains(searchTerm, StringComparison.OrdinalIgnoreCase))
-                        | None -> true)
-
-            let getBoundedContextsByLabel (item: Query) =
-                fun (next: HttpFunc) (ctx: HttpContext) ->
-                    let database = ctx.GetService<EventStore>()
-
-                    let relevantNamespaceIds =
-                        item.Namespace
-                        |> Option.map (findRelevantNamespaces database)
-                        |> Option.map (Set.map (fun n -> n.NamespaceId))
-
-                    let relevantLabels =
-                        item.Label
-                        |> Option.map (findRelevantLabels database)
-
-                    let namespacesIds =
-                        match relevantNamespaceIds, relevantLabels with
-                        | Some namespaces, Some labels ->
-                            labels
-                            |> Set.filter (fun { NamespaceId = namespaceId } -> namespaces.Contains namespaceId)
-                            |> Set.map (fun n -> n.NamespaceId)
-                        | Some namespaces, None -> namespaces
-                        | None, Some labels -> labels |> Set.map (fun n -> n.NamespaceId)
-                        | None, None -> Set.empty
-
-                    let boundedContextsByNamespace =
-                        ReadModels.Namespace.Find.BoundedContexts.byNamespace database
-
-                    let boundedContextIds =
-                        namespacesIds
-                        |> Set.map (
+                let boundedContextIdsFromNamespace =
+                    namespaceIds
+                    |> Option.map (
+                        Set.map (
                             boundedContextsByNamespace
                             >> Option.toList
                             >> Set.ofList
                         )
-                        |> Set.unionMany
-                        |> Set.toList
+                        >> Set.unionMany
+                    )
 
-                    mapToBoundedContext database boundedContextIds next ctx
-
-            let getBoundedContextsWithLabel (name, value) =
-                fun (next: HttpFunc) (ctx: HttpContext) ->
-                    let database = ctx.GetService<EventStore>()
-
-                    let namespaces =
-                        database
-                        |> ReadModels.Namespace.Find.labels
-                        |> ReadModels.Namespace.Find.Labels.getByLabelName name
-                        |> Set.filter (fun { Value = v } -> v = Some value)
-                        |> Set.map (fun n -> n.NamespaceId)
-
-                    let boundedContextsByNamespace =
-                        ReadModels.Namespace.Find.BoundedContexts.byNamespace database
-
-                    let boundedContextIds =
-                        namespaces
-                        |> Set.map (
-                            boundedContextsByNamespace
-                            >> Option.toList
+                let boundedContextIdsFromDomain =
+                    domainIds
+                    |> Option.map (
+                        Set.map (
+                            boundedContextsByDomain
+                            >> List.map (fun b -> b.Id)
                             >> Set.ofList
                         )
-                        |> Set.unionMany
-                        |> Set.toList
+                        >> Set.unionMany
+                    )
+                  
+                let boundedContextIds =
+                    SearchFor.combineResultsWithAnd
+                        [ boundedContextIdsFromSearch
+                          boundedContextIdsFromNamespace
+                          boundedContextIdsFromDomain
+                        ]
 
-                    mapToBoundedContext database boundedContextIds next ctx
+                mapToBoundedContext database (Set.toList boundedContextIds) next ctx
 
         let getBoundedContexts =
             fun (next: HttpFunc) (ctx: HttpContext) ->
@@ -259,8 +204,8 @@ module BoundedContexts =
             fun (next: HttpFunc) (ctx: HttpContext) ->
                 let nextHandler =
                     if ctx.Request.QueryString.HasValue then
-                        match ctx.TryBindQueryString<Search.Query>() with
-                        | Ok query when query.IsActive -> Search.getBoundedContextsByLabel query
+                        match ctx.TryBindQueryString<Query>() with
+                        | Ok query when query.IsActive -> getBoundedContextsByQuery query
                         | _ -> getBoundedContexts
                     else
                         getBoundedContexts
@@ -320,6 +265,4 @@ module BoundedContexts =
                                         >=> bindJson (CommandEndpoints.messages contextId)
                                         DELETE
                                         >=> CommandEndpoints.removeAndReturnId contextId ]))
-                      GET
-                      >=> routef "/%s/%s" QueryEndpoints.Search.getBoundedContextsWithLabel
                       GET >=> QueryEndpoints.getOrSearchBoundedContexts ])

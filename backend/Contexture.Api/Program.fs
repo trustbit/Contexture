@@ -30,7 +30,8 @@ let allRoute =
             let result =
                 {| BoundedContexts = document.BoundedContexts.All
                    Domains = document.Domains.All
-                   Collaborations = document.Collaborations.All |}
+                   Collaborations = document.Collaborations.All
+                   NamespaceTemplates = document.NamespaceTemplates.All |}
             json result next ctx
 
 let webApp hostFrontend =

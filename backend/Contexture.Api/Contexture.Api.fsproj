@@ -18,10 +18,12 @@
     <Compile Include="Database.fs" />
     <Compile Include="Infrastructure.fs" />
     <Compile Include="CommandHandlers.fs" />
-    <Compile Include="ReadModels.fs" />
+    <Compile Include="ReadModels\ReadModels.fs" />
+    <Compile Include="ReadModels\Find.fs" />
     <Compile Include="Views.fs" />
     <Compile Include="Domains.fs" />
     <Compile Include="Namespaces.fs" />
+    <Compile Include="SearchHandler.fs" />
     <Compile Include="BoundedContexts.fs" />
     <Compile Include="Collaborations.fs" />
     <Compile Include="Search.fs" />
