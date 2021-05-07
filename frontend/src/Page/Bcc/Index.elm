@@ -43,7 +43,7 @@ import BoundedContext.BoundedContextId as BoundedContextId exposing (BoundedCont
 
 import ContextMapping.Collaboration as Collaboration
 import ContextMapping.Collaborator as Collaborator
-import Page.Bcc.BoundedContextCard as BoundedContextCard
+import Components.BoundedContextCard as BoundedContextCard
 import ContextMapping.Communication as Communication
 import List
 

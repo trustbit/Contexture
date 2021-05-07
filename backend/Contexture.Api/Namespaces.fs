@@ -140,9 +140,7 @@ module Namespaces =
 
                     template next ctx
 
-
     module Views =
-
         open Layout
         open Giraffe.ViewEngine
 
@@ -165,7 +163,7 @@ module Namespaces =
 
                 div [] [
                     div [ _id "namespaces" ] []
-                    initElm serialize "Components.ManageNamespaces" "namespaces" flags
+                    initElm serialize "EntryPoints.ManageNamespaces" "namespaces" flags
                 ]
 
             let content =

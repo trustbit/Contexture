@@ -28,7 +28,7 @@ module Search =
             let searchSnipped =
                 div [] [
                     div [ _id "search" ] []
-                    initElm jsonEncoder "Components.Search" "search" flags
+                    initElm jsonEncoder "EntryPoints.Search" "search" flags
                 ]
 
             documentTemplate (headTemplate resolveAssets) (bodyTemplate searchSnipped)

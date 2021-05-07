@@ -1,4 +1,4 @@
-module Page.Bcc.BoundedContextsOfDomain exposing (..)
+module Components.BoundedContextsOfDomain exposing (..)
 
 
 import Json.Decode as Decode
@@ -49,7 +49,7 @@ import ContextMapping.Collaborator as Collaborator
 import ContextMapping.Communication as Communication
 import BoundedContext.Namespace as Namespace exposing (Namespace)
 
-import Page.Bcc.BoundedContextCard as BoundedContextCard
+import Components.BoundedContextCard as BoundedContextCard
 
 import List
 

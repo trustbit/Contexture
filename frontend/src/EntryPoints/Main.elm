@@ -1,4 +1,4 @@
-module Main exposing (main)
+module EntryPoints.Main exposing (main)
 
 import Browser
 import Browser.Navigation as Nav

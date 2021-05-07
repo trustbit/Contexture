@@ -1,4 +1,4 @@
-module Components.ManageNamespaces exposing (main)
+module EntryPoints.ManageNamespaces exposing (main)
 
 
 import Api exposing (boundedContexts)

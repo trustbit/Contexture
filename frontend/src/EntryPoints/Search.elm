@@ -1,4 +1,4 @@
-module Components.Search exposing (main)
+module EntryPoints.Search exposing (main)
 
 import Url
 import Http
@@ -9,7 +9,7 @@ import Bootstrap.Grid.Row as Row
 import Bootstrap.Grid.Col as Col
 
 import Api as Api
-import Page.Bcc.BoundedContextCard as BoundedContextCard
+import Components.BoundedContextCard as BoundedContextCard
 import BoundedContext as BoundedContext
 import BoundedContext.BoundedContextId as BoundedContextId
 import Domain.DomainId as DomainId
@@ -22,7 +22,7 @@ import Html exposing (Html, div, text)
 import Html.Attributes exposing (..)
 import Json.Decode as Decode
 import Json.Decode.Pipeline as JP
-import Page.Bcc.BoundedContextsOfDomain as BoundedContext
+import Components.BoundedContextsOfDomain as BoundedContext
 import Url
 import Url.Builder exposing (QueryParameter)
 import Url.Parser

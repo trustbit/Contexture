@@ -1,4 +1,4 @@
-module Page.Bcc.BoundedContextCard exposing (init,Model,Item,view,decoder)
+module Components.BoundedContextCard exposing (init,Model,Item,view,decoder)
 
 import Json.Decode as Decode
 import Json.Decode.Pipeline as JP
