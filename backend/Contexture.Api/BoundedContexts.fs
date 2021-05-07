@@ -127,11 +127,13 @@ module BoundedContexts =
         type Query =
             { Label: SearchFor.NamespaceId.LabelQuery option
               Namespace: SearchFor.NamespaceId.NamespaceQuery option
-              Domain: SearchFor.DomainId.DomainQuery option }
+              Domain: SearchFor.DomainId.DomainQuery option
+              BoundedContext : SearchFor.BoundedContextId.BoundedContextQuery option }
             member this.IsActive =
                 [ this.Label |> Option.map (fun l -> l.IsActive)
                   this.Namespace |> Option.map (fun n -> n.IsActive)
-                  this.Domain |> Option.map (fun n -> n.IsActive) ]
+                  this.Domain |> Option.map (fun n -> n.IsActive)
+                  this.BoundedContext |> Option.map (fun n -> n.IsActive) ]
                 |> List.map (Option.defaultValue false)
                 |> List.exists id
 
@@ -144,6 +146,9 @@ module BoundedContexts =
 
                 let domainIds =
                     SearchFor.DomainId.findRelevantDomains database item.Domain
+                    
+                let boundedContextIdsFromSearch =
+                    SearchFor.BoundedContextId.findRelevantBoundedContexts database item.BoundedContext
 
                 let boundedContextsByNamespace =
                     Namespace.BoundedContexts.byNamespace database
@@ -173,13 +178,13 @@ module BoundedContexts =
                         )
                         >> Set.unionMany
                     )
-
+                  
                 let boundedContextIds =
-                    match boundedContextIdsFromNamespace, boundedContextIdsFromDomain with
-                    | Some fromNamespace, Some fromDomain -> Set.intersect fromNamespace fromDomain
-                    | Some fromNamespace, None -> fromNamespace
-                    | None, Some fromDomain -> fromDomain
-                    | None, None -> Set.empty
+                    SearchFor.combineResultsWithAnd
+                        [ boundedContextIdsFromSearch
+                          boundedContextIdsFromNamespace
+                          boundedContextIdsFromDomain
+                        ]
 
                 mapToBoundedContext database (Set.toList boundedContextIds) next ctx
 

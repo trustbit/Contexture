@@ -233,3 +233,57 @@ module Find =
     let domains (eventStore: EventStore) : Domains.DomainByKeyAndNameModel =
         eventStore.Get<Aggregates.Domain.Event>()
         |> List.fold Domains.projectToDomain Domains.DomainByKeyAndNameModel.Empty
+        
+        
+    module BoundedContexts =
+        open Contexture.Api.Aggregates.BoundedContext
+
+        type BoundedContextByKeyAndNameModel =
+            { ByKey: Map<string, BoundedContextId>
+              ByName: Map<string, Set<BoundedContextId>> }
+            static member Empty =
+                { ByKey = Map.empty
+                  ByName = Map.empty }
+
+        let projectToBoundedContext state eventEnvelope =
+            let addKey canBeKey domain byKey =
+                match canBeKey with
+                | Some key -> byKey |> Map.add key domain
+                | None -> byKey
+
+            let append key value items = appendToSet items (key, value)
+
+            match eventEnvelope.Event with
+            | BoundedContextCreated n ->
+                { state with
+                      ByName = state.ByName |> append n.Name n.BoundedContextId }
+            | KeyAssigned k ->
+                { state with
+                      ByKey =
+                          state.ByKey
+                          |> Map.filter (fun _ v -> v <> k.BoundedContextId)
+                          |> addKey k.Key k.BoundedContextId }
+            | BoundedContextImported n ->
+                { state with
+                      ByName = appendToSet state.ByName (n.Name, n.BoundedContextId)
+                      ByKey = state.ByKey |> addKey n.Key n.BoundedContextId }
+            | BoundedContextRenamed l ->
+                { state with
+                      ByName =
+                          state.ByName
+                          |> removeFromSet id l.BoundedContextId
+                          |> append l.Name l.BoundedContextId }
+            | BoundedContextRemoved l ->
+                { state with
+                      ByName = state.ByName |> removeFromSet id l.BoundedContextId
+                      ByKey =
+                          state.ByKey
+                          |> Map.filter (fun _ v -> v <> l.BoundedContextId) }
+            | _ ->
+                state
+        let byName (model: BoundedContextByKeyAndNameModel) (phrase: SearchPhrase option) = model.ByName |> findByKeySet phrase
+        let byKey (model: BoundedContextByKeyAndNameModel) (phrase: SearchPhrase option) = model.ByKey |> findByKey phrase |> Set.ofList
+
+    let boundedContexts (eventStore: EventStore) : BoundedContexts.BoundedContextByKeyAndNameModel =
+        eventStore.Get<Aggregates.BoundedContext.Event>()
+        |> List.fold BoundedContexts.projectToBoundedContext BoundedContexts.BoundedContextByKeyAndNameModel.Empty

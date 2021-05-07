@@ -2,15 +2,13 @@ namespace Contexture.Api.Tests
 
 open System
 open Contexture.Api.Aggregates
-open Contexture.Api.Aggregates.BoundedContext
-open Contexture.Api.Aggregates.Domain
 open Contexture.Api.Aggregates.Namespace
-open Contexture.Api.Entities
-open Contexture.Api.Infrastructure
 open Contexture.Api.Tests.EnvironmentSimulation
 
 module Fixtures =
     module Domain =
+        open Domain
+
         [<Literal>]
         let Name = "domain"
 
@@ -29,8 +27,13 @@ module Fixtures =
             KeyAssigned key |> Utils.asEvent key.DomainId
 
     module BoundedContext =
+        open BoundedContext
+
         [<Literal>]
         let Name = "bounded-context"
+
+        [<Literal>]
+        let Key = "BC-1"
 
         let definition domainId contextId =
             { BoundedContextId = contextId
@@ -40,6 +43,14 @@ module Fixtures =
         let boundedContextCreated definition =
             BoundedContextCreated definition
             |> Utils.asEvent definition.BoundedContextId
+
+        let key domainId : KeyAssigned =
+            { BoundedContextId = domainId
+              Key = Some Key }
+
+        let keyAssigned key =
+            KeyAssigned key
+            |> Utils.asEvent key.BoundedContextId
 
     module Label =
 
@@ -121,11 +132,12 @@ module Fixtures =
                                  |> Domain.domainDefinition
                                  |> Domain.domainCreated
                                  domainId |> Domain.key |> Domain.keyAssigned ]
-            |> Given.andOneEvent (
+            |> Given.andEvents[
                 contextId
                 |> BoundedContext.definition domainId
                 |> BoundedContext.boundedContextCreated
-            )
+                contextId |> BoundedContext.key |> BoundedContext.keyAssigned
+            ]
 
         let givenADomainWithOneBoundedContextAndOneNamespace domainId contextId namespaceId =
             givenADomainWithOneBoundedContext domainId contextId

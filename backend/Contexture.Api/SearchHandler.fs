@@ -8,6 +8,18 @@ open Contexture.Api.ReadModels
 
 module SearchFor =
 
+    let combineResultsWithAnd (searchResults: Set<_> option list) =
+        searchResults
+        |> List.fold
+            (fun ids results ->
+                match ids, results with
+                | Some existing, Some r -> Set.intersect r existing |> Some
+                | None, Some r -> Some r
+                | Some existing, None -> Some existing
+                | None, None -> None)
+            None
+        |> Option.defaultValue Set.empty
+
     module NamespaceId =
 
         [<CLIMutable>]
@@ -35,11 +47,8 @@ module SearchFor =
                 |> Option.map (Find.Namespaces.byTemplate availableNamespaces)
 
             let relevantNamespaces =
-                match namespacesByName, namespacesByTemplate with
-                | Some byName, Some byTemplate -> Set.intersect byName byTemplate
-                | Some byName, None -> byName
-                | None, Some byTemplate -> byTemplate
-                | None, None -> Set.empty
+                combineResultsWithAnd [ namespacesByName
+                                        namespacesByTemplate ]
 
             relevantNamespaces
 
@@ -61,7 +70,6 @@ module SearchFor =
                         |> Option.map (Find.SearchPhrase.matches searchTerm)
                         |> Option.defaultValue false
                     | None -> true)
-
 
         let find (database: EventStore) (byNamespace: NamespaceQuery option) (byLabel: LabelQuery option) =
             let relevantNamespaceIds =
@@ -109,8 +117,31 @@ module SearchFor =
                         |> Option.map Find.SearchPhrase.fromInput
                         |> Option.map (Find.Domains.byKey findDomains)
 
-                    match foundByName, foundByKey with
-                    | Some byName, Some byKey -> Set.intersect byName byKey
-                    | Some byName, None -> byName
-                    | None, Some byKey -> byKey
-                    | None, None -> Set.empty)
+                    combineResultsWithAnd [ foundByName
+                                            foundByKey ])
+
+    module BoundedContextId =
+        [<CLIMutable>]
+        type BoundedContextQuery =
+            { Name: string option
+              Key: string option }
+            member this.IsActive = this.Name.IsSome || this.Key.IsSome
+
+        let findRelevantBoundedContexts (database: EventStore) (query: BoundedContextQuery option) =
+            query
+            |> Option.map
+                (fun item ->
+                    let findBoundedContext = database |> Find.boundedContexts
+
+                    let foundByName =
+                        item.Name
+                        |> Option.map Find.SearchPhrase.fromInput
+                        |> Option.map (Find.BoundedContexts.byName findBoundedContext)
+
+                    let foundByKey =
+                        item.Key
+                        |> Option.map Find.SearchPhrase.fromInput
+                        |> Option.map (Find.BoundedContexts.byKey findBoundedContext)
+
+                    combineResultsWithAnd [ foundByName
+                                            foundByKey ])
