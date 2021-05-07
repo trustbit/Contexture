@@ -82,6 +82,10 @@ module Find =
         |> Map.filter (fun k _ -> matchesKey k)
         |> Map.toList
         |> List.map snd
+        
+    let private findByKeySet keyPhrase items =
+        items
+        |> findByKey keyPhrase
         |> Set.unionMany
 
     module Namespaces =
@@ -111,7 +115,7 @@ module Find =
             | LabelAdded l -> state
             | LabelRemoved l -> state
 
-        let byName (namespaces: NamespaceFinder) (name: SearchPhrase option) = namespaces |> findByKey name
+        let byName (namespaces: NamespaceFinder) (name: SearchPhrase option) = namespaces |> findByKeySet name
 
         let byTemplate (namespaces: NamespaceFinder) (templateId: NamespaceTemplateId) =
             namespaces
@@ -166,7 +170,7 @@ module Find =
                 state
                 |> removeFromSet (fun n -> n.NamespaceId) n.NamespaceId
 
-        let byLabelName (phrase: SearchPhrase option) (namespaces: NamespacesByLabel) = namespaces |> findByKey phrase
+        let byLabelName (phrase: SearchPhrase option) (namespaces: NamespacesByLabel) = namespaces |> findByKeySet phrase
 
     let labels (eventStore: EventStore) : Labels.NamespacesByLabel =
         eventStore.Get<Aggregates.Namespace.Event>()
@@ -223,7 +227,8 @@ module Find =
             | PromotedToDomain _
             | VisionRefined _ -> state
 
-        let byName (phrase: SearchPhrase option) (model: DomainByKeyAndNameModel) = model.ByName |> findByKey phrase
+        let byName (model: DomainByKeyAndNameModel) (phrase: SearchPhrase option) = model.ByName |> findByKeySet phrase
+        let byKey (model: DomainByKeyAndNameModel) (phrase: SearchPhrase option) = model.ByKey |> findByKey phrase |> Set.ofList
 
     let domains (eventStore: EventStore) : Domains.DomainByKeyAndNameModel =
         eventStore.Get<Aggregates.Domain.Event>()

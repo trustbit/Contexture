@@ -14,12 +14,19 @@ module Fixtures =
         [<Literal>]
         let Name = "domain"
 
-        let definition domainId : DomainCreated =
-            { DomainId = domainId; Name = Name }
+        [<Literal>]
+        let Key = "DO-1"
+
+        let domainDefinition domainId : DomainCreated = { DomainId = domainId; Name = Name }
 
         let domainCreated definition =
             DomainCreated definition
             |> Utils.asEvent definition.DomainId
+
+        let key domainId : KeyAssigned = { DomainId = domainId; Key = Some Key }
+
+        let keyAssigned key =
+            KeyAssigned key |> Utils.asEvent key.DomainId
 
     module BoundedContext =
         [<Literal>]
@@ -68,7 +75,7 @@ module Fixtures =
             NamespaceAdded definition
             |> Utils.asEvent definition.BoundedContextId
 
-    
+
     module Builders =
         let givenARandomDomainWithBoundedContextAndNamespace environment =
             let namespaceId = environment |> PseudoRandom.guid
@@ -77,7 +84,7 @@ module Fixtures =
 
             Given.noEvents
             |> Given.andOneEvent (
-                { Domain.definition domainId with
+                { Domain.domainDefinition domainId with
                       Name =
                           environment
                           |> PseudoRandom.nameWithGuid "random-domain-name" }
@@ -110,11 +117,10 @@ module Fixtures =
 
         let givenADomainWithOneBoundedContext domainId contextId =
             Given.noEvents
-            |> Given.andOneEvent (
-                domainId
-                |> Domain.definition
-                |> Domain.domainCreated
-            )
+            |> Given.andEvents [ domainId
+                                 |> Domain.domainDefinition
+                                 |> Domain.domainCreated
+                                 domainId |> Domain.key |> Domain.keyAssigned ]
             |> Given.andOneEvent (
                 contextId
                 |> BoundedContext.definition domainId

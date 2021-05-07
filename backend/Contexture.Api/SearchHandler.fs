@@ -89,8 +89,9 @@ module SearchFor =
     module DomainId =
         [<CLIMutable>]
         type DomainQuery =
-            { Name: string option }
-            member this.IsActive = this.Name.IsSome
+            { Name: string option
+              Key: string option }
+            member this.IsActive = this.Name.IsSome || this.Key.IsSome
 
         let findRelevantDomains (database: EventStore) (query: DomainQuery option) =
             query
@@ -98,8 +99,18 @@ module SearchFor =
                 (fun item ->
                     let findDomains = database |> Find.domains
 
-                    findDomains
-                    |> Find.Domains.byName (
+                    let foundByName =
                         item.Name
-                        |> Option.bind Find.SearchPhrase.fromInput
-                    ))
+                        |> Option.map Find.SearchPhrase.fromInput
+                        |> Option.map (Find.Domains.byName findDomains)
+
+                    let foundByKey =
+                        item.Key
+                        |> Option.map Find.SearchPhrase.fromInput
+                        |> Option.map (Find.Domains.byKey findDomains)
+
+                    match foundByName, foundByKey with
+                    | Some byName, Some byKey -> Set.intersect byName byKey
+                    | Some byName, None -> byName
+                    | None, Some byKey -> byKey
+                    | None, None -> Set.empty)
