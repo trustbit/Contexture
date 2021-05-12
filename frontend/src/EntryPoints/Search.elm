@@ -28,6 +28,7 @@ import Url.Builder exposing (QueryParameter)
 import Url.Parser
 import Url.Parser.Query
 import Dict
+import BoundedContext.Namespace exposing (NamespaceTemplateId)
 
 
 main =
@@ -67,6 +68,11 @@ initModel config collaboration items domains =
         |> List.map (\domain -> BoundedContext.init config domain (getContexts domain) collaboration)
         |> List.filter(\i -> not <| List.isEmpty i.contextItems)
 
+initFilter : List QueryParameter -> Filter
+initFilter query = 
+    { query = query
+    , namespaceFilter = RemoteData.Loading
+    }
 
 init : Decode.Value -> ( Model, Cmd Msg )
 init flag =
@@ -78,16 +84,19 @@ init flag =
                 , collaboration = decoded.collaboration
                 , items = RemoteData.Loading
                 , models = RemoteData.Loading
-                , query = decoded.initialQuery
+                , filter = initFilter decoded.initialQuery
                 }
-            , findAll decoded.apiBase decoded.initialQuery
+            , Cmd.batch 
+                [ findAll decoded.apiBase decoded.initialQuery
+                , getNamespaceFilters decoded.apiBase
+                ]
             )
 
         Err e ->
             ( Debug.log "Error on initializing"
                 { configuration = Api.baseConfig ""
                 , domains = []
-                , query = []
+                , filter = initFilter []
                 , collaboration = []
                 , items = RemoteData.Failure <| Http.BadBody (Debug.toString e)
                 , models = RemoteData.Failure <| Http.BadBody (Debug.toString e)
@@ -135,7 +144,34 @@ type alias QueryParameter =
     , value : String
     }
 
+type alias NamespaceFilterDescription =
+    { name : String
+    , description : Maybe String
+    , templateId : Maybe NamespaceTemplateId
+    , labels : List String
+    }
 
+type alias NamespaceFilter =
+    { withTemplate : NamespaceFilterDescription
+    , withoutTemplate : NamespaceFilterDescription
+    }
+
+namespaceFilterDescriptionDecoder =
+    Decode.map4 NamespaceFilterDescription
+        (Decode.field "name" Decode.string)
+        (Decode.maybe (Decode.field "description" Decode.string))
+        (Decode.maybe (Decode.field "templateId" Decode.string))
+        (Decode.field "labels" (Decode.list Decode.string))
+
+namespaceFilterDecoder =
+    Decode.map2 NamespaceFilter
+        (Decode.field "withTemplate" namespaceFilterDescriptionDecoder)
+        (Decode.field "withoutTemplate" namespaceFilterDescriptionDecoder)
+
+type alias Filter =
+    { namespaceFilter : RemoteData.WebData NamespaceFilter
+    , query : List QueryParameter
+    }
 
 type alias Model =
     { configuration : Api.Configuration
@@ -143,12 +179,13 @@ type alias Model =
     , collaboration : Collaborations
     , items : RemoteData.WebData (List BoundedContextCard.Item)
     , models : RemoteData.WebData (List BoundedContext.Model)
-    , query : List QueryParameter
+    , filter : Filter
     }
 
 
 type Msg
     = BoundedContextsFound (Api.ApiResponse (List BoundedContextCard.Item))
+    | NamespaceFiltersLoaded (Api.ApiResponse NamespaceFilter)
     | BoundedContextMsg BoundedContext.Msg
 
 
@@ -172,6 +209,11 @@ update msg model =
         BoundedContextsFound found ->
             ( updateModels { model | items = RemoteData.fromResult found }, Cmd.none)
 
+        NamespaceFiltersLoaded namespaces ->
+            ( { model | filter = model.filter |> (\filter -> { filter | namespaceFilter = RemoteData.fromResult namespaces} ) }
+            , Cmd.none
+            )
+
 
 viewItems : List BoundedContext.Model -> List (Html Msg)
 viewItems items =
@@ -180,8 +222,8 @@ viewItems items =
     |> List.map (Html.map BoundedContextMsg)
 
 
-viewFilter : List QueryParameter -> Html Msg
-viewFilter query =
+viewFilter : Filter -> Html Msg
+viewFilter { query}  =
     if not <| List.isEmpty query then
         Grid.simpleRow
             [ Grid.col []
@@ -199,7 +241,7 @@ view model =
     case model.models of
         RemoteData.Success items ->
             Grid.container [ ]
-                ( viewFilter model.query
+                ( viewFilter model.filter
                 :: viewItems items
                 )
         e ->
@@ -216,4 +258,11 @@ findAll config query =
   Http.get
     { url = Api.allBoundedContexts [] |> Api.urlWithQueryParameters config (query |> List.map (\q -> Url.Builder.string q.name q.value))
     , expect = Http.expectJson BoundedContextsFound (Decode.list BoundedContextCard.decoder)
+    }
+
+getNamespaceFilters : Api.Configuration -> Cmd Msg
+getNamespaceFilters config =
+  Http.get
+    { url = Api.withoutQuery [ "search", "namespaces"] |> Api.url config
+    , expect = Http.expectJson NamespaceFiltersLoaded namespaceFilterDecoder
     }
