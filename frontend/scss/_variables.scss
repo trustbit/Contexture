@@ -1,17 +1,28 @@
-﻿@import "../node_modules/bootstrap/scss/variables";
+// COLORS
+$primary: #0339E1;
+$secondary: #5F7696;
 
+$light: #F2F5FF;
+
+$success: #00D4A1;
+$danger: #F04C50;
+$info: $secondary;
+
+$form-text-color: $secondary;
+
+// FONTS
 $font-family-base: "Montserrat";
 
 $enable-rounded: false;
 
+// BUTTONS
 $btn-font-weight: 700;
 $btn-border-width: 2px;
 $btn-font-size: 0.875rem;
 
+// ACCORDION
 $accordion-button-active-color: inherit;
 $accordion-button-active-bg: inherit;
 
 $accordion-button-icon: url("../node_modules/bootstrap-icons/icons/chevron-right.svg");
 $accordion-button-active-icon: url("../node_modules/bootstrap-icons/icons/chevron-up.svg");
-
-$form-text-color: $secondary;
