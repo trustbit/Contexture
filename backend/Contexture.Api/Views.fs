@@ -53,7 +53,6 @@ module Layout =
             ]
             resolveAsset (Asset.css "contexture.css")
             resolveAsset (Asset.js "Contexture.js")
-            Asset.stylesheet "https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/css/bootstrap.min.css"
         ]
 
     let navTemplate =
