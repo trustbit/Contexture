@@ -88,19 +88,23 @@ module Search =
                         byTemplateId
                         |> Map.find (Some key)
                         |> List.collect (fun n -> n.Labels)
-                        |> List.map(fun l -> l.Name)
-                        |> Set.ofList
+                        |> List.groupBy(fun l -> l.Name)
+                        |> Map.ofList
+                        |> Map.map(fun _ labels -> labels |> List.map (fun l -> l.Value) |> Set.ofList)
                     {|
                         Name = value.Name
                         Description = value.Description
                         TemplateId = value.Id
                         Labels =
                             value.Template
-                            |> List.map(fun t -> t.Name)
-                            |> Set.ofList
-                            |> Set.union(labelNames)
-                            |> Set.toList
-                            |> List.sort
+                            |> List.map(fun t -> t.Name, Set.empty)
+                            |> Map.ofList
+                            |> Map.fold(fun s key value ->
+                                s |> Map.change key (Option.map(Set.union value) >> Option.orElse (Some value))
+                                ) labelNames
+                            |> Map.toList
+                            |> List.map (fun l -> {| Name = fst l; Values =  l |> snd |> Set.toList |> List.sort |})
+                            |> List.sortBy (fun l -> l.Name)
                     |}
                     )
                 |> Map.toList
@@ -117,18 +121,24 @@ module Search =
                        Name = name
                        Labels =
                            namespaces
-                           |> List.collect (fun n -> n.Labels)
-                           |> List.map(fun l -> l.Name)
-                           |> List.distinct
-                           |> List.sort
+                            |> List.collect (fun n -> n.Labels)
+                            |> List.groupBy(fun l -> l.Name)
+                            |> Map.ofList
+                            |> Map.map(fun _ labels -> labels |> List.map (fun l -> l.Value) |> Set.ofList)
+                            |> Map.toList
+                            |> List.map (fun l -> {| Name = fst l; Values =  l |> snd |> Set.toList |> List.sort |})
+                            |> List.sort
                     |}
-                     )
+                     )  
                 
                 
-            json {| WithTemplate = namespacesTemplates; WithoutTemplate = namespacesTemplates |} next ctx 
+            json {| WithTemplate = namespacesTemplates; WithoutTemplate = namespacesWithoutTemplates |} next ctx 
 
+    let apiRoutes: HttpHandler =
+        subRoute "/search/filter" (choose [
+            route "/namespaces" >=> getNamespaces 
+        ])
     let routes: HttpHandler =
         subRoute "/search" (choose [
-            route "/namespaces" >=> getNamespaces 
             GET >=> indexHandler
         ])

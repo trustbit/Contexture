@@ -42,6 +42,7 @@ let webApp hostFrontend =
                 BoundedContexts.routes
                 Collaborations.routes
                 Namespaces.routes
+                Search.apiRoutes
                 GET >=> route "/all" >=> allRoute
             ])
         Search.routes
