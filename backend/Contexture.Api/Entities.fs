@@ -935,7 +935,7 @@ module Aggregates =
                 | NamespaceAdded c ->
                     Some {
                       Id = c.NamespaceId
-                      Template = None
+                      Template = c.NamespaceTemplateId
                       Name = c.Name
                       Labels = c.Labels |> convertLabels }
                 | NamespaceRemoved c ->
@@ -970,7 +970,7 @@ module Aggregates =
                     :: namespaces
                 | NamespaceAdded c ->
                     { Id = c.NamespaceId
-                      Template = None
+                      Template = c.NamespaceTemplateId
                       Name = c.Name
                       Labels = c.Labels |> convertLabels }
                     :: namespaces
