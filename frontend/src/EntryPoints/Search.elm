@@ -1,6 +1,7 @@
 module EntryPoints.Search exposing (main)
 
 import Api as Api
+import Bootstrap.Button as Button
 import Bootstrap.Form as Form
 import Bootstrap.Form.Input as Input
 import Bootstrap.Grid as Grid
@@ -221,6 +222,7 @@ type Msg
     | BoundedContextMsg BoundedContext.Msg
     | FilterLabelNameChanged LabelFilter String
     | FilterLabelValueChanged LabelFilter String
+    | ApplyFilters
 
 
 updateModels : Model -> Model
@@ -301,6 +303,22 @@ update msg model =
                     }
                 )
             , Cmd.none
+            )
+
+        ApplyFilters ->
+            let
+                query =
+                    model.filter.selectedFilters
+                    |> Dict.toList
+                    |> List.map (Tuple.second)
+                    |> List.concatMap (\t -> 
+                        [ { name = "Label.Name" , value = t.name}, { name = "Label.Value", value = t.value} ]
+                        |> List.filter (\f -> not <| String.isEmpty f.value)
+                    )
+            in
+            ( model
+                |> updateFilter (\f -> { f | query = query })
+            , findAll model.configuration query
             )
 
 
@@ -401,6 +419,7 @@ viewFilter model =
         , model.namespaceFilter
             |> RemoteData.map (viewNamespaceFilter model.selectedFilters)
             |> RemoteData.withDefault (text "Loading namespaces")
+        , Button.button [ Button.onClick ApplyFilters] [ text "Apply Filters"]
         ]
 
 
