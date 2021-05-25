@@ -9,8 +9,8 @@ import Html.Attributes as Attributes exposing (..)
 import Http
 import Json.Decode as Decode
 import Json.Decode.Pipeline as JP
-import Page.Search.Filter as Filter
-import Page.Search.Searching as Searching
+import Page.Searching.Filter as Filter
+import Page.Searching.Searching as Searching
 import Url
 
 

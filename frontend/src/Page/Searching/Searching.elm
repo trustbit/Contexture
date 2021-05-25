@@ -1,4 +1,4 @@
-module Page.Search.Searching exposing (..)
+module Page.Searching.Searching exposing (..)
 
 import Api as Api
 import Bootstrap.Button as Button
@@ -24,7 +24,7 @@ import Html.Attributes as Attributes exposing (..)
 import Http
 import Json.Decode as Decode
 import Json.Decode.Pipeline as JP
-import Page.Search.Filter as Filter
+import Page.Searching.Filter as Filter
 import RemoteData
 import Task
 import Url

@@ -1,4 +1,4 @@
-module Page.Search.Filter exposing (Model,FilterParameter,init,update,Msg,OutMsg(..),view)
+module Page.Searching.Filter exposing (Model,FilterParameter,init,update,Msg,OutMsg(..),view)
 
 import Api as Api
 import Bootstrap.Button as Button
