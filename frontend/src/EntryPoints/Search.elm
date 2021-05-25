@@ -7,6 +7,7 @@ import Bootstrap.Form.Input as Input
 import Bootstrap.Grid as Grid
 import Bootstrap.Grid.Col as Col
 import Bootstrap.Grid.Row as Row
+import Bounce exposing (Bounce)
 import BoundedContext as BoundedContext
 import BoundedContext.BoundedContextId as BoundedContextId
 import BoundedContext.Canvas
@@ -24,6 +25,7 @@ import Http
 import Json.Decode as Decode
 import Json.Decode.Pipeline as JP
 import RemoteData
+import Task
 import Url
 import Url.Builder exposing (QueryParameter)
 import Url.Parser
@@ -74,6 +76,7 @@ initFilter query =
     { query = query
     , namespaceFilter = RemoteData.Loading
     , selectedFilters = Dict.empty
+    , bounce = Bounce.init
     }
 
 
@@ -157,6 +160,7 @@ type alias LabelFilterOption =
     , values : List String
     }
 
+
 type alias LabelFilter =
     { name : String
     , value : String
@@ -200,9 +204,10 @@ namespaceFilterDecoder =
 
 
 type alias Filter =
-    { namespaceFilter : RemoteData.WebData (NamespaceFilter)
+    { namespaceFilter : RemoteData.WebData NamespaceFilter
     , query : List QueryParameter
     , selectedFilters : Dict.Dict String LabelFilter
+    , bounce : Bounce
     }
 
 
@@ -223,6 +228,7 @@ type Msg
     | FilterLabelNameChanged LabelFilter String
     | FilterLabelValueChanged LabelFilter String
     | ApplyFilters
+    | BounceMsg
 
 
 updateModels : Model -> Model
@@ -236,17 +242,31 @@ updateModels model =
                     )
     }
 
+
 updateFilter : (Filter -> Filter) -> Model -> Model
 updateFilter apply model =
     { model | filter = apply model.filter }
+
 
 asFilterKey : NamespaceFilterDescription -> Maybe String -> String
 asFilterKey namespace name =
     case name of
         Just n ->
             namespace.name ++ "---" ++ n
+
         Nothing ->
             namespace.name
+
+
+buildQuery selectedFilters =
+    selectedFilters
+        |> Dict.toList
+        |> List.map Tuple.second
+        |> List.concatMap
+            (\t ->
+                [ { name = "Label.Name", value = t.name }, { name = "Label.Value", value = t.value } ]
+                    |> List.filter (\f -> not <| String.isEmpty f.value)
+            )
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
@@ -259,12 +279,13 @@ update msg model =
             ( updateModels { model | items = RemoteData.fromResult found }, Cmd.none )
 
         NamespaceFiltersLoaded namespaces ->
-            ( model |>
-                updateFilter (\f ->
+            ( model
+                |> updateFilter
+                    (\f ->
                         { f
-                        | namespaceFilter =
-                            namespaces
-                            |> RemoteData.fromResult
+                            | namespaceFilter =
+                                namespaces
+                                    |> RemoteData.fromResult
                         }
                     )
             , Cmd.none
@@ -272,53 +293,64 @@ update msg model =
 
         FilterLabelNameChanged basis text ->
             ( model
-                |> updateFilter (\f ->
-                    { f
-                    | selectedFilters =
-                        f.selectedFilters
-                        |> Dict.insert
-                            (asFilterKey basis.filterOn Nothing)
-                            { basis
-                            | name = text
-                            , basedOn =
-                                basis.filterOn.labels
-                                |> List.filter (\l -> (String.toLower l.name) == (String.toLower text))
-                                |> List.head
-                            }
-                    }
-                )
-
-            , Cmd.none
+                |> updateFilter
+                    (\f ->
+                        { f
+                            | selectedFilters =
+                                f.selectedFilters
+                                    |> Dict.insert
+                                        (asFilterKey basis.filterOn Nothing)
+                                        { basis
+                                            | name = text
+                                            , basedOn =
+                                                basis.filterOn.labels
+                                                    |> List.filter (\l -> String.toLower l.name == String.toLower text)
+                                                    |> List.head
+                                        }
+                            , bounce = Bounce.push f.bounce
+                        }
+                    )
+            , Bounce.delay 300 BounceMsg
             )
 
         FilterLabelValueChanged label value ->
             ( model
-                |> updateFilter (\f ->
-                    { f
-                    | selectedFilters =
-                        f.selectedFilters
-                        |> Dict.insert
-                            (asFilterKey label.filterOn Nothing)
-                            { label | value = value }
-                    }
-                )
-            , Cmd.none
+                |> updateFilter
+                    (\f ->
+                        { f
+                            | selectedFilters =
+                                f.selectedFilters
+                                    |> Dict.insert
+                                        (asFilterKey label.filterOn Nothing)
+                                        { label | value = value }
+                            , bounce = Bounce.push f.bounce
+                        }
+                    )
+            , Bounce.delay 300 BounceMsg
             )
 
         ApplyFilters ->
             let
                 query =
-                    model.filter.selectedFilters
-                    |> Dict.toList
-                    |> List.map (Tuple.second)
-                    |> List.concatMap (\t -> 
-                        [ { name = "Label.Name" , value = t.name}, { name = "Label.Value", value = t.value} ]
-                        |> List.filter (\f -> not <| String.isEmpty f.value)
-                    )
+                    buildQuery model.filter.selectedFilters
             in
             ( model
                 |> updateFilter (\f -> { f | query = query })
             , findAll model.configuration query
+            )
+
+        BounceMsg ->
+            let
+                newBounce =
+                    Bounce.pop model.filter.bounce
+            in
+            ( model
+                |> updateFilter (\filter -> { filter | bounce = newBounce })
+            , if Bounce.steady newBounce then
+                Task.perform (\_ -> ApplyFilters) (Task.succeed ())
+
+              else
+                Cmd.none
             )
 
 
@@ -348,8 +380,10 @@ viewAppliedFilters query =
 viewFilterDescription : LabelFilter -> Html Msg
 viewFilterDescription filter =
     let
-        { basedOn, filterOn, name, value } = filter
-    in Form.row []
+        { basedOn, filterOn, name, value } =
+            filter
+    in
+    Form.row []
         [ Form.colLabel
             [ Col.attrs
                 (filterOn.description
@@ -378,17 +412,19 @@ viewFilterDescription filter =
                 , Input.value value
                 , Input.onInput (FilterLabelValueChanged filter)
                 ]
-            ,  Html.datalist
+            , Html.datalist
                 [ id <| "list-" ++ filterOn.name ++ "-values" ]
-                ( case basedOn of
+                (case basedOn of
                     Just basedOnLabel ->
                         basedOnLabel.values
-                        |> List.map (\l -> Html.option [] [ text l ])
+                            |> List.map (\l -> Html.option [] [ text l ])
+
                     Nothing ->
                         []
                 )
             ]
         ]
+
 
 viewNamespaceFilter : Dict.Dict String LabelFilter -> NamespaceFilter -> Html Msg
 viewNamespaceFilter activeFilters namespaces =
@@ -397,17 +433,19 @@ viewNamespaceFilter activeFilters namespaces =
             [ Html.h5 [] [ text "Search in Namespaces" ] ]
         , Grid.col []
             (List.append namespaces.withTemplate namespaces.withoutTemplate
-                |> List.map (\t -> viewFilterDescription (
-                    activeFilters
-                    |> Dict.get (asFilterKey t Nothing)
-                    |> Maybe.withDefault
-                        { name = ""
-                        , value = ""
-                        , basedOn = Nothing
-                        , filterOn = t
-                        }
+                |> List.map
+                    (\t ->
+                        viewFilterDescription
+                            (activeFilters
+                                |> Dict.get (asFilterKey t Nothing)
+                                |> Maybe.withDefault
+                                    { name = ""
+                                    , value = ""
+                                    , basedOn = Nothing
+                                    , filterOn = t
+                                    }
+                            )
                     )
-                )
             )
         ]
 
@@ -419,7 +457,7 @@ viewFilter model =
         , model.namespaceFilter
             |> RemoteData.map (viewNamespaceFilter model.selectedFilters)
             |> RemoteData.withDefault (text "Loading namespaces")
-        , Button.button [ Button.onClick ApplyFilters] [ text "Apply Filters"]
+        , Button.button [ Button.onClick ApplyFilters ] [ text "Apply Filters" ]
         ]
 
 
