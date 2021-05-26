@@ -5,6 +5,10 @@ import Browser.Navigation as Nav
 import Url
 import Html exposing (Html, div, text)
 import Html.Attributes exposing (..)
+import Bootstrap.CDN as CDN
+import Bootstrap.Grid as Grid
+import Bootstrap.Grid.Row as Row
+import Bootstrap.Grid.Col as Col
 import Bootstrap.Navbar as Navbar
 import Bootstrap.Utilities.Spacing as Spacing
 
@@ -98,7 +102,7 @@ initWithDerivedUrl : () -> Url.Url -> Nav.Key -> (Model, Cmd Msg)
 initWithDerivedUrl _ url key =
   init { baseUrl = deriveBaseUrl url} url key
 
-hostShouldHandleNotFound : Url.Url -> Url.Url -> Cmd msg
+hostShouldHandleNotFound : Url.Url -> Url.Url -> Cmd msg 
 hostShouldHandleNotFound baseUrl url =
   Nav.load  ({ url | port_ = baseUrl.port_ } |> Url.toString)
 
@@ -199,9 +203,9 @@ menu model =
       |> Navbar.withAnimation
       |> Navbar.primary
       |> Navbar.brand [ href (Route.routeToString <| Route.Home)] [ text "Contexture" ]
-      |> Navbar.items
+      |> Navbar.items 
         [ Navbar.itemLinkActive [ href (Route.routeToString <| Route.Home) ] [ text "Domains"]
-        , Navbar.itemLink [ href (Route.routeToString <| Route.Search [])] [ text "Search"]
+        , Navbar.itemLink [ href (Route.routeToString <| Route.Search [])] [ text "Search"] 
         ]
       |> Navbar.view model.navState
 
@@ -221,7 +225,8 @@ view model =
   in
     { title = "Contexture - Managing your Domains & Contexts"
     , body =
-      [ div []
+      [ CDN.stylesheet
+      , div []
         [ menu model
         , div [ Spacing.pt3 ]
           [ content ]
