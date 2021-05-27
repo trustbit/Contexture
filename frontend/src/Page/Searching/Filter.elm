@@ -1,12 +1,16 @@
-module Page.Searching.Filter exposing (Model,FilterParameter,init,update,Msg,OutMsg(..),view)
+module Page.Searching.Filter exposing (FilterParameter, Model, Msg, OutMsg(..), init, update, view)
 
 import Api as Api
+import Bootstrap.Badge as Badge
 import Bootstrap.Button as Button
 import Bootstrap.Form as Form
 import Bootstrap.Form.Input as Input
+import Bootstrap.Form.InputGroup as InputGroup
 import Bootstrap.Grid as Grid
 import Bootstrap.Grid.Col as Col
 import Bootstrap.Grid.Row as Row
+import Bootstrap.Text as Text
+import Bootstrap.Utilities.Spacing as Spacing
 import Bounce exposing (Bounce)
 import BoundedContext as BoundedContext
 import BoundedContext.BoundedContextId as BoundedContextId
@@ -22,11 +26,17 @@ import Domain exposing (Domain)
 import Domain.DomainId as DomainId
 import Html exposing (Html, div, text)
 import Html.Attributes as Attributes exposing (..)
+import Html.Events exposing (onClick)
 import Http
 import Json.Decode as Decode
 import Json.Decode.Pipeline as JP
 import RemoteData
 import Task
+
+
+applyFiltersCommand =
+    Task.perform (\_ -> ApplyFilters) (Task.succeed ())
+
 
 init : Api.Configuration -> List FilterParameter -> ( Filter, Cmd Msg )
 init config parameters =
@@ -35,7 +45,7 @@ init config parameters =
       , selectedFilters = Dict.empty
       , bounce = Bounce.init
       }
-    , Cmd.batch [ getNamespaceFilters config, Task.perform (\_ -> ApplyFilters) (Task.succeed ()) ]
+    , Cmd.batch [ getNamespaceFilters config, applyFiltersCommand ]
     )
 
 
@@ -84,7 +94,9 @@ type alias Filter =
 type Msg
     = NamespaceFiltersLoaded (Api.ApiResponse NamespaceFilter)
     | FilterLabelNameChanged LabelFilter String
+    | RemoveFilterLabelName LabelFilter
     | FilterLabelValueChanged LabelFilter String
+    | RemoveFilterLabelValue LabelFilter
     | ApplyFilters
     | BounceMsg
 
@@ -108,15 +120,58 @@ asFilterKey namespace name =
             namespace.name
 
 
+filterByLabelName filter =
+    if String.isEmpty filter.name then
+        Nothing
+
+    else
+        Just { name = "Label.Name", value = filter.name }
+
+
+filterByLabelValue filter =
+    if String.isEmpty filter.value then
+        Nothing
+
+    else
+        Just { name = "Label.Value", value = filter.value }
+
+
 buildParameters selectedFilters =
     selectedFilters
         |> Dict.toList
         |> List.map Tuple.second
         |> List.concatMap
             (\t ->
-                [ { name = "Label.Name", value = t.name }, { name = "Label.Value", value = t.value } ]
-                    |> List.filter (\f -> not <| String.isEmpty f.value)
+                [ filterByLabelName t, filterByLabelValue t ] |> List.filterMap identity
             )
+
+
+updateLabelNameFilter basis text model =
+    { model
+        | selectedFilters =
+            model.selectedFilters
+                |> Dict.insert
+                    (asFilterKey basis.filterOn Nothing)
+                    { basis
+                        | name = text
+                        , basedOn =
+                            basis.filterOn.labels
+                                |> List.filter (\l -> String.toLower l.name == String.toLower text)
+                                |> List.head
+                    }
+        , bounce = Bounce.push model.bounce
+    }
+
+
+updateLabelValueFilter label value model =
+    { model
+        | selectedFilters =
+            model.selectedFilters
+                |> Dict.insert
+                    (asFilterKey label.filterOn Nothing)
+                    { label | value = value }
+        , bounce = Bounce.push model.bounce
+    }
 
 
 update : Msg -> Model -> ( Model, Cmd Msg, OutMsg )
@@ -133,34 +188,26 @@ update msg model =
             )
 
         FilterLabelNameChanged basis text ->
-            ( { model
-                | selectedFilters =
-                    model.selectedFilters
-                        |> Dict.insert
-                            (asFilterKey basis.filterOn Nothing)
-                            { basis
-                                | name = text
-                                , basedOn =
-                                    basis.filterOn.labels
-                                        |> List.filter (\l -> String.toLower l.name == String.toLower text)
-                                        |> List.head
-                            }
-                , bounce = Bounce.push model.bounce
-              }
+            ( model |> updateLabelNameFilter basis text
             , Bounce.delay 300 BounceMsg
             , NoOp
             )
 
+        RemoveFilterLabelName basis ->
+            ( model |> updateLabelNameFilter basis ""
+            , applyFiltersCommand
+            , NoOp
+            )
+
         FilterLabelValueChanged label value ->
-            ( { model
-                | selectedFilters =
-                    model.selectedFilters
-                        |> Dict.insert
-                            (asFilterKey label.filterOn Nothing)
-                            { label | value = value }
-                , bounce = Bounce.push model.bounce
-              }
+            ( model |> updateLabelValueFilter label value
             , Bounce.delay 300 BounceMsg
+            , NoOp
+            )
+
+        RemoveFilterLabelValue label ->
+            ( model |> updateLabelValueFilter label ""
+            , applyFiltersCommand
             , NoOp
             )
 
@@ -169,7 +216,11 @@ update msg model =
                 query =
                     buildParameters model.selectedFilters
             in
-            ( { model | parameters = query }
+            ( { model
+                | parameters = query
+                , bounce = Bounce.init
+                , selectedFilters = model.selectedFilters |> Dict.filter (\_ { name, value } -> not (String.isEmpty name && String.isEmpty value))
+              }
             , Cmd.none
             , FilterApplied query
             )
@@ -181,7 +232,7 @@ update msg model =
             in
             ( { model | bounce = newBounce }
             , if Bounce.steady newBounce then
-                Task.perform (\_ -> ApplyFilters) (Task.succeed ())
+                applyFiltersCommand
 
               else
                 Cmd.none
@@ -189,20 +240,35 @@ update msg model =
             )
 
 
-viewAppliedFilters : List FilterParameter -> Html Msg
+viewAppliedFilters : List LabelFilter -> Html Msg
 viewAppliedFilters query =
-    if not <| List.isEmpty query then
-        Grid.simpleRow
-            [ Grid.col [ Col.xs3 ]
-                [ Html.h5 [] [ text "Active filters" ] ]
-            , Grid.col []
-                [ Html.ul []
-                    (query |> List.map (\q -> Html.li [] [ text <| q.name ++ ": " ++ q.value ]))
-                ]
-            ]
+    Grid.simpleRow
+        [ Grid.col [ Col.xs3 ]
+            [ Html.h5 [] [ text "Active filters" ] ]
+        , Grid.col []
+            (if not <| List.isEmpty query then
+                query
+                    |> List.concatMap
+                        (\q ->
+                            [ q
+                                |> filterByLabelName
+                                |> Maybe.map (Tuple.pair (RemoveFilterLabelName q))
+                            , q
+                                |> filterByLabelValue
+                                |> Maybe.map (Tuple.pair (RemoveFilterLabelValue q))
+                            ]
+                                |> List.filterMap
+                                    (Maybe.map
+                                        (\( removeAction, filter ) ->
+                                            Html.a [ class "badge badge-secondary", Spacing.ml1, Attributes.href "#", title "Remove filter", onClick removeAction ] [ text <| filter.name ++ ": " ++ filter.value ]
+                                        )
+                                    )
+                        )
 
-    else
-        Grid.simpleRow []
+             else
+                [ text "None" ]
+            )
+        ]
 
 
 viewFilterDescription : LabelFilter -> Html Msg
@@ -223,11 +289,23 @@ viewFilterDescription filter =
             [ Html.span [] [ text "Search in ", Html.b [] [ text filterOn.name ] ]
             ]
         , Form.col []
-            [ Input.text
-                [ Input.attrs [ Attributes.list <| "list-" ++ filterOn.name ]
-                , Input.onInput (FilterLabelNameChanged filter)
-                , Input.value name
-                ]
+            [ let
+                labelNameArguments =
+                    [ Input.attrs [ Attributes.list <| "list-" ++ filterOn.name ]
+                    , Input.onInput (FilterLabelNameChanged filter)
+                    , Input.value name
+                    ]
+              in
+              if String.isEmpty name then
+                Input.text labelNameArguments
+
+              else
+                InputGroup.config
+                    (InputGroup.text labelNameArguments)
+                    |> InputGroup.successors
+                        [ InputGroup.button [ Button.outlineSecondary, Button.onClick (RemoveFilterLabelName filter) ] [ text "x" ]
+                        ]
+                    |> InputGroup.view
             , Html.datalist
                 [ id <| "list-" ++ filterOn.name ]
                 (filterOn.labels
@@ -235,11 +313,23 @@ viewFilterDescription filter =
                 )
             ]
         , Form.col []
-            [ Input.text
-                [ Input.attrs [ Attributes.list <| "list-" ++ filterOn.name ++ "-values" ]
-                , Input.value value
-                , Input.onInput (FilterLabelValueChanged filter)
-                ]
+            [ let
+                labelValueArguments =
+                    [ Input.attrs [ Attributes.list <| "list-" ++ filterOn.name ++ "-values" ]
+                    , Input.value value
+                    , Input.onInput (FilterLabelValueChanged filter)
+                    ]
+              in
+              if String.isEmpty value then
+                Input.text labelValueArguments
+
+              else
+                InputGroup.config
+                    (InputGroup.text labelValueArguments)
+                    |> InputGroup.successors
+                        [ InputGroup.button [ Button.outlineSecondary, Button.onClick (RemoveFilterLabelValue filter) ] [ text "x" ]
+                        ]
+                    |> InputGroup.view
             , Html.datalist
                 [ id <| "list-" ++ filterOn.name ++ "-values" ]
                 (case basedOn of
@@ -281,11 +371,12 @@ viewNamespaceFilter activeFilters namespaces =
 view : Filter -> Html Msg
 view model =
     div []
-        [ viewAppliedFilters model.parameters
+        [ viewAppliedFilters (model.selectedFilters |> Dict.values)
         , model.namespaceFilter
             |> RemoteData.map (viewNamespaceFilter model.selectedFilters)
             |> RemoteData.withDefault (text "Loading namespaces")
-        , Button.button [ Button.onClick ApplyFilters ] [ text "Apply Filters" ]
+        , Grid.simpleRow
+            [ Grid.col [ Col.textAlign Text.alignMdRight ] [ Button.button [ Button.onClick ApplyFilters, Button.outlinePrimary ] [ text "Apply Filters" ] ] ]
         ]
 
 
