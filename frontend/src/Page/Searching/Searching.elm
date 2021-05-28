@@ -7,6 +7,8 @@ import Bootstrap.Form.Input as Input
 import Bootstrap.Grid as Grid
 import Bootstrap.Grid.Col as Col
 import Bootstrap.Grid.Row as Row
+import Bootstrap.Text as Text
+import Bootstrap.Utilities.Spacing as Spacing
 import Bounce exposing (Bounce)
 import BoundedContext as BoundedContext
 import BoundedContext.BoundedContextId as BoundedContextId
@@ -97,6 +99,7 @@ type Msg
     = BoundedContextsFound (Api.ApiResponse (List BoundedContextCard.Item))
     | BoundedContextMsg BoundedContext.Msg
     | FilterMsg Filter.Msg
+    | ApplyFilters
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
@@ -113,6 +116,11 @@ update msg model =
                         |> RemoteData.map (initSearchResult model.configuration model.collaboration model.domains)
               }
             , Cmd.none
+            )
+
+        ApplyFilters ->
+            ( model
+            , findAll model.configuration model.filter.parameters
             )
 
         FilterMsg msg_ ->
@@ -134,24 +142,49 @@ update msg model =
             )
 
 
-viewItems : List BoundedContext.Model -> List (Html Msg)
-viewItems items =
-    items
-        |> List.map BoundedContext.view
-        |> List.map (Html.map BoundedContextMsg)
+viewItems : RemoteData.WebData (List BoundedContext.Model) -> List (Html Msg)
+viewItems searchResults =
+    case searchResults of
+        RemoteData.Success items ->
+            [ Grid.simpleRow
+                [ Grid.col [ Col.xs3 ]
+                    [ Html.h5 [] [ text "Search results" ] ]
+                , if List.isEmpty items then
+                    Grid.col [] [ text "No items found!" ]
+
+                  else
+                    Grid.col []
+                        [ Html.b [] [ text (items |> List.length |> String.fromInt) ]
+                        , text " Domain(s) with "
+                        , Html.b [] [ text (items |> List.map (\b -> b.contextItems |> List.length) |> List.sum |> String.fromInt) ]
+                        , text " Bounded Context(s)"
+                        ]
+                , Grid.col [ Col.textAlign Text.alignMdRight ]
+                    [ Button.button [ Button.onClick ApplyFilters, Button.outlinePrimary ] [ text "Apply Filter Manually" ] ]
+                ]
+            , Grid.row [ Row.attrs [ Spacing.mt2 ] ]
+                [ Grid.col []
+                    (items
+                        |> List.map BoundedContext.view
+                        |> List.map (Html.map BoundedContextMsg)
+                    )
+                ]
+            ]
+
+        e ->
+            [ Grid.simpleRow [ Grid.col [] [ text <| "Could not execute search: " ++ Debug.toString e ] ]
+            ]
 
 
 view : Model -> Html Msg
 view model =
-    case model.searchResults of
-        RemoteData.Success items ->
-            Grid.container []
-                ((model.filter |> Filter.view |> Html.map FilterMsg)
-                    :: viewItems items
-                )
-
-        e ->
-            text <| "Could not execute search: " ++ Debug.toString e
+    Grid.container []
+        (Grid.simpleRow
+            [ Grid.col []
+                [ model.filter |> Filter.view |> Html.map FilterMsg ]
+            ]
+            :: viewItems model.searchResults
+        )
 
 
 findAll : Api.Configuration -> List Filter.FilterParameter -> Cmd Msg

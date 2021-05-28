@@ -97,6 +97,7 @@ type Msg
     | RemoveFilterLabelName LabelFilter
     | FilterLabelValueChanged LabelFilter String
     | RemoveFilterLabelValue LabelFilter
+    | RemoveAllFilters
     | ApplyFilters
     | BounceMsg
 
@@ -211,6 +212,13 @@ update msg model =
             , NoOp
             )
 
+        RemoveAllFilters ->
+            ( { model | selectedFilters = Dict.empty }
+            , applyFiltersCommand
+            , NoOp
+            )
+            
+
         ApplyFilters ->
             let
                 query =
@@ -247,24 +255,30 @@ viewAppliedFilters query =
             [ Html.h5 [] [ text "Active filters" ] ]
         , Grid.col []
             (if not <| List.isEmpty query then
-                query
-                    |> List.concatMap
-                        (\q ->
-                            [ q
-                                |> filterByLabelName
-                                |> Maybe.map (Tuple.pair (RemoveFilterLabelName q))
-                            , q
-                                |> filterByLabelValue
-                                |> Maybe.map (Tuple.pair (RemoveFilterLabelValue q))
-                            ]
-                                |> List.filterMap
-                                    (Maybe.map
-                                        (\( removeAction, filter ) ->
-                                            Html.a [ class "badge badge-secondary", Spacing.ml1, Attributes.href "#", title "Remove filter", onClick removeAction ] [ text <| filter.name ++ ": " ++ filter.value ]
+                [ Grid.simpleRow
+                    [ Grid.col [ ]
+                        (query
+                        |> List.concatMap
+                            (\q ->
+                                [ q
+                                    |> filterByLabelName
+                                    |> Maybe.map (Tuple.pair (RemoveFilterLabelName q))
+                                , q
+                                    |> filterByLabelValue
+                                    |> Maybe.map (Tuple.pair (RemoveFilterLabelValue q))
+                                ]
+                                    |> List.filterMap
+                                        (Maybe.map
+                                            (\( removeAction, filter ) ->
+                                                Html.a [ class "badge badge-secondary", Spacing.ml1, Attributes.href "#", title "Remove filter", onClick removeAction ] [ text <| filter.name ++ ": " ++ filter.value ]
+                                            )
                                         )
-                                    )
+                            )
                         )
-
+                    , Grid.col [ Col.mdAuto]
+                        [ Button.button [ Button.secondary, Button.onClick RemoveAllFilters, Button.small, Button.roleLink] [ text "Remove all Filters"]]
+                    ]
+                ]
              else
                 [ text "None" ]
             )
@@ -375,8 +389,6 @@ view model =
         , model.namespaceFilter
             |> RemoteData.map (viewNamespaceFilter model.selectedFilters)
             |> RemoteData.withDefault (text "Loading namespaces")
-        , Grid.simpleRow
-            [ Grid.col [ Col.textAlign Text.alignMdRight ] [ Button.button [ Button.onClick ApplyFilters, Button.outlinePrimary ] [ text "Apply Filters" ] ] ]
         ]
 
 

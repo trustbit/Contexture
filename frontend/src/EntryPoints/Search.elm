@@ -5,10 +5,7 @@ import Browser
 import ContextMapping.Collaboration as Collaboration exposing (Collaborations)
 import Domain exposing (Domain)
 import Html exposing (Html, div, text)
-import Html.Attributes as Attributes exposing (..)
-import Http
 import Json.Decode as Decode
-import Json.Decode.Pipeline as JP
 import Page.Searching.Filter as Filter
 import Page.Searching.Searching as Searching
 import Url
