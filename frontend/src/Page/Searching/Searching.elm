@@ -9,6 +9,7 @@ import Bootstrap.Grid.Col as Col
 import Bootstrap.Grid.Row as Row
 import Bootstrap.Text as Text
 import Bootstrap.Utilities.Spacing as Spacing
+import Bootstrap.Utilities.Border as Border
 import Bounce exposing (Bounce)
 import BoundedContext as BoundedContext
 import BoundedContext.BoundedContextId as BoundedContextId
@@ -162,7 +163,7 @@ viewItems searchResults =
                 , Grid.col [ Col.textAlign Text.alignMdRight ]
                     [ Button.button [ Button.onClick ApplyFilters, Button.outlinePrimary ] [ text "Apply Filter Manually" ] ]
                 ]
-            , Grid.row [ Row.attrs [ Spacing.mt2 ] ]
+            , Grid.row [ Row.attrs [ Spacing.mt2, Border.top ] ]
                 [ Grid.col []
                     (items
                         |> List.map BoundedContext.view

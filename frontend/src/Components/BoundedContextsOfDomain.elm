@@ -129,19 +129,16 @@ view { contextItems, domain } =
     let
         cards =
             contextItems
-            |> List.sortBy (\{ contextItem } -> contextItem.context |> BoundedContext.name)
-            |> List.map viewWithActions
-            |> chunksOfLeft 2
-            |> List.map Card.deck
-            |> div []
+                |> List.sortBy (\{ contextItem } -> contextItem.context |> BoundedContext.name)
+                |> List.map viewWithActions
+                |> chunksOfLeft 2
+                |> List.map Card.deck
 
-        contextCount = contextItems |> List.length |> String.fromInt
+        contextCount =
+            contextItems |> List.length |> String.fromInt
     in
-        Card.config []
-        |> Card.headerH5 []
-            [ text <| "Bounded Contexts of '" ++ (domain |> Domain.name) ++ "' (" ++ contextCount ++ ")" ]
-        |> Card.block []
-            [ Block.custom cards ]
-        |> Card.view
+    div [ Spacing.mt3 ]
+        [ Html.h5 [] [ text <| contextCount ++ " Bounded Context(s) in Domain '" ++ (domain |> Domain.name) ++ "'" ]
+        , div [] cards
+        ]
         |> Html.map (\_ -> NoOp)
-
