@@ -390,6 +390,33 @@ viewAppliedFilters { byNamespace, unknown } =
         ]
 
 
+viewFilterInput : String -> List String -> (String -> Msg) -> Msg -> String -> List (Html Msg)
+viewFilterInput name options inputAction removeAction value =
+    let
+        arguments =
+            [ Input.attrs [ Attributes.list <| "list-" ++ name ]
+            , Input.onInput inputAction
+            , Input.value value
+            ]
+    in
+    [ if String.isEmpty value then
+        Input.text arguments
+
+      else
+        InputGroup.config
+            (InputGroup.text arguments)
+            |> InputGroup.successors
+                [ InputGroup.button [ Button.outlineSecondary, Button.onClick removeAction ] [ text "x" ]
+                ]
+            |> InputGroup.view
+    , Html.datalist
+        [ id <| "list-" ++ name ]
+        (options
+            |> List.map (\l -> Html.option [] [ text l ])
+        )
+    ]
+
+
 viewFilterDescription : LabelFilter -> Html Msg
 viewFilterDescription filter =
     let
@@ -404,58 +431,24 @@ viewFilterDescription filter =
             [ Html.span [] [ text "Search in ", Html.b [] [ text filterOn.name ] ]
             ]
         , Form.col []
-            [ let
-                labelNameArguments =
-                    [ Input.attrs [ Attributes.list <| "list-" ++ filterOn.name ]
-                    , Input.onInput (FilterLabelNameChanged filter)
-                    , Input.value filter.name
-                    ]
-              in
-              if String.isEmpty filter.name then
-                Input.text labelNameArguments
-
-              else
-                InputGroup.config
-                    (InputGroup.text labelNameArguments)
-                    |> InputGroup.successors
-                        [ InputGroup.button [ Button.outlineSecondary, Button.onClick (RemoveFilterLabelName filter) ] [ text "x" ]
-                        ]
-                    |> InputGroup.view
-            , Html.datalist
-                [ id <| "list-" ++ filterOn.name ]
-                (filterOn.labels
-                    |> List.map (\l -> Html.option [] [ text l.name ])
-                )
-            ]
+            (viewFilterInput
+                filterOn.name
+                (filterOn.labels |> List.map .name)
+                (FilterLabelNameChanged filter)
+                (RemoveFilterLabelName filter)
+                filter.name
+            )
         , Form.col []
-            [ let
-                labelValueArguments =
-                    [ Input.attrs [ Attributes.list <| "list-" ++ filterOn.name ++ "-values" ]
-                    , Input.value filter.value
-                    , Input.onInput (FilterLabelValueChanged filter)
-                    ]
-              in
-              if String.isEmpty filter.value then
-                Input.text labelValueArguments
-
-              else
-                InputGroup.config
-                    (InputGroup.text labelValueArguments)
-                    |> InputGroup.successors
-                        [ InputGroup.button [ Button.outlineSecondary, Button.onClick (RemoveFilterLabelValue filter) ] [ text "x" ]
-                        ]
-                    |> InputGroup.view
-            , Html.datalist
-                [ id <| "list-" ++ filterOn.name ++ "-values" ]
+            (viewFilterInput
+                (filterOn.name ++ "-values")
                 (basedOn
-                    |> Maybe.map
-                        (\basedOnLabel ->
-                            basedOnLabel.values
-                                |> List.map (\l -> Html.option [] [ text l ])
-                        )
+                    |> Maybe.map .values
                     |> Maybe.withDefault []
                 )
-            ]
+                (FilterLabelValueChanged filter)
+                (RemoveFilterLabelValue filter)
+                filter.value
+            )
         ]
 
 
