@@ -100,7 +100,6 @@ type Msg
     = BoundedContextsFound (Api.ApiResponse (List BoundedContextCard.Item))
     | BoundedContextMsg BoundedContext.Msg
     | FilterMsg Filter.Msg
-    | ApplyFilters
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
@@ -117,11 +116,6 @@ update msg model =
                         |> RemoteData.map (initSearchResult model.configuration model.collaboration model.domains)
               }
             , Cmd.none
-            )
-
-        ApplyFilters ->
-            ( model
-            , findAll model.configuration model.filter.parameters
             )
 
         FilterMsg msg_ ->
@@ -160,8 +154,6 @@ viewItems searchResults =
                         , Html.b [] [ text (items |> List.map (\b -> b.contextItems |> List.length) |> List.sum |> String.fromInt) ]
                         , text " Bounded Context(s)"
                         ]
-                , Grid.col [ Col.textAlign Text.alignMdRight ]
-                    [ Button.button [ Button.onClick ApplyFilters, Button.outlinePrimary ] [ text "Apply Filter Manually" ] ]
                 ]
             , Grid.row [ Row.attrs [ Spacing.mt2, Border.top ] ]
                 [ Grid.col []
