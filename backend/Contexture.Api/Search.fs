@@ -55,7 +55,7 @@ module Search =
                    ApiBase = basePath.ApiBase + "/api"
                    InitialQuery =
                        ctx.Request.Query
-                       |> Seq.map (fun q -> {| Name = q.Key; Value = q.Value |> Seq.tryHead |})
+                       |> Seq.collect (fun q -> q.Value |> Seq.map (fun value -> {| Name = q.Key; Value = value |}))
                 |}
 
             let jsonEncoder = ctx.GetJsonSerializer()
