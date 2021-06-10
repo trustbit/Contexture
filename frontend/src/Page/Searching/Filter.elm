@@ -29,7 +29,7 @@ applyFiltersCommand =
     Task.perform (\_ -> ApplyFilters) (Task.succeed ())
 
 
-initSelectedFilters =
+initActiveFilters =
     { byNamespace = Dict.empty, unknown = [] }
 
 
@@ -37,10 +37,10 @@ init : Api.Configuration -> List FilterParameter -> ( Filter, Cmd Msg )
 init config parameters =
     ( { initialParameters = parameters
       , namespaceFilter = RemoteData.Loading
-      , selectedFilters = initSelectedFilters
+      , activeFilters = initActiveFilters
       , bounce = Bounce.init
       }
-    , Cmd.batch [ getNamespaceFilters config ]
+    , Cmd.batch [ getNamespaceFilterDescriptions config ]
     )
 
 
@@ -51,21 +51,21 @@ type alias FilterParameter =
 
 
 type alias LabelFilterOption =
-    { name : String
+    { labelName : String
     , values : List String
     }
 
 
 type alias LabelFilter =
-    { name : String
-    , value : String
-    , filterOn : NamespaceFilterDescription
-    , basedOn : Maybe LabelFilterOption
+    { labelName : String
+    , labelValue : String
+    , filterInNamespace : NamespaceFilterDescription
+    , basedOnLabel : Maybe LabelFilterOption
     }
 
 
 type alias NamespaceFilterDescription =
-    { name : String
+    { namespaceName : String
     , description : Maybe String
     , templateId : Maybe NamespaceTemplateId
     , labels : List LabelFilterOption
@@ -78,7 +78,7 @@ type alias NamespaceFilter =
     }
 
 
-type alias SelectedFilters =
+type alias ActiveFilters =
     { byNamespace : Dict.Dict String LabelFilter
     , unknown : List FilterParameter
     }
@@ -87,13 +87,13 @@ type alias SelectedFilters =
 type alias Filter =
     { namespaceFilter : RemoteData.WebData NamespaceFilter
     , initialParameters : List FilterParameter
-    , selectedFilters : SelectedFilters
+    , activeFilters : ActiveFilters
     , bounce : Bounce
     }
 
 
 type Msg
-    = NamespaceFiltersLoaded (Api.ApiResponse NamespaceFilter)
+    = NamespaceFilterDescriptionsLoaded (Api.ApiResponse NamespaceFilter)
     | FilterLabelNameChanged LabelFilter String
     | RemoveFilterLabelName LabelFilter
     | FilterLabelValueChanged LabelFilter String
@@ -117,26 +117,28 @@ asNamespaceFilterKey : NamespaceFilterDescription -> Maybe String -> String
 asNamespaceFilterKey namespace name =
     case name of
         Just n ->
-            namespace.name ++ "---" ++ n
+            namespace.namespaceName ++ "---" ++ n
 
         Nothing ->
-            namespace.name
+            namespace.namespaceName
 
 
+filterByLabelName : LabelFilter -> Maybe FilterParameter
 filterByLabelName filter =
-    if String.isEmpty filter.name then
+    if String.isEmpty filter.labelName then
         Nothing
 
     else
-        Just { name = "Label.Name", value = filter.name }
+        Just { name = "Label.Name", value = filter.labelName }
 
 
+filterByLabelValue : LabelFilter -> Maybe FilterParameter
 filterByLabelValue filter =
-    if String.isEmpty filter.value then
+    if String.isEmpty filter.labelValue then
         Nothing
 
     else
-        Just { name = "Label.Value", value = filter.value }
+        Just { name = "Label.Value", value = filter.labelValue }
 
 
 buildParameters selectedFilters =
@@ -152,12 +154,12 @@ buildParameters selectedFilters =
 
 removeUnusedNamespaceFilters byNamespace =
     byNamespace
-        |> Dict.filter (\_ { name, value } -> not (String.isEmpty name && String.isEmpty value))
+        |> Dict.filter (\_ { labelName, labelValue } -> not (String.isEmpty labelName && String.isEmpty labelValue))
 
 
 findBasedOnValues text labels =
     labels
-        |> List.filter (\l -> String.toLower l.name == String.toLower text)
+        |> List.filter (\l -> String.toLower l.labelName == String.toLower text)
         |> List.head
 
 
@@ -166,10 +168,10 @@ updateLabelNameFilter basis text model =
         | byNamespace =
             model.byNamespace
                 |> Dict.insert
-                    (asNamespaceFilterKey basis.filterOn Nothing)
+                    (asNamespaceFilterKey basis.filterInNamespace Nothing)
                     { basis
-                        | name = text
-                        , basedOn = basis.filterOn.labels |> findBasedOnValues text
+                        | labelName = text
+                        , basedOnLabel = basis.filterInNamespace.labels |> findBasedOnValues text
                     }
                 |> removeUnusedNamespaceFilters
     }
@@ -180,26 +182,26 @@ updateLabelValueFilter label value model =
         | byNamespace =
             model.byNamespace
                 |> Dict.insert
-                    (asNamespaceFilterKey label.filterOn Nothing)
-                    { label | value = value }
+                    (asNamespaceFilterKey label.filterInNamespace Nothing)
+                    { label | labelValue = value }
                 |> removeUnusedNamespaceFilters
     }
 
 
 updateFilter action model =
     { model
-        | selectedFilters =
-            action model.selectedFilters
+        | activeFilters =
+            action model.activeFilters
         , bounce = Bounce.push model.bounce
     }
 
 
-applyExistingFilters : List FilterParameter -> List NamespaceFilterDescription -> SelectedFilters
+applyExistingFilters : List FilterParameter -> List NamespaceFilterDescription -> ActiveFilters
 applyExistingFilters parameters namespaceFilter =
     let
         groupByLabelName ( label, namespace ) grouping =
             Dict.update
-                label.name
+                label.labelName
                 (\g ->
                     case g of
                         Just group ->
@@ -226,11 +228,11 @@ applyExistingFilters parameters namespaceFilter =
                                     | byNamespace =
                                         filters.byNamespace
                                             |> Dict.insert
-                                                filterDescription.name
-                                                { name = parameter.value
-                                                , value = ""
-                                                , filterOn = filterDescription
-                                                , basedOn = filterDescription.labels |> findBasedOnValues parameter.value
+                                                filterDescription.namespaceName
+                                                { labelName = parameter.value
+                                                , labelValue = ""
+                                                , filterInNamespace = filterDescription
+                                                , basedOnLabel = filterDescription.labels |> findBasedOnValues parameter.value
                                                 }
                                 }
 
@@ -238,9 +240,9 @@ applyExistingFilters parameters namespaceFilter =
                                 { filters | unknown = parameter :: filters.unknown }
 
                     "label.value" ->
-                        case filters.byNamespace |> Dict.values |> List.filter (\l -> l.filterOn.labels |> List.concatMap (\label -> label.values) |> List.member parameter.value) |> List.head of
+                        case filters.byNamespace |> Dict.values |> List.filter (\l -> l.filterInNamespace.labels |> List.concatMap (\label -> label.values) |> List.member parameter.value) |> List.head of
                             Just filter ->
-                                { filters | byNamespace = filters.byNamespace |> Dict.insert filter.filterOn.name { filter | value = parameter.value } }
+                                { filters | byNamespace = filters.byNamespace |> Dict.insert filter.filterInNamespace.namespaceName { filter | labelValue = parameter.value } }
 
                             Nothing ->
                                 { filters | unknown = parameter :: filters.unknown }
@@ -248,24 +250,24 @@ applyExistingFilters parameters namespaceFilter =
                     _ ->
                         { filters | unknown = parameter :: filters.unknown }
             )
-            initSelectedFilters
+            initActiveFilters
 
 
 update : Msg -> Model -> ( Model, Cmd Msg, OutMsg )
 update msg model =
     case msg of
-        NamespaceFiltersLoaded namespaces ->
+        NamespaceFilterDescriptionsLoaded namespaces ->
             ( { model
                 | namespaceFilter =
                     namespaces
                         |> RemoteData.fromResult
-                , selectedFilters =
+                , activeFilters =
                     case namespaces of
                         Ok n ->
                             applyExistingFilters model.initialParameters (List.append n.withoutTemplate n.withTemplate)
 
                         _ ->
-                            model.selectedFilters
+                            model.activeFilters
               }
             , applyFiltersCommand
             , NoOp
@@ -302,7 +304,7 @@ update msg model =
             )
 
         RemoveAllFilters ->
-            ( { model | selectedFilters = initSelectedFilters }
+            ( { model | activeFilters = initActiveFilters }
             , applyFiltersCommand
             , NoOp
             )
@@ -310,7 +312,7 @@ update msg model =
         ApplyFilters ->
             let
                 query =
-                    buildParameters model.selectedFilters
+                    buildParameters model.activeFilters
             in
             ( { model
                 | initialParameters = query
@@ -362,7 +364,7 @@ viewAppliedUnkownFilters query =
         |> List.map (\filter -> Html.a [ class "badge badge-warning", Spacing.ml1, Attributes.href "#", title "Remove unkown filter", onClick (RemoveUnknownFilter filter) ] [ text <| filter.name ++ ": " ++ filter.value ])
 
 
-viewAppliedFilters : SelectedFilters -> Html Msg
+viewAppliedFilters : ActiveFilters -> Html Msg
 viewAppliedFilters { byNamespace, unknown } =
     let
         activeFilters =
@@ -393,18 +395,18 @@ viewAppliedFilters { byNamespace, unknown } =
 viewFilterInput : String -> List String -> (String -> Msg) -> Msg -> String -> List (Html Msg)
 viewFilterInput name options inputAction removeAction value =
     let
-        arguments =
+        inputArguments =
             [ Input.attrs [ Attributes.list <| "list-" ++ name ]
             , Input.onInput inputAction
             , Input.value value
             ]
     in
     [ if String.isEmpty value then
-        Input.text arguments
+        Input.text inputArguments
 
       else
         InputGroup.config
-            (InputGroup.text arguments)
+            (InputGroup.text inputArguments)
             |> InputGroup.successors
                 [ InputGroup.button [ Button.outlineSecondary, Button.onClick removeAction ] [ text "x" ]
                 ]
@@ -420,34 +422,34 @@ viewFilterInput name options inputAction removeAction value =
 viewFilterDescription : LabelFilter -> Html Msg
 viewFilterDescription filter =
     let
-        { basedOn, filterOn } =
+        { basedOnLabel, filterInNamespace } =
             filter
     in
     Form.row []
         [ Form.colLabel
             [ Col.attrs
-                [ title (filterOn.description |> Maybe.withDefault ("Filter in " ++ filterOn.name)) ]
+                [ title (filterInNamespace.description |> Maybe.withDefault ("Filter in " ++ filterInNamespace.namespaceName)) ]
             ]
-            [ Html.span [] [ text "Search in ", Html.b [] [ text filterOn.name ] ]
+            [ Html.span [] [ text "Search in ", Html.b [] [ text filterInNamespace.namespaceName ] ]
             ]
         , Form.col []
             (viewFilterInput
-                filterOn.name
-                (filterOn.labels |> List.map .name)
+                filterInNamespace.namespaceName
+                (filterInNamespace.labels |> List.map .labelName)
                 (FilterLabelNameChanged filter)
                 (RemoveFilterLabelName filter)
-                filter.name
+                filter.labelName
             )
         , Form.col []
             (viewFilterInput
-                (filterOn.name ++ "-values")
-                (basedOn
+                (filterInNamespace.namespaceName ++ "-values")
+                (basedOnLabel
                     |> Maybe.map .values
                     |> Maybe.withDefault []
                 )
                 (FilterLabelValueChanged filter)
                 (RemoveFilterLabelValue filter)
-                filter.value
+                filter.labelValue
             )
         ]
 
@@ -465,10 +467,10 @@ viewNamespaceFilter activeFilters namespaces =
                             (activeFilters
                                 |> Dict.get (asNamespaceFilterKey t Nothing)
                                 |> Maybe.withDefault
-                                    { name = ""
-                                    , value = ""
-                                    , basedOn = Nothing
-                                    , filterOn = t
+                                    { labelName = ""
+                                    , labelValue = ""
+                                    , basedOnLabel = Nothing
+                                    , filterInNamespace = t
                                     }
                             )
                     )
@@ -479,18 +481,18 @@ viewNamespaceFilter activeFilters namespaces =
 view : Filter -> Html Msg
 view model =
     div []
-        [ viewAppliedFilters model.selectedFilters
+        [ viewAppliedFilters model.activeFilters
         , model.namespaceFilter
-            |> RemoteData.map (viewNamespaceFilter model.selectedFilters.byNamespace)
+            |> RemoteData.map (viewNamespaceFilter model.activeFilters.byNamespace)
             |> RemoteData.withDefault (text "Loading namespaces")
         ]
 
 
-getNamespaceFilters : Api.Configuration -> Cmd Msg
-getNamespaceFilters config =
+getNamespaceFilterDescriptions : Api.Configuration -> Cmd Msg
+getNamespaceFilterDescriptions config =
     Http.get
         { url = Api.withoutQuery [ "search", "filter", "namespaces" ] |> Api.url config
-        , expect = Http.expectJson NamespaceFiltersLoaded namespaceFilterDecoder
+        , expect = Http.expectJson NamespaceFilterDescriptionsLoaded namespaceFilterDecoder
         }
 
 
