@@ -8,8 +8,8 @@ import Bootstrap.Grid as Grid
 import Bootstrap.Grid.Col as Col
 import Bootstrap.Grid.Row as Row
 import Bootstrap.Text as Text
-import Bootstrap.Utilities.Spacing as Spacing
 import Bootstrap.Utilities.Border as Border
+import Bootstrap.Utilities.Spacing as Spacing
 import Bounce exposing (Bounce)
 import BoundedContext as BoundedContext
 import BoundedContext.BoundedContextId as BoundedContextId
@@ -66,25 +66,29 @@ initSearchResult config collaboration domains searchResults =
         |> List.filter (\i -> not <| List.isEmpty i.contextItems)
 
 
-init apiBase domains collaboration initialQuery =
+init apiBase collaboration initialQuery =
     let
         ( filterModel, filterCmd ) =
             Filter.init apiBase initialQuery
     in
     ( { configuration = apiBase
-      , domains = domains
+      , domains = RemoteData.Loading
       , collaboration = collaboration
-      , searchResults = RemoteData.Loading
+      , searchResults = RemoteData.NotAsked
+      , searchResponse = RemoteData.Loading
       , filter = filterModel
       }
     , Cmd.batch
-        [ filterCmd |> Cmd.map FilterMsg ]
+        [ filterCmd |> Cmd.map FilterMsg
+        , getDomains apiBase
+        ]
     )
 
 
 type alias Model =
     { configuration : Api.Configuration
-    , domains : List Domain
+    , domains : RemoteData.WebData (List Domain)
+    , searchResponse : RemoteData.WebData (List BoundedContextCard.Item)
     , collaboration : Collaborations
     , searchResults : RemoteData.WebData (List BoundedContext.Model)
     , filter : Filter.Model
@@ -97,9 +101,20 @@ updateFilter apply model =
 
 
 type Msg
-    = BoundedContextsFound (Api.ApiResponse (List BoundedContextCard.Item))
+    = DomainsLoaded (Api.ApiResponse (List Domain))
+    | BoundedContextsFound (Api.ApiResponse (List BoundedContextCard.Item))
     | BoundedContextMsg BoundedContext.Msg
     | FilterMsg Filter.Msg
+
+
+updateSearchResults model =
+    { model
+        | searchResults =
+            RemoteData.map2
+                (initSearchResult model.configuration model.collaboration)
+                model.domains
+                model.searchResponse
+    }
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
@@ -109,12 +124,14 @@ update msg model =
             ( model, Cmd.none )
 
         BoundedContextsFound foundItems ->
-            ( { model
-                | searchResults =
-                    foundItems
-                        |> RemoteData.fromResult
-                        |> RemoteData.map (initSearchResult model.configuration model.collaboration model.domains)
-              }
+            ( updateSearchResults
+                { model | searchResponse = foundItems |> RemoteData.fromResult }
+            , Cmd.none
+            )
+
+        DomainsLoaded domains ->
+            ( updateSearchResults
+                { model | domains = domains |> RemoteData.fromResult }
             , Cmd.none
             )
 
@@ -187,4 +204,12 @@ findAll config query =
             Api.allBoundedContexts []
                 |> Api.urlWithQueryParameters config (query |> List.map (\q -> Url.Builder.string q.name q.value))
         , expect = Http.expectJson BoundedContextsFound (Decode.list BoundedContextCard.decoder)
+        }
+
+
+getDomains : Api.Configuration -> Cmd Msg
+getDomains config =
+    Http.get
+        { url = Api.domains [] |> Api.url config
+        , expect = Http.expectJson DomainsLoaded (Decode.list Domain.domainDecoder)
         }

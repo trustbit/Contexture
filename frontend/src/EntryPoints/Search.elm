@@ -24,7 +24,7 @@ init : Decode.Value -> ( Model, Cmd Msg )
 init flag =
     case flag |> Decode.decodeValue flagsDecoder of
         Ok decoded ->
-            Searching.init decoded.apiBase decoded.domains decoded.collaboration decoded.initialQuery
+            Searching.init decoded.apiBase decoded.collaboration decoded.initialQuery
                 |> Tuple.mapFirst Ok
 
         Err e ->
@@ -33,7 +33,6 @@ init flag =
 
 type alias Flags =
     { collaboration : Collaborations
-    , domains : List Domain
     , apiBase : Api.Configuration
     , initialQuery : List Filter.FilterParameter
     }
@@ -63,9 +62,8 @@ queryDecoder =
 
 
 flagsDecoder =
-    Decode.map4 Flags
+    Decode.map3 Flags
         (Decode.field "collaboration" (Decode.list Collaboration.decoder))
-        (Decode.field "domains" (Decode.list Domain.domainDecoder))
         (Decode.field "apiBase" baseConfiguration)
         (Decode.field "initialQuery" (Decode.list queryDecoder))
 

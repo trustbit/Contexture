@@ -44,14 +44,11 @@ module Search =
 
             let eventStore = ctx.GetService<EventStore>()
 
-            let domains = Domain.allDomains eventStore
-
             let collaborations =
                 Collaboration.allCollaborations eventStore  
                 
             let result =
                 {| Collaboration = collaborations
-                   Domains = domains
                    ApiBase = basePath.ApiBase + "/api"
                    InitialQuery =
                        ctx.Request.Query
