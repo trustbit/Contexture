@@ -42,14 +42,8 @@ module Search =
             let pathResolver = Asset.resolvePath basePath.AssetBase
             let assetsResolver = Asset.resolveAsset pathResolver
 
-            let eventStore = ctx.GetService<EventStore>()
-
-            let collaborations =
-                Collaboration.allCollaborations eventStore  
-                
             let result =
-                {| Collaboration = collaborations
-                   ApiBase = basePath.ApiBase + "/api"
+                {| ApiBase = basePath.ApiBase + "/api"
                    InitialQuery =
                        ctx.Request.Query
                        |> Seq.collect (fun q -> q.Value |> Seq.map (fun value -> {| Name = q.Key; Value = value |}))

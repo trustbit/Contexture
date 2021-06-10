@@ -66,14 +66,14 @@ initSearchResult config collaboration domains searchResults =
         |> List.filter (\i -> not <| List.isEmpty i.contextItems)
 
 
-init apiBase collaboration initialQuery =
+init apiBase initialQuery =
     let
         ( filterModel, filterCmd ) =
             Filter.init apiBase initialQuery
     in
     ( { configuration = apiBase
       , domains = RemoteData.Loading
-      , collaboration = collaboration
+      , collaboration =  RemoteData.Loading
       , searchResults = RemoteData.NotAsked
       , searchResponse = RemoteData.Loading
       , filter = filterModel
@@ -81,6 +81,7 @@ init apiBase collaboration initialQuery =
     , Cmd.batch
         [ filterCmd |> Cmd.map FilterMsg
         , getDomains apiBase
+        , getCollaborations apiBase
         ]
     )
 
@@ -89,7 +90,7 @@ type alias Model =
     { configuration : Api.Configuration
     , domains : RemoteData.WebData (List Domain)
     , searchResponse : RemoteData.WebData (List BoundedContextCard.Item)
-    , collaboration : Collaborations
+    , collaboration : RemoteData.WebData Collaborations
     , searchResults : RemoteData.WebData (List BoundedContext.Model)
     , filter : Filter.Model
     }
@@ -102,6 +103,7 @@ updateFilter apply model =
 
 type Msg
     = DomainsLoaded (Api.ApiResponse (List Domain))
+    | CollaborationsLoaded (Api.ApiResponse Collaborations)
     | BoundedContextsFound (Api.ApiResponse (List BoundedContextCard.Item))
     | BoundedContextMsg BoundedContext.Msg
     | FilterMsg Filter.Msg
@@ -110,8 +112,9 @@ type Msg
 updateSearchResults model =
     { model
         | searchResults =
-            RemoteData.map2
-                (initSearchResult model.configuration model.collaboration)
+            RemoteData.map3
+                (initSearchResult model.configuration)
+                model.collaboration
                 model.domains
                 model.searchResponse
     }
@@ -132,6 +135,12 @@ update msg model =
         DomainsLoaded domains ->
             ( updateSearchResults
                 { model | domains = domains |> RemoteData.fromResult }
+            , Cmd.none
+            )
+            
+        CollaborationsLoaded collaborations ->
+            ( updateSearchResults
+                { model | collaboration = collaborations |> RemoteData.fromResult }
             , Cmd.none
             )
 
@@ -212,4 +221,12 @@ getDomains config =
     Http.get
         { url = Api.domains [] |> Api.url config
         , expect = Http.expectJson DomainsLoaded (Decode.list Domain.domainDecoder)
+        }
+
+
+getCollaborations : Api.Configuration -> Cmd Msg
+getCollaborations config =
+    Http.get
+        { url = Api.collaborations |> Api.url config
+        , expect = Http.expectJson CollaborationsLoaded (Decode.list Collaboration.decoder)
         }
