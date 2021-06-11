@@ -20,10 +20,10 @@ open Microsoft.Extensions.Hosting
 module Search =
 
     module Views =
-        
+
         open Layout
         open Giraffe.ViewEngine
-        
+
         let index jsonEncoder resolveAssets flags =
             let searchSnipped =
                 div [] [
@@ -33,7 +33,7 @@ module Search =
 
             documentTemplate (headTemplate resolveAssets) (bodyTemplate searchSnipped)
 
-    let indexHandler: HttpHandler =
+    let indexHandler : HttpHandler =
         fun (next: HttpFunc) (ctx: HttpContext) ->
             let basePath =
                 ctx.GetService<IHostEnvironment>()
@@ -46,21 +46,23 @@ module Search =
                 {| ApiBase = basePath.ApiBase + "/api"
                    InitialQuery =
                        ctx.Request.Query
-                       |> Seq.collect (fun q -> q.Value |> Seq.map (fun value -> {| Name = q.Key; Value = value |}))
-                |}
+                       |> Seq.collect
+                           (fun q ->
+                               q.Value
+                               |> Seq.map (fun value -> {| Name = q.Key; Value = value |})) |}
 
             let jsonEncoder = ctx.GetJsonSerializer()
 
             htmlView (Views.index jsonEncoder.SerializeToString assetsResolver result) next ctx
-            
+
     let getNamespaces : HttpHandler =
-         fun (next: HttpFunc) (ctx: HttpContext) ->
+        fun (next: HttpFunc) (ctx: HttpContext) ->
             let eventStore = ctx.GetService<EventStore>()
 
             let allNamespaces =
                 ReadModels.Namespace.allNamespaces eventStore
-                
-            let byTemplateId =
+
+            let namespacesByTemplateId =
                 allNamespaces
                 |> List.groupBy (fun n -> n.Template)
                 |> Map.ofList
@@ -68,68 +70,84 @@ module Search =
             let templateNamespaces =
                 eventStore
                 |> ReadModels.Templates.allTemplates
-                |> List.map(fun t -> t.Id,t)
-                |> Map.ofList                
-            
+                |> List.map (fun t -> t.Id, t)
+                |> Map.ofList
+                
+            let collectLabelsAndValues namespaces =
+                namespaces
+                |> List.collect (fun n -> n.Labels)
+                |> List.groupBy (fun l -> l.Name)
+                |> Map.ofList
+                |> Map.map
+                    (fun _ labels ->
+                        labels
+                        |> List.map (fun l -> l.Value)
+                        |> Set.ofList)
+                    
+            let convertLabelsAndValuesToOutput labelsAndValues =
+                labelsAndValues
+                |> Map.toList
+                |> List.map
+                   (fun l ->
+                       {| Name = fst l
+                          Values = l |> snd |> Set.toList |> List.sort |})
+                |> List.sortBy (fun l -> l.Name)
+
             let namespacesTemplates =
                 templateNamespaces
-                |> Map.filter (fun key _ -> byTemplateId |> Map.containsKey (Some key))
-                |> Map.map (fun key value ->
-                    let labelNames =
-                        byTemplateId
-                        |> Map.find (Some key)
-                        |> List.collect (fun n -> n.Labels)
-                        |> List.groupBy(fun l -> l.Name)
-                        |> Map.ofList
-                        |> Map.map(fun _ labels -> labels |> List.map (fun l -> l.Value) |> Set.ofList)
-                    {|
-                        Name = value.Name
-                        Description = value.Description
-                        TemplateId = value.Id
-                        Labels =
-                            value.Template
-                            |> List.map(fun t -> t.Name, Set.empty)
-                            |> Map.ofList
-                            |> Map.fold(fun s key value ->
-                                s |> Map.change key (Option.map(Set.union value) >> Option.orElse (Some value))
-                                ) labelNames
-                            |> Map.toList
-                            |> List.map (fun l -> {| Name = fst l; Values =  l |> snd |> Set.toList |> List.sort |})
-                            |> List.sortBy (fun l -> l.Name)
-                    |}
-                    )
                 |> Map.toList
-                |> List.sortBy fst
-                |> List.map snd
-            
+                |> List.filter
+                    (fun (key, _) ->
+                        namespacesByTemplateId
+                        |> Map.containsKey (Some key))
+                |> List.map
+                    (fun (key, value) ->
+                        let existingLabels =
+                            namespacesByTemplateId
+                            |> Map.find (Some key)
+                            |> collectLabelsAndValues
+                            
+                        let templateLabelsWithoutValues =
+                            value.Template
+                           |> List.map (fun t -> t.Name, Set.empty)
+                           |> Map.ofList
+
+                        let mergeLabels state key value =
+                            state
+                            |> Map.change
+                               key
+                               (Option.map (Set.union value)
+                                >> Option.orElse (Some value))
+
+                        {| Name = value.Name
+                           Description = value.Description
+                           TemplateId = value.Id
+                           Labels =
+                               Map.fold mergeLabels existingLabels templateLabelsWithoutValues
+                               |> convertLabelsAndValuesToOutput |})
+                |> List.sortBy (fun m -> m.Name)
+
             let namespacesWithoutTemplates =
-                byTemplateId
+                namespacesByTemplateId
                 |> Map.tryFind None
                 |> Option.defaultValue []
                 |> List.groupBy (fun n -> n.Name)
-                |> List.map (fun (name,namespaces) ->
-                    {|
-                       Name = name
-                       Labels =
-                           namespaces
-                            |> List.collect (fun n -> n.Labels)
-                            |> List.groupBy(fun l -> l.Name)
-                            |> Map.ofList
-                            |> Map.map(fun _ labels -> labels |> List.map (fun l -> l.Value) |> Set.ofList)
-                            |> Map.toList
-                            |> List.map (fun l -> {| Name = fst l; Values =  l |> snd |> Set.toList |> List.sort |})
-                            |> List.sort
-                    |}
-                     )  
-                
-                
-            json {| WithTemplate = namespacesTemplates; WithoutTemplate = namespacesWithoutTemplates |} next ctx 
+                |> List.map
+                    (fun (name, namespaces) ->
+                        {| Name = name
+                           Labels =
+                               namespaces
+                               |> collectLabelsAndValues
+                               |> convertLabelsAndValuesToOutput |})
 
-    let apiRoutes: HttpHandler =
-        subRoute "/search/filter" (choose [
-            route "/namespaces" >=> getNamespaces 
-        ])
-    let routes: HttpHandler =
-        subRoute "/search" (choose [
-            GET >=> indexHandler
-        ])
+            json
+                {| WithTemplate = namespacesTemplates
+                   WithoutTemplate = namespacesWithoutTemplates |}
+                next
+                ctx
+
+    let apiRoutes : HttpHandler =
+        subRoute "/search/filter" (choose [ route "/namespaces" >=> getNamespaces ])
+
+    let routes : HttpHandler =
+        subRoute "/search" (choose [ GET >=> indexHandler ])
