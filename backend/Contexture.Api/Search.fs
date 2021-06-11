@@ -3,6 +3,7 @@ namespace Contexture.Api
 open System
 open Contexture.Api
 open Contexture.Api.Aggregates
+open Contexture.Api.Aggregates.Namespace
 open Contexture.Api.BoundedContexts
 open Contexture.Api.Entities
 open Contexture.Api.ReadModels
@@ -62,17 +63,12 @@ module Search =
             let allNamespaces =
                 ReadModels.Namespace.allNamespaces eventStore
 
-            let namespacesByTemplateId =
-                allNamespaces
-                |> List.groupBy (fun n -> n.Template)
-                |> Map.ofList
-
             let templateNamespaces =
                 eventStore
                 |> ReadModels.Templates.allTemplates
                 |> List.map (fun t -> t.Id, t)
                 |> Map.ofList
-                
+
             let collectLabelsAndValues namespaces =
                 namespaces
                 |> List.collect (fun n -> n.Labels)
@@ -83,68 +79,54 @@ module Search =
                         labels
                         |> List.map (fun l -> l.Value)
                         |> Set.ofList)
-                    
+
             let convertLabelsAndValuesToOutput labelsAndValues =
                 labelsAndValues
                 |> Map.toList
                 |> List.map
-                   (fun l ->
-                       {| Name = fst l
-                          Values = l |> snd |> Set.toList |> List.sort |})
+                    (fun l ->
+                        {| Name = fst l
+                           Values = l |> snd |> Set.toList |> List.sort |})
                 |> List.sortBy (fun l -> l.Name)
 
-            let namespacesTemplates =
-                templateNamespaces
-                |> Map.toList
-                |> List.filter
-                    (fun (key, _) ->
-                        namespacesByTemplateId
-                        |> Map.containsKey (Some key))
+            let mergeLabels state key value =
+                state
+                |> Map.change
+                    key
+                    (Option.map (Set.union value)
+                     >> Option.orElse (Some value))
+
+            let namespaces =
+                allNamespaces
+                |> List.groupBy (fun n -> n.Name.ToLowerInvariant())
                 |> List.map
-                    (fun (key, value) ->
-                        let existingLabels =
-                            namespacesByTemplateId
-                            |> Map.find (Some key)
-                            |> collectLabelsAndValues
-                            
-                        let templateLabelsWithoutValues =
-                            value.Template
-                           |> List.map (fun t -> t.Name, Set.empty)
-                           |> Map.ofList
+                    (fun (_, namespaces) ->
+                        let existingLabels = namespaces |> collectLabelsAndValues
 
-                        let mergeLabels state key value =
-                            state
-                            |> Map.change
-                               key
-                               (Option.map (Set.union value)
-                                >> Option.orElse (Some value))
+                        let referenceNamespace =
+                            namespaces
+                            |> List.tryFind (fun n -> Option.isSome n.Template)
+                            |> Option.defaultValue (namespaces |> List.head)
 
-                        {| Name = value.Name
-                           Description = value.Description
-                           TemplateId = value.Id
+                        let namespaceDescription, templateLabels =
+                            referenceNamespace.Template
+                            |> Option.bind (fun key -> templateNamespaces |> Map.tryFind key)
+                            |> Option.map
+                                (fun template ->
+                                    Some template.Description,
+                                    template.Template
+                                    |> List.map (fun t -> t.Name, Set.empty)
+                                    |> Map.ofList)
+                            |> Option.defaultValue (None, Map.empty)
+
+                        {| Name = referenceNamespace.Name
+                           Template = referenceNamespace.Template
+                           Description = namespaceDescription
                            Labels =
-                               Map.fold mergeLabels existingLabels templateLabelsWithoutValues
-                               |> convertLabelsAndValuesToOutput |})
-                |> List.sortBy (fun m -> m.Name)
-
-            let namespacesWithoutTemplates =
-                namespacesByTemplateId
-                |> Map.tryFind None
-                |> Option.defaultValue []
-                |> List.groupBy (fun n -> n.Name)
-                |> List.map
-                    (fun (name, namespaces) ->
-                        {| Name = name
-                           Labels =
-                               namespaces
-                               |> collectLabelsAndValues
+                               Map.fold mergeLabels existingLabels templateLabels
                                |> convertLabelsAndValuesToOutput |})
 
-            json
-                {| WithTemplate = namespacesTemplates
-                   WithoutTemplate = namespacesWithoutTemplates |}
-                next
-                ctx
+            json namespaces next ctx
 
     let apiRoutes : HttpHandler =
         subRoute "/search/filter" (choose [ route "/namespaces" >=> getNamespaces ])

@@ -72,12 +72,6 @@ type alias NamespaceFilterDescription =
     }
 
 
-type alias NamespaceFilter =
-    { withTemplate : List NamespaceFilterDescription
-    , withoutTemplate : List NamespaceFilterDescription
-    }
-
-
 type alias ActiveFilters =
     { byNamespace : Dict.Dict String LabelFilter
     , unknown : List FilterParameter
@@ -85,7 +79,7 @@ type alias ActiveFilters =
 
 
 type alias Filter =
-    { namespaceFilter : RemoteData.WebData NamespaceFilter
+    { namespaceFilter : RemoteData.WebData (List NamespaceFilterDescription)
     , initialParameters : List FilterParameter
     , activeFilters : ActiveFilters
     , bounce : Bounce
@@ -93,7 +87,7 @@ type alias Filter =
 
 
 type Msg
-    = NamespaceFilterDescriptionsLoaded (Api.ApiResponse NamespaceFilter)
+    = NamespaceFilterDescriptionsLoaded (Api.ApiResponse (List NamespaceFilterDescription))
     | FilterLabelNameChanged LabelFilter String
     | RemoveFilterLabelName LabelFilter
     | FilterLabelValueChanged LabelFilter String
@@ -262,12 +256,9 @@ update msg model =
                     namespaces
                         |> RemoteData.fromResult
                 , activeFilters =
-                    case namespaces of
-                        Ok n ->
-                            applyExistingFilters model.initialParameters (List.append n.withoutTemplate n.withTemplate)
-
-                        _ ->
-                            model.activeFilters
+                    namespaces
+                    |> Result.map (applyExistingFilters model.initialParameters)
+                    |> Result.withDefault model.activeFilters
               }
             , applyFiltersCommand
             , NoOp
@@ -454,13 +445,14 @@ viewFilterDescription filter =
         ]
 
 
-viewNamespaceFilter : Dict.Dict String LabelFilter -> NamespaceFilter -> Html Msg
+viewNamespaceFilter : Dict.Dict String LabelFilter -> List NamespaceFilterDescription -> Html Msg
 viewNamespaceFilter activeFilters namespaces =
     Grid.simpleRow
         [ Grid.col [ Col.xs3 ]
             [ Html.h5 [] [ text "Search in Namespaces" ] ]
         , Grid.col []
-            (List.append namespaces.withTemplate namespaces.withoutTemplate
+            (namespaces
+                |> List.sortBy (\n -> n.namespaceName)
                 |> List.map
                     (\t ->
                         viewFilterDescription
@@ -492,7 +484,7 @@ getNamespaceFilterDescriptions : Api.Configuration -> Cmd Msg
 getNamespaceFilterDescriptions config =
     Http.get
         { url = Api.withoutQuery [ "search", "filter", "namespaces" ] |> Api.url config
-        , expect = Http.expectJson NamespaceFilterDescriptionsLoaded namespaceFilterDecoder
+        , expect = Http.expectJson NamespaceFilterDescriptionsLoaded (Decode.list namespaceFilterDescriptionDecoder)
         }
 
 
@@ -508,9 +500,3 @@ namespaceFilterDescriptionDecoder =
         (Decode.maybe (Decode.field "description" Decode.string))
         (Decode.maybe (Decode.field "templateId" Decode.string))
         (Decode.field "labels" (Decode.list labelFilterDecoder))
-
-
-namespaceFilterDecoder =
-    Decode.map2 NamespaceFilter
-        (Decode.field "withTemplate" <| Decode.list namespaceFilterDescriptionDecoder)
-        (Decode.field "withoutTemplate" <| Decode.list namespaceFilterDescriptionDecoder)
