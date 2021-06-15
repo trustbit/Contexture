@@ -176,6 +176,55 @@ module BoundedContexts =
             Then.Collection(result, (fun x -> Then.Equal(contextId, x)))
         }
 
+    [<Fact>]
+    let ``Can find the bounded context when searching with two different label.names`` () =
+        task {
+            let simulation = FixedTimeEnvironment.FromSystemClock()
+
+            let namespaceTemplateId =
+                Guid("A9F5D70E-B947-40B6-B7BE-4AC45CFE7F34")
+
+            let namespaceId = simulation |> PseudoRandom.guid
+            let contextId = simulation |> PseudoRandom.guid
+            let domainId = simulation |> PseudoRandom.guid
+
+            let firstLabel =
+                { Fixtures.Label.newLabel (Guid.NewGuid()) with
+                      Name = "first" }
+
+            let secondLabel =
+                { Fixtures.Label.newLabel (Guid.NewGuid()) with
+                      Name = "second" }
+
+            let searchedBoundedContext =
+                Fixtures.Builders.givenADomainWithOneBoundedContext domainId contextId
+                |> Given.andOneEvent (
+                    { Fixtures.Namespace.definition contextId namespaceId with
+                          NamespaceTemplateId = Some namespaceTemplateId }
+                    |> Fixtures.Namespace.appendLabel firstLabel
+                    |> Fixtures.Namespace.appendLabel secondLabel
+                    |> Fixtures.Namespace.namespaceAdded
+                )
+
+            let randomBoundedContext =
+                Fixtures.Builders.givenARandomDomainWithBoundedContextAndNamespace simulation
+
+            let given =
+                searchedBoundedContext @ randomBoundedContext
+
+            use testEnvironment = Prepare.withGiven simulation given
+
+            //act
+            let! result =
+                testEnvironment
+                |> When.searchingFor $"Label.Name=%s{firstLabel.Name}&Label.Name=%s{secondLabel.Name}"
+
+            // assert
+            Then.NotEmpty result
+            Then.Collection(result, (fun x -> Then.Equal(contextId, x)))
+        }
+
+
     module ``When searching for bounded contexts`` =
         open Fixtures
 

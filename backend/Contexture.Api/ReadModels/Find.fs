@@ -74,19 +74,26 @@ module Find =
         let matchesKey (key: string) =
             let term = SearchTerm.fromInput key |> Option.get
 
-            match keyPhrase with
-            | Some searchTerm -> SearchPhrase.matches searchTerm term
-            | None -> true
+            SearchPhrase.matches keyPhrase term
 
         items
         |> Map.filter (fun k _ -> matchesKey k)
         |> Map.toList
         |> List.map snd
-        
-    let private findByKeySet keyPhrase items =
+
+    let private findByKeys keyPhrases items =
+        if keyPhrases |> Seq.isEmpty then
+            None
+        else
+            keyPhrases
+            |> Seq.collect (fun phrase -> findByKey phrase items)
+            |> Set.ofSeq
+            |> Some
+
+    let private findByKeySet keyPhrase (items) =
         items
-        |> findByKey keyPhrase
-        |> Set.unionMany
+        |> findByKeys keyPhrase
+        |> Option.map (Set.unionMany)
 
     module Namespaces =
         type NamespaceModel =
@@ -115,7 +122,7 @@ module Find =
             | LabelAdded l -> state
             | LabelRemoved l -> state
 
-        let byName (namespaces: NamespaceFinder) (name: SearchPhrase option) = namespaces |> findByKeySet name
+        let byName (namespaces: NamespaceFinder) (name: SearchPhrase seq) = namespaces |> findByKeySet name
 
         let byTemplate (namespaces: NamespaceFinder) (templateId: NamespaceTemplateId) =
             namespaces
@@ -170,7 +177,7 @@ module Find =
                 state
                 |> removeFromSet (fun n -> n.NamespaceId) n.NamespaceId
 
-        let byLabelName (phrase: SearchPhrase option) (namespaces: NamespacesByLabel) = namespaces |> findByKeySet phrase
+        let byLabelName (namespaces: NamespacesByLabel) (phrase: SearchPhrase seq) = namespaces |> findByKeySet phrase
 
     let labels (eventStore: EventStore) : Labels.NamespacesByLabel =
         eventStore.Get<Aggregates.Namespace.Event>()
@@ -227,14 +234,14 @@ module Find =
             | PromotedToDomain _
             | VisionRefined _ -> state
 
-        let byName (model: DomainByKeyAndNameModel) (phrase: SearchPhrase option) = model.ByName |> findByKeySet phrase
-        let byKey (model: DomainByKeyAndNameModel) (phrase: SearchPhrase option) = model.ByKey |> findByKey phrase |> Set.ofList
+        let byName (model: DomainByKeyAndNameModel) (phrase: SearchPhrase seq) = model.ByName |> findByKeySet phrase
+        let byKey (model: DomainByKeyAndNameModel) (phrase: SearchPhrase seq) = model.ByKey |> findByKeys phrase
 
     let domains (eventStore: EventStore) : Domains.DomainByKeyAndNameModel =
         eventStore.Get<Aggregates.Domain.Event>()
         |> List.fold Domains.projectToDomain Domains.DomainByKeyAndNameModel.Empty
-        
-        
+
+
     module BoundedContexts =
         open Contexture.Api.Aggregates.BoundedContext
 
@@ -275,14 +282,18 @@ module Find =
                           |> append l.Name l.BoundedContextId }
             | BoundedContextRemoved l ->
                 { state with
-                      ByName = state.ByName |> removeFromSet id l.BoundedContextId
+                      ByName =
+                          state.ByName
+                          |> removeFromSet id l.BoundedContextId
                       ByKey =
                           state.ByKey
                           |> Map.filter (fun _ v -> v <> l.BoundedContextId) }
-            | _ ->
-                state
-        let byName (model: BoundedContextByKeyAndNameModel) (phrase: SearchPhrase option) = model.ByName |> findByKeySet phrase
-        let byKey (model: BoundedContextByKeyAndNameModel) (phrase: SearchPhrase option) = model.ByKey |> findByKey phrase |> Set.ofList
+            | _ -> state
+
+        let byName (model: BoundedContextByKeyAndNameModel) (phrase: SearchPhrase seq) =
+            model.ByName |> findByKeySet phrase
+
+        let byKey (model: BoundedContextByKeyAndNameModel) (phrase: SearchPhrase seq) = model.ByKey |> findByKeys phrase
 
     let boundedContexts (eventStore: EventStore) : BoundedContexts.BoundedContextByKeyAndNameModel =
         eventStore.Get<Aggregates.BoundedContext.Event>()

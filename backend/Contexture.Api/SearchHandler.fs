@@ -8,9 +8,9 @@ open Contexture.Api.ReadModels
 
 module SearchFor =
 
-    let combineResultsWithAnd (searchResults: Set<_> option list) =
+    let combineResultsWithAnd (searchResults: Set<_> option seq) =
         searchResults
-        |> List.fold
+        |> Seq.fold
             (fun ids results ->
                 match ids, results with
                 | Some existing, Some r -> Set.intersect r existing |> Some
@@ -24,52 +24,76 @@ module SearchFor =
 
         [<CLIMutable>]
         type LabelQuery =
-            { Name: string option
-              Value: string option }
-            member this.IsActive = this.Name.IsSome || this.Value.IsSome
+            { Name: string []
+              Value: string [] }
+            member this.IsActive =
+                not (Seq.isEmpty (Seq.append this.Name this.Value))
 
         [<CLIMutable>]
         type NamespaceQuery =
-            { Template: NamespaceTemplateId option
-              Name: string option }
-            member this.IsActive = this.Name.IsSome || this.Template.IsSome
+            { Template: NamespaceTemplateId []
+              Name: string [] }
+            member this.IsActive =
+                this.Name.Length > 0 || this.Template.Length > 0
 
         let findRelevantNamespaces (database: EventStore) (item: NamespaceQuery) =
             let availableNamespaces = Find.namespaces database
 
             let namespacesByName =
                 item.Name
-                |> Option.map Find.SearchPhrase.fromInput
-                |> Option.map (Find.Namespaces.byName availableNamespaces)
+                |> Seq.choose Find.SearchPhrase.fromInput
+                |> Find.Namespaces.byName availableNamespaces
 
             let namespacesByTemplate =
                 item.Template
-                |> Option.map (Find.Namespaces.byTemplate availableNamespaces)
+                |> Option.ofObj
+                |> Option.filter (not << Seq.isEmpty)
+                |> Option.map (Seq.map (Find.Namespaces.byTemplate availableNamespaces))
+                |> Option.map Set.intersectMany
 
             let relevantNamespaces =
-                combineResultsWithAnd [ namespacesByName
-                                        namespacesByTemplate ]
+                combineResultsWithAnd
+                    [ namespacesByName
+                      namespacesByTemplate ]
 
             relevantNamespaces
 
         let findRelevantLabels (database: EventStore) (item: LabelQuery) =
             let namespacesByLabel = database |> Find.labels
 
-            namespacesByLabel
-            |> Find.Labels.byLabelName (
+            let byName =
                 item.Name
-                |> Option.bind Find.SearchPhrase.fromInput
-            )
-            |> Set.filter
-                (fun { Value = value } ->
-                    match item.Value
-                          |> Option.bind Find.SearchPhrase.fromInput with
-                    | Some searchTerm ->
-                        value
-                        |> Option.bind Find.SearchTerm.fromInput
-                        |> Option.map (Find.SearchPhrase.matches searchTerm)
-                        |> Option.defaultValue false
-                    | None -> true)
+                |> Seq.choose Find.SearchPhrase.fromInput
+                |> Find.Labels.byLabelName namespacesByLabel
+
+
+            let searchForLabels =
+                namespacesByLabel
+                |> Map.toList
+                |> List.map snd
+                |> Set.unionMany
+
+
+            let byLabel =
+                item.Value
+                |> Seq.choose Find.SearchPhrase.fromInput
+                |> Option.ofObj
+                |> Option.filter (not << Seq.isEmpty)
+                |> Option.map
+                    (fun searchPhrases ->
+                        searchForLabels
+                        |> Set.filter
+                            (fun { Value = value } ->
+                                value
+                                |> Option.bind Find.SearchTerm.fromInput
+                                |> Option.map
+                                    (fun searchTerm ->
+                                        searchPhrases
+                                        |> Seq.exists (fun phrase -> Find.SearchPhrase.matches phrase searchTerm))
+                                |> Option.defaultValue false))
+
+            combineResultsWithAnd [ byName
+                                    byLabel ]
 
         let find (database: EventStore) (byNamespace: NamespaceQuery option) (byLabel: LabelQuery option) =
             let relevantNamespaceIds =
@@ -97,9 +121,10 @@ module SearchFor =
     module DomainId =
         [<CLIMutable>]
         type DomainQuery =
-            { Name: string option
-              Key: string option }
-            member this.IsActive = this.Name.IsSome || this.Key.IsSome
+            { Name: string []
+              Key: string [] }
+            member this.IsActive =
+                not (Seq.isEmpty (Seq.append this.Name this.Key))
 
         let findRelevantDomains (database: EventStore) (query: DomainQuery option) =
             query
@@ -109,13 +134,13 @@ module SearchFor =
 
                     let foundByName =
                         item.Name
-                        |> Option.map Find.SearchPhrase.fromInput
-                        |> Option.map (Find.Domains.byName findDomains)
+                        |> Seq.choose Find.SearchPhrase.fromInput
+                        |> Find.Domains.byName findDomains
 
                     let foundByKey =
                         item.Key
-                        |> Option.map Find.SearchPhrase.fromInput
-                        |> Option.map (Find.Domains.byKey findDomains)
+                        |> Seq.choose Find.SearchPhrase.fromInput
+                        |> Find.Domains.byKey findDomains
 
                     combineResultsWithAnd [ foundByName
                                             foundByKey ])
@@ -123,9 +148,10 @@ module SearchFor =
     module BoundedContextId =
         [<CLIMutable>]
         type BoundedContextQuery =
-            { Name: string option
-              Key: string option }
-            member this.IsActive = this.Name.IsSome || this.Key.IsSome
+            { Name: string []
+              Key: string [] }
+            member this.IsActive =
+                not (Seq.isEmpty (Seq.append this.Name this.Key))
 
         let findRelevantBoundedContexts (database: EventStore) (query: BoundedContextQuery option) =
             query
@@ -135,13 +161,14 @@ module SearchFor =
 
                     let foundByName =
                         item.Name
-                        |> Option.map Find.SearchPhrase.fromInput
-                        |> Option.map (Find.BoundedContexts.byName findBoundedContext)
+                        |> Seq.choose Find.SearchPhrase.fromInput
+                        |> Find.BoundedContexts.byName findBoundedContext
 
                     let foundByKey =
                         item.Key
-                        |> Option.map Find.SearchPhrase.fromInput
-                        |> Option.map (Find.BoundedContexts.byKey findBoundedContext)
+                        |> Seq.choose Find.SearchPhrase.fromInput
+                        |> Find.BoundedContexts.byKey findBoundedContext
 
-                    combineResultsWithAnd [ foundByName
-                                            foundByKey ])
+                    combineResultsWithAnd
+                        [ foundByName
+                          foundByKey ])
