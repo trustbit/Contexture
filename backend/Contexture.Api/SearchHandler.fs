@@ -67,30 +67,10 @@ module SearchFor =
                 |> Find.Labels.byLabelName namespacesByLabel
 
 
-            let searchForLabels =
-                namespacesByLabel
-                |> Map.toList
-                |> List.map snd
-                |> Set.unionMany
-
-
             let byLabel =
                 item.Value
                 |> Seq.choose Find.SearchPhrase.fromInput
-                |> Option.ofObj
-                |> Option.filter (not << Seq.isEmpty)
-                |> Option.map
-                    (fun searchPhrases ->
-                        searchForLabels
-                        |> Set.filter
-                            (fun { Value = value } ->
-                                value
-                                |> Option.bind Find.SearchTerm.fromInput
-                                |> Option.map
-                                    (fun searchTerm ->
-                                        searchPhrases
-                                        |> Seq.exists (fun phrase -> Find.SearchPhrase.matches phrase searchTerm))
-                                |> Option.defaultValue false))
+                |> Find.Labels.byLabelValue namespacesByLabel
 
             combineResultsWithAnd [ byName
                                     byLabel ]
@@ -107,13 +87,12 @@ module SearchFor =
 
             let namespacesIds =
                 match relevantNamespaceIds, relevantLabels with
-                | Some namespaces, Some labels ->
-                    labels
-                    |> Set.filter (fun { NamespaceId = namespaceId } -> namespaces.Contains namespaceId)
-                    |> Set.map (fun n -> n.NamespaceId)
+                | Some namespaces, Some namespacesFromLabels ->
+                    namespacesFromLabels
+                    |> Set.filter namespaces.Contains
                     |> Some
                 | Some namespaces, None -> Some namespaces
-                | None, Some labels -> labels |> Set.map (fun n -> n.NamespaceId) |> Some
+                | None, Some namespacesFromLabels -> namespacesFromLabels |> Some
                 | None, None -> None
 
             namespacesIds

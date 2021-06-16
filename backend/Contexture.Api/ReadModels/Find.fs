@@ -55,7 +55,7 @@ module Find =
             | EndsWith -> value.EndsWith(phrase, StringComparison.OrdinalIgnoreCase)
             | Contains -> value.Contains(phrase, StringComparison.OrdinalIgnoreCase)
 
-    let private appendToSet items (key: string, value) =
+    let private appendToSet items (key, value) =
         items
         |> Map.change
             key
@@ -72,9 +72,11 @@ module Find =
 
     let private findByKey keyPhrase items =
         let matchesKey (key: string) =
-            let term = SearchTerm.fromInput key |> Option.get
+            let term = key |> SearchTerm.fromInput
 
-            SearchPhrase.matches keyPhrase term
+            term
+            |> Option.map (SearchPhrase.matches keyPhrase)
+            |> Option.defaultValue true
 
         items
         |> Map.filter (fun k _ -> matchesKey k)
@@ -82,6 +84,7 @@ module Find =
         |> List.map snd
 
     let private findByKeys keyPhrases items =
+        // TODO: could this functionality be reused?
         if keyPhrases |> Seq.isEmpty then
             None
         else
@@ -90,10 +93,13 @@ module Find =
             |> Set.ofSeq
             |> Some
 
-    let private findByKeySet keyPhrase (items) =
+    let private selectResults selectResult items =
         items
-        |> findByKeys keyPhrase
-        |> Option.map (Set.unionMany)
+        |> Option.map (Set.map (Set.map selectResult))
+
+    let private takeAllResults items = items |> Option.map Set.unionMany
+
+    let private combineResults items = items |> Option.map Set.intersectMany
 
     module Namespaces =
         type NamespaceModel =
@@ -122,7 +128,8 @@ module Find =
             | LabelAdded l -> state
             | LabelRemoved l -> state
 
-        let byName (namespaces: NamespaceFinder) (name: SearchPhrase seq) = namespaces |> findByKeySet name
+        let byName (namespaces: NamespaceFinder) (name: SearchPhrase seq) =
+            namespaces |> findByKeys name |> combineResults
 
         let byTemplate (namespaces: NamespaceFinder) (templateId: NamespaceTemplateId) =
             namespaces
@@ -141,47 +148,82 @@ module Find =
               NamespaceId: NamespaceId
               NamespaceTemplateId: NamespaceTemplateId option }
 
-        type NamespacesByLabel = Map<string, Set<LabelAndNamespaceModel>>
+        type NamespacesByLabel =
+            { ByLabelName2: Map<String, Set<NamespaceId * LabelId>>
+              ByLabelValue: Map<String, Set<NamespaceId * LabelId>> }
+            static member Initial =
+                {
+                  // TODO: group by BC ID
+                  ByLabelName2 = Map.empty
+                  ByLabelValue = Map.empty }
 
         let projectLabelNameToNamespace state eventEnvelope =
             match eventEnvelope.Event with
             | NamespaceAdded n ->
-                n.Labels
-                |> List.map
-                    (fun l ->
-                        l.Name,
-                        { Value = l.Value
-                          NamespaceId = n.NamespaceId
-                          NamespaceTemplateId = n.NamespaceTemplateId })
-                |> List.fold appendToSet state
+                { state with
+                      ByLabelName2 =
+                          n.Labels
+                          |> List.map (fun l -> l.Name, (n.NamespaceId, l.LabelId))
+                          |> List.fold appendToSet state.ByLabelName2
+                      ByLabelValue =
+                          n.Labels
+                          |> List.choose
+                              (fun l ->
+                                  l.Value
+                                  |> Option.map (fun value -> value, (n.NamespaceId, l.LabelId)))
+                          |> List.fold appendToSet state.ByLabelValue }
             | NamespaceImported n ->
-                n.Labels
-                |> List.map
-                    (fun l ->
-                        l.Name,
-                        { Value = l.Value
-                          NamespaceId = n.NamespaceId
-                          NamespaceTemplateId = n.NamespaceTemplateId })
-                |> List.fold appendToSet state
+                { state with
+                      ByLabelName2 =
+                          n.Labels
+                          |> List.map (fun l -> l.Name, (n.NamespaceId, l.LabelId))
+                          |> List.fold appendToSet state.ByLabelName2
+                      ByLabelValue =
+                          n.Labels
+                          |> List.choose
+                              (fun l ->
+                                  l.Value
+                                  |> Option.map (fun value -> value, (n.NamespaceId, l.LabelId)))
+                          |> List.fold appendToSet state.ByLabelValue }
             | LabelAdded l ->
-                appendToSet
-                    state
-                    (l.Name,
-                     { Value = l.Value
-                       NamespaceId = l.NamespaceId
-                       NamespaceTemplateId = None })
+                { state with
+                      ByLabelName2 = appendToSet state.ByLabelName2 (l.Name, (l.NamespaceId, l.LabelId))
+                      ByLabelValue =
+                          match l.Value with
+                          | Some value -> appendToSet state.ByLabelValue (value, (l.NamespaceId, l.LabelId))
+                          | None -> state.ByLabelValue }
             | LabelRemoved l ->
-                state
-                |> removeFromSet (fun n -> n.NamespaceId) l.NamespaceId
+                { state with
+                      ByLabelName2 =
+                          state.ByLabelName2
+                          |> removeFromSet fst l.NamespaceId
+                      ByLabelValue =
+                          state.ByLabelValue
+                          |> removeFromSet snd l.NamespaceId }
             | NamespaceRemoved n ->
-                state
-                |> removeFromSet (fun n -> n.NamespaceId) n.NamespaceId
+                { state with
+                      ByLabelName2 =
+                          state.ByLabelName2
+                          |> removeFromSet fst n.NamespaceId
+                      ByLabelValue =
+                          state.ByLabelValue
+                          |> removeFromSet snd n.NamespaceId }
 
-        let byLabelName (namespaces: NamespacesByLabel) (phrase: SearchPhrase seq) = namespaces |> findByKeySet phrase
+        let byLabelName (namespaces: NamespacesByLabel) (phrase: SearchPhrase seq) =
+            namespaces.ByLabelName2
+            |> findByKeys phrase
+            |> selectResults fst
+            |> takeAllResults
+
+        let byLabelValue (namespaces: NamespacesByLabel) (phrase: SearchPhrase seq) =
+            namespaces.ByLabelValue
+            |> findByKeys phrase
+            |> selectResults fst
+            |> takeAllResults
 
     let labels (eventStore: EventStore) : Labels.NamespacesByLabel =
         eventStore.Get<Aggregates.Namespace.Event>()
-        |> List.fold Labels.projectLabelNameToNamespace Map.empty
+        |> List.fold Labels.projectLabelNameToNamespace Labels.NamespacesByLabel.Initial
 
     module Domains =
         open Contexture.Api.Aggregates.Domain
@@ -234,7 +276,11 @@ module Find =
             | PromotedToDomain _
             | VisionRefined _ -> state
 
-        let byName (model: DomainByKeyAndNameModel) (phrase: SearchPhrase seq) = model.ByName |> findByKeySet phrase
+        let byName (model: DomainByKeyAndNameModel) (phrase: SearchPhrase seq) =
+            model.ByName
+            |> findByKeys phrase
+            |> combineResults
+
         let byKey (model: DomainByKeyAndNameModel) (phrase: SearchPhrase seq) = model.ByKey |> findByKeys phrase
 
     let domains (eventStore: EventStore) : Domains.DomainByKeyAndNameModel =
@@ -291,7 +337,9 @@ module Find =
             | _ -> state
 
         let byName (model: BoundedContextByKeyAndNameModel) (phrase: SearchPhrase seq) =
-            model.ByName |> findByKeySet phrase
+            model.ByName
+            |> findByKeys phrase
+            |> combineResults
 
         let byKey (model: BoundedContextByKeyAndNameModel) (phrase: SearchPhrase seq) = model.ByKey |> findByKeys phrase
 

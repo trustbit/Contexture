@@ -77,6 +77,9 @@ module BoundedContexts =
                 return result |> Array.map (fun i -> i.Id)
             }
 
+        module Searching =
+            let forALabelNamed name = $"Label.Name=%s{name}"
+
     [<Fact>]
     let ``Can list all bounded contexts`` () =
         task {
@@ -176,53 +179,141 @@ module BoundedContexts =
             Then.Collection(result, (fun x -> Then.Equal(contextId, x)))
         }
 
-    [<Fact>]
-    let ``Can find the bounded context when searching with two different label.names`` () =
-        task {
-            let simulation = FixedTimeEnvironment.FromSystemClock()
+    type ``When searching for two different label names``() =
 
-            let namespaceTemplateId =
+        let simulation = FixedTimeEnvironment.FromSystemClock()
+
+        let namespaceTemplateId =
                 Guid("A9F5D70E-B947-40B6-B7BE-4AC45CFE7F34")
+        let domainId = simulation |> PseudoRandom.guid
 
-            let namespaceId = simulation |> PseudoRandom.guid
-            let contextId = simulation |> PseudoRandom.guid
-            let domainId = simulation |> PseudoRandom.guid
+        let firstLabel =
+            { Fixtures.Label.newLabel (Guid.NewGuid()) with
+                  Name = "first" }
 
-            let firstLabel =
-                { Fixtures.Label.newLabel (Guid.NewGuid()) with
-                      Name = "first" }
+        let secondLabel =
+            { Fixtures.Label.newLabel (Guid.NewGuid()) with
+                  Name = "second" }
+            
+        
+        let whenSearchingForDifferentLabels =
+            When.searchingFor $"Label.Name=%s{firstLabel.Name}&Label.Name=%s{secondLabel.Name}"
 
-            let secondLabel =
-                { Fixtures.Label.newLabel (Guid.NewGuid()) with
-                      Name = "second" }
+        [<Fact>]
+        member _. ``Given one bounded context with two different labels in the same namespace, then the bounded context is found`` () =
+            task {
+                let contextId = simulation |> PseudoRandom.guid
+                let singleNamespaceId = simulation |> PseudoRandom.guid                
+            
+                let searchedBoundedContext =
+                    Fixtures.Builders.givenADomainWithOneBoundedContext domainId contextId
+                    |> Given.andOneEvent (
+                        { Fixtures.Namespace.definition contextId singleNamespaceId with
+                              NamespaceTemplateId = Some namespaceTemplateId }
+                        |> Fixtures.Namespace.appendLabel firstLabel
+                        |> Fixtures.Namespace.appendLabel secondLabel
+                        |> Fixtures.Namespace.namespaceAdded
+                    )
 
-            let searchedBoundedContext =
-                Fixtures.Builders.givenADomainWithOneBoundedContext domainId contextId
-                |> Given.andOneEvent (
-                    { Fixtures.Namespace.definition contextId namespaceId with
-                          NamespaceTemplateId = Some namespaceTemplateId }
-                    |> Fixtures.Namespace.appendLabel firstLabel
-                    |> Fixtures.Namespace.appendLabel secondLabel
-                    |> Fixtures.Namespace.namespaceAdded
-                )
+                let randomBoundedContext =
+                    Fixtures.Builders.givenARandomDomainWithBoundedContextAndNamespace simulation
 
-            let randomBoundedContext =
-                Fixtures.Builders.givenARandomDomainWithBoundedContextAndNamespace simulation
+                let given =
+                    searchedBoundedContext @ randomBoundedContext
 
-            let given =
-                searchedBoundedContext @ randomBoundedContext
+                use testEnvironment = Prepare.withGiven simulation given
 
-            use testEnvironment = Prepare.withGiven simulation given
+                //act
+                let! result =
+                    testEnvironment
+                    |> whenSearchingForDifferentLabels
 
-            //act
-            let! result =
-                testEnvironment
-                |> When.searchingFor $"Label.Name=%s{firstLabel.Name}&Label.Name=%s{secondLabel.Name}"
+                // assert
+                Then.NotEmpty result
+                Then.Collection(result, (fun x -> Then.Equal(contextId, x)))
+            }
+            
+        [<Fact>]
+        member _. ``Given one bounded context with two different labels in two different namespaces, then the bounded context is found`` () =
+            task {
+                let contextId = simulation |> PseudoRandom.guid
+                let firstNamespaceId = simulation |> PseudoRandom.guid
+                let secondNamespaceId = simulation |> PseudoRandom.guid
+            
+                let firstBoundedContext =
+                    Fixtures.Builders.givenADomainWithOneBoundedContext domainId contextId
+                    |> Given.andOneEvent (
+                        { Fixtures.Namespace.definition contextId firstNamespaceId with
+                              NamespaceTemplateId = Some namespaceTemplateId }
+                        |> Fixtures.Namespace.appendLabel firstLabel
+                        |> Fixtures.Namespace.namespaceAdded
+                    )
+                let secondBoundedContext =
+                    Fixtures.Builders.givenADomainWithOneBoundedContext domainId contextId
+                    |> Given.andOneEvent (
+                        { Fixtures.Namespace.definition contextId secondNamespaceId with
+                              NamespaceTemplateId = Some namespaceTemplateId }
+                        |> Fixtures.Namespace.appendLabel secondLabel
+                        |> Fixtures.Namespace.namespaceAdded
+                    )
 
-            // assert
-            Then.NotEmpty result
-            Then.Collection(result, (fun x -> Then.Equal(contextId, x)))
-        }
+                let randomBoundedContext =
+                    Fixtures.Builders.givenARandomDomainWithBoundedContextAndNamespace simulation
+
+                let given =
+                    firstBoundedContext @ secondBoundedContext @ randomBoundedContext
+
+                use testEnvironment = Prepare.withGiven simulation given
+
+                //act
+                let! result =
+                    testEnvironment
+                    |> whenSearchingForDifferentLabels
+
+                // assert
+                Then.NotEmpty result
+                Then.Collection(result, (fun x -> Then.Equal(contextId, x)))
+            }
+        
+        [<Fact>]
+        member _.``Given two bounded contexts with different label names, then no bounded context should be found`` () =
+            task {
+                let firstContextId = simulation |> PseudoRandom.guid                
+                let firstBoundedContext =
+                    Fixtures.Builders.givenADomainWithOneBoundedContext domainId firstContextId
+                    |> Given.andOneEvent (
+                        { Fixtures.Namespace.definition firstContextId (simulation |> PseudoRandom.guid) with
+                              NamespaceTemplateId = Some namespaceTemplateId }
+                        |> Fixtures.Namespace.appendLabel firstLabel
+                        |> Fixtures.Namespace.namespaceAdded
+                    )
+
+                let secondContextId = simulation |> PseudoRandom.guid
+                let secondBoundedContext =
+                    Fixtures.Builders.givenADomainWithOneBoundedContext domainId secondContextId
+                    |> Given.andOneEvent (
+                        { Fixtures.Namespace.definition secondContextId (simulation |> PseudoRandom.guid) with
+                              NamespaceTemplateId = Some namespaceTemplateId }
+                        |> Fixtures.Namespace.appendLabel secondLabel
+                        |> Fixtures.Namespace.namespaceAdded
+                    )
+
+                let randomBoundedContext =
+                    Fixtures.Builders.givenARandomDomainWithBoundedContextAndNamespace simulation
+
+                let given =
+                    firstBoundedContext @ secondBoundedContext @ randomBoundedContext
+
+                use testEnvironment = Prepare.withGiven simulation given
+
+                //act
+                let! result =
+                    testEnvironment
+                    |> whenSearchingForDifferentLabels
+
+                // assert
+                Then.Empty result
+            }
 
 
     module ``When searching for bounded contexts`` =
