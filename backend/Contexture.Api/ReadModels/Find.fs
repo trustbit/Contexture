@@ -17,9 +17,9 @@ module Find =
 
     type SearchTerm = private SearchTerm of string
 
-    type SearchArgument =
+    type SearchArgument<'v> =
         private
-        | Active of SearchPhrase list
+        | Used of 'v list
         | NotUsed
 
     type SearchResult<'T when 'T: comparison> =
@@ -65,23 +65,13 @@ module Find =
             | EndsWith -> value.EndsWith(phrase, StringComparison.OrdinalIgnoreCase)
             | Contains -> value.Contains(phrase, StringComparison.OrdinalIgnoreCase)
 
-    module SearchArgument =
-        let fromInputs (phraseInputs: string seq) =
-            let searchPhrases =
-                phraseInputs
-                |> Seq.choose SearchPhrase.fromInput
-                |> Seq.toList
-
-            if List.isEmpty searchPhrases then
-                SearchArgument.NotUsed
-            else
-                SearchArgument.Active searchPhrases
-
     module SearchResult =
 
-        let private takeAllResults items = items |> Set.unionMany
-
-        let combineResults items = items |> Set.intersectMany
+        let value =
+            function
+            | SearchResult.Results results -> Some results
+            | SearchResult.NoResult -> Some Set.empty
+            | SearchResult.NotUsed -> None
 
         let fromResults results =
             if Seq.isEmpty results then
@@ -89,11 +79,28 @@ module Find =
             else
                 results |> Set.ofSeq |> Results
 
-        let fromOptionalResults results =
+        let takeAllResults results =
             results
-            |> Option.map fromResults
-            |> Option.defaultValue NotUsed
+            |> Seq.map Set.ofSeq
+            |> Set.unionMany
+            |> fromResults
 
+        let fromOption result = result |> Option.defaultValue NotUsed
+
+        let map<'a, 'b when 'a: comparison and 'b: comparison> (mapper: 'a -> 'b) result : SearchResult<'b> =
+            match result with
+            | Results r -> r |> Set.map mapper |> fromResults
+            | NoResult -> NoResult
+            | NotUsed -> NotUsed
+
+        let bind<'a, 'b when 'a: comparison and 'b: comparison>
+            (mapper: Set<'a> -> SearchResult<'b>)
+            result
+            : SearchResult<'b> =
+            match result with
+            | Results r -> mapper r
+            | NoResult -> NoResult
+            | NotUsed -> NotUsed
 
         let combineResultsWithAnd (searchResults: SearchResult<_> seq) =
             searchResults
@@ -108,12 +115,43 @@ module Find =
                     | _, NoResult -> NoResult)
                 NotUsed
 
+        let combineAllResults searchResults =
+            searchResults
+            |> Seq.fold
+                (fun ids results ->
+                    match ids, results with
+                    | Results existing, Results r -> Set.union r existing |> fromResults
+                    | NotUsed, NotUsed -> NotUsed
+                    | NoResult, NoResult -> NoResult
+                    | NoResult, NotUsed -> NoResult
+                    | NotUsed, NoResult -> NoResult
+                    | _, Results r -> fromResults r
+                    | Results existing, _ -> fromResults existing)
 
-        let applyArguments search argument =
+                NotUsed
+
+    module SearchArgument =
+        let fromValues (values: _ seq) =
+            let valueList = values |> Seq.toList
+
+            if List.isEmpty valueList then
+                SearchArgument.NotUsed
+            else
+                SearchArgument.Used valueList
+
+        let fromInputs (phraseInputs: string seq) =
+            let searchPhrases =
+                phraseInputs |> Seq.choose SearchPhrase.fromInput
+
+            fromValues searchPhrases
+
+        let executeSearch search argument =
             match argument with
-            | SearchArgument.Active phrases -> phrases |> Seq.map search |> combineResultsWithAnd
+            | Used phrases ->
+                phrases
+                |> Seq.map search
+                |> SearchResult.combineResultsWithAnd
             | SearchArgument.NotUsed -> SearchResult.NotUsed
-
 
     let private appendToSet items (key, value) =
         items
@@ -142,16 +180,6 @@ module Find =
         |> Map.filter (fun k _ -> matchesKey k)
         |> Map.toList
         |> List.map snd
-
-    let private findByKeys keyPhrases items =
-        // TODO: could this functionality be reused?
-        if keyPhrases |> Seq.isEmpty then
-            None
-        else
-            keyPhrases
-            |> Seq.collect (fun phrase -> findByKey phrase items)
-            |> Set.ofSeq
-            |> Some
 
     let private selectResults selectResult items =
         items
@@ -184,10 +212,11 @@ module Find =
             | LabelAdded l -> state
             | LabelRemoved l -> state
 
-        let byName (namespaces: NamespaceFinder) (name: SearchPhrase seq) =
+        let byName (namespaces: NamespaceFinder) (name: SearchPhrase) =
             namespaces
-            |> findByKeys name
-            |> Option.map SearchResult.combineResults
+            |> findByKey name
+            |> Seq.map SearchResult.fromResults
+            |> SearchResult.combineResultsWithAnd
 
         let byTemplate (namespaces: NamespaceFinder) (templateId: NamespaceTemplateId) =
             namespaces
@@ -195,6 +224,7 @@ module Find =
             |> List.map snd
             |> Set.unionMany
             |> Set.filter (fun m -> m.NamespaceTemplateId = Some templateId)
+            |> SearchResult.fromResults
 
     let namespaces (eventStore: EventStore) : Namespaces.NamespaceFinder =
         eventStore.Get<Aggregates.Namespace.Event>()
@@ -308,15 +338,13 @@ module Find =
             namespaces.ByLabelName
             |> findByKey phrase
             |> selectResults fst
-            |> Set.unionMany
-            |> SearchResult.fromResults
+            |> SearchResult.takeAllResults
 
         let byLabelValue (namespaces: NamespacesByLabel) (phrase: SearchPhrase) =
             namespaces.ByLabelValue
             |> findByKey phrase
             |> selectResults fst
-            |> Set.unionMany
-            |> SearchResult.fromResults
+            |> SearchResult.takeAllResults
 
     let labels (eventStore: EventStore) : Labels.NamespacesByLabel =
         eventStore.Get<Aggregates.Namespace.Event>()
@@ -436,12 +464,16 @@ module Find =
                           |> Map.filter (fun _ v -> v <> l.BoundedContextId) }
             | _ -> state
 
-        let byName (model: BoundedContextByKeyAndNameModel) (phrase: SearchPhrase seq) =
+        let byName (model: BoundedContextByKeyAndNameModel) (phrase: SearchPhrase) =
             model.ByName
-            |> findByKeys phrase
-            |> Option.map SearchResult.combineResults
+            |> findByKey phrase
+            |> Seq.map SearchResult.fromResults
+            |> SearchResult.combineResultsWithAnd
 
-        let byKey (model: BoundedContextByKeyAndNameModel) (phrase: SearchPhrase seq) = model.ByKey |> findByKeys phrase
+        let byKey (model: BoundedContextByKeyAndNameModel) (phrase: SearchPhrase) =
+            model.ByKey
+            |> findByKey phrase
+            |> SearchResult.fromResults
 
     let boundedContexts (eventStore: EventStore) : BoundedContexts.BoundedContextByKeyAndNameModel =
         eventStore.Get<Aggregates.BoundedContext.Event>()

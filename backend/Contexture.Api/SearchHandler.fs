@@ -35,28 +35,24 @@ module SearchFor =
 
             let namespacesByName =
                 item.Name
-                |> Seq.choose Find.SearchPhrase.fromInput
-                |> Find.Namespaces.byName availableNamespaces
+                |> SearchArgument.fromInputs
+                |> SearchArgument.executeSearch (Find.Namespaces.byName availableNamespaces)
 
             let namespacesByTemplate =
                 item.Template
-                |> Option.ofObj
-                |> Option.filter (not << Seq.isEmpty)
-                |> Option.map (Seq.map (Find.Namespaces.byTemplate availableNamespaces))
-                |> Option.map SearchResult.combineResults
+                |> SearchArgument.fromValues
+                |> SearchArgument.executeSearch (Find.Namespaces.byTemplate availableNamespaces)
 
-            let relevantNamespaces =
-                combineResultsWithAnd
+            SearchResult.combineResultsWithAnd
                     [ namespacesByName
                       namespacesByTemplate ]
-
-            relevantNamespaces      
 
         let find (database: EventStore) (byNamespace: NamespaceQuery option) =
             let relevantNamespaceIds =
                 byNamespace
                 |> Option.map (findRelevantNamespaces database)
-                |> Option.map (Set.map (fun n -> n.NamespaceId))
+                |> Option.map (SearchResult.map (fun n -> n.NamespaceId))
+                |> SearchResult.fromOption
 
             relevantNamespaceIds
             
@@ -75,13 +71,13 @@ module SearchFor =
             let byNameResults =
                 item.Name
                 |> SearchArgument.fromInputs
-                |> SearchResult.applyArguments (Find.Labels.byLabelName namespacesByLabel)
+                |> SearchArgument.executeSearch (Find.Labels.byLabelName namespacesByLabel)
 
 
             let byLabelResults =
                 item.Value
                 |> SearchArgument.fromInputs
-                |> SearchResult.applyArguments (Find.Labels.byLabelValue namespacesByLabel)
+                |> SearchArgument.executeSearch (Find.Labels.byLabelValue namespacesByLabel)
 
             SearchResult.combineResultsWithAnd [ byNameResults; byLabelResults]
 
@@ -89,6 +85,7 @@ module SearchFor =
             let relevantLabels =
                 byLabel
                 |> Option.map (findRelevantLabels database)
+                |> SearchResult.fromOption
 
             relevantLabels
             
@@ -101,25 +98,27 @@ module SearchFor =
             member this.IsActive =
                 not (Seq.isEmpty (Seq.append this.Name this.Key))
 
-        let findRelevantDomains (database: EventStore) (query: DomainQuery option) =
+        let findRelevantDomains (database: EventStore) (query: DomainQuery) =
+            let findDomains = database |> Find.domains
+
+            let foundByName =
+                query.Name
+                |> SearchArgument.fromInputs
+                |> SearchArgument.executeSearch (Find.Domains.byName findDomains)
+
+            let foundByKey =
+                query.Key
+                |> SearchArgument.fromInputs
+                |> SearchArgument.executeSearch (Find.Domains.byKey findDomains)
+
+            SearchResult.combineResultsWithAnd
+                [ foundByName
+                  foundByKey ]
+                
+        let find (database: EventStore) (query: DomainQuery option) =
             query
-            |> Option.map
-                (fun item ->
-                    let findDomains = database |> Find.domains
-
-                    let foundByName =
-                        item.Name
-                        |> SearchArgument.fromInputs
-                        |> SearchResult.applyArguments (Find.Domains.byName findDomains)
-
-                    let foundByKey =
-                        item.Key
-                        |> SearchArgument.fromInputs
-                        |> SearchResult.applyArguments (Find.Domains.byKey findDomains)
-
-                    SearchResult.combineResultsWithAnd
-                        [ foundByName
-                          foundByKey ])
+            |> Option.map (findRelevantDomains database)
+            |> SearchResult.fromOption
 
     module BoundedContextId =
         [<CLIMutable>]
@@ -129,22 +128,24 @@ module SearchFor =
             member this.IsActive =
                 not (Seq.isEmpty (Seq.append this.Name this.Key))
 
-        let findRelevantBoundedContexts (database: EventStore) (query: BoundedContextQuery option) =
+        let findRelevantBoundedContexts (database: EventStore) (query: BoundedContextQuery) =
+            let findBoundedContext = database |> Find.boundedContexts
+
+            let foundByName =
+                query.Name
+                |> SearchArgument.fromInputs
+                |> SearchArgument.executeSearch (Find.BoundedContexts.byName findBoundedContext)
+
+            let foundByKey =
+                query.Key
+                |> SearchArgument.fromInputs
+                |> SearchArgument.executeSearch  (Find.BoundedContexts.byKey findBoundedContext)
+
+            SearchResult.combineResultsWithAnd
+                [ foundByName
+                  foundByKey ]
+
+        let find (database: EventStore) (query: BoundedContextQuery option) =
             query
-            |> Option.map
-                (fun item ->
-                    let findBoundedContext = database |> Find.boundedContexts
-
-                    let foundByName =
-                        item.Name
-                        |> Seq.choose Find.SearchPhrase.fromInput
-                        |> Find.BoundedContexts.byName findBoundedContext
-
-                    let foundByKey =
-                        item.Key
-                        |> Seq.choose Find.SearchPhrase.fromInput
-                        |> Find.BoundedContexts.byKey findBoundedContext
-
-                    combineResultsWithAnd
-                        [ foundByName
-                          foundByKey ])
+            |> Option.map (findRelevantBoundedContexts database)
+            |> SearchResult.fromOption

@@ -147,21 +147,13 @@ module BoundedContexts =
                     SearchFor.NamespaceId.find database item.Namespace
 
                 let domainIds =
-                    SearchFor.DomainId.findRelevantDomains database item.Domain
-
-                let mapToOptionSet =
-                    function
-                    | SearchResult.Results r -> Some r
-                    | SearchResult.NoResult -> Some Set.empty
-                    | SearchResult.NotUsed -> None
-
+                    SearchFor.DomainId.find database item.Domain
 
                 let boundedContextIdsFromLabels =
                     SearchFor.Labels.find database item.Label
-                    |> Option.bind mapToOptionSet
 
                 let boundedContextIdsFromSearch =
-                    SearchFor.BoundedContextId.findRelevantBoundedContexts database item.BoundedContext
+                    SearchFor.BoundedContextId.find database item.BoundedContext
 
                 let boundedContextsByNamespace =
                     Namespace.BoundedContexts.byNamespace database
@@ -172,36 +164,40 @@ module BoundedContexts =
 
                 let boundedContextIdsFromNamespace =
                     namespaceIds
-                    |> Option.map (
+                    |> SearchResult.bind (
                         Set.map (
                             boundedContextsByNamespace
                             >> Option.toList
                             >> Set.ofList
                         )
-                        >> Set.unionMany
+                       >> SearchResult.takeAllResults
                     )
 
                 let boundedContextIdsFromDomain =
                     domainIds
-                    |> Option.bind mapToOptionSet
-                    |> Option.map (
+                    |> SearchResult.bind (
                         Set.map (
                             boundedContextsByDomain
                             >> List.map (fun b -> b.Id)
                             >> Set.ofList
                         )
-                        >> Set.unionMany
+                        >> SearchResult.takeAllResults
                     )
-                  
+
                 let boundedContextIds =
-                    SearchFor.combineResultsWithAnd
+                    SearchResult.combineResultsWithAnd
                         [ boundedContextIdsFromSearch
                           boundedContextIdsFromNamespace
                           boundedContextIdsFromDomain
-                          boundedContextIdsFromLabels
-                        ]
+                          boundedContextIdsFromLabels ]
+                        
+                let idsToLoad =
+                    boundedContextIds
+                    |> SearchResult.value
+                    |> Option.map Set.toList
+                    |> Option.defaultValue List.empty
 
-                mapToBoundedContext database (Set.toList boundedContextIds) next ctx
+                mapToBoundedContext database idsToLoad next ctx
 
         let getBoundedContexts =
             fun (next: HttpFunc) (ctx: HttpContext) ->
