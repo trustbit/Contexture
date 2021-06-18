@@ -257,8 +257,8 @@ update msg model =
                         |> RemoteData.fromResult
                 , activeFilters =
                     namespaces
-                    |> Result.map (applyExistingFilters model.initialParameters)
-                    |> Result.withDefault model.activeFilters
+                        |> Result.map (applyExistingFilters model.initialParameters)
+                        |> Result.withDefault model.activeFilters
               }
             , applyFiltersCommand
             , NoOp
@@ -349,8 +349,8 @@ viewAppliedNamespaceFilters query =
             )
 
 
-viewAppliedUnkownFilters : List FilterParameter -> List (Html Msg)
-viewAppliedUnkownFilters query =
+viewAppliedUnknownFilters : List FilterParameter -> List (Html Msg)
+viewAppliedUnknownFilters query =
     query
         |> List.map (\filter -> Html.a [ class "badge badge-warning", Spacing.ml1, Attributes.href "#", title "Remove unkown filter", onClick (RemoveUnknownFilter filter) ] [ text <| filter.name ++ ": " ++ filter.value ])
 
@@ -361,7 +361,7 @@ viewAppliedFilters { byNamespace, unknown } =
         activeFilters =
             List.concat
                 [ viewAppliedNamespaceFilters (byNamespace |> Dict.values)
-                , viewAppliedUnkownFilters unknown
+                , viewAppliedUnknownFilters unknown
                 ]
     in
     Grid.simpleRow
@@ -385,23 +385,24 @@ viewAppliedFilters { byNamespace, unknown } =
 
 viewFilterInput : String -> List String -> (String -> Msg) -> Msg -> String -> List (Html Msg)
 viewFilterInput name options inputAction removeAction value =
-    let
-        inputArguments =
+    [ InputGroup.config
+        (InputGroup.text
             [ Input.attrs [ Attributes.list <| "list-" ++ name ]
             , Input.onInput inputAction
             , Input.value value
             ]
-    in
-    [ if String.isEmpty value then
-        Input.text inputArguments
+        )
+        |> (\inputConfig ->
+                if String.isEmpty value then
+                    inputConfig
 
-      else
-        InputGroup.config
-            (InputGroup.text inputArguments)
-            |> InputGroup.successors
-                [ InputGroup.button [ Button.outlineSecondary, Button.onClick removeAction ] [ text "x" ]
-                ]
-            |> InputGroup.view
+                else
+                    inputConfig
+                        |> InputGroup.successors
+                            [ InputGroup.button [ Button.outlineSecondary, Button.onClick removeAction ] [ text "x" ]
+                            ]
+           )
+        |> InputGroup.view
     , Html.datalist
         [ id <| "list-" ++ name ]
         (options
