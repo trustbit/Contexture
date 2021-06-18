@@ -177,7 +177,7 @@ updateLabel index updateLabelProperty namespace =
                 Nothing ->
                     updateLabelProperty initNewLabel
     in
-    { namespace | labels = namespace.labels |> Array.set index item }
+        { namespace | labels = namespace.labels |> Array.set index item }
 
 
 editingNamespace namespaceId updateNamespace namespaces =
@@ -192,23 +192,25 @@ editingNamespace namespaceId updateNamespace namespaces =
             )
 
 
-removeLabel : Int -> Array a -> Array a
-removeLabel i a =
+removeItemFromArray : Int -> Array a -> Array a
+removeItemFromArray index arrayItems =
     let
         a1 =
-            Array.slice 0 i a
+            Array.slice 0 index arrayItems
 
         a2 =
-            Array.slice (i + 1) (Array.length a) a
+            Array.slice (index + 1) (Array.length arrayItems) arrayItems
     in
     Array.append a1 a2
 
 
-updateLabelName name label =
+updateLabelNameTo name label =
     { label
         | name = name
         , isValid = not <| String.isEmpty name
     }
+updateLabelValueTo value label =
+    { label | value = value }
 
 
 namespaceNameShouldNotBeEmpty value =
@@ -267,16 +269,24 @@ update msg model =
             ( { model | newNamespace = model.newNamespace |> Maybe.map appendNewLabel }, Cmd.none )
 
         UpdateLabelName index name ->
-            ( { model | newNamespace = model.newNamespace |> Maybe.map (updateLabel index (updateLabelName name)) }, Cmd.none )
+            ( { model | newNamespace = model.newNamespace |> Maybe.map (updateLabel index (updateLabelNameTo name)) }, Cmd.none )
 
         UpdateLabelValue index value ->
-            ( { model | newNamespace = model.newNamespace |> Maybe.map (updateLabel index (\l -> { l | value = value })) }, Cmd.none )
+            ( { model | newNamespace = model.newNamespace |> Maybe.map (updateLabel index (updateLabelValueTo value)) }, Cmd.none )
 
         RemoveLabel index ->
-            ( { model | newNamespace = model.newNamespace |> Maybe.map (\namespace -> { namespace | labels = namespace.labels |> removeLabel index }) }, Cmd.none )
+            ( { model | newNamespace = model.newNamespace |> Maybe.map (\namespace -> { namespace | labels = namespace.labels |> removeItemFromArray index }) }, Cmd.none )
 
         AddNamespace namespace ->
-            ( model, addNamespace model.configuration model.boundedContextId namespace )
+            let
+                removeEmptyLabelInTemplateNamespace labels =
+                    labels
+                    |> Array.filter (\label -> (not <| String.isEmpty label.value) || namespace.template == Nothing)
+                namespaceWithoutEmptyLabels = { namespace | labels = removeEmptyLabelInTemplateNamespace namespace.labels } 
+            in 
+                ( model
+                , addNamespace model.configuration model.boundedContextId namespaceWithoutEmptyLabels  
+                )
 
         NamespaceAdded namespaces ->
             ( { model
@@ -305,7 +315,7 @@ update msg model =
             ( { model | namespaces = model.namespaces |> RemoteData.map (editingNamespace namespace (\n -> { n | addLabel = Just initNewLabel })) }, Cmd.none )
 
         UpdateLabelNameForExistingNamespace namespace name ->
-            ( { model | namespaces = model.namespaces |> RemoteData.map (editingNamespace namespace (\n -> { n | addLabel = n.addLabel |> Maybe.map (updateLabelName name) })) }, Cmd.none )
+            ( { model | namespaces = model.namespaces |> RemoteData.map (editingNamespace namespace (\n -> { n | addLabel = n.addLabel |> Maybe.map (updateLabelNameTo name) })) }, Cmd.none )
 
         UpdateLabelValueForExistingNamespace namespace value ->
             ( { model | namespaces = model.namespaces |> RemoteData.map (editingNamespace namespace (\n -> { n | addLabel = n.addLabel |> Maybe.map (\l -> { l | value = value }) })) }, Cmd.none )
