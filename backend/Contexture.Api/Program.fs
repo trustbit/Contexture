@@ -16,14 +16,15 @@ open Microsoft.Extensions.Hosting
 open Microsoft.Extensions.Logging
 open Microsoft.Extensions.DependencyInjection
 open Microsoft.Extensions.Options
+open FSharp.Control.Tasks
 
 [<CLIMutable>]
-type ContextureOptions = {
-    DatabasePath : string
-}
+type ContextureOptions = { DatabasePath: string }
 
-let allRoute =
-     fun (next: HttpFunc) (ctx: HttpContext) ->
+module AllRoute =
+
+    let getAllData =
+        fun (next: HttpFunc) (ctx: HttpContext) ->
             let database = ctx.GetService<FileBased>()
             let document = database.Read
 
@@ -32,23 +33,63 @@ let allRoute =
                    Domains = document.Domains.All
                    Collaborations = document.Collaborations.All
                    NamespaceTemplates = document.NamespaceTemplates.All |}
+
             json result next ctx
 
+    open Entities
+
+    [<CLIMutable>]
+    type UpdateAllData =
+        { Domains: Domain list
+          BoundedContexts: BoundedContext list
+          Collaborations: Collaboration list
+          NamespaceTemplates: NamespaceTemplate.Projections.NamespaceTemplate list }
+
+    let postAllData =
+        fun (next: HttpFunc) (ctx: HttpContext) ->
+            task {
+                let database = ctx.GetService<FileBased>()
+                let notEmpty items = not (List.isEmpty items)
+                let! data = ctx.BindJsonAsync<UpdateAllData>()
+
+                if notEmpty data.Domains
+                   && notEmpty data.BoundedContexts
+                   && notEmpty data.Collaborations then
+                    let document =
+                        database.Change
+                            (fun document ->
+                                let newDocument : Document =
+                                    { Domains = collectionOfGuid data.Domains (fun d -> d.Id)
+                                      BoundedContexts = collectionOfGuid data.BoundedContexts (fun d -> d.Id)
+                                      Collaborations = collectionOfGuid data.Collaborations (fun d -> d.Id)
+                                      NamespaceTemplates = collectionOfGuid data.NamespaceTemplates (fun d -> d.Id) }
+
+                                Ok(newDocument, ()))
+
+                    return! text "Successfully imported all data - NOTE: you need to restart the application" next ctx
+                else
+                    return! RequestErrors.BAD_REQUEST "Not overwriting with (partly) missing data" next ctx
+            }
+
+    let routes =
+        route "/all"
+        >=> choose [ GET >=> getAllData
+                     POST >=> postAllData ]
+
 let webApp hostFrontend =
-    choose [
-        subRoute "/api"
-            (choose [
-                Domains.routes
-                BoundedContexts.routes
-                Collaborations.routes
-                Namespaces.routes
-                Search.apiRoutes
-                GET >=> route "/all" >=> allRoute
-            ])
-        Search.routes
-        GET >=> routef "/boundedContext/%O/namespaces" Namespaces.index
-        hostFrontend
-        setStatusCode 404 >=> text "Not Found" ]
+    choose [ subRoute
+                 "/api"
+                 (choose [ Domains.routes
+                           BoundedContexts.routes
+                           Collaborations.routes
+                           Namespaces.routes
+                           Search.apiRoutes
+                           AllRoute.routes ])
+             Search.routes
+             GET
+             >=> routef "/boundedContext/%O/namespaces" Namespaces.index
+             hostFrontend
+             setStatusCode 404 >=> text "Not Found" ]
 
 let frontendHostRoutes (env: IWebHostEnvironment) : HttpHandler =
     if env.IsDevelopment() then
