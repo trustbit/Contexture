@@ -7,6 +7,7 @@ open Contexture.Api.Domains
 open Contexture.Api.Entities
 open Contexture.Api.Aggregates.BoundedContext
 open Contexture.Api.Infrastructure
+open Contexture.Api.ReadModels.Find
 open Microsoft.AspNetCore.Http
 open FSharp.Control.Tasks
 
@@ -128,12 +129,13 @@ module BoundedContexts =
             { Label: SearchFor.Labels.LabelQuery option
               Namespace: SearchFor.NamespaceId.NamespaceQuery option
               Domain: SearchFor.DomainId.DomainQuery option
-              BoundedContext : SearchFor.BoundedContextId.BoundedContextQuery option }
+              BoundedContext: SearchFor.BoundedContextId.BoundedContextQuery option }
             member this.IsActive =
                 [ this.Label |> Option.map (fun l -> l.IsActive)
                   this.Namespace |> Option.map (fun n -> n.IsActive)
                   this.Domain |> Option.map (fun n -> n.IsActive)
-                  this.BoundedContext |> Option.map (fun n -> n.IsActive) ]
+                  this.BoundedContext
+                  |> Option.map (fun n -> n.IsActive) ]
                 |> List.map (Option.defaultValue false)
                 |> List.exists id
 
@@ -146,10 +148,18 @@ module BoundedContexts =
 
                 let domainIds =
                     SearchFor.DomainId.findRelevantDomains database item.Domain
-                    
+
+                let mapToOptionSet =
+                    function
+                    | SearchResult.Results r -> Some r
+                    | SearchResult.NoResult -> Some Set.empty
+                    | SearchResult.NotUsed -> None
+
+
                 let boundedContextIdsFromLabels =
                     SearchFor.Labels.find database item.Label
-                    
+                    |> Option.bind mapToOptionSet
+
                 let boundedContextIdsFromSearch =
                     SearchFor.BoundedContextId.findRelevantBoundedContexts database item.BoundedContext
 
@@ -173,6 +183,7 @@ module BoundedContexts =
 
                 let boundedContextIdsFromDomain =
                     domainIds
+                    |> Option.bind mapToOptionSet
                     |> Option.map (
                         Set.map (
                             boundedContextsByDomain

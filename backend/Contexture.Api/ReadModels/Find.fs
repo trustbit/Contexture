@@ -17,6 +17,16 @@ module Find =
 
     type SearchTerm = private SearchTerm of string
 
+    type SearchArgument =
+        private
+        | Active of SearchPhrase list
+        | NotUsed
+
+    type SearchResult<'T when 'T: comparison> =
+        | Results of Set<'T>
+        | NoResult
+        | NotUsed
+
     module SearchTerm =
         let fromInput (term: string) =
             term
@@ -54,6 +64,56 @@ module Find =
             | StartsWith -> value.StartsWith(phrase, StringComparison.OrdinalIgnoreCase)
             | EndsWith -> value.EndsWith(phrase, StringComparison.OrdinalIgnoreCase)
             | Contains -> value.Contains(phrase, StringComparison.OrdinalIgnoreCase)
+
+    module SearchArgument =
+        let fromInputs (phraseInputs: string seq) =
+            let searchPhrases =
+                phraseInputs
+                |> Seq.choose SearchPhrase.fromInput
+                |> Seq.toList
+
+            if List.isEmpty searchPhrases then
+                SearchArgument.NotUsed
+            else
+                SearchArgument.Active searchPhrases
+
+    module SearchResult =
+
+        let private takeAllResults items = items |> Set.unionMany
+
+        let combineResults items = items |> Set.intersectMany
+
+        let fromResults results =
+            if Seq.isEmpty results then
+                NoResult
+            else
+                results |> Set.ofSeq |> Results
+
+        let fromOptionalResults results =
+            results
+            |> Option.map fromResults
+            |> Option.defaultValue NotUsed
+
+
+        let combineResultsWithAnd (searchResults: SearchResult<_> seq) =
+            searchResults
+            |> Seq.fold
+                (fun ids results ->
+                    match ids, results with
+                    | Results existing, Results r -> Set.intersect r existing |> fromResults
+                    | NotUsed, Results r -> fromResults r
+                    | Results existing, NotUsed -> fromResults existing
+                    | NotUsed, NotUsed -> NotUsed
+                    | NoResult, _ -> NoResult
+                    | _, NoResult -> NoResult)
+                NotUsed
+
+
+        let applyArguments search argument =
+            match argument with
+            | SearchArgument.Active phrases -> phrases |> Seq.map search |> combineResultsWithAnd
+            | SearchArgument.NotUsed -> SearchResult.NotUsed
+
 
     let private appendToSet items (key, value) =
         items
@@ -97,10 +157,6 @@ module Find =
         items
         |> List.map (Map.toList >> List.map selectResult >> Set.ofList)
 
-    let takeAllResults items = items |> Option.map Set.unionMany
-
-    let combineResults items = items |> Option.map Set.intersectMany
-
     module Namespaces =
         type NamespaceModel =
             { NamespaceId: NamespaceId
@@ -129,7 +185,9 @@ module Find =
             | LabelRemoved l -> state
 
         let byName (namespaces: NamespaceFinder) (name: SearchPhrase seq) =
-            namespaces |> findByKeys name |> combineResults
+            namespaces
+            |> findByKeys name
+            |> Option.map SearchResult.combineResults
 
         let byTemplate (namespaces: NamespaceFinder) (templateId: NamespaceTemplateId) =
             namespaces
@@ -149,108 +207,116 @@ module Find =
               NamespaceTemplateId: NamespaceTemplateId option }
 
         type NamespacesByLabel =
-            { ByLabelName: Map<String, NamespacesOfBoundedContext>
-              ByLabelValue:  Map<String, NamespacesOfBoundedContext> }
+            { Namespaces: Map<NamespaceId, BoundedContextId>
+              ByLabelName: Map<String, NamespacesOfBoundedContext>
+              ByLabelValue: Map<String, NamespacesOfBoundedContext> }
             static member Initial =
-                {
+                { Namespaces = Map.empty
                   ByLabelName = Map.empty
                   ByLabelValue = Map.empty }
-        and NamespacesOfBoundedContext = Map<BoundedContextId, Set<NamespaceId * LabelId>>
-        
-        let private appendForBoundedContext boundedContext namespaces (key,value)  =
+
+        and NamespacesOfBoundedContext = Map<BoundedContextId, Set<NamespaceId>>
+
+        let private appendForBoundedContext boundedContext namespaces (key, value) =
             namespaces
             |> Map.change
-                  key
-                  (Option.orElse (Some Map.empty)
-                      >> Option.map(fun items -> appendToSet items (boundedContext, value))
-                    )
+                key
+                (Option.orElse (Some Map.empty)
+                 >> Option.map (fun items -> appendToSet items (boundedContext, value)))
 
         let projectLabelNameToNamespace state eventEnvelope =
             match eventEnvelope.Event with
             | NamespaceAdded n ->
                 { state with
+                      Namespaces =
+                          state.Namespaces
+                          |> Map.add n.NamespaceId n.BoundedContextId
                       ByLabelName =
-                         n.Labels
-                         |> List.map(fun l -> l.Name,(n.NamespaceId,l.LabelId))
-                         |> List.fold (appendForBoundedContext n.BoundedContextId) state.ByLabelName
+                          n.Labels
+                          |> List.map (fun l -> l.Name, n.NamespaceId)
+                          |> List.fold (appendForBoundedContext n.BoundedContextId) state.ByLabelName
                       ByLabelValue =
                           n.Labels
                           |> List.choose
                               (fun l ->
                                   l.Value
-                                  |> Option.map (fun value -> value, (n.NamespaceId, l.LabelId)))
+                                  |> Option.map (fun value -> value, n.NamespaceId))
                           |> List.fold (appendForBoundedContext n.BoundedContextId) state.ByLabelValue }
             | NamespaceImported n ->
                 { state with
+                      Namespaces =
+                          state.Namespaces
+                          |> Map.add n.NamespaceId n.BoundedContextId
                       ByLabelName =
                           n.Labels
-                         |> List.map(fun l -> l.Name,(n.NamespaceId,l.LabelId))
-                         |> List.fold (appendForBoundedContext n.BoundedContextId) state.ByLabelName
+                          |> List.map (fun l -> l.Name, n.NamespaceId)
+                          |> List.fold (appendForBoundedContext n.BoundedContextId) state.ByLabelName
                       ByLabelValue =
-                         n.Labels
+                          n.Labels
                           |> List.choose
                               (fun l ->
                                   l.Value
-                                  |> Option.map (fun value -> value, (n.NamespaceId, l.LabelId)))
+                                  |> Option.map (fun value -> value, n.NamespaceId))
                           |> List.fold (appendForBoundedContext n.BoundedContextId) state.ByLabelValue }
             | LabelAdded l ->
-                let appendLabelToExistingNamespace k v=
-                    if v
-                                                 |> Set.exists (fun (namespaceId, _) -> namespaceId = l.NamespaceId) then
-                                                  Set.add (l.NamespaceId, l.LabelId) v
-                                              else
-                                                  v
-                let findAndAppendToBoundedContext value namespaces =
+                let appendNamespaceToBoundedContext value namespaces =
+                    let associatedBoundedContextId =
+                        state.Namespaces |> Map.find l.NamespaceId
+
                     namespaces
                     |> Map.change
-                          value
-                          (fun s ->
-                              match s with
-                              | Some byBc ->
-                                  byBc
-                                  |> Map.map appendLabelToExistingNamespace
-                                  |> Some
-                              | None -> None
-                        )
+                        value
+                        (fun contexts ->
+                            let namespaceToAdd = Set.singleton l.NamespaceId
+
+                            match contexts with
+                            | Some contexts ->
+                                contexts
+                                |> Map.change
+                                    associatedBoundedContextId
+                                    (Option.map (Set.union namespaceToAdd)
+                                     >> Option.orElse (Some namespaceToAdd))
+                                |> Some
+                            | None ->
+                                Map.ofSeq [ (associatedBoundedContextId, namespaceToAdd) ]
+                                |> Some)
+
                 { state with
-                      ByLabelName =
-                          state.ByLabelName
-                          |> findAndAppendToBoundedContext l.Name
+                      ByLabelName = appendNamespaceToBoundedContext l.Name state.ByLabelName
                       ByLabelValue =
                           match l.Value with
-                          | Some value ->
-                            state.ByLabelValue
-                            |> findAndAppendToBoundedContext value
+                          | Some value -> appendNamespaceToBoundedContext value state.ByLabelValue
                           | None -> state.ByLabelValue }
             | LabelRemoved l ->
                 { state with
                       ByLabelName =
                           state.ByLabelName
-                          |> Map.map (fun _ values -> values |> removeFromSet fst l.NamespaceId)
+                          |> Map.map (fun _ values -> values |> removeFromSet id l.NamespaceId)
                       ByLabelValue =
                           state.ByLabelValue
-                          |> Map.map (fun _ values -> values |> removeFromSet fst l.NamespaceId)
-                          }
+                          |> Map.map (fun _ values -> values |> removeFromSet id l.NamespaceId) }
             | NamespaceRemoved n ->
                 { state with
                       ByLabelName =
                           state.ByLabelName
-                          |> Map.map (fun _ values -> values |> removeFromSet fst n.NamespaceId)
+                          |> Map.map (fun _ values -> values |> removeFromSet id n.NamespaceId)
                       ByLabelValue =
                           state.ByLabelValue
-                          |> Map.map (fun _ values -> values |> removeFromSet fst n.NamespaceId) }
+                          |> Map.map (fun _ values -> values |> removeFromSet id n.NamespaceId) }
 
         let byLabelName (namespaces: NamespacesByLabel) (phrase: SearchPhrase) =
             namespaces.ByLabelName
             |> findByKey phrase
-            |> selectResults fst 
+            |> selectResults fst
             |> Set.unionMany
+            |> SearchResult.fromResults
 
         let byLabelValue (namespaces: NamespacesByLabel) (phrase: SearchPhrase) =
             namespaces.ByLabelValue
             |> findByKey phrase
             |> selectResults fst
             |> Set.unionMany
+            |> SearchResult.fromResults
 
     let labels (eventStore: EventStore) : Labels.NamespacesByLabel =
         eventStore.Get<Aggregates.Namespace.Event>()
@@ -307,17 +373,20 @@ module Find =
             | PromotedToDomain _
             | VisionRefined _ -> state
 
-        let byName (model: DomainByKeyAndNameModel) (phrase: SearchPhrase seq) =
+        let byName (model: DomainByKeyAndNameModel) (phrase: SearchPhrase) =
             model.ByName
-            |> findByKeys phrase
-            |> combineResults
+            |> findByKey phrase
+            |> Seq.map SearchResult.fromResults
+            |> SearchResult.combineResultsWithAnd
 
-        let byKey (model: DomainByKeyAndNameModel) (phrase: SearchPhrase seq) = model.ByKey |> findByKeys phrase
+        let byKey (model: DomainByKeyAndNameModel) (phrase: SearchPhrase) =
+            model.ByKey
+            |> findByKey phrase
+            |> SearchResult.fromResults
 
     let domains (eventStore: EventStore) : Domains.DomainByKeyAndNameModel =
         eventStore.Get<Aggregates.Domain.Event>()
         |> List.fold Domains.projectToDomain Domains.DomainByKeyAndNameModel.Empty
-
 
     module BoundedContexts =
         open Contexture.Api.Aggregates.BoundedContext
@@ -370,7 +439,7 @@ module Find =
         let byName (model: BoundedContextByKeyAndNameModel) (phrase: SearchPhrase seq) =
             model.ByName
             |> findByKeys phrase
-            |> combineResults
+            |> Option.map SearchResult.combineResults
 
         let byKey (model: BoundedContextByKeyAndNameModel) (phrase: SearchPhrase seq) = model.ByKey |> findByKeys phrase
 

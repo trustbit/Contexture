@@ -43,37 +43,20 @@ module SearchFor =
                 |> Option.ofObj
                 |> Option.filter (not << Seq.isEmpty)
                 |> Option.map (Seq.map (Find.Namespaces.byTemplate availableNamespaces))
-                |> Option.map Set.intersectMany
+                |> Option.map SearchResult.combineResults
 
             let relevantNamespaces =
                 combineResultsWithAnd
                     [ namespacesByName
                       namespacesByTemplate ]
 
-            relevantNamespaces
-
-       
-                                    
+            relevantNamespaces      
 
         let find (database: EventStore) (byNamespace: NamespaceQuery option) =
             let relevantNamespaceIds =
                 byNamespace
                 |> Option.map (findRelevantNamespaces database)
                 |> Option.map (Set.map (fun n -> n.NamespaceId))
-//
-//            let relevantLabels =
-//                byLabel
-//                |> Option.map (findRelevantLabels database)
-
-//            let namespacesIds =
-//                match relevantNamespaceIds, relevantLabels with
-//                | Some namespaces, Some namespacesFromLabels ->
-//                    namespacesFromLabels
-//                    |> Set.filter namespaces.Contains
-//                    |> Some
-//                | Some namespaces, None -> Some namespaces
-//                | None, Some namespacesFromLabels -> namespacesFromLabels |> Some
-//                | None, None -> None
 
             relevantNamespaceIds
             
@@ -89,28 +72,18 @@ module SearchFor =
         let findRelevantLabels (database: EventStore) (item: LabelQuery) =
             let namespacesByLabel = database |> Find.labels
 
-            let byName =
-                if item.Name |> Seq.isEmpty then
-                    None
-                else
-                    item.Name
-                    |> Seq.choose Find.SearchPhrase.fromInput
-                    |> Seq.map (Find.Labels.byLabelName namespacesByLabel)
-                    |> Set.intersectMany
-                    |> Some
+            let byNameResults =
+                item.Name
+                |> SearchArgument.fromInputs
+                |> SearchResult.applyArguments (Find.Labels.byLabelName namespacesByLabel)
 
 
-            let byLabel =
-                if item.Value|> Seq.isEmpty then
-                    None
-                else
-                    item.Value
-                    |> Seq.choose Find.SearchPhrase.fromInput
-                    |> Seq.map(Find.Labels.byLabelValue namespacesByLabel)
-                    |> Set.intersectMany
-                    |> Some
+            let byLabelResults =
+                item.Value
+                |> SearchArgument.fromInputs
+                |> SearchResult.applyArguments (Find.Labels.byLabelValue namespacesByLabel)
 
-            combineResultsWithAnd [ byName; byLabel]
+            SearchResult.combineResultsWithAnd [ byNameResults; byLabelResults]
 
         let find (database: EventStore) (byLabel: LabelQuery option) =
             let relevantLabels =
@@ -136,16 +109,17 @@ module SearchFor =
 
                     let foundByName =
                         item.Name
-                        |> Seq.choose Find.SearchPhrase.fromInput
-                        |> Find.Domains.byName findDomains
+                        |> SearchArgument.fromInputs
+                        |> SearchResult.applyArguments (Find.Domains.byName findDomains)
 
                     let foundByKey =
                         item.Key
-                        |> Seq.choose Find.SearchPhrase.fromInput
-                        |> Find.Domains.byKey findDomains
+                        |> SearchArgument.fromInputs
+                        |> SearchResult.applyArguments (Find.Domains.byKey findDomains)
 
-                    combineResultsWithAnd [ foundByName
-                                            foundByKey ])
+                    SearchResult.combineResultsWithAnd
+                        [ foundByName
+                          foundByKey ])
 
     module BoundedContextId =
         [<CLIMutable>]
