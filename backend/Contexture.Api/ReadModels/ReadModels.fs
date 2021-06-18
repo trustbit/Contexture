@@ -16,7 +16,7 @@ module Domain =
 
     let allDomains (eventStore: EventStore) =
         eventStore.Get<Aggregates.Domain.Event>()
-        |> List.fold (projectIntoMap domainsProjection) Map.empty
+        |> List.fold (projectIntoMapBySourceId domainsProjection) Map.empty
         |> Map.toList
         |> List.choose snd
 
@@ -40,7 +40,7 @@ module BoundedContext =
 
     let boundedContextLookup (eventStore: EventStore) : Map<BoundedContextId, BoundedContext> =
         eventStore.Get<Aggregates.BoundedContext.Event>()
-        |> List.fold (projectIntoMap boundedContextProjection) Map.empty
+        |> List.fold (projectIntoMapBySourceId boundedContextProjection) Map.empty
         |> Map.filter (fun _ v -> Option.isSome v)
         |> Map.map (fun _ v -> Option.get v)
 
@@ -80,7 +80,7 @@ module Collaboration =
 
     let allCollaborations (eventStore: EventStore) =
         eventStore.Get<Aggregates.Collaboration.Event>()
-        |> List.fold (projectIntoMap collaborationsProjection) Map.empty
+        |> List.fold (projectIntoMapBySourceId collaborationsProjection) Map.empty
         |> Map.toList
         |> List.choose snd
 
@@ -99,10 +99,18 @@ module Namespace =
     let private namespaceProjection : Projection<Namespace option, Aggregates.Namespace.Event> =
         { Init = None
           Update = Projections.asNamespace }
+        
+    let selectNamespaceId =
+        function
+        | NamespaceImported e -> e.NamespaceId
+        | NamespaceAdded e -> e.NamespaceId
+        | NamespaceRemoved e -> e.NamespaceId
+        | LabelAdded l -> l.NamespaceId
+        | LabelRemoved l -> l.NamespaceId
 
     let namespaceLookup (eventStore: EventStore) : Map<NamespaceId, Namespace> =
         eventStore.Get<Aggregates.Namespace.Event>()
-        |> List.fold (projectIntoMap namespaceProjection) Map.empty
+        |> List.fold (projectIntoMap (fun e -> selectNamespaceId e.Event) namespaceProjection) Map.empty
         |> Map.filter (fun _ v -> Option.isSome v)
         |> Map.map (fun _ v -> Option.get v)
 
@@ -115,14 +123,14 @@ module Namespace =
     let namespacesOf (eventStore: EventStore) boundedContextId =
         boundedContextId
         |> eventStore.Stream
-        |> List.fold (projectIntoMap namespacesProjection) Map.empty
+        |> List.fold (projectIntoMapBySourceId namespacesProjection) Map.empty
         |> Map.toList
         |> List.collect snd
 
     let allNamespacesByContext (eventStore: EventStore) =
         let namespaces =
             eventStore.Get<Aggregates.Namespace.Event>()
-            |> List.fold (projectIntoMap namespacesProjection) Map.empty
+            |> List.fold (projectIntoMapBySourceId namespacesProjection) Map.empty
 
         fun contextId ->
             namespaces
@@ -159,7 +167,7 @@ module Templates =
 
     let allTemplates (eventStore: EventStore) =
         eventStore.Get<Aggregates.NamespaceTemplate.Event>()
-        |> List.fold (projectIntoMap projection) Map.empty
+        |> List.fold (projectIntoMapBySourceId projection) Map.empty
         |> Map.toList
         |> List.choose snd
 

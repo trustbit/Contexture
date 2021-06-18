@@ -1,5 +1,6 @@
 module Api exposing (
   Endpoint, Configuration, ApiResponse, ApiResult, Include(..), Expand(..),
+  withoutQuery,withQuery,
   domains, domain, subDomains,
   allBoundedContexts, boundedContexts, boundedContext,
   collaborations, collaboration,
@@ -52,7 +53,6 @@ url (Configuration basePath) (Endpoint segments query) =
 urlWithQueryParameters : Configuration -> List QueryParameter -> Endpoint -> String
 urlWithQueryParameters (Configuration basePath) additionalQueries (Endpoint segments query) =
   basePath ++ (Url.Builder.absolute segments (query ++ additionalQueries))
-
 
 type Include
   = Subdomains
