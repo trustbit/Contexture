@@ -125,7 +125,7 @@ module BoundedContexts =
 
         [<CLIMutable>]
         type Query =
-            { Label: SearchFor.NamespaceId.LabelQuery option
+            { Label: SearchFor.Labels.LabelQuery option
               Namespace: SearchFor.NamespaceId.NamespaceQuery option
               Domain: SearchFor.DomainId.DomainQuery option
               BoundedContext : SearchFor.BoundedContextId.BoundedContextQuery option }
@@ -142,10 +142,13 @@ module BoundedContexts =
                 let database = ctx.GetService<EventStore>()
 
                 let namespaceIds =
-                    SearchFor.NamespaceId.find database item.Namespace item.Label
+                    SearchFor.NamespaceId.find database item.Namespace
 
                 let domainIds =
                     SearchFor.DomainId.findRelevantDomains database item.Domain
+                    
+                let boundedContextIdsFromLabels =
+                    SearchFor.Labels.find database item.Label
                     
                 let boundedContextIdsFromSearch =
                     SearchFor.BoundedContextId.findRelevantBoundedContexts database item.BoundedContext
@@ -184,6 +187,7 @@ module BoundedContexts =
                         [ boundedContextIdsFromSearch
                           boundedContextIdsFromNamespace
                           boundedContextIdsFromDomain
+                          boundedContextIdsFromLabels
                         ]
 
                 mapToBoundedContext database (Set.toList boundedContextIds) next ctx

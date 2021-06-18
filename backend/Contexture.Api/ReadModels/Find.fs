@@ -76,7 +76,7 @@ module Find =
 
             term
             |> Option.map (SearchPhrase.matches keyPhrase)
-            |> Option.defaultValue true
+            |> Option.defaultValue false
 
         items
         |> Map.filter (fun k _ -> matchesKey k)
@@ -95,11 +95,13 @@ module Find =
 
     let private selectResults selectResult items =
         items
-        |> Option.map (Set.map (Set.map selectResult))
+        |> Option.ofObj
+        |> Option.filter (not << Seq.isEmpty)
+        |> Option.map (Seq.map (Set.map selectResult))
 
-    let private takeAllResults items = items |> Option.map Set.unionMany
+    let takeAllResults items = items |> Option.map Set.unionMany
 
-    let private combineResults items = items |> Option.map Set.intersectMany
+    let combineResults items = items |> Option.map Set.intersectMany
 
     module Namespaces =
         type NamespaceModel =
@@ -149,13 +151,14 @@ module Find =
               NamespaceTemplateId: NamespaceTemplateId option }
 
         type NamespacesByLabel =
-            { ByLabelName2: Map<String, Set<NamespaceId * LabelId>>
-              ByLabelValue: Map<String, Set<NamespaceId * LabelId>> }
+            { ByLabelName2: Map<String, NamespaceMap>
+              ByLabelValue:  Map<String, NamespaceMap> }
             static member Initial =
                 {
                   // TODO: group by BC ID
                   ByLabelName2 = Map.empty
                   ByLabelValue = Map.empty }
+        and NamespaceMap = Map<BoundedContextId, Set<NamespaceId * LabelId>>
 
         let projectLabelNameToNamespace state eventEnvelope =
             match eventEnvelope.Event with
@@ -163,63 +166,150 @@ module Find =
                 { state with
                       ByLabelName2 =
                           n.Labels
-                          |> List.map (fun l -> l.Name, (n.NamespaceId, l.LabelId))
-                          |> List.fold appendToSet state.ByLabelName2
+                         |> List.fold
+                              (fun map l ->
+                                  map
+                                  |> Map.change
+                                      l.Name
+                                      (fun items ->
+                                          match items with
+                                          | Some i ->
+                                              Some(appendToSet i (n.BoundedContextId, (n.NamespaceId, l.LabelId)))
+                                          | None ->
+                                              Some(
+                                                  appendToSet Map.empty (n.BoundedContextId, (n.NamespaceId, l.LabelId))
+                                              )))
+                              state.ByLabelName2
+
+
                       ByLabelValue =
                           n.Labels
                           |> List.choose
                               (fun l ->
                                   l.Value
                                   |> Option.map (fun value -> value, (n.NamespaceId, l.LabelId)))
-                          |> List.fold appendToSet state.ByLabelValue }
+                          |> List.fold (fun map (key,value) ->
+                                  map
+                                  |> Map.change
+                                      key
+                                      (fun items ->
+                                          match items with
+                                          | Some i ->
+                                              Some(appendToSet i (n.BoundedContextId, value))
+                                          | None ->
+                                              Some(
+                                                  appendToSet Map.empty (n.BoundedContextId, value)
+                                              )))
+                                state.ByLabelValue }
             | NamespaceImported n ->
                 { state with
                       ByLabelName2 =
                           n.Labels
-                          |> List.map (fun l -> l.Name, (n.NamespaceId, l.LabelId))
-                          |> List.fold appendToSet state.ByLabelName2
+                         |> List.fold
+                              (fun map l ->
+                                  map
+                                  |> Map.change
+                                      l.Name
+                                      (fun items ->
+                                          match items with
+                                          | Some i ->
+                                              Some(appendToSet i (n.BoundedContextId, (n.NamespaceId, l.LabelId)))
+                                          | None ->
+                                              Some(
+                                                  appendToSet Map.empty (n.BoundedContextId, (n.NamespaceId, l.LabelId))
+                                              )))
+                              state.ByLabelName2
                       ByLabelValue =
-                          n.Labels
+                         n.Labels
                           |> List.choose
                               (fun l ->
                                   l.Value
                                   |> Option.map (fun value -> value, (n.NamespaceId, l.LabelId)))
-                          |> List.fold appendToSet state.ByLabelValue }
+                          |> List.fold (fun map (key,value) ->
+                                  map
+                                  |> Map.change
+                                      key
+                                      (fun items ->
+                                          match items with
+                                          | Some i ->
+                                              Some(appendToSet i (n.BoundedContextId, value))
+                                          | None ->
+                                              Some(
+                                                  appendToSet Map.empty (n.BoundedContextId, value)
+                                              )))state.ByLabelValue }
             | LabelAdded l ->
                 { state with
-                      ByLabelName2 = appendToSet state.ByLabelName2 (l.Name, (l.NamespaceId, l.LabelId))
+                      ByLabelName2 =
+                          state.ByLabelName2
+                          |> Map.change
+                              l.Name
+                              (fun s ->
+                                  match s with
+                                  | Some byBc ->
+                                      byBc
+                                      |> Map.map
+                                          (fun k v ->
+                                              if v
+                                                 |> Set.exists (fun (namespaceId, _) -> namespaceId = l.NamespaceId) then
+                                                  Set.add (l.NamespaceId, l.LabelId) v
+                                              else
+                                                  v)
+                                      |> Some
+                                  | None -> None)
                       ByLabelValue =
                           match l.Value with
-                          | Some value -> appendToSet state.ByLabelValue (value, (l.NamespaceId, l.LabelId))
+                          | Some value ->
+                            state.ByLabelValue
+                            |> Map.change
+                              l.Name
+                              (fun s ->
+                                  match s with
+                                  | Some byBc ->
+                                      byBc
+                                      |> Map.map
+                                          (fun k v ->
+                                              if v
+                                                 |> Set.exists (fun (namespaceId, _) -> namespaceId = l.NamespaceId) then
+                                                  Set.add (l.NamespaceId, l.LabelId) v
+                                              else
+                                                  v)
+                                      |> Some
+                                  | None -> None
+                            )
                           | None -> state.ByLabelValue }
             | LabelRemoved l ->
                 { state with
                       ByLabelName2 =
                           state.ByLabelName2
-                          |> removeFromSet fst l.NamespaceId
+                          |> Map.map (fun _ values -> values |> removeFromSet fst l.NamespaceId)
                       ByLabelValue =
                           state.ByLabelValue
-                          |> removeFromSet snd l.NamespaceId }
+                          |> Map.map (fun _ values -> values |> removeFromSet snd l.NamespaceId)
+                          }
             | NamespaceRemoved n ->
                 { state with
                       ByLabelName2 =
                           state.ByLabelName2
-                          |> removeFromSet fst n.NamespaceId
+                          |> Map.map (fun _ values -> values |> removeFromSet fst n.NamespaceId)
                       ByLabelValue =
                           state.ByLabelValue
-                          |> removeFromSet snd n.NamespaceId }
+                          |> Map.map (fun _ values -> values |> removeFromSet snd n.NamespaceId) }
 
-        let byLabelName (namespaces: NamespacesByLabel) (phrase: SearchPhrase seq) =
+        let byLabelName (namespaces: NamespacesByLabel) (phrase: SearchPhrase) =
             namespaces.ByLabelName2
-            |> findByKeys phrase
-            |> selectResults fst
-            |> takeAllResults
+            |> findByKey phrase
+            |> List.map (Map.toList >> List.map fst >> Set.ofList)
+//            |> selectResults id 
+//            |> takeAllResults
+            |> Set.unionMany
 
-        let byLabelValue (namespaces: NamespacesByLabel) (phrase: SearchPhrase seq) =
+        let byLabelValue (namespaces: NamespacesByLabel) (phrase: SearchPhrase) =
             namespaces.ByLabelValue
-            |> findByKeys phrase
-            |> selectResults fst
-            |> takeAllResults
+            |> findByKey phrase
+            |> List.map (Map.toList >> List.map fst >> Set.ofList)
+//            |> selectResults id 
+//            |> takeAllResults
+            |> Set.unionMany
 
     let labels (eventStore: EventStore) : Labels.NamespacesByLabel =
         eventStore.Get<Aggregates.Namespace.Event>()

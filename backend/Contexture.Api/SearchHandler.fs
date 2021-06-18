@@ -5,6 +5,7 @@ open Contexture.Api.Entities
 open Contexture.Api.Aggregates.BoundedContext
 open Contexture.Api.Infrastructure
 open Contexture.Api.ReadModels
+open Contexture.Api.ReadModels.Find
 
 module SearchFor =
 
@@ -21,13 +22,6 @@ module SearchFor =
         |> Option.defaultValue Set.empty
 
     module NamespaceId =
-
-        [<CLIMutable>]
-        type LabelQuery =
-            { Name: string []
-              Value: string [] }
-            member this.IsActive =
-                not (Seq.isEmpty (Seq.append this.Name this.Value))
 
         [<CLIMutable>]
         type NamespaceQuery =
@@ -58,44 +52,73 @@ module SearchFor =
 
             relevantNamespaces
 
-        let findRelevantLabels (database: EventStore) (item: LabelQuery) =
-            let namespacesByLabel = database |> Find.labels
+       
+                                    
 
-            let byName =
-                item.Name
-                |> Seq.choose Find.SearchPhrase.fromInput
-                |> Find.Labels.byLabelName namespacesByLabel
-
-
-            let byLabel =
-                item.Value
-                |> Seq.choose Find.SearchPhrase.fromInput
-                |> Find.Labels.byLabelValue namespacesByLabel
-
-            combineResultsWithAnd [ byName
-                                    byLabel ]
-
-        let find (database: EventStore) (byNamespace: NamespaceQuery option) (byLabel: LabelQuery option) =
+        let find (database: EventStore) (byNamespace: NamespaceQuery option) =
             let relevantNamespaceIds =
                 byNamespace
                 |> Option.map (findRelevantNamespaces database)
                 |> Option.map (Set.map (fun n -> n.NamespaceId))
+//
+//            let relevantLabels =
+//                byLabel
+//                |> Option.map (findRelevantLabels database)
 
+//            let namespacesIds =
+//                match relevantNamespaceIds, relevantLabels with
+//                | Some namespaces, Some namespacesFromLabels ->
+//                    namespacesFromLabels
+//                    |> Set.filter namespaces.Contains
+//                    |> Some
+//                | Some namespaces, None -> Some namespaces
+//                | None, Some namespacesFromLabels -> namespacesFromLabels |> Some
+//                | None, None -> None
+
+            relevantNamespaceIds
+            
+    module Labels =
+          
+        [<CLIMutable>]
+        type LabelQuery =
+            { Name: string []
+              Value: string [] }
+            member this.IsActive =
+                not (Seq.isEmpty (Seq.append this.Name this.Value))
+                
+        let findRelevantLabels (database: EventStore) (item: LabelQuery) =
+            let namespacesByLabel = database |> Find.labels
+
+            let byName =
+                if item.Name |> Seq.isEmpty then
+                    None
+                else
+                    item.Name
+                    |> Seq.choose Find.SearchPhrase.fromInput
+                    |> Seq.map (Find.Labels.byLabelName namespacesByLabel)
+                    |> Set.intersectMany
+                    |> Some
+
+
+            let byLabel =
+                if item.Value|> Seq.isEmpty then
+                    None
+                else
+                    item.Value
+                    |> Seq.choose Find.SearchPhrase.fromInput
+                    |> Seq.map(Find.Labels.byLabelValue namespacesByLabel)
+                    |> Set.intersectMany
+                    |> Some
+
+            combineResultsWithAnd [ byName; byLabel]
+
+        let find (database: EventStore) (byLabel: LabelQuery option) =
             let relevantLabels =
                 byLabel
                 |> Option.map (findRelevantLabels database)
 
-            let namespacesIds =
-                match relevantNamespaceIds, relevantLabels with
-                | Some namespaces, Some namespacesFromLabels ->
-                    namespacesFromLabels
-                    |> Set.filter namespaces.Contains
-                    |> Some
-                | Some namespaces, None -> Some namespaces
-                | None, Some namespacesFromLabels -> namespacesFromLabels |> Some
-                | None, None -> None
-
-            namespacesIds
+            relevantLabels
+            
 
     module DomainId =
         [<CLIMutable>]
