@@ -103,8 +103,8 @@ input:checked + label {
 // Remove once the final design is applied
 .card-deck {
   .card-body {
-    padding-top: 10px;
-    padding-bottom: 10px;
+    padding-top: 8px;
+    padding-bottom: 8px;
   }
   .card-text {
     margin-bottom: 8px;
@@ -116,8 +116,16 @@ input:checked + label {
     padding-top: 6px;
     padding-bottom: 6px;
   }
+  .list-group  {
+    padding-top: 8px;
+  }
+  .list-group > .list-group-item {
+    padding-top: 0px;
+    padding-bottom: 8px;
+  }
 }
-.container > .card {
+.container > .card,
+.container-fluid > .card {
   > .card-header {
     padding-top: 6px;
     padding-bottom: 6px;

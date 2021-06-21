@@ -97,15 +97,13 @@ viewLabelAsBadge label =
           ]
 
 
-viewPillMessage : String -> Int -> List (Html msg)
+viewPillMessage : String -> Int -> List (Grid.Column msg)
 viewPillMessage caption value =
   if value > 0 then
-  [ Grid.simpleRow
     [ Grid.col [] [text caption]
-    , Grid.col []
+    , Grid.col [ Col.lg2]
       [ Badge.pillWarning [] [ text (value |> String.fromInt)] ]
     ]
-  ]
   else []
 
 
@@ -185,10 +183,15 @@ viewItem communication { context, canvas, namespaces } =
         else Block.text [class "text-muted", class "text-center" ] [ Html.i [] [ text "No description :-(" ] ]
       , Block.custom (div [] badges)
       ]
-    |> Card.block []
-      [ Block.custom (div [] dependencies)
-      , Block.custom (div [] messages)
-      ]
+    |> (\t ->
+        if (List.append dependencies messages) |> List.isEmpty
+        then t
+        else t
+            |> Card.block []
+              [ Block.custom (Grid.row [ Row.attrs [ class "row-cols-2", class "row-cols-lg-4", class "align-items-center"]] dependencies)
+              , Block.custom (Grid.row [ Row.attrs [ class "row-cols-2", class "align-items-center" ]] messages)
+              ]
+      )
     |> (\t ->
         if List.isEmpty namespaceBlocks
         then t
