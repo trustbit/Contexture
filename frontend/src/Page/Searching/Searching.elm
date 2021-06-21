@@ -163,11 +163,13 @@ update msg model =
             )
 
 
+stickyTopAttributes = [ class "sticky-top", style "top" "5rem", style "height" "calc(100vh - 5rem)"]
+
 viewItems : RemoteData.WebData (List BoundedContext.Model) -> List (Html Msg)
 viewItems searchResults =
     case searchResults of
         RemoteData.Success items ->
-            [ Grid.simpleRow
+            [ Grid.row [ ]
                 [ Grid.col [ Col.xs3 ]
                     [ Html.h5 [] [ text "Search results" ] ]
                 , if List.isEmpty items then
@@ -197,13 +199,13 @@ viewItems searchResults =
 
 view : Model -> Html Msg
 view model =
-    Grid.container []
-        (Grid.simpleRow
-            [ Grid.col []
+    Grid.containerFluid []
+        [ Grid.row [Row.attrs[]]
+            [ Grid.col [Col.md4, Col.attrs stickyTopAttributes]
                 [ model.filter |> Filter.view |> Html.map FilterMsg ]
+            , Grid.col [ Col.attrs [ class "position-relative"]] (viewItems model.searchResults)
             ]
-            :: viewItems model.searchResults
-        )
+        ]
 
 
 findAll : Api.Configuration -> List Filter.FilterParameter -> Cmd Msg

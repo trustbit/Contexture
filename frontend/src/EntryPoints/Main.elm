@@ -202,6 +202,7 @@ menu model =
   Navbar.config NavMsg
       |> Navbar.withAnimation
       |> Navbar.primary
+      |> Navbar.attrs [ class "sticky-top"]
       |> Navbar.brand [ href (Route.routeToString <| Route.Home)] [ text "Contexture" ]
       |> Navbar.items 
         [ Navbar.itemLinkActive [ href (Route.routeToString <| Route.Home) ] [ text "Domains"]

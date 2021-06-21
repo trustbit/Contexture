@@ -3,16 +3,18 @@ module Page.Searching.Filter exposing (FilterParameter, Model, Msg, OutMsg(..), 
 import Api as Api
 import Bootstrap.Badge as Badge
 import Bootstrap.Button as Button
+import Bootstrap.Card as Card
+import Bootstrap.Card.Block as Block
 import Bootstrap.Form as Form
 import Bootstrap.Form.Input as Input
 import Bootstrap.Form.InputGroup as InputGroup
 import Bootstrap.Grid as Grid
 import Bootstrap.Grid.Col as Col
 import Bootstrap.Grid.Row as Row
+import Bootstrap.ListGroup as ListGroup
 import Bootstrap.Text as Text
 import Bootstrap.Utilities.Spacing as Spacing
 import Bounce exposing (Bounce)
-import BoundedContext.Message exposing (Query)
 import BoundedContext.Namespace as Namespace exposing (NamespaceTemplateId)
 import Dict
 import Html exposing (Html, div, text)
@@ -20,7 +22,6 @@ import Html.Attributes as Attributes exposing (..)
 import Html.Events exposing (onClick)
 import Http
 import Json.Decode as Decode
-import Json.Decode.Pipeline as JP
 import RemoteData
 import Task
 
@@ -355,7 +356,7 @@ viewAppliedUnknownFilters query =
         |> List.map (\filter -> Html.a [ class "badge badge-warning", Spacing.ml1, Attributes.href "#", title "Remove unkown filter", onClick (RemoveUnknownFilter filter) ] [ text <| filter.name ++ ": " ++ filter.value ])
 
 
-viewAppliedFilters : ActiveFilters -> Html Msg
+viewAppliedFilters : ActiveFilters -> List (Block.Item Msg)
 viewAppliedFilters { byNamespace, unknown } =
     let
         activeFilters =
@@ -364,22 +365,21 @@ viewAppliedFilters { byNamespace, unknown } =
                 , viewAppliedUnknownFilters unknown
                 ]
     in
-    Grid.simpleRow
-        [ Grid.col [ Col.xs3 ]
-            [ Html.h5 [] [ text "Active filters" ] ]
-        , Grid.col []
-            (if not <| List.isEmpty activeFilters then
-                [ Grid.simpleRow
-                    [ Grid.col []
-                        activeFilters
-                    , Grid.col [ Col.mdAuto ]
-                        [ Button.button [ Button.secondary, Button.onClick RemoveAllFilters, Button.small, Button.roleLink ] [ text "Remove all Filters" ] ]
-                    ]
+    if not <| List.isEmpty activeFilters then
+        [ Block.titleH5 []
+            [ Grid.simpleRow
+                [ Grid.col []
+                    [ text "Active filters" ]
+                , Grid.col [ Col.mdAuto ]
+                    [ Button.button [ Button.secondary, Button.onClick RemoveAllFilters, Button.small, Button.roleLink ] [ text "Remove all Filters" ] ]
                 ]
+            ]
+        , Block.text [] activeFilters
+        ]
 
-             else
-                [ text "None" ]
-            )
+    else
+        [ Block.titleH5 [] [ text "Active filters" ]
+        , Block.text [] [ text "None" ]
         ]
 
 
@@ -411,50 +411,46 @@ viewFilterInput name options inputAction removeAction value =
     ]
 
 
-viewFilterDescription : LabelFilter -> Html Msg
+viewFilterDescription : LabelFilter -> List (Block.Item Msg)
 viewFilterDescription filter =
     let
         { basedOnLabel, filterInNamespace } =
             filter
     in
-    Form.row []
-        [ Form.colLabel
-            [ Col.attrs
-                [ title (filterInNamespace.description |> Maybe.withDefault ("Filter in " ++ filterInNamespace.namespaceName)) ]
-            ]
-            [ Html.span [] [ text "Search in ", Html.b [] [ text filterInNamespace.namespaceName ] ]
-            ]
-        , Form.col []
-            (viewFilterInput
-                filterInNamespace.namespaceName
-                (filterInNamespace.labels |> List.map .labelName)
-                (FilterLabelNameChanged filter)
-                (RemoveFilterLabelName filter)
-                filter.labelName
-            )
-        , Form.col []
-            (viewFilterInput
-                (filterInNamespace.namespaceName ++ "-values")
-                (basedOnLabel
-                    |> Maybe.map .values
-                    |> Maybe.withDefault []
+    [ Block.text
+        [ title (filterInNamespace.description |> Maybe.withDefault ("Filter in " ++ filterInNamespace.namespaceName)) ]
+        [ Html.span [] [ text "Search in ", Html.b [] [ text filterInNamespace.namespaceName ] ] ]
+    , Block.custom <|
+        Form.row []
+            [ Form.col []
+                (viewFilterInput
+                    filterInNamespace.namespaceName
+                    (filterInNamespace.labels |> List.map .labelName)
+                    (FilterLabelNameChanged filter)
+                    (RemoveFilterLabelName filter)
+                    filter.labelName
                 )
-                (FilterLabelValueChanged filter)
-                (RemoveFilterLabelValue filter)
-                filter.labelValue
-            )
-        ]
+            , Form.col []
+                (viewFilterInput
+                    (filterInNamespace.namespaceName ++ "-values")
+                    (basedOnLabel
+                        |> Maybe.map .values
+                        |> Maybe.withDefault []
+                    )
+                    (FilterLabelValueChanged filter)
+                    (RemoveFilterLabelValue filter)
+                    filter.labelValue
+                )
+            ]
+    ]
 
 
-viewNamespaceFilter : Dict.Dict String LabelFilter -> List NamespaceFilterDescription -> Html Msg
+viewNamespaceFilter : Dict.Dict String LabelFilter -> List NamespaceFilterDescription -> List (Block.Item Msg)
 viewNamespaceFilter activeFilters namespaces =
-    Grid.simpleRow
-        [ Grid.col [ Col.xs3 ]
-            [ Html.h5 [] [ text "Search in Namespaces" ] ]
-        , Grid.col []
-            (namespaces
+    Block.titleH5 [] [ text "Search in Namespaces" ]
+        :: (namespaces
                 |> List.sortBy (\n -> n.namespaceName)
-                |> List.map
+                |> List.concatMap
                     (\t ->
                         viewFilterDescription
                             (activeFilters
@@ -467,18 +463,19 @@ viewNamespaceFilter activeFilters namespaces =
                                     }
                             )
                     )
-            )
-        ]
+           )
 
 
 view : Filter -> Html Msg
 view model =
-    div []
-        [ viewAppliedFilters model.activeFilters
-        , model.namespaceFilter
-            |> RemoteData.map (viewNamespaceFilter model.activeFilters.byNamespace)
-            |> RemoteData.withDefault (text "Loading namespaces")
-        ]
+    Card.config []
+        |> Card.block [] (viewAppliedFilters model.activeFilters)
+        |> Card.block []
+            (model.namespaceFilter
+                |> RemoteData.map (viewNamespaceFilter model.activeFilters.byNamespace)
+                |> RemoteData.withDefault [ Block.text [] [ text "Loading namespaces" ] ]
+            )
+        |> Card.view
 
 
 getNamespaceFilterDescriptions : Api.Configuration -> Cmd Msg

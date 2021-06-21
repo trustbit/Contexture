@@ -57,7 +57,7 @@ module Layout =
         ]
 
     let navTemplate =
-        nav [ _class "navbar navbar-expand-sm navbar-dark bg-primary" ] [
+        nav [ _class "navbar navbar-expand-sm navbar-dark bg-primary sticky-top" ] [
             a [ _class "navbar-brand"; _href "/" ] [
                 str "Contexture"
             ]
