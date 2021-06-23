@@ -204,51 +204,60 @@ module Namespaces =
             | None -> RequestErrors.NOT_FOUND "Unknown" next ctx
 
     let routesForBoundedContext boundedContextId : HttpHandler =
-        subRouteCi
-            "/namespaces"
-            (choose [ subRoutef
-                          "/%O"
-                          (fun namespaceId ->
-                              (choose [ subRoute
-                                            "/labels"
-                                            (choose [ subRoutef
-                                                          "/%O"
-                                                          (fun labelId ->
-                                                              (choose [ DELETE
-                                                                        >=> CommandEndpoints.removeLabel
-                                                                                boundedContextId
-                                                                                { Namespace = namespaceId
-                                                                                  Label = labelId } ]))
-                                                      POST
-                                                      >=> bindJson (
-                                                          CommandEndpoints.newLabel boundedContextId namespaceId
-                                                      ) ])
-                                        DELETE
-                                        >=> CommandEndpoints.removeNamespace boundedContextId namespaceId ]))
-                      GET
-                      >=> QueryEndpoints.getNamespaces boundedContextId
-                      POST
-                      >=> bindJson (CommandEndpoints.newNamespace boundedContextId) ])
+        let routesForOneSpecificLabelOfNamespace namespaceId = 
+            fun labelId ->
+                choose [
+                    DELETE >=> CommandEndpoints.removeLabel
+                        boundedContextId
+                        { Namespace = namespaceId
+                          Label = labelId }
+                    RequestErrors.NOT_FOUND "Not found"
+                ]
+        let routesForOneNamespace =
+            fun namespaceId ->
+                choose [
+                    subRouteCi "/labels"
+                        (choose [
+                            subRoutef "/%O" (routesForOneSpecificLabelOfNamespace namespaceId)                                              
+                            POST >=> bindJson (CommandEndpoints.newLabel boundedContextId namespaceId)
+                            RequestErrors.NOT_FOUND "Not found"
+                        ])
+                    DELETE >=> CommandEndpoints.removeNamespace boundedContextId namespaceId
+                    RequestErrors.NOT_FOUND "Not found"
+                ]
+              
+        subRouteCi "/namespaces"
+            (choose [
+                subRoutef "/%O" routesForOneNamespace
+                GET >=> QueryEndpoints.getNamespaces boundedContextId
+                POST >=> bindJson (CommandEndpoints.newNamespace boundedContextId)
+                RequestErrors.NOT_FOUND "Not found"
+            ])
 
     let routes : HttpHandler =
-        subRouteCi
-            "/namespaces"
-            (choose [ subRoute
-                          "/templates"
-                          (choose [ subRoutef
-                                        "/%O"
-                                        (fun templateId ->
-                                            choose [ DELETE
-                                                     >=> routef
-                                                             "/labels/%O"
-                                                             (Templates.CommandEndpoints.removeLabel templateId)
-                                                     POST
-                                                     >=> bindModel None (Templates.CommandEndpoints.newLabel templateId)
-                                                     GET
-                                                     >=> Templates.QueryEndpoints.getTemplate templateId
-                                                     DELETE
-                                                     >=> Templates.CommandEndpoints.removeTemplate templateId ])
-                                    GET >=> Templates.QueryEndpoints.getAllTemplates
-                                    POST
-                                    >=> bindModel None Templates.CommandEndpoints.newTemplate ])
-                      GET >=> QueryEndpoints.getAllNamespaces ])
+        subRouteCi "/namespaces"
+            (choose [
+                subRoute "/templates"
+                    (choose [
+                        subRoutef "/%O"
+                            (fun templateId ->
+                                choose [
+                                     subRoutef "/labels/%O"
+                                         (fun labelId ->
+                                            choose [
+                                                 DELETE >=> (Templates.CommandEndpoints.removeLabel templateId labelId)
+                                                 RequestErrors.NOT_FOUND "Not found"
+                                            ])   
+                                     POST >=> bindModel None (Templates.CommandEndpoints.newLabel templateId)
+                                     GET >=> Templates.QueryEndpoints.getTemplate templateId
+                                     DELETE >=> Templates.CommandEndpoints.removeTemplate templateId
+                                     RequestErrors.NOT_FOUND "Not found"
+                                ]
+                            )
+                        GET >=> Templates.QueryEndpoints.getAllTemplates
+                        POST >=> bindModel None Templates.CommandEndpoints.newTemplate
+                        RequestErrors.NOT_FOUND "Not found"
+                    ])
+                GET >=> QueryEndpoints.getAllNamespaces
+                RequestErrors.NOT_FOUND "Not found"
+            ])

@@ -77,19 +77,23 @@ module AllRoute =
                      POST >=> postAllData ]
 
 let webApp hostFrontend =
-    choose [ subRoute
-                 "/api"
-                 (choose [ Domains.routes
-                           BoundedContexts.routes
-                           Collaborations.routes
-                           Namespaces.routes
-                           Search.apiRoutes
-                           AllRoute.routes ])
-             Search.routes
-             GET
-             >=> routef "/boundedContext/%O/namespaces" Namespaces.index
-             hostFrontend
-             setStatusCode 404 >=> text "Not Found" ]
+    choose [
+         subRoute "/api"
+             (choose [
+                   Domains.routes
+                   BoundedContexts.routes
+                   Collaborations.routes
+                   Namespaces.routes
+                   Search.apiRoutes
+                   AllRoute.routes
+                   RequestErrors.NOT_FOUND "Not found"
+            ])
+         Search.routes
+         GET
+         >=> routef "/boundedContext/%O/namespaces" Namespaces.index
+         hostFrontend
+         setStatusCode 404 >=> text "Not Found"
+    ]
 
 let frontendHostRoutes (env: IWebHostEnvironment) : HttpHandler =
     if env.IsDevelopment() then

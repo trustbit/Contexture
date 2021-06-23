@@ -2,6 +2,7 @@ module Contexture.Api.Tests.ApiTests
 
 open System
 
+open System.Net
 open Contexture.Api.Aggregates
 open Contexture.Api.Aggregates.BoundedContext
 open Contexture.Api.Aggregates.Domain
@@ -178,6 +179,29 @@ module BoundedContexts =
             Then.NotEmpty result
             Then.Collection(result, (fun x -> Then.Equal(contextId, x)))
         }
+        
+    [<Fact>]
+    let ``When trying to delete a namespace with a malformed namespace-id then the bounded context is not deleted instead``() =
+        task {
+            let simulation = FixedTimeEnvironment.FromSystemClock()
+            let domainId = simulation |> PseudoRandom.guid
+            let contextId = simulation |> PseudoRandom.guid
+            let namespaceId = simulation |> PseudoRandom.guid                
+        
+            let given =
+                Fixtures.Builders.givenADomainWithOneBoundedContextAndOneNamespace domainId contextId namespaceId
+                
+            use testEnvironment = Prepare.withGiven simulation given
+
+            //act
+            let! result =
+                testEnvironment
+                |> When.deleting $"api/boundedContexts/%O{contextId}/namespaces/\"%O{namespaceId}\""
+
+            // assert
+            Then.Response.shouldNotBeSuccessful result
+            Then.Response.shouldHaveStatusCode HttpStatusCode.NotFound result
+        }
 
     type ``When searching for two different label names``() =
 
@@ -314,7 +338,6 @@ module BoundedContexts =
                 // assert
                 Then.Empty result
             }
-
 
     module ``When searching for bounded contexts`` =
         open Fixtures

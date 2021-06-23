@@ -2,6 +2,8 @@ namespace Contexture.Api.Tests
 
 open System
 open System.IO
+open System.Net
+open System.Net.Http
 open Microsoft.AspNetCore.Hosting
 open Microsoft.Extensions.Hosting
 open Microsoft.Extensions.Http
@@ -95,6 +97,12 @@ module When =
 
     open TestHost
 
+    let deleting (url: string) (environment: TestHostEnvironment) =
+        task {
+            let! result = environment.Client.DeleteAsync(url)
+            return result
+        }
+    
     let postingJson (url: string) (jsonContent: string) (environment: TestHostEnvironment) =
         task {
             let! result = environment.Client.PostAsync(url, new StringContent(jsonContent))
@@ -108,6 +116,12 @@ module When =
         }
 
 type Then = Xunit.Assert
+module Then =
+    module Response =
+        let shouldNotBeSuccessful (response: HttpResponseMessage) =
+            Then.Equal(false, response.IsSuccessStatusCode)
+        let shouldHaveStatusCode (statusCode: HttpStatusCode) (response: HttpResponseMessage) =
+            Then.Equal(statusCode,response.StatusCode)
 
 module Utils =
     open Contexture.Api.Tests.EnvironmentSimulation
