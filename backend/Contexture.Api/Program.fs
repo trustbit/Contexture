@@ -96,24 +96,33 @@ let webApp hostFrontend =
     ]
 
 let frontendHostRoutes (env: IWebHostEnvironment) : HttpHandler =
+    let detectRedirectLoop : HttpHandler =
+        fun (next : HttpFunc) (ctx : HttpContext) ->
+            let headers = HeaderDictionaryTypeExtensions.GetTypedHeaders(ctx.Request)
+            match headers.Referer |> Option.ofObj with
+            | Some referer when referer.AbsolutePath = ctx.Request.Path.ToUriComponent() && referer.Query = ctx.Request.QueryString.ToUriComponent() ->
+                RequestErrors.NOT_FOUND "Not found and stuck in a redirect loop" next ctx
+            | _ ->
+                next ctx
     if env.IsDevelopment() then
-        let skip : HttpFuncResult = System.Threading.Tasks.Task.FromResult None
-        choose [
-            GET >=>
-                fun (next : HttpFunc) (ctx : HttpContext) ->
-                    let urlBuilder =
-                        ctx.GetRequestUrl()
-                        |> UriBuilder
-                    urlBuilder.Port <- 8000
-                    urlBuilder.Scheme <- "http"
-                    redirectTo false (urlBuilder.ToString()) next ctx
-        ]
+        detectRedirectLoop >=>
+            choose [
+                GET >=> 
+                    fun (next : HttpFunc) (ctx : HttpContext) -> 
+                        let urlBuilder =
+                            ctx.GetRequestUrl()
+                            |> UriBuilder
+                        urlBuilder.Port <- 8000
+                        urlBuilder.Scheme <- "http"
+                        redirectTo false (urlBuilder.ToString()) next ctx
+            ]
      
     else
-        choose [
-            route "/" >=> htmlFile "wwwroot/index.html"
-            GET >=> htmlFile "wwwroot/index.html"
-        ]
+        detectRedirectLoop >=>
+            choose [
+                route "/" >=> htmlFile "wwwroot/index.html"
+                GET >=> htmlFile "wwwroot/index.html"
+            ]
 
 let errorHandler (ex : Exception) (logger : ILogger) =
     logger.LogError(ex, "An unhandled exception has occurred while executing the request.")
