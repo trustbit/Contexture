@@ -14,7 +14,12 @@
   </ItemGroup>
 
   <ItemGroup>
-    <Compile Include="Entities.fs" />
+    <Compile Include="Entities\Entities.fs" />
+    <Compile Include="Entities\Domain.fs" />
+    <Compile Include="Entities\BoundedContext.fs" />
+    <Compile Include="Entities\Collaboration.fs" />
+    <Compile Include="Entities\Namespace.fs" />
+    <Compile Include="Entities\NamespaceTemplate.fs" />
     <Compile Include="Database.fs" />
     <Compile Include="Infrastructure.fs" />
     <Compile Include="CommandHandlers.fs" />
@@ -43,5 +48,6 @@
     <Content Include="appsettings.Development.json">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
+  
   </ItemGroup>
 </Project>

@@ -6,7 +6,7 @@ open Database
 open Contexture.Api.Infrastructure
 
 module FileBasedCommandHandlers =
-    open Aggregates
+    open Contexture.Api.Aggregates
 
     type CommandHandlerError<'T, 'Id> =
         | DomainError of 'T
