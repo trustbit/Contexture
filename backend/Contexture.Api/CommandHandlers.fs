@@ -76,7 +76,7 @@ module FileBasedCommandHandlers =
             | Error e ->
                 e |> DomainError |> Error
             
-        let asEvents clock (domain: Domain) =
+        let asEvents clock (domain: Domain.Projections.Domain) =
             { Metadata =
                   { Source = domain.Id
                     RecordedAt = clock () }
@@ -162,6 +162,7 @@ module FileBasedCommandHandlers =
     module Collaboration =
         open Contexture.Api.Entities
         open Collaboration
+        open Projections
         open BridgeEventSourcingWithFilebasedDatabase
         
         let handle clock (store: EventStore) command =

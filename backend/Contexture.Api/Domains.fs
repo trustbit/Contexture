@@ -16,6 +16,8 @@ module Domains =
     
 
     module Results =
+        
+        open Projections
 
         type BoundedContextResult =
             { Id: BoundedContextId

@@ -10,7 +10,7 @@ module Domain =
 
     open Contexture.Api.Aggregates.Domain
 
-    let private domainsProjection : Projection<Domain option, Aggregates.Domain.Event> =
+    let private domainsProjection : Projection<Projections.Domain option, Aggregates.Domain.Event> =
         { Init = None
           Update = Projections.asDomain }
 
@@ -20,7 +20,7 @@ module Domain =
         |> Map.toList
         |> List.choose snd
 
-    let subdomainLookup (domains: Domain list) =
+    let subdomainLookup (domains: Projections.Domain list) =
         domains
         |> List.groupBy (fun l -> l.ParentDomainId)
         |> List.choose (fun (key, values) -> key |> Option.map (fun parent -> (parent, values)))
@@ -74,7 +74,7 @@ module BoundedContext =
 module Collaboration =
     open Contexture.Api.Aggregates.Collaboration
 
-    let private collaborationsProjection : Projection<Collaboration option, Aggregates.Collaboration.Event> =
+    let private collaborationsProjection : Projection<Projections.Collaboration option, Aggregates.Collaboration.Event> =
         { Init = None
           Update = Projections.asCollaboration }
 

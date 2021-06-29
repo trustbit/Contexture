@@ -163,6 +163,13 @@ module Domain =
         |> Result.map List.singleton
 
     module Projections =
+        type Domain =
+            { Id: DomainId
+              ParentDomainId: DomainId option
+              Key: string option
+              Name: string
+              Vision: string option }
+
         let asDomain domain event =
             match event with
             | DomainImported c ->

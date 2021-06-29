@@ -7,6 +7,7 @@ open Contexture.Api.Database
 open Contexture.Api.Entities
 open Contexture.Api.Domains
 open Contexture.Api.Infrastructure
+open Contexture.Api.ReadModels
 open Contexture.Api.Views
 open Microsoft.AspNetCore.Http
 open FSharp.Control.Tasks
@@ -143,6 +144,8 @@ module Namespaces =
     module Views =
         open Layout
         open Giraffe.ViewEngine
+        
+        open Domain.Projections
 
         let breadcrumb (domain: Domain) =
             div [ _class "row" ] [

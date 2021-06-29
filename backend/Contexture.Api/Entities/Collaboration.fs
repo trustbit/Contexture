@@ -2,6 +2,54 @@ module Contexture.Api.Aggregates.Collaboration
 
 open Contexture.Api.Entities
 
+module ValueObjects =
+    type CollaborationId = System.Guid
+
+    type SymmetricRelationship =
+        | SharedKernel
+        | Partnership
+        | SeparateWays
+        | BigBallOfMud
+
+    type UpstreamRelationship =
+        | Upstream
+        | PublishedLanguage
+        | OpenHost
+
+    type DownstreamRelationship =
+        | Downstream
+        | AntiCorruptionLayer
+        | Conformist
+
+    type InitiatorCustomerSupplierRole =
+        | Supplier
+        | Customer
+
+    type InitiatorUpstreamDownstreamRole =
+        | Upstream
+        | Downstream
+
+    type UpstreamDownstreamRelationship =
+        | CustomerSupplierRelationship of role: InitiatorCustomerSupplierRole
+        | UpstreamDownstreamRelationship of
+            initiatorRole: InitiatorUpstreamDownstreamRole *
+            upstreamType: UpstreamRelationship *
+            downstreamType: DownstreamRelationship
+
+    type RelationshipType =
+        | Symmetric of symmetric: SymmetricRelationship
+        | UpstreamDownstream of upstreamDownstream: UpstreamDownstreamRelationship
+        | Unknown
+
+    type Collaborator =
+        | BoundedContext of BoundedContext: BoundedContextId
+        | Domain of Domain: DomainId
+        | ExternalSystem of ExternalSystem: string
+        | Frontend of Frontend: string
+        | UserInteraction of UserInteraction: string
+
+open ValueObjects
+
 type Command =
     | DefineRelationship of CollaborationId * DefineRelationship
     | DefineOutboundConnection of CollaborationId * DefineConnection
@@ -87,7 +135,16 @@ let handle (state: State) (command: Command) =
     | _, _ -> Ok []
 
 module Projections =
-    let asCollaboration collaboration event =
+    open ValueObjects
+     
+    type Collaboration =
+        { Id: CollaborationId
+          Description: string option
+          Initiator: Collaborator
+          Recipient: Collaborator
+          RelationshipType: RelationshipType option }
+
+    let asCollaboration collaboration event : Collaboration option =
         match event with
         | CollaborationImported c ->
             Some

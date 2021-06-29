@@ -5,6 +5,7 @@ open System.Text.Encodings.Web
 open System.Text.Json
 open System.Text.Json.Serialization
 
+open Contexture.Api.Aggregates
 open Contexture.Api.Aggregates.NamespaceTemplate
 open Contexture.Api.Entities
 
@@ -122,9 +123,9 @@ module Database =
         CollectionOfGuid(byId)
 
     type Document =
-        { Domains: CollectionOfGuid<Domain>
+        { Domains: CollectionOfGuid<Domain.Projections.Domain>
           BoundedContexts: CollectionOfGuid<BoundedContext>
-          Collaborations: CollectionOfGuid<Collaboration>
+          Collaborations: CollectionOfGuid<Collaboration.Projections.Collaboration>
           NamespaceTemplates: CollectionOfGuid<Projections.NamespaceTemplate> }
 
     module Persistence =
@@ -141,9 +142,9 @@ module Database =
 
         type Root =
             { Version: int option
-              Domains: Domain list
+              Domains: Domain.Projections.Domain list
               BoundedContexts: BoundedContext list
-              Collaborations: Collaboration list
+              Collaborations: Collaboration.Projections.Collaboration list
               NamespaceTemplates: Projections.NamespaceTemplate list }
             static member Empty =
                 { Version = None

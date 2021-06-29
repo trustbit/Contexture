@@ -15,6 +15,8 @@ open Giraffe
 
 module BoundedContexts =
     module Results =
+        open Domain.Projections
+
         type BoundedContextResult =
             { Id: BoundedContextId
               ParentDomainId: DomainId
