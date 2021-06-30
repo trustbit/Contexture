@@ -121,13 +121,7 @@ module Database =
             |> Map.ofList
 
         CollectionOfGuid(byId)
-
-    type Document =
-        { Domains: CollectionOfGuid<Domain.Projections.Domain>
-          BoundedContexts: CollectionOfGuid<BoundedContext>
-          Collaborations: CollectionOfGuid<Collaboration.Projections.Collaboration>
-          NamespaceTemplates: CollectionOfGuid<Projections.NamespaceTemplate> }
-
+        
     module Persistence =
         let read path = path |> File.ReadAllText
 
@@ -139,10 +133,16 @@ module Database =
     module Serialization =
 
         open Newtonsoft.Json.Linq
+        type Domain =
+            { Id: DomainId
+              ParentDomainId: DomainId option
+              Key: string option
+              Name: string
+              Vision: string option }
 
         type Root =
             { Version: int option
-              Domains: Domain.Projections.Domain list
+              Domains: Domain list
               BoundedContexts: BoundedContext list
               Collaborations: Collaboration.Projections.Collaboration list
               NamespaceTemplates: Projections.NamespaceTemplate list }
@@ -405,6 +405,12 @@ module Database =
             json
             |> applyMigrations currentVersion
             |> deserializeWithOptions<Root>
+
+    type Document =
+        { Domains: CollectionOfGuid<Serialization.Domain>
+          BoundedContexts: CollectionOfGuid<BoundedContext>
+          Collaborations: CollectionOfGuid<Collaboration.Projections.Collaboration>
+          NamespaceTemplates: CollectionOfGuid<Projections.NamespaceTemplate> }
 
 
     type FileBased(fileName: string) =

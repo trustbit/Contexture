@@ -10,17 +10,23 @@ module Domain =
 
     open Contexture.Api.Aggregates.Domain
 
-    let private domainsProjection : Projection<Projections.Domain option, Aggregates.Domain.Event> =
-        { Init = None
-          Update = Projections.asDomain }
+    let private domainsProjection : Projection<State, Aggregates.Domain.Event> =
+        { Init = State.Initial
+          Update = State.evolve }
+        
+    let private asOption =
+        function
+        | Existing s -> Some s
+        | _ -> None
 
     let allDomains (eventStore: EventStore) =
         eventStore.Get<Aggregates.Domain.Event>()
         |> List.fold (projectIntoMapBySourceId domainsProjection) Map.empty
         |> Map.toList
-        |> List.choose snd
+        |> List.map snd
+        |> List.choose asOption
 
-    let subdomainLookup (domains: Projections.Domain list) =
+    let subdomainLookup (domains: Domain list) =
         domains
         |> List.groupBy (fun l -> l.ParentDomainId)
         |> List.choose (fun (key, values) -> key |> Option.map (fun parent -> (parent, values)))
@@ -30,6 +36,7 @@ module Domain =
         domainId
         |> eventStore.Stream
         |> project domainsProjection
+        |> asOption
 
 module BoundedContext =
     open Contexture.Api.Aggregates.BoundedContext

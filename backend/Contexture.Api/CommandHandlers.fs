@@ -60,7 +60,7 @@ module FileBasedCommandHandlers =
                 streamName
                 |> store.Stream
                 |> List.map (fun e -> e.Event)
-                |> List.fold State.Fold State.Initial
+                |> List.fold State.evolve State.Initial
 
             match handle state command with
             | Ok newEvents ->
@@ -76,7 +76,7 @@ module FileBasedCommandHandlers =
             | Error e ->
                 e |> DomainError |> Error
             
-        let asEvents clock (domain: Domain.Projections.Domain) =
+        let asEvents clock (domain: Serialization.Domain) =
             { Metadata =
                   { Source = domain.Id
                     RecordedAt = clock () }
@@ -89,12 +89,43 @@ module FileBasedCommandHandlers =
                         Key = domain.Key } }
             |> List.singleton
 
+        let mapDomainToSerialization (state: Serialization.Domain option) event : Serialization.Domain option =
+            let convertToOption =
+                function
+                | Initial -> None
+                | Existing state ->
+                    let mappedState: Serialization.Domain =
+                        {
+                            Id = state.Id
+                            Key = state.Key
+                            Name = state.Name
+                            Vision = state.Vision
+                            ParentDomainId = state.ParentDomainId
+                        }
+                    Some mappedState
+                | Deleted -> None
+            
+            match state with
+            | Some s ->
+                let mappedState =
+                    Existing {
+                        Id = s.Id
+                        Key = s.Key
+                        Name = s.Name
+                        Vision = s.Vision
+                        ParentDomainId = s.ParentDomainId
+                    }
+                State.evolve mappedState event
+            | None ->
+                State.evolve Initial event
+            |> convertToOption 
+                
         let subscription (database: FileBased): Subscription<Domain.Event> =
             fun (events: EventEnvelope<Domain.Event> list) ->
                 database.Change(fun document ->
                     events
                     |> List.fold
-                        (applyToCollection Projections.asDomain)
+                        (applyToCollection mapDomainToSerialization)
                            (Ok document.Domains)
                     |> Result.map (fun c -> { document with Domains = c }, System.Guid.Empty))
                 |> ignore

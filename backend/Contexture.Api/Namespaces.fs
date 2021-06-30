@@ -144,10 +144,9 @@ module Namespaces =
     module Views =
         open Layout
         open Giraffe.ViewEngine
-        
-        open Domain.Projections
+       
 
-        let breadcrumb (domain: Domain) =
+        let breadcrumb (domain: Domain.Domain) =
             div [ _class "row" ] [
                 div [ _class "col" ] [
                     a [ attr "role" "button"
@@ -158,7 +157,7 @@ module Namespaces =
                 ]
             ]
 
-        let index serialize resolveAssets (boundedContextId: BoundedContextId) (domain: Domain) baseUrl =
+        let index serialize resolveAssets (boundedContextId: BoundedContextId) (domain: Domain.Domain) baseUrl =
             let namespaceSnippet =
                 let flags =
                     {| ApiBase = baseUrl

@@ -15,8 +15,7 @@ open Giraffe
 
 module BoundedContexts =
     module Results =
-        open Domain.Projections
-
+        
         type BoundedContextResult =
             { Id: BoundedContextId
               ParentDomainId: DomainId
@@ -28,11 +27,11 @@ module BoundedContexts =
               UbiquitousLanguage: Map<string, UbiquitousLanguageTerm>
               Messages: Messages
               DomainRoles: DomainRole list
-              Domain: Domain
+              Domain: Domain.Domain
               Namespaces: Namespace list }
 
         let convertBoundedContextWithDomain
-            (findDomain: DomainId -> Domain option)
+            (findDomain: DomainId -> Domain.Domain option)
             (findNamespaces: BoundedContextId -> Namespace list)
             (boundedContext: BoundedContext)
             =

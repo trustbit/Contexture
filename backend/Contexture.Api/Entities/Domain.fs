@@ -85,16 +85,55 @@ module Domain =
 
     let name id = id
 
+    type Domain =
+        { Id: DomainId
+          ParentDomainId: DomainId option
+          Key: string option
+          Name: string
+          Vision: string option }
+
     type State =
         | Initial
-        | Existing of name: string
+        | Existing of Domain
         | Deleted
-        static member Fold (state: State) (event: Event) =
-            match event with
-            | DomainRemoved _ -> Deleted
-            | DomainImported n -> Existing n.Name
-            | DomainCreated n -> Existing n.Name
-            | SubDomainCreated n -> Existing n.Name
+    
+    module State =
+        let evolve (state: State) (event: Event) =
+            match state, event with
+            | _, DomainRemoved _ -> Deleted
+            | Initial, DomainImported c ->
+                Existing
+                    { Id = c.DomainId
+                      Vision = c.Vision
+                      ParentDomainId = c.ParentDomainId
+                      Key = c.Key
+                      Name = c.Name }
+            |  Initial, DomainCreated c ->
+                Existing
+                    { Id = c.DomainId
+                      Vision = None
+                      ParentDomainId = None
+                      Name = c.Name
+                      Key = None }
+            | Initial, SubDomainCreated c ->
+                Existing
+                    { Id = c.DomainId
+                      Vision = None
+                      ParentDomainId = Some c.ParentDomainId
+                      Name = c.Name
+                      Key = None }
+            | Existing domain, CategorizedAsSubdomain c ->
+                Existing
+                    { domain with
+                        ParentDomainId = Some c.ParentDomainId }
+            | Existing domain, PromotedToDomain c ->
+                Existing { domain with ParentDomainId = None }
+            | Existing domain, DomainRenamed c ->
+                Existing { domain with Name = c.Name }
+            | Existing domain, VisionRefined c ->
+                Existing { domain with Vision = c.Vision }
+            | Existing domain, KeyAssigned c ->
+                Existing { domain with Key = c.Key }
             | _ -> state
 
     let newDomain id name parentDomain =
@@ -162,52 +201,4 @@ module Domain =
         | AssignKey (domainId, assignKey) -> assignKeyToDomain assignKey.Key domainId
         |> Result.map List.singleton
 
-    module Projections =
-        type Domain =
-            { Id: DomainId
-              ParentDomainId: DomainId option
-              Key: string option
-              Name: string
-              Vision: string option }
-
-        let asDomain domain event =
-            match event with
-            | DomainImported c ->
-                Some
-                    { Id = c.DomainId
-                      Vision = c.Vision
-                      ParentDomainId = c.ParentDomainId
-                      Key = c.Key
-                      Name = c.Name }
-            | DomainCreated c ->
-                Some
-                    { Id = c.DomainId
-                      Vision = None
-                      ParentDomainId = None
-                      Name = c.Name
-                      Key = None }
-            | SubDomainCreated c ->
-                Some
-                    { Id = c.DomainId
-                      Vision = None
-                      ParentDomainId = Some c.ParentDomainId
-                      Name = c.Name
-                      Key = None }
-            | CategorizedAsSubdomain c ->
-                domain
-                |> Option.map (fun o ->
-                    { o with
-                          ParentDomainId = Some c.ParentDomainId })
-            | PromotedToDomain c ->
-                domain
-                |> Option.map (fun o -> { o with ParentDomainId = None })
-            | DomainRemoved _ -> None
-            | DomainRenamed c ->
-                domain
-                |> Option.map (fun o -> { o with Name = c.Name })
-            | VisionRefined c ->
-                domain
-                |> Option.map (fun o -> { o with Vision = c.Vision })
-            | KeyAssigned c ->
-                domain
-                |> Option.map (fun o -> { o with Key = c.Key })
+   

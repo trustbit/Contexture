@@ -40,7 +40,7 @@ module AllRoute =
 
     [<CLIMutable>]
     type UpdateAllData =
-        { Domains: Domain.Projections.Domain list
+        { Domains: Serialization.Domain list
           BoundedContexts: BoundedContext list
           Collaborations: Collaboration.Projections.Collaboration list
           NamespaceTemplates: NamespaceTemplate.Projections.NamespaceTemplate list }
