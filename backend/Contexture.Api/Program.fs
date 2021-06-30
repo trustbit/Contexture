@@ -151,6 +151,9 @@ let configureJsonSerializer (services: IServiceCollection) =
     |> SystemTextJson.Serializer
     |> services.AddSingleton<Json.ISerializer>
     |> ignore
+    
+let configureReadModels (services: IServiceCollection) =
+    services.AddSingleton<ReadModels.Domain.AllDomains>(ReadModels.Domain.allDomainsReadmodel())
 
 
 let configureServices (context: HostBuilderContext) (services : IServiceCollection) =
@@ -164,6 +167,9 @@ let configureServices (context: HostBuilderContext) (services : IServiceCollecti
         FileBased.InitializeDatabase(options.Value.DatabasePath))
         |> ignore
     services.AddSingleton<EventStore> (EventStore.Empty) |> ignore
+    services
+    |> configureReadModels
+    |> ignore
     services.AddCors() |> ignore
     services.AddGiraffe() |> ignore
     services |> configureJsonSerializer
@@ -213,6 +219,9 @@ let main args =
     let database = host.Services.GetRequiredService<FileBased>()
     let store = host.Services.GetRequiredService<EventStore>()
     
+    let domainReadmodel = host.Services.GetRequiredService<ReadModels.Domain.AllDomains>()
+    store.SubscribeAsync(domainReadmodel.EventHandler)
+    
     importFromDocument store database.Read
     
     // collaboration subscription is added after initial seeding
@@ -221,6 +230,7 @@ let main args =
     store.Subscribe (BoundedContext.subscription database)
     store.Subscribe (Namespace.subscription database)
     store.Subscribe (NamespaceTemplate.subscription database)
-
+    
+    
     host.Run()
     0

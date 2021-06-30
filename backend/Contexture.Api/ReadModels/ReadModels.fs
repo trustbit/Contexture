@@ -1,6 +1,7 @@
 namespace Contexture.Api.ReadModels
 
 open Contexture.Api
+open Contexture.Api.Aggregates
 open Contexture.Api.Aggregates.NamespaceTemplate.Projections
 open Contexture.Api.Infrastructure
 open Contexture.Api.Infrastructure.Projections
@@ -19,12 +20,27 @@ module Domain =
         | Existing s -> Some s
         | _ -> None
 
-    let allDomains (eventStore: EventStore) =
-        eventStore.Get<Aggregates.Domain.Event>()
-        |> List.fold (projectIntoMapBySourceId domainsProjection) Map.empty
+    let getDomains domainState =
+        domainState
         |> Map.toList
         |> List.map snd
         |> List.choose asOption
+
+    let allDomains (eventStore: EventStore) =
+        eventStore.Get<Aggregates.Domain.Event>()
+        |> List.fold (projectIntoMapBySourceId domainsProjection) Map.empty
+        |> getDomains
+        
+    open ReadModels
+    type AllDomains = ReadModels.ReadModel<Domain.Event,Map<EventSource,Domain.State>>
+    
+    let allDomainsReadmodel () : AllDomains =
+        let updateState state eventEnvelopes =
+            eventEnvelopes
+            |> List.fold (projectIntoMapBySourceId domainsProjection) state
+
+        ReadModels.readModel updateState Map.empty
+   
 
     let subdomainLookup (domains: Domain list) =
         domains

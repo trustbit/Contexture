@@ -141,10 +141,11 @@ module Domains =
         open Contexture.Api.ReadModels
 
         let getDomains =
-            fun (next: HttpFunc) (ctx: HttpContext) ->
+            fun (next: HttpFunc) (ctx: HttpContext) -> task {
                 let eventStore = ctx.GetService<EventStore>()
 
-                let domains = Domain.allDomains eventStore
+                let! domainState = ctx.GetService<ReadModels.Domain.AllDomains>().State()
+                let domains = domainState |> Domain.getDomains
                 let subdomainsOf = Domain.subdomainLookup domains
                 let boundedContextsOf = BoundedContext.allBoundedContextsByDomain eventStore
                 let namespacesOf = Namespace.allNamespacesByContext eventStore
@@ -153,7 +154,8 @@ module Domains =
                     domains
                     |> List.map (Results.includingSubdomainsAndBoundedContexts boundedContextsOf subdomainsOf namespacesOf)
 
-                json result next ctx
+                return! json result next ctx
+                }
 
         let getSubDomains domainId =
             fun (next: HttpFunc) (ctx: HttpContext) ->
