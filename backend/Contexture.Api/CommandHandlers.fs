@@ -204,7 +204,7 @@ module FileBasedCommandHandlers =
                 streamName
                 |> store.Stream
                 |> List.map (fun e -> e.Event)
-                |> List.fold State.Fold State.Initial
+                |> List.fold State.evolve State.Initial
 
             match handle state command with
             | Ok newEvents ->
@@ -220,7 +220,7 @@ module FileBasedCommandHandlers =
             | Error e ->
                 e |> DomainError |> Error
 
-        let asEvents clock (collaboration: Collaboration) =
+        let asEvents clock (collaboration: Serialization.Collaboration) =
             { Metadata =
                   { Source = collaboration.Id
                     RecordedAt = clock () }
@@ -232,13 +232,43 @@ module FileBasedCommandHandlers =
                         Initiator = collaboration.Initiator
                         Recipient = collaboration.Recipient } }
             |> List.singleton
+            
+        let mapToSerialization (state: Serialization.Collaboration option) event : Serialization.Collaboration option =
+            let convertToOption =
+                function
+                | Initial -> None
+                | Existing s ->
+                    let mappedState: Serialization.Collaboration =
+                        {
+                            Id = s.Id
+                            Initiator = s.Initiator
+                            Recipient = s.Recipient
+                            Description = s.Description
+                            RelationshipType = s.RelationshipType
+                        }
+                    Some mappedState
+                | Deleted -> None
+            match state with
+            | Some s ->
+                let mappedState =
+                    Existing {
+                        Id = s.Id
+                        Initiator = s.Initiator
+                        Recipient = s.Recipient
+                        Description = s.Description
+                        RelationshipType = s.RelationshipType
+                    }
+                State.evolve mappedState event
+            | None ->
+                State.evolve Initial event
+            |> convertToOption 
 
         let subscription (database: FileBased): Subscription<Event> =
             fun (events: EventEnvelope<Event> list) ->
                 database.Change(fun document ->
                     events
                     |> List.fold
-                        (applyToCollection Projections.asCollaboration)
+                        (applyToCollection mapToSerialization)
                            (Ok document.Collaborations)
                     |> Result.map (fun c -> { document with Collaborations = c }, System.Guid.Empty))
                 |> ignore

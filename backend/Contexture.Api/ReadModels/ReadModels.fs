@@ -18,6 +18,7 @@ module Domain =
             { Domains = Map.empty
               Subdomains = Map.empty }
 
+    // ATM we reuse the state projection to reduce effort
     let private domainsProjection : Projection<State, Aggregates.Domain.Event> =
         { Init = State.Initial
           Update = State.evolve }
@@ -105,20 +106,28 @@ module BoundedContext =
 module Collaboration =
     open Contexture.Api.Aggregates.Collaboration
 
-    let private collaborationsProjection : Projection<Projections.Collaboration option, Aggregates.Collaboration.Event> =
-        { Init = None
-          Update = Projections.asCollaboration }
+    let private collaborationsProjection : Projection<State, Aggregates.Collaboration.Event> =
+        { Init = Initial
+          Update = State.evolve }
+        
+    let private asOption =
+        function
+        | Initial -> None
+        | Existing e -> Some e
+        | Deleted -> None
 
     let allCollaborations (eventStore: EventStore) =
         eventStore.Get<Aggregates.Collaboration.Event>()
         |> List.fold (projectIntoMapBySourceId collaborationsProjection) Map.empty
         |> Map.toList
-        |> List.choose snd
+        |> List.map snd
+        |> List.choose asOption
 
     let buildCollaboration (eventStore: EventStore) collaborationId =
         collaborationId
         |> eventStore.Stream
         |> project collaborationsProjection
+        |> asOption
 
 module Namespace =
     open Contexture.Api.Aggregates.Namespace

@@ -42,7 +42,7 @@ module AllRoute =
     type UpdateAllData =
         { Domains: Serialization.Domain list
           BoundedContexts: BoundedContext list
-          Collaborations: Collaboration.Projections.Collaboration list
+          Collaborations: Serialization.Collaboration list
           NamespaceTemplates: NamespaceTemplate.Projections.NamespaceTemplate list }
 
     let postAllData =

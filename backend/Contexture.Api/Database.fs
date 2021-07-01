@@ -8,6 +8,7 @@ open System.Text.Json.Serialization
 open Contexture.Api.Aggregates
 open Contexture.Api.Aggregates.NamespaceTemplate
 open Contexture.Api.Entities
+open Contexture.Api.Aggregates.Collaboration
 
 module Database =
 
@@ -133,18 +134,27 @@ module Database =
     module Serialization =
 
         open Newtonsoft.Json.Linq
+        open ValueObjects
+
         type Domain =
             { Id: DomainId
               ParentDomainId: DomainId option
               Key: string option
               Name: string
               Vision: string option }
+            
+        type Collaboration =
+            { Id: CollaborationId
+              Description: string option
+              Initiator: Collaborator
+              Recipient: Collaborator
+              RelationshipType: RelationshipType option }
 
         type Root =
             { Version: int option
               Domains: Domain list
               BoundedContexts: BoundedContext list
-              Collaborations: Collaboration.Projections.Collaboration list
+              Collaborations: Collaboration list
               NamespaceTemplates: Projections.NamespaceTemplate list }
             static member Empty =
                 { Version = None
@@ -409,7 +419,7 @@ module Database =
     type Document =
         { Domains: CollectionOfGuid<Serialization.Domain>
           BoundedContexts: CollectionOfGuid<BoundedContext>
-          Collaborations: CollectionOfGuid<Collaboration.Projections.Collaboration>
+          Collaborations: CollectionOfGuid<Serialization.Collaboration>
           NamespaceTemplates: CollectionOfGuid<Projections.NamespaceTemplate> }
 
 
