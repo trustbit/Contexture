@@ -53,23 +53,25 @@ module Collaborations =
     module QueryEndpoints =
         open Contexture.Api.ReadModels
         let getCollaborations =
-            fun (next: HttpFunc) (ctx: HttpContext) ->
-                let database = ctx.GetService<EventStore>()
+            fun (next: HttpFunc) (ctx: HttpContext) -> task {
+                let! collaborationState = ctx.GetService<ReadModels.Collaboration.AllCollaborationsReadModel>().State()
                 let collaborations =
-                    database |> Collaboration.allCollaborations
+                    collaborationState |> Collaboration.activeCollaborations
                     
-                json collaborations next ctx
+                return! json collaborations next ctx
+            }
 
         let getCollaboration collaborationId =
-            fun (next: HttpFunc) (ctx: HttpContext) ->
-                let database = ctx.GetService<EventStore>()
+            fun (next: HttpFunc) (ctx: HttpContext) -> task {
+                let! collaborationState = ctx.GetService<ReadModels.Collaboration.AllCollaborationsReadModel>().State()
                 let result =
                     collaborationId
-                    |> Collaboration.buildCollaboration database
+                    |> Collaboration.collaboration collaborationState
                     |> Option.map json
                     |> Option.defaultValue (RequestErrors.NOT_FOUND(sprintf "Collaboration %O not found" collaborationId))
 
-                result next ctx
+                return! result next ctx
+            }
 
     let routes: HttpHandler =
         subRoute

@@ -18,6 +18,8 @@ module Domain =
             { Domains = Map.empty
               Subdomains = Map.empty }
 
+    type AllDomainReadModel = ReadModels.ReadModel<Domain.Event, AllDomainState>
+
     // ATM we reuse the state projection to reduce effort
     let private domainsProjection : Projection<State, Aggregates.Domain.Event> =
         { Init = State.Initial
@@ -39,8 +41,6 @@ module Domain =
         |> List.groupBy (fun l -> l.ParentDomainId)
         |> List.choose (fun (key, values) -> key |> Option.map (fun parent -> (parent, values)))
         |> Map.ofList
-
-    type AllDomainReadModel = ReadModels.ReadModel<Domain.Event, AllDomainState>
 
     let domainsReadModel () : AllDomainReadModel =
         let updateState state eventEnvelopes =
@@ -106,28 +106,40 @@ module BoundedContext =
 module Collaboration =
     open Contexture.Api.Aggregates.Collaboration
 
+    type CollaborationState = Map<EventSource, State>
+    type AllCollaborationsReadModel = ReadModels.ReadModel<Event, CollaborationState>
+
+    // ATM we reuse the state projection to reduce effort
     let private collaborationsProjection : Projection<State, Aggregates.Collaboration.Event> =
         { Init = Initial
           Update = State.evolve }
-        
+
     let private asOption =
         function
         | Initial -> None
         | Existing e -> Some e
         | Deleted -> None
 
-    let allCollaborations (eventStore: EventStore) =
-        eventStore.Get<Aggregates.Collaboration.Event>()
-        |> List.fold (projectIntoMapBySourceId collaborationsProjection) Map.empty
+    let activeCollaborations (state: CollaborationState) =
+        state
         |> Map.toList
         |> List.map snd
         |> List.choose asOption
 
-    let buildCollaboration (eventStore: EventStore) collaborationId =
-        collaborationId
-        |> eventStore.Stream
-        |> project collaborationsProjection
-        |> asOption
+    let collaboration (state: CollaborationState) collaborationId =
+        state
+        |> Map.tryFind collaborationId
+        |> Option.bind asOption
+
+    let collaborationsReadModel () =
+        let updateState state eventEnvelopes =
+            let collaborations =
+                eventEnvelopes
+                |> List.fold (projectIntoMapBySourceId collaborationsProjection) state
+
+            collaborations
+
+        ReadModels.readModel updateState Map.empty
 
 module Namespace =
     open Contexture.Api.Aggregates.Namespace

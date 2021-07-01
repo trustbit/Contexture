@@ -158,6 +158,7 @@ let configureReadModels (store: EventStore) (services: IServiceCollection) =
         store.SubscribeAsync readModel.EventHandler
         
     registerReadModel (ReadModels.Domain.domainsReadModel())
+    registerReadModel (ReadModels.Collaboration.collaborationsReadModel())
     
 
 
