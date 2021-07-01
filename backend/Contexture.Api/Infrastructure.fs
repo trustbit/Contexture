@@ -6,6 +6,9 @@ open System.Collections.Generic
 open System.Runtime.CompilerServices
 open System.Threading.Tasks
 
+
+type Agent<'T> = MailboxProcessor<'T>
+
 type EventSource = System.Guid
 
 type EventMetadata =
@@ -36,55 +39,119 @@ module EventEnvelope =
         { Metadata = envelope.Metadata
           Event = unbox<'E> envelope.Payload }
 
+type EventResult = Result<EventEnvelope list, string>
+
+type StreamKind =
+    private
+    | SystemType of System.Type
+    static member Of<'E>() = SystemType typeof<'E>
+
+type StreamIdentifier = EventSource * StreamKind
+
+type EventStorage =
+    abstract member Stream : StreamIdentifier -> Async<EventResult>
+    abstract member AllStreamsOf : StreamKind -> Async<EventResult>
+    abstract member Append : EventEnvelope list -> Async<unit>
+
+module InMemoryStorage =
+
+    type Msg =
+        private
+        | Get of StreamKind * AsyncReplyChannel<EventResult>
+        | GetStream of StreamIdentifier * AsyncReplyChannel<EventResult>
+        | Append of EventEnvelope list * AsyncReplyChannel<unit>
+
+    type private History =
+        { items: Dictionary<StreamIdentifier, EventEnvelope list>
+          byEventType: Dictionary<StreamKind, EventEnvelope list> }
+        static member Empty =
+            { items = Dictionary()
+              byEventType = Dictionary() }
+
+    let private stream history source =
+        let (success, events) = history.items.TryGetValue source
+        if success then events else []
+
+    let private getAllStreamsOf history key : EventEnvelope list =
+        let (success, items) = history.byEventType.TryGetValue key
+        if success then items else []
+
+    let private appendToHistory (history: History) (envelope: EventEnvelope) =
+        let source = envelope.Metadata.Source
+        let streamKind = SystemType envelope.EventType
+        let key = (source, streamKind)
+
+        let fullStream =
+            key |> stream history |> fun s -> s @ [ envelope ]
+
+        history.items.[key] <- fullStream
+        let allEvents = getAllStreamsOf history streamKind
+        history.byEventType.[streamKind] <- allEvents @ [ envelope ]
+        history
+
+    let initialize (initialEvents: EventEnvelope list) =
+        let proc (inbox: Agent<Msg>) =
+            let rec loop history =
+                async {
+                    let! msg = inbox.Receive()
+
+                    match msg with
+                    | Get (kind, reply) ->
+                        kind
+                        |> getAllStreamsOf history
+                        |> Ok
+                        |> reply.Reply
+
+                        return! loop history
+
+                    | GetStream (identifier, reply) ->
+                        identifier |> stream history |> Ok |> reply.Reply
+
+                        return! loop history
+
+                    | Append (events, reply) ->
+                        reply.Reply()
+
+                        let extendedHistory =
+                            events |> List.fold appendToHistory history
+
+                        return! loop extendedHistory
+                }
+
+            let initialHistory =
+                initialEvents
+                |> List.fold appendToHistory History.Empty
+
+            loop initialHistory
+
+        let agent = Agent<Msg>.Start (proc)
+
+        { new EventStorage with
+            member _.Stream identifier =
+                agent.PostAndAsyncReply(fun reply -> GetStream(identifier, reply))
+
+            member _.AllStreamsOf streamType =
+                agent.PostAndAsyncReply(fun reply -> Get(streamType, reply))
+
+            member _.Append events =
+                agent.PostAndAsyncReply(fun reply -> Append(events, reply)) }
+
 type EventStore
     private
     (
-        items: Dictionary<EventSource * System.Type, EventEnvelope list>,
+        storage: EventStorage,
         subscriptions: ConcurrentDictionary<System.Type, SubscriptionWrapper list>
     ) =
-    let byEventType =
-        items.Values
-        |> Seq.collect id
-        |> Seq.toList
-        |> List.groupBy (fun v -> v.EventType)
-        |> dict
-        |> Dictionary
-
-    let stream source =
-        let (success, events) = items.TryGetValue source
-        if success then events else []
 
     let subscriptionsOf key =
         let (success, items) = subscriptions.TryGetValue key
-        if success then items else []
-
-    let getAll key : EventEnvelope list =
-        let (success, items) = byEventType.TryGetValue key
         if success then items else []
 
     let asTyped items : EventEnvelope<'E> list = items |> List.map EventEnvelope.unbox
 
     let asUntyped items = items |> List.map EventEnvelope.box
 
-    let append (newItems: EventEnvelope<'E> list) =
-        newItems
-        |> List.iter
-            (fun envelope ->
-                let source = envelope.Metadata.Source
-                let eventType = typedefof<'E>
-                let key = (source, eventType)
-
-                let fullStream =
-                    key
-                    |> stream
-                    |> asTyped
-                    |> fun s -> s @ [ envelope ]
-                    |> asUntyped
-
-                items.[key] <- fullStream
-                let allEvents = getAll eventType
-                byEventType.[eventType] <- allEvents @ [ EventEnvelope.box envelope ])
-
+    let notifySubscriptions (newItems: EventEnvelope<'E> list) =
         subscriptionsOf typedefof<'E>
         |> List.map
             (fun subscription ->
@@ -92,8 +159,13 @@ type EventStore
 
                 upcastSubscription newItems)
         |> Async.Sequential
-        |> Async.RunSynchronously
-        |> ignore
+        |> Async.Ignore
+
+    let appendAndNotify (newItems: EventEnvelope<'E> list) =
+        async {
+            do! storage.Append(newItems |> asUntyped)
+            do! notifySubscriptions newItems
+        }
 
     let subscribeAsync (subscription: SubscriptionAsync<'E>) =
         let key = typedefof<'E>
@@ -110,34 +182,35 @@ type EventStore
     let subscribe (subscription: Subscription<'E>) =
         subscribeAsync (fun events -> async { subscription events })
 
-
-    let get () : EventEnvelope<'E> list = typeof<'E> |> getAll |> asTyped
-
-    static member Empty =
-        EventStore(Dictionary(), ConcurrentDictionary())
-
-    static member With(items: EventEnvelope list) =
-        EventStore(
-            items
-            |> List.groupBy (fun i -> (i.Metadata.Source, i.EventType))
-            |> dict
-            |> Dictionary,
-            ConcurrentDictionary()
-        )
-
-    member __.Stream name : Async<EventEnvelope<'E> list> =
+    let allStreams () : Async<EventEnvelope<'E> list> =
         async {
-            let events = stream (name, typeof<'E>) |> asTyped
-            return events
+            match! StreamKind.Of<'E>() |> storage.AllStreamsOf with
+            | Ok allStreams -> return allStreams |> asTyped
+            | Error e ->
+                failwithf "Could not get all streams: %s" e
+                return List.empty
         }
 
-    member __.Append items =
-        lock __ (fun () -> append items)
-        async { return () }
+    let stream name : Async<EventEnvelope<'E> list> =
+        async {
+            match! storage.Stream(name, StreamKind.Of<'E>()) with
+            | Ok events -> return events |> asTyped
+            | Error e ->
+                failwithf "Could not get stream %s" e
+                return List.empty
+        }
 
-    member __.Subscribe(subscription: Subscription<'E>) = subscribe subscription
-    member __.SubscribeAsync(subscription: SubscriptionAsync<'E>) = subscribeAsync subscription
-    member __.AllStreams() = async { return get () }
+    static member Empty =
+        EventStore(InMemoryStorage.initialize List.empty, ConcurrentDictionary())
+
+    static member With(history: EventEnvelope list) =
+        EventStore(InMemoryStorage.initialize history, ConcurrentDictionary())
+
+    member _.Stream name = stream name
+    member _.Append items = appendAndNotify items
+    member _.AllStreams() = allStreams ()
+    member _.Subscribe(subscription: Subscription<'E>) = subscribe subscription
+    member _.SubscribeAsync(subscription: SubscriptionAsync<'E>) = subscribeAsync subscription
 
 module Projections =
     type Projection<'State, 'Event> =
@@ -184,13 +257,9 @@ module ReadModels =
         let initializeWith (eventStore: EventStore) (handler: EventHandler<'Event>) : ReadModelInitialization =
             RMI(eventStore, handler) :> ReadModelInitialization
 
-
     type ReadModel<'Event, 'State> =
         abstract member EventHandler : EventEnvelope<'Event> list -> Async<unit>
         abstract member State : unit -> Task<'State>
-
-
-    type Agent<'T> = MailboxProcessor<'T>
 
     type Msg<'Event, 'Result> =
         | Notify of EventEnvelope<'Event> list * AsyncReplyChannel<unit>
