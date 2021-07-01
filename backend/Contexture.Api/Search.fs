@@ -59,12 +59,12 @@ module Search =
     let getNamespaces : HttpHandler =
         fun (next: HttpFunc) (ctx: HttpContext) -> task {
             let eventStore = ctx.GetService<EventStore>()
+            let! templateState = ctx.GetService<ReadModels.Templates.AllTemplatesReadModel>().State()
 
             let! allNamespaces =
                 ReadModels.Namespace.allNamespaces eventStore
-            let! allTemplates =
-                eventStore
-                |> ReadModels.Templates.allTemplates
+            let allTemplates =
+                ReadModels.Templates.allTemplates templateState
 
             let templateNamespaces =
                 allTemplates

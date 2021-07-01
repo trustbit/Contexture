@@ -123,18 +123,21 @@ module Namespaces =
 
         module QueryEndpoints =
             let getAllTemplates =
-                fun (next: HttpFunc) (ctx: HttpContext) ->
-                    let database = ctx.GetService<EventStore>()
+                fun (next: HttpFunc) (ctx: HttpContext) -> task {
+                    let! templateState = ctx.GetService<ReadModels.Templates.AllTemplatesReadModel>().State()
 
-                    let namespaces =
-                        ReadModels.Templates.allTemplates database
+                    let templates =
+                        ReadModels.Templates.allTemplates templateState
 
-                    json namespaces next ctx
+                    return! json templates next ctx
+                    }
 
             let getTemplate templateId =
                 fun (next: HttpFunc) (ctx: HttpContext) -> task {
-                    let database = ctx.GetService<EventStore>()
-                    let! template = ReadModels.Templates.buildTemplate database templateId
+                    let! templateState = ctx.GetService<ReadModels.Templates.AllTemplatesReadModel>().State()
+                    let template =
+                        templateId
+                        |> ReadModels.Templates.template templateState 
 
                     let result =
                         template

@@ -140,6 +140,7 @@ type EventStore
     private
     (
         storage: Storage.EventStorage,
+        // TODO: use an agent for subscriptions?!
         subscriptions: ConcurrentDictionary<System.Type, SubscriptionWrapper list>
     ) =
 

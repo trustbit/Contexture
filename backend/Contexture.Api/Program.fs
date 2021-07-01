@@ -162,6 +162,7 @@ let configureReadModels (services: IServiceCollection) =
     services
     |> registerReadModel (ReadModels.Domain.domainsReadModel())
     |> registerReadModel (ReadModels.Collaboration.collaborationsReadModel())
+    |> registerReadModel(ReadModels.Templates.templatesReadModel())
     |> ignore
 
 let configureServices (context: HostBuilderContext) (services : IServiceCollection) =
