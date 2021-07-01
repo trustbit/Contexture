@@ -246,27 +246,36 @@ let importFromDocument (store: EventStore) (database: Document) = async {
         |> List.map store.Append
         |> runAsync
     }
+let runAsync (host: IHost) =
+    task {
+        // make sure the database is loaded
+        let database =
+            host.Services.GetRequiredService<FileBased>()
+
+        let store =
+            host.Services.GetRequiredService<EventStore>()
+
+        // Do replays before we import the document
+        let readModels =
+            host.Services.GetServices<ReadModels.ReadModelInitialization>()
+
+        do! connectAndReplayReadModels readModels
+
+        do! importFromDocument store database.Read
+
+        // subscriptions for syncing back to the filebased-db are added after initial seeding/loading
+        store.Subscribe(Collaboration.subscription database)
+        store.Subscribe(Domain.subscription database)
+        store.Subscribe(BoundedContext.subscription database)
+        store.Subscribe(Namespace.subscription database)
+        store.Subscribe(NamespaceTemplate.subscription database)
+
+        return! host.RunAsync()
+    }
 
 [<EntryPoint>]
 let main args =
     let host = buildHost args
-
-    // make sure the database is loaded
-    let database = host.Services.GetRequiredService<FileBased>()
-    let store = host.Services.GetRequiredService<EventStore>()
-    
-    // Do replays before we import the document
-    let readModels = host.Services.GetServices<ReadModels.ReadModelInitialization>()
-    Async.RunSynchronously(connectAndReplayReadModels readModels)
-        
-    do! importFromDocument store database.Read
-    
-    // subscriptions for syncing back to the filebased-db are added after initial seeding/loading
-    store.Subscribe (Collaboration.subscription database)
-    store.Subscribe (Domain.subscription database)
-    store.Subscribe (BoundedContext.subscription database)
-    store.Subscribe (Namespace.subscription database)
-    store.Subscribe (NamespaceTemplate.subscription database)    
-    
-    host.Run()
+    let executingHost = runAsync host
+    executingHost.GetAwaiter().GetResult()
     0
