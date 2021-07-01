@@ -66,51 +66,59 @@ module Domain =
 module BoundedContext =
     open Contexture.Api.Aggregates.BoundedContext
 
+    type BoundedContextState =
+        { BoundedContexts: Map<BoundedContextId, BoundedContext option>
+          ByDomain: Map<DomainId, BoundedContext list> }
+        static member Initial =
+            { BoundedContexts = Map.empty
+              ByDomain = Map.empty }
+
+    type AllBoundedContextsReadModel = ReadModels.ReadModel<Event, BoundedContextState>
+
     let private boundedContextProjection : Projection<BoundedContext option, Aggregates.BoundedContext.Event> =
         { Init = None
           Update = Projections.asBoundedContext }
 
-    let boundedContextLookup (eventStore: EventStore) : Async<Map<BoundedContextId, BoundedContext>> =
-        async {
-            let! allStreams = eventStore.AllStreams<Aggregates.BoundedContext.Event>()
-
-            return
-                allStreams
-                |> List.fold (projectIntoMapBySourceId boundedContextProjection) Map.empty
-                |> Map.filter (fun _ v -> Option.isSome v)
-                |> Map.map (fun _ v -> Option.get v)
-        }
-
-    let allBoundedContexts (eventStore: EventStore) =
-        async {
-            let! lookup = eventStore |> boundedContextLookup
-            return lookup |> Map.toList |> List.map snd
-        }
-
-    let boundedContextsByDomainLookup (contexts: BoundedContext list) =
+    let private boundedContextsByDomainLookup (contexts: BoundedContext list) =
         contexts
         |> List.groupBy (fun l -> l.DomainId)
         |> Map.ofList
 
-    let allBoundedContextsByDomain (eventStore: EventStore) =
-        async {
-            let! boundedContexts = eventStore |> allBoundedContexts
+    let private allContexts state = state |> Map.toList |> List.choose snd
 
-            let lookup =
-                boundedContexts |> boundedContextsByDomainLookup
+    let boundedContextsReadModel () : AllBoundedContextsReadModel =
+        let updateState state eventEnvelopes =
+            let contexts =
+                eventEnvelopes
+                |> List.fold (projectIntoMapBySourceId boundedContextProjection) state.BoundedContexts
 
-            return
-                fun domainId ->
-                    lookup
-                    |> Map.tryFind domainId
-                    |> Option.defaultValue []
-        }
+            { BoundedContexts = contexts
+              // this is brute force ATM - but probably good enough for a while
+              ByDomain =
+                  contexts
+                  |> allContexts
+                  |> boundedContextsByDomainLookup }
 
-    let buildBoundedContext (eventStore: EventStore) boundedContextId =
-        async {
-            let! stream = eventStore.Stream boundedContextId
-            return stream |> project boundedContextProjection
-        }
+        ReadModels.readModel updateState BoundedContextState.Initial
+
+    let boundedContextLookup (state: BoundedContextState) =
+        state.BoundedContexts
+        |> Map.filter (fun _ v -> Option.isSome v)
+        |> Map.map (fun _ v -> Option.get v)
+
+    let allBoundedContexts (state: BoundedContextState) = state.BoundedContexts |> allContexts
+
+    let boundedContextsByDomain (state: BoundedContextState) =
+        fun domainId ->
+            state.ByDomain
+            |> Map.tryFind domainId
+            |> Option.defaultValue []
+
+    let boundedContext (state: BoundedContextState) boundedContextId =
+        state.BoundedContexts
+        |> Map.tryFind boundedContextId
+        |> Option.flatten
+
 
 module Collaboration =
     open Contexture.Api.Aggregates.Collaboration

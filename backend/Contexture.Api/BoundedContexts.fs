@@ -110,13 +110,13 @@ module BoundedContexts =
     module QueryEndpoints =
         open Contexture.Api.ReadModels
 
-        let private mapToBoundedContext eventStore domainState ids =
+        let private mapToBoundedContext eventStore domainState boundedContextState ids =
             fun (next: HttpFunc) (ctx: HttpContext) -> task {
                 let! namespacesOf =
                     Namespace.allNamespacesByContext eventStore
 
-                let! boundedContextLookup =
-                    ReadModels.BoundedContext.boundedContextLookup eventStore
+                let boundedContextLookup =
+                    ReadModels.BoundedContext.boundedContextLookup boundedContextState
 
                 let boundedContexts =
                     ids
@@ -145,6 +145,7 @@ module BoundedContexts =
             fun (next: HttpFunc) (ctx: HttpContext) -> task {
                 let database = ctx.GetService<EventStore>()
                 let! domainState = ctx.GetService<ReadModels.Domain.AllDomainReadModel>().State()
+                let! boundedContextState = ctx.GetService<ReadModels.BoundedContext.AllBoundedContextsReadModel>().State()
 
                 let! namespaceIds =
                     SearchFor.NamespaceId.find database item.Namespace
@@ -161,9 +162,9 @@ module BoundedContexts =
                 let! boundedContextsByNamespace =
                     Namespace.BoundedContexts.byNamespace database
 
-                let! boundedContextsByDomain =
-                    database
-                    |> ReadModels.BoundedContext.allBoundedContextsByDomain
+                let boundedContextsByDomain =
+                    boundedContextState
+                    |> ReadModels.BoundedContext.boundedContextsByDomain
 
                 let boundedContextIdsFromNamespace =
                     namespaceIds
@@ -200,22 +201,23 @@ module BoundedContexts =
                     |> Option.map Set.toList
                     |> Option.defaultValue List.empty
 
-                return! mapToBoundedContext database domainState idsToLoad next ctx
+                return! mapToBoundedContext database domainState boundedContextState idsToLoad next ctx
             }
 
         let getBoundedContexts =
             fun (next: HttpFunc) (ctx: HttpContext) -> task {
                 let eventStore = ctx.GetService<EventStore>()
                 let! domainState = ctx.GetService<ReadModels.Domain.AllDomainReadModel>().State()
-                let! lookup =
-                    eventStore
+                let! boundedContextState = ctx.GetService<ReadModels.BoundedContext.AllBoundedContextsReadModel>().State()
+                let lookup =
+                    boundedContextState
                     |> BoundedContext.boundedContextLookup
                 let allContexts =
                     lookup
                     |> Map.toList
                     |> List.map fst
 
-                return! mapToBoundedContext eventStore domainState allContexts next ctx
+                return! mapToBoundedContext eventStore domainState boundedContextState allContexts next ctx
             }
 
         let getOrSearchBoundedContexts =
@@ -235,13 +237,14 @@ module BoundedContexts =
             fun (next: HttpFunc) (ctx: HttpContext) -> task {
                 let eventStore = ctx.GetService<EventStore>()
                 let! domainState = ctx.GetService<ReadModels.Domain.AllDomainReadModel>().State()
+                let! boundedContextState = ctx.GetService<ReadModels.BoundedContext.AllBoundedContextsReadModel>().State()
 
                 let! namespacesOf =
                     Namespace.allNamespacesByContext eventStore
                     
-                let! boundedContext = 
+                let boundedContext = 
                     contextId
-                    |> BoundedContext.buildBoundedContext eventStore
+                    |> BoundedContext.boundedContext boundedContextState
                 let result =
                     boundedContext
                     |> Option.map (Results.convertBoundedContextWithDomain (Domain.domain domainState) namespacesOf)

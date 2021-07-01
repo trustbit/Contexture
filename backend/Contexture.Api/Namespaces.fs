@@ -193,9 +193,10 @@ module Namespaces =
 
             let eventStore = ctx.GetService<EventStore>()
             let! domainState = ctx.GetService<ReadModels.Domain.AllDomainReadModel>().State()
-            let! boundedContext =
+            let! boundedContextState = ctx.GetService<ReadModels.BoundedContext.AllBoundedContextsReadModel>().State()
+            let boundedContext =
                 boundedContextId
-                |> ReadModels.BoundedContext.buildBoundedContext eventStore
+                |> ReadModels.BoundedContext.boundedContext boundedContextState
                 
             let domainOption =
                 boundedContext
