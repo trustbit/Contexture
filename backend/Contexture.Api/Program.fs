@@ -152,8 +152,13 @@ let configureJsonSerializer (services: IServiceCollection) =
     |> services.AddSingleton<Json.ISerializer>
     |> ignore
     
-let configureReadModels (services: IServiceCollection) =
-    services.AddSingleton<ReadModels.Domain.AllDomains>(ReadModels.Domain.allDomainsReadmodel())
+let configureReadModels (store: EventStore) (services: IServiceCollection) =
+    let registerReadModel (readModel:  ReadModels.ReadModel<_,_>) =
+        services.AddSingleton(readModel) |> ignore
+        store.SubscribeAsync readModel.EventHandler
+        
+    registerReadModel (ReadModels.Domain.domainsReadModel())
+    
 
 
 let configureServices (context: HostBuilderContext) (services : IServiceCollection) =
@@ -166,10 +171,11 @@ let configureServices (context: HostBuilderContext) (services : IServiceCollecti
         let options = services.GetRequiredService<IOptions<ContextureOptions>>()
         FileBased.InitializeDatabase(options.Value.DatabasePath))
         |> ignore
-    services.AddSingleton<EventStore> (EventStore.Empty) |> ignore
-    services
-    |> configureReadModels
-    |> ignore
+    
+    let eventStore = EventStore.Empty
+    services.AddSingleton<EventStore> (eventStore) 
+    |> configureReadModels eventStore
+    
     services.AddCors() |> ignore
     services.AddGiraffe() |> ignore
     services |> configureJsonSerializer
@@ -218,9 +224,6 @@ let main args =
     // make sure the database is loaded
     let database = host.Services.GetRequiredService<FileBased>()
     let store = host.Services.GetRequiredService<EventStore>()
-    
-    let domainReadmodel = host.Services.GetRequiredService<ReadModels.Domain.AllDomains>()
-    store.SubscribeAsync(domainReadmodel.EventHandler)
     
     importFromDocument store database.Read
     

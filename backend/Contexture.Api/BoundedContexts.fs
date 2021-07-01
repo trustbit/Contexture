@@ -110,7 +110,7 @@ module BoundedContexts =
     module QueryEndpoints =
         open Contexture.Api.ReadModels
 
-        let private mapToBoundedContext eventStore ids =
+        let private mapToBoundedContext eventStore domainState ids =
             fun (next: HttpFunc) (ctx: HttpContext) ->
                 let namespacesOf =
                     Namespace.allNamespacesByContext eventStore
@@ -121,7 +121,7 @@ module BoundedContexts =
                 let boundedContexts =
                     ids
                     |> List.choose (fun id -> boundedContextLookup |> Map.tryFind id)
-                    |> List.map (Results.convertBoundedContextWithDomain (Domain.buildDomain eventStore) namespacesOf)
+                    |> List.map (Results.convertBoundedContextWithDomain (Domain.domain domainState) namespacesOf)
 
                 json boundedContexts next ctx
 
@@ -141,8 +141,9 @@ module BoundedContexts =
                 |> List.exists id
 
         let getBoundedContextsByQuery (item: Query) =
-            fun (next: HttpFunc) (ctx: HttpContext) ->
+            fun (next: HttpFunc) (ctx: HttpContext) -> task {
                 let database = ctx.GetService<EventStore>()
+                let! domainState = ctx.GetService<ReadModels.Domain.AllDomainReadModel>().State()
 
                 let namespaceIds =
                     SearchFor.NamespaceId.find database item.Namespace
@@ -198,11 +199,13 @@ module BoundedContexts =
                     |> Option.map Set.toList
                     |> Option.defaultValue List.empty
 
-                mapToBoundedContext database idsToLoad next ctx
+                return! mapToBoundedContext database domainState idsToLoad next ctx
+            }
 
         let getBoundedContexts =
-            fun (next: HttpFunc) (ctx: HttpContext) ->
+            fun (next: HttpFunc) (ctx: HttpContext) -> task {
                 let eventStore = ctx.GetService<EventStore>()
+                let! domainState = ctx.GetService<ReadModels.Domain.AllDomainReadModel>().State()
 
                 let allContexts =
                     eventStore
@@ -210,10 +213,11 @@ module BoundedContexts =
                     |> Map.toList
                     |> List.map fst
 
-                mapToBoundedContext eventStore allContexts next ctx
+                return! mapToBoundedContext eventStore domainState allContexts next ctx
+            }
 
         let getOrSearchBoundedContexts =
-            fun (next: HttpFunc) (ctx: HttpContext) ->
+            fun (next: HttpFunc) (ctx: HttpContext) -> task {
                 let nextHandler =
                     if ctx.Request.QueryString.HasValue then
                         match ctx.TryBindQueryString<Query>() with
@@ -222,11 +226,13 @@ module BoundedContexts =
                     else
                         getBoundedContexts
 
-                nextHandler next ctx
+                return! nextHandler next ctx
+            }
 
         let getBoundedContext contextId =
-            fun (next: HttpFunc) (ctx: HttpContext) ->
+            fun (next: HttpFunc) (ctx: HttpContext) -> task {
                 let eventStore = ctx.GetService<EventStore>()
+                let! domainState = ctx.GetService<ReadModels.Domain.AllDomainReadModel>().State()
 
                 let namespacesOf =
                     Namespace.allNamespacesByContext eventStore
@@ -234,11 +240,12 @@ module BoundedContexts =
                 let result =
                     contextId
                     |> BoundedContext.buildBoundedContext eventStore
-                    |> Option.map (Results.convertBoundedContextWithDomain (Domain.buildDomain eventStore) namespacesOf)
+                    |> Option.map (Results.convertBoundedContextWithDomain (Domain.domain domainState) namespacesOf)
                     |> Option.map json
                     |> Option.defaultValue (RequestErrors.NOT_FOUND(sprintf "BoundedContext %O not found" contextId))
 
-                result next ctx
+                return! result next ctx
+            }
 
     let routes : HttpHandler =
         subRouteCi

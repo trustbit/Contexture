@@ -3,6 +3,7 @@ namespace Contexture.Api.Infrastructure
 open System
 open System.Collections.Concurrent
 open System.Collections.Generic
+open System.Runtime.CompilerServices
 open System.Threading.Tasks
 
 type EventSource = System.Guid

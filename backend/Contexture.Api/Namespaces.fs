@@ -177,7 +177,7 @@ module Namespaces =
             documentTemplate (headTemplate resolveAssets) (bodyTemplate content)
 
     let index boundedContextId =
-        fun (next: HttpFunc) (ctx: HttpContext) ->
+        fun (next: HttpFunc) (ctx: HttpContext) -> task {
             let basePath =
                 ctx.GetService<IHostEnvironment>()
                 |> BasePaths.resolve
@@ -186,12 +186,13 @@ module Namespaces =
             let assetsResolver = Asset.resolveAsset pathResolver
 
             let eventStore = ctx.GetService<EventStore>()
+            let! domainState = ctx.GetService<ReadModels.Domain.AllDomainReadModel>().State() 
 
             let domainOption =
                 boundedContextId
                 |> ReadModels.BoundedContext.buildBoundedContext eventStore
                 |> Option.map (fun bc -> bc.DomainId)
-                |> Option.bind (ReadModels.Domain.buildDomain eventStore)
+                |> Option.bind (ReadModels.Domain.domain domainState)
 
             match domainOption with
             | Some domain ->
@@ -199,11 +200,12 @@ module Namespaces =
 
                 let baseApi = basePath.ApiBase + "/api"
 
-                htmlView
+                return! htmlView
                     (Views.index jsonEncoder.SerializeToString assetsResolver boundedContextId domain baseApi)
                     next
                     ctx
-            | None -> RequestErrors.NOT_FOUND "Unknown" next ctx
+            | None -> return! RequestErrors.NOT_FOUND "Unknown" next ctx
+        }
 
     let routesForBoundedContext boundedContextId : HttpHandler =
         let routesForOneSpecificLabelOfNamespace namespaceId = 

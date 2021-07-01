@@ -139,14 +139,15 @@ module Domains =
 
     module QueryEndpoints =
         open Contexture.Api.ReadModels
+        open ReadModels
 
         let getDomains =
             fun (next: HttpFunc) (ctx: HttpContext) -> task {
                 let eventStore = ctx.GetService<EventStore>()
 
-                let! domainState = ctx.GetService<ReadModels.Domain.AllDomains>().State()
-                let domains = domainState |> Domain.getDomains
-                let subdomainsOf = Domain.subdomainLookup domains
+                let! domainState = ctx.GetService<ReadModels.Domain.AllDomainReadModel>().State()
+                let domains = domainState |> Domain.allDomains
+                let subdomainsOf = Domain.subdomainsOf domainState
                 let boundedContextsOf = BoundedContext.allBoundedContextsByDomain eventStore
                 let namespacesOf = Namespace.allNamespacesByContext eventStore
 
@@ -158,11 +159,12 @@ module Domains =
                 }
 
         let getSubDomains domainId =
-            fun (next: HttpFunc) (ctx: HttpContext) ->
+            fun (next: HttpFunc) (ctx: HttpContext) -> task {
                 let eventStore = ctx.GetService<EventStore>()
 
-                let domains = Domain.allDomains eventStore
-                let subdomainsOf = Domain.subdomainLookup domains
+                let! domainState =  ctx.GetService<ReadModels.Domain.AllDomainReadModel>().State()
+                let domains = Domain.allDomains domainState
+                let subdomainsOf = Domain.subdomainsOf domainState
                 let boundedContextsOf = BoundedContext.allBoundedContextsByDomain eventStore
                 let namespacesOf = Namespace.allNamespacesByContext eventStore
 
@@ -171,24 +173,27 @@ module Domains =
                     |> List.filter (fun d -> d.ParentDomainId = Some domainId)
                     |> List.map (Results.includingSubdomainsAndBoundedContexts boundedContextsOf subdomainsOf namespacesOf)
 
-                json result next ctx
-
+                return! json result next ctx
+            }
+         
         let getDomain domainId =
-            fun (next: HttpFunc) (ctx: HttpContext) ->
+            fun (next: HttpFunc) (ctx: HttpContext) -> task {
                 let eventStore = ctx.GetService<EventStore>()
 
-                let subdomains = eventStore |> Domain.allDomains |> Domain.subdomainLookup
+                let! domainState = ctx.GetService<ReadModels.Domain.AllDomainReadModel>().State()
+                let subdomainsOf = Domain.subdomainsOf domainState
                 let boundedContextsOf = BoundedContext.allBoundedContextsByDomain eventStore
                 let namespacesOf = Namespace.allNamespacesByContext eventStore
 
                 let result =
                     domainId
-                    |> Domain.buildDomain eventStore
-                    |> Option.map (Results.includingSubdomainsAndBoundedContexts boundedContextsOf subdomains namespacesOf)
+                    |> Domain.domain domainState
+                    |> Option.map (Results.includingSubdomainsAndBoundedContexts boundedContextsOf subdomainsOf namespacesOf)
                     |> Option.map json
                     |> Option.defaultValue (RequestErrors.NOT_FOUND(sprintf "Domain %O not found" domainId))
 
-                result next ctx
+                return! result next ctx
+            }
 
         let getBoundedContextsOf domainId =
             fun (next: HttpFunc) (ctx: HttpContext) ->

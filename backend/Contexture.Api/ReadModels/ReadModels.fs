@@ -11,48 +11,56 @@ module Domain =
 
     open Contexture.Api.Aggregates.Domain
 
+    type AllDomainState =
+        { Domains: Map<EventSource, Domain.State>
+          Subdomains: Map<DomainId, Domain list> }
+        static member Initial =
+            { Domains = Map.empty
+              Subdomains = Map.empty }
+
     let private domainsProjection : Projection<State, Aggregates.Domain.Event> =
         { Init = State.Initial
           Update = State.evolve }
-        
+
     let private asOption =
         function
         | Existing s -> Some s
         | _ -> None
 
-    let getDomains domainState =
+    let private getDomains domainState =
         domainState
         |> Map.toList
         |> List.map snd
         |> List.choose asOption
 
-    let allDomains (eventStore: EventStore) =
-        eventStore.Get<Aggregates.Domain.Event>()
-        |> List.fold (projectIntoMapBySourceId domainsProjection) Map.empty
-        |> getDomains
-        
-    open ReadModels
-    type AllDomains = ReadModels.ReadModel<Domain.Event,Map<EventSource,Domain.State>>
-    
-    let allDomainsReadmodel () : AllDomains =
-        let updateState state eventEnvelopes =
-            eventEnvelopes
-            |> List.fold (projectIntoMapBySourceId domainsProjection) state
-
-        ReadModels.readModel updateState Map.empty
-   
-
-    let subdomainLookup (domains: Domain list) =
+    let private subdomainLookup (domains: Domain list) =
         domains
         |> List.groupBy (fun l -> l.ParentDomainId)
         |> List.choose (fun (key, values) -> key |> Option.map (fun parent -> (parent, values)))
         |> Map.ofList
 
-    let buildDomain (eventStore: EventStore) domainId =
-        domainId
-        |> eventStore.Stream
-        |> project domainsProjection
-        |> asOption
+    type AllDomainReadModel = ReadModels.ReadModel<Domain.Event, AllDomainState>
+
+    let domainsReadModel () : AllDomainReadModel =
+        let updateState state eventEnvelopes =
+            let domains =
+                eventEnvelopes
+                |> List.fold (projectIntoMapBySourceId domainsProjection) state.Domains
+
+            { Domains = domains
+              // this is brute force ATM - but probably good enough for a while
+              Subdomains = domains |> getDomains |> subdomainLookup }
+
+        ReadModels.readModel updateState AllDomainState.Initial
+
+    let allDomains readModel = readModel.Domains |> getDomains
+
+    let subdomainsOf readModel = readModel.Subdomains
+
+    let domain readModel domainId =
+        readModel.Domains
+        |> Map.tryFind domainId
+        |> Option.bind asOption
 
 module BoundedContext =
     open Contexture.Api.Aggregates.BoundedContext
@@ -122,7 +130,7 @@ module Namespace =
     let private namespaceProjection : Projection<Namespace option, Aggregates.Namespace.Event> =
         { Init = None
           Update = Projections.asNamespace }
-        
+
     let selectNamespaceId =
         function
         | NamespaceImported e -> e.NamespaceId
@@ -164,7 +172,7 @@ module Namespace =
         boundedContextId
         |> eventStore.Stream
         |> project namespacesProjection
-    
+
     module BoundedContexts =
         let private projectNamespaceIdToBoundedContextId state eventEnvelope =
             match eventEnvelope.Event with
