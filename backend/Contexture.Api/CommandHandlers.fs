@@ -1,9 +1,11 @@
 namespace Contexture.Api
 
+open System.Threading.Tasks
 open Contexture.Api
 open Contexture.Api.Aggregates.NamespaceTemplate.Projections
 open Database
 open Contexture.Api.Infrastructure
+open FSharp.Control.Tasks
 
 module FileBasedCommandHandlers =
     open Contexture.Api.Aggregates
@@ -46,6 +48,13 @@ module FileBasedCommandHandlers =
                     | Remove id -> collection.Remove id
                     | NoOp -> collection |> Ok
                 | Error e -> Error e
+                
+        let waitForDbChange results = async {
+            do!
+                results
+                |> Async.AwaitTask
+                |> Async.Ignore
+        }
 
     module Domain =
         open Contexture.Api.Aggregates.Domain
@@ -130,7 +139,7 @@ module FileBasedCommandHandlers =
                         (applyToCollection mapDomainToSerialization)
                            (Ok document.Domains)
                     |> Result.map (fun c -> { document with Domains = c }, System.Guid.Empty))
-                |> ignore
+                |> waitForDbChange
 
     module BoundedContext =
 
@@ -191,7 +200,7 @@ module FileBasedCommandHandlers =
                         (applyToCollection BoundedContext.Projections.asBoundedContext)
                            (Ok document.BoundedContexts)
                     |> Result.map (fun c -> { document with BoundedContexts = c }, System.Guid.Empty))
-                |> ignore
+                |> waitForDbChange
 
     module Collaboration =
         open Contexture.Api.Entities
@@ -269,14 +278,15 @@ module FileBasedCommandHandlers =
             |> convertToOption 
 
         let subscription (database: FileBased): Subscription<Event> =
-            fun (events: EventEnvelope<Event> list) ->
+            fun (events: EventEnvelope<Event> list) -> 
                 database.Change(fun document ->
                     events
                     |> List.fold
                         (applyToCollection mapToSerialization)
                            (Ok document.Collaborations)
-                    |> Result.map (fun c -> { document with Collaborations = c }, System.Guid.Empty))
-                |> ignore
+                    |> Result.map (fun c -> { document with Collaborations = c }, System.Guid.Empty)
+                )
+                |> waitForDbChange
 
     module Namespace =
         open Entities
@@ -340,7 +350,7 @@ module FileBasedCommandHandlers =
                         (applyToCollection Projections.asNamespaceWithBoundedContext)
                            (Ok document.BoundedContexts)
                     |> Result.map (fun c -> { document with BoundedContexts = c }, System.Guid.Empty))
-                |> ignore
+                |> waitForDbChange
 
     module NamespaceTemplate =
         open Entities
@@ -399,4 +409,4 @@ module FileBasedCommandHandlers =
                         (applyToCollection Projections.asTemplate)
                            (Ok document.NamespaceTemplates)
                     |> Result.map (fun c -> { document with NamespaceTemplates = c }, System.Guid.Empty))
-                |> ignore
+                |> waitForDbChange

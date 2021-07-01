@@ -172,7 +172,12 @@ let configureServices (context: HostBuilderContext) (services : IServiceCollecti
         |> ignore
     services.AddSingleton<FileBased>(fun services ->
         let options = services.GetRequiredService<IOptions<ContextureOptions>>()
-        FileBased.InitializeDatabase(options.Value.DatabasePath))
+        // TODO: danger zone - loading should not be done as part of the initialization
+        FileBased.InitializeDatabase(options.Value.DatabasePath)
+        |> Async.AwaitTask
+        |> Async.RunSynchronously
+        )
+        
         |> ignore
     
     services.AddSingleton<EventStore> (EventStore.Empty) |> ignore 
@@ -254,15 +259,14 @@ let main args =
     let readModels = host.Services.GetServices<ReadModels.ReadModelInitialization>()
     Async.RunSynchronously(connectAndReplayReadModels readModels)
         
-    Async.RunSynchronously (importFromDocument store database.Read)
+    do! importFromDocument store database.Read
     
-    // collaboration subscription is added after initial seeding
+    // subscriptions for syncing back to the filebased-db are added after initial seeding/loading
     store.Subscribe (Collaboration.subscription database)
     store.Subscribe (Domain.subscription database)
     store.Subscribe (BoundedContext.subscription database)
     store.Subscribe (Namespace.subscription database)
-    store.Subscribe (NamespaceTemplate.subscription database)
-    
+    store.Subscribe (NamespaceTemplate.subscription database)    
     
     host.Run()
     0

@@ -24,8 +24,7 @@ type EventEnvelope =
       Payload: obj
       EventType: Type }
 
-type Subscription<'E> = EventEnvelope<'E> list -> unit
-type SubscriptionAsync<'E> = EventEnvelope<'E> list -> Async<unit>
+type Subscription<'E> = EventEnvelope<'E> list -> Async<unit>
 
 type private SubscriptionWrapper = EventEnvelope list -> Async<unit>
 
@@ -167,7 +166,7 @@ type EventStore
             do! notifySubscriptions newItems
         }
 
-    let subscribeAsync (subscription: SubscriptionAsync<'E>) =
+    let subscribe (subscription: Subscription<'E>) =
         let key = typedefof<'E>
 
         let upcastSubscription events = events |> asTyped |> subscription
@@ -178,9 +177,6 @@ type EventStore
             (fun _ subscriptions -> subscriptions @ [ upcastSubscription ])
         )
         |> ignore
-
-    let subscribe (subscription: Subscription<'E>) =
-        subscribeAsync (fun events -> async { subscription events })
 
     let allStreams () : Async<EventEnvelope<'E> list> =
         async {
@@ -210,7 +206,6 @@ type EventStore
     member _.Append items = appendAndNotify items
     member _.AllStreams() = allStreams ()
     member _.Subscribe(subscription: Subscription<'E>) = subscribe subscription
-    member _.SubscribeAsync(subscription: SubscriptionAsync<'E>) = subscribeAsync subscription
 
 module Projections =
     type Projection<'State, 'Event> =
@@ -251,7 +246,7 @@ module ReadModels =
                     async {
                         let! allStreams = eventStore.AllStreams<'Event>()
                         do! handler allStreams
-                        eventStore.SubscribeAsync handler
+                        eventStore.Subscribe handler
                     }
 
         let initializeWith (eventStore: EventStore) (handler: EventHandler<'Event>) : ReadModelInitialization =
