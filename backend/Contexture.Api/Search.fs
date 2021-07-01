@@ -57,15 +57,17 @@ module Search =
             htmlView (Views.index jsonEncoder.SerializeToString assetsResolver result) next ctx
 
     let getNamespaces : HttpHandler =
-        fun (next: HttpFunc) (ctx: HttpContext) ->
+        fun (next: HttpFunc) (ctx: HttpContext) -> task {
             let eventStore = ctx.GetService<EventStore>()
 
-            let allNamespaces =
+            let! allNamespaces =
                 ReadModels.Namespace.allNamespaces eventStore
-
-            let templateNamespaces =
+            let! allTemplates =
                 eventStore
                 |> ReadModels.Templates.allTemplates
+
+            let templateNamespaces =
+                allTemplates
                 |> List.map (fun t -> t.Id, t)
                 |> Map.ofList
 
@@ -126,7 +128,8 @@ module Search =
                                Map.fold mergeLabels existingLabels templateLabels
                                |> convertLabelsAndValuesToOutput |})
 
-            json namespaces next ctx
+            return! json namespaces next ctx
+        }
 
     let apiRoutes : HttpHandler =
         subRoute "/search/filter" (choose [ route "/namespaces" >=> getNamespaces ])

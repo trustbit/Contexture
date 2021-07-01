@@ -226,9 +226,12 @@ module Find =
             |> Set.filter (fun m -> m.NamespaceTemplateId = Some templateId)
             |> SearchResult.fromResults
 
-    let namespaces (eventStore: EventStore) : Namespaces.NamespaceFinder =
-        eventStore.Get<Aggregates.Namespace.Event>()
-        |> List.fold Namespaces.projectNamespaceNameToNamespaceId Map.empty
+    let namespaces (eventStore: EventStore) : Async<Namespaces.NamespaceFinder> = async {
+        let! allStreams = eventStore.AllStreams<Aggregates.Namespace.Event>()
+        return
+            allStreams
+            |> List.fold Namespaces.projectNamespaceNameToNamespaceId Map.empty
+        }
 
     module Labels =
         type LabelAndNamespaceModel =
@@ -346,9 +349,12 @@ module Find =
             |> selectResults fst
             |> SearchResult.takeAllResults
 
-    let labels (eventStore: EventStore) : Labels.NamespacesByLabel =
-        eventStore.Get<Aggregates.Namespace.Event>()
-        |> List.fold Labels.projectLabelNameToNamespace Labels.NamespacesByLabel.Initial
+    let labels (eventStore: EventStore) : Async<Labels.NamespacesByLabel> = async {
+        let! allStreams = eventStore.AllStreams<Aggregates.Namespace.Event>()
+        return
+            allStreams
+            |> List.fold Labels.projectLabelNameToNamespace Labels.NamespacesByLabel.Initial
+        }
 
     module Domains =
         open Contexture.Api.Aggregates.Domain
@@ -412,9 +418,12 @@ module Find =
             |> findByKey phrase
             |> SearchResult.fromResults
 
-    let domains (eventStore: EventStore) : Domains.DomainByKeyAndNameModel =
-        eventStore.Get<Aggregates.Domain.Event>()
-        |> List.fold Domains.projectToDomain Domains.DomainByKeyAndNameModel.Empty
+    let domains (eventStore: EventStore) : Async<Domains.DomainByKeyAndNameModel> = async {
+        let! allStreams = eventStore.AllStreams<Aggregates.Domain.Event>()
+        return
+            allStreams
+            |> List.fold Domains.projectToDomain Domains.DomainByKeyAndNameModel.Empty
+        }
 
     module BoundedContexts =
         open Contexture.Api.Aggregates.BoundedContext
@@ -475,6 +484,9 @@ module Find =
             |> findByKey phrase
             |> SearchResult.fromResults
 
-    let boundedContexts (eventStore: EventStore) : BoundedContexts.BoundedContextByKeyAndNameModel =
-        eventStore.Get<Aggregates.BoundedContext.Event>()
-        |> List.fold BoundedContexts.projectToBoundedContext BoundedContexts.BoundedContextByKeyAndNameModel.Empty
+    let boundedContexts (eventStore: EventStore) : Async<BoundedContexts.BoundedContextByKeyAndNameModel> = async {
+        let! allStreams = eventStore.AllStreams<Aggregates.BoundedContext.Event>()
+        return
+            allStreams
+            |> List.fold BoundedContexts.projectToBoundedContext BoundedContexts.BoundedContextByKeyAndNameModel.Empty
+        }

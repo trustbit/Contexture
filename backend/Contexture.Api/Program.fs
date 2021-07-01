@@ -135,7 +135,7 @@ let configureCors (builder : CorsPolicyBuilder) =
         .AllowAnyHeader()
         |> ignore
 
-let configureApp (app : IApplicationBuilder) =
+let configureApp (app : IApplicationBuilder) =    
     let env = app.ApplicationServices.GetService<IWebHostEnvironment>()
     (match env.IsDevelopment() with
     | true  ->
@@ -152,15 +152,17 @@ let configureJsonSerializer (services: IServiceCollection) =
     |> services.AddSingleton<Json.ISerializer>
     |> ignore
     
-let configureReadModels (store: EventStore) (services: IServiceCollection) =
-    let registerReadModel (readModel:  ReadModels.ReadModel<_,_>) =
-        services.AddSingleton(readModel) |> ignore
-        store.SubscribeAsync readModel.EventHandler
-        
-    registerReadModel (ReadModels.Domain.domainsReadModel())
-    registerReadModel (ReadModels.Collaboration.collaborationsReadModel())
+let registerReadModel<'R, 'E, 'S when 'R :> ReadModels.ReadModel<'E,'S> and 'R : not struct> (readModel: 'R) (services: IServiceCollection) =
+    services.AddSingleton<'R>(readModel) |> ignore
+    let initializeReadModel (s: IServiceProvider) =
+        ReadModels.ReadModelInitialization.initializeWith (s.GetRequiredService<EventStore>()) readModel.EventHandler
+    services.AddSingleton<ReadModels.ReadModelInitialization> initializeReadModel
     
-
+let configureReadModels (services: IServiceCollection) =
+    services
+    |> registerReadModel (ReadModels.Domain.domainsReadModel())
+    |> registerReadModel (ReadModels.Collaboration.collaborationsReadModel())
+    |> ignore
 
 let configureServices (context: HostBuilderContext) (services : IServiceCollection) =
     services
@@ -173,9 +175,8 @@ let configureServices (context: HostBuilderContext) (services : IServiceCollecti
         FileBased.InitializeDatabase(options.Value.DatabasePath))
         |> ignore
     
-    let eventStore = EventStore.Empty
-    services.AddSingleton<EventStore> (eventStore) 
-    |> configureReadModels eventStore
+    services.AddSingleton<EventStore> (EventStore.Empty) |> ignore 
+    services |> configureReadModels
     
     services.AddCors() |> ignore
     services.AddGiraffe() |> ignore
@@ -195,6 +196,13 @@ let buildHost args =
                     .ConfigureLogging(configureLogging)
                     |> ignore)
         .Build()
+
+let connectAndReplayReadModels (readModels: ReadModels.ReadModelInitialization seq) =
+    readModels
+    |> Seq.map (fun r -> r.ReplayAndConnect())
+    |> Async.Sequential
+    |> Async.Ignore
+
 
 let importFromDocument (store: EventStore) (database: Document) = async {
     let runAsync (items: Async<Unit> list) =
@@ -242,6 +250,10 @@ let main args =
     let database = host.Services.GetRequiredService<FileBased>()
     let store = host.Services.GetRequiredService<EventStore>()
     
+    // Do replays before we import the document
+    let readModels = host.Services.GetServices<ReadModels.ReadModelInitialization>()
+    Async.RunSynchronously(connectAndReplayReadModels readModels)
+        
     Async.RunSynchronously (importFromDocument store database.Read)
     
     // collaboration subscription is added after initial seeding

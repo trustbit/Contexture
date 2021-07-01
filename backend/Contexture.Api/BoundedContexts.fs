@@ -111,11 +111,11 @@ module BoundedContexts =
         open Contexture.Api.ReadModels
 
         let private mapToBoundedContext eventStore domainState ids =
-            fun (next: HttpFunc) (ctx: HttpContext) ->
-                let namespacesOf =
+            fun (next: HttpFunc) (ctx: HttpContext) -> task {
+                let! namespacesOf =
                     Namespace.allNamespacesByContext eventStore
 
-                let boundedContextLookup =
+                let! boundedContextLookup =
                     ReadModels.BoundedContext.boundedContextLookup eventStore
 
                 let boundedContexts =
@@ -123,7 +123,8 @@ module BoundedContexts =
                     |> List.choose (fun id -> boundedContextLookup |> Map.tryFind id)
                     |> List.map (Results.convertBoundedContextWithDomain (Domain.domain domainState) namespacesOf)
 
-                json boundedContexts next ctx
+                return! json boundedContexts next ctx
+            }
 
         [<CLIMutable>]
         type Query =
@@ -145,22 +146,22 @@ module BoundedContexts =
                 let database = ctx.GetService<EventStore>()
                 let! domainState = ctx.GetService<ReadModels.Domain.AllDomainReadModel>().State()
 
-                let namespaceIds =
+                let! namespaceIds =
                     SearchFor.NamespaceId.find database item.Namespace
 
-                let domainIds =
+                let! domainIds =
                     SearchFor.DomainId.find database item.Domain
 
-                let boundedContextIdsFromLabels =
+                let! boundedContextIdsFromLabels =
                     SearchFor.Labels.find database item.Label
 
-                let boundedContextIdsFromSearch =
+                let! boundedContextIdsFromSearch =
                     SearchFor.BoundedContextId.find database item.BoundedContext
 
-                let boundedContextsByNamespace =
+                let! boundedContextsByNamespace =
                     Namespace.BoundedContexts.byNamespace database
 
-                let boundedContextsByDomain =
+                let! boundedContextsByDomain =
                     database
                     |> ReadModels.BoundedContext.allBoundedContextsByDomain
 
@@ -206,10 +207,11 @@ module BoundedContexts =
             fun (next: HttpFunc) (ctx: HttpContext) -> task {
                 let eventStore = ctx.GetService<EventStore>()
                 let! domainState = ctx.GetService<ReadModels.Domain.AllDomainReadModel>().State()
-
-                let allContexts =
+                let! lookup =
                     eventStore
                     |> BoundedContext.boundedContextLookup
+                let allContexts =
+                    lookup
                     |> Map.toList
                     |> List.map fst
 
@@ -234,7 +236,7 @@ module BoundedContexts =
                 let eventStore = ctx.GetService<EventStore>()
                 let! domainState = ctx.GetService<ReadModels.Domain.AllDomainReadModel>().State()
 
-                let namespacesOf =
+                let! namespacesOf =
                     Namespace.allNamespacesByContext eventStore
                     
                 let! boundedContext = 

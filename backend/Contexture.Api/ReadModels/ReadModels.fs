@@ -70,33 +70,45 @@ module BoundedContext =
         { Init = None
           Update = Projections.asBoundedContext }
 
-    let boundedContextLookup (eventStore: EventStore) : Map<BoundedContextId, BoundedContext> =
-        eventStore.Get<Aggregates.BoundedContext.Event>()
-        |> List.fold (projectIntoMapBySourceId boundedContextProjection) Map.empty
-        |> Map.filter (fun _ v -> Option.isSome v)
-        |> Map.map (fun _ v -> Option.get v)
+    let boundedContextLookup (eventStore: EventStore) : Async<Map<BoundedContextId, BoundedContext>> =
+        async {
+            let! allStreams = eventStore.AllStreams<Aggregates.BoundedContext.Event>()
+            return
+                allStreams
+                |> List.fold (projectIntoMapBySourceId boundedContextProjection) Map.empty
+                |> Map.filter (fun _ v -> Option.isSome v)
+                |> Map.map (fun _ v -> Option.get v)
+        }
 
-    let allBoundedContexts (eventStore: EventStore) =
-        eventStore
-        |> boundedContextLookup
-        |> Map.toList
-        |> List.map snd
+    let allBoundedContexts (eventStore: EventStore) = async {
+        let! lookup =
+            eventStore
+            |> boundedContextLookup
+        return lookup
+            |> Map.toList
+            |> List.map snd
+        }
 
     let boundedContextsByDomainLookup (contexts: BoundedContext list) =
         contexts
         |> List.groupBy (fun l -> l.DomainId)
         |> Map.ofList
 
-    let allBoundedContextsByDomain (eventStore: EventStore) =
-        let boundedContexts =
+    let allBoundedContextsByDomain (eventStore: EventStore) = async {
+        let! boundedContexts =
             eventStore
             |> allBoundedContexts
+        
+        let lookup =
+            boundedContexts
             |> boundedContextsByDomainLookup
 
-        fun domainId ->
-            boundedContexts
-            |> Map.tryFind domainId
-            |> Option.defaultValue []
+        return
+            fun domainId ->
+                lookup
+                |> Map.tryFind domainId
+                |> Option.defaultValue []
+        }
 
     let buildBoundedContext (eventStore: EventStore) boundedContextId = async {
         let! stream = eventStore.Stream boundedContextId
@@ -162,17 +174,24 @@ module Namespace =
         | LabelAdded l -> l.NamespaceId
         | LabelRemoved l -> l.NamespaceId
 
-    let namespaceLookup (eventStore: EventStore) : Map<NamespaceId, Namespace> =
-        eventStore.Get<Aggregates.Namespace.Event>()
-        |> List.fold (projectIntoMap (fun e -> selectNamespaceId e.Event) namespaceProjection) Map.empty
-        |> Map.filter (fun _ v -> Option.isSome v)
-        |> Map.map (fun _ v -> Option.get v)
+    let namespaceLookup (eventStore: EventStore) : Async<Map<NamespaceId, Namespace>> = async {
+        let! allStreams = eventStore.AllStreams<Aggregates.Namespace.Event>()
+        return
+            allStreams
+            |> List.fold (projectIntoMap (fun e -> selectNamespaceId e.Event) namespaceProjection) Map.empty
+            |> Map.filter (fun _ v -> Option.isSome v)
+            |> Map.map (fun _ v -> Option.get v)
+        }
 
-    let allNamespaces (eventStore: EventStore) =
-        eventStore
-        |> namespaceLookup
-        |> Map.toList
-        |> List.map snd
+    let allNamespaces (eventStore: EventStore) = async {
+        let! lookup =
+            eventStore
+            |> namespaceLookup
+        return
+            lookup
+            |> Map.toList
+            |> List.map snd
+        }
 
     let namespacesOf (eventStore: EventStore) boundedContextId = async {
         let! stream = eventStore.Stream boundedContextId
@@ -183,15 +202,19 @@ module Namespace =
             |> List.collect snd
         }
 
-    let allNamespacesByContext (eventStore: EventStore) =
-        let namespaces =
-            eventStore.Get<Aggregates.Namespace.Event>()
+    let allNamespacesByContext (eventStore: EventStore) = async {
+        let! namespaces =
+            eventStore.AllStreams<Aggregates.Namespace.Event>()
+        let lookup =
+            namespaces
             |> List.fold (projectIntoMapBySourceId namespacesProjection) Map.empty
 
-        fun contextId ->
-            namespaces
-            |> Map.tryFind contextId
-            |> Option.defaultValue []
+        return 
+            fun contextId ->
+                lookup
+                |> Map.tryFind contextId
+                |> Option.defaultValue []
+        }
 
     let buildNamespaces (eventStore: EventStore) boundedContextId =
         async {
@@ -210,12 +233,16 @@ module Namespace =
             | LabelAdded l -> state
             | LabelRemoved l -> state
 
-        let byNamespace (eventStore: EventStore) =
-            let namespaces =
-                eventStore.Get<Aggregates.Namespace.Event>()
+        let byNamespace (eventStore: EventStore) = async {
+            let! namespaces =
+                eventStore.AllStreams<Aggregates.Namespace.Event>()
+            let lookup =
+                namespaces
                 |> List.fold projectNamespaceIdToBoundedContextId Map.empty
 
-            fun (namespaceId: NamespaceId) -> namespaces |> Map.tryFind namespaceId
+            return
+                fun (namespaceId: NamespaceId) -> lookup |> Map.tryFind namespaceId
+        }
 
 module Templates =
     open Contexture.Api.Aggregates.NamespaceTemplate
@@ -224,11 +251,14 @@ module Templates =
         { Init = None
           Update = Projections.asTemplate }
 
-    let allTemplates (eventStore: EventStore) =
-        eventStore.Get<Aggregates.NamespaceTemplate.Event>()
-        |> List.fold (projectIntoMapBySourceId projection) Map.empty
-        |> Map.toList
-        |> List.choose snd
+    let allTemplates (eventStore: EventStore) = async {
+        let! allStreams = eventStore.AllStreams<Aggregates.NamespaceTemplate.Event>()
+        return
+            allStreams
+            |> List.fold (projectIntoMapBySourceId projection) Map.empty
+            |> Map.toList
+            |> List.choose snd
+        }
 
     let buildTemplate (eventStore: EventStore) templateId = async {
         let! stream = eventStore.Stream templateId

@@ -45,7 +45,7 @@ module Namespaces =
             // assert
             let eventStore = testEnvironment.GetService<EventStore>()
 
-            let event =
+            let! event =
                 Utils.singleEvent<Namespace.Event> eventStore
 
             match event.Event with

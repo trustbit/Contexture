@@ -106,14 +106,10 @@ type EventStore
             (fun _ subscriptions -> subscriptions @ [ upcastSubscription ])
         )
         |> ignore
-        
+
     let subscribe (subscription: Subscription<'E>) =
-        subscribeAsync (fun events ->
-            async {
-                subscription events
-            }
-        )
-        
+        subscribeAsync (fun events -> async { subscription events })
+
 
     let get () : EventEnvelope<'E> list = typeof<'E> |> getAll |> asTyped
 
@@ -134,30 +130,31 @@ type EventStore
             let events = stream (name, typeof<'E>) |> asTyped
             return events
         }
+
     member __.Append items =
         lock __ (fun () -> append items)
         async { return () }
+
     member __.Subscribe(subscription: Subscription<'E>) = subscribe subscription
-    member __.SubscribeAsync(subscription: SubscriptionAsync<'E>) = subscribeAsync subscription 
-    member __.Get() = get ()
+    member __.SubscribeAsync(subscription: SubscriptionAsync<'E>) = subscribeAsync subscription
+    member __.AllStreams() = async { return get () }
 
 module Projections =
     type Projection<'State, 'Event> =
         { Init: 'State
           Update: 'State -> 'Event -> 'State }
-        
+
     let projectIntoMap selectId projection =
         fun state (eventEnvelope: EventEnvelope<_>) ->
             let selectedId = selectId eventEnvelope
+
             state
             |> Map.tryFind selectedId
             |> Option.defaultValue projection.Init
             |> fun projectionState ->
                 eventEnvelope.Event
                 |> projection.Update projectionState
-            |> fun newState ->
-                state
-                |> Map.add selectedId newState
+            |> fun newState -> state |> Map.add selectedId newState
 
     let projectIntoMapBySourceId projection =
         projectIntoMap (fun eventEnvelope -> eventEnvelope.Metadata.Source) projection
@@ -169,43 +166,63 @@ module Projections =
 
 
 module ReadModels =
-    type EventHandler<'Event> =
-        EventEnvelope<'Event> list -> Async<unit>
-    
+    type EventHandler<'Event> = EventEnvelope<'Event> list -> Async<unit>
+
+    type ReadModelInitialization =
+        abstract member ReplayAndConnect : unit -> Async<unit>
+
+    module ReadModelInitialization =
+        type private RMI<'Event>(eventStore: EventStore, handler: EventHandler<'Event>) =
+            interface ReadModelInitialization with
+                member __.ReplayAndConnect() =
+                    async {
+                        let! allStreams = eventStore.AllStreams<'Event>()
+                        do! handler allStreams
+                        eventStore.SubscribeAsync handler
+                    }
+
+        let initializeWith (eventStore: EventStore) (handler: EventHandler<'Event>) : ReadModelInitialization =
+            RMI(eventStore, handler) :> ReadModelInitialization
+
+
     type ReadModel<'Event, 'State> =
-      {
-        EventHandler : EventHandler<'Event>
-        State : unit -> Task<'State>
-      }
-    
+        abstract member EventHandler : EventEnvelope<'Event> list -> Async<unit>
+        abstract member State : unit -> Task<'State>
+
+
     type Agent<'T> = MailboxProcessor<'T>
 
-    type Msg<'Event,'Result> =
+    type Msg<'Event, 'Result> =
         | Notify of EventEnvelope<'Event> list * AsyncReplyChannel<unit>
         | State of AsyncReplyChannel<'Result>
 
-    let readModel (updateState : 'State -> EventEnvelope<'Event> list -> 'State) (initState : 'State) : ReadModel<'Event, 'State> =
+    let readModel
+        (updateState: 'State -> EventEnvelope<'Event> list -> 'State)
+        (initState: 'State)
+        : ReadModel<'Event, 'State> =
         let agent =
-          let eventSubscriber (inbox : Agent<Msg<_,_>>) =
-            let rec loop state =
-              async {
-                let! msg = inbox.Receive()
+            let eventSubscriber (inbox: Agent<Msg<_, _>>) =
+                let rec loop state =
+                    async {
+                        let! msg = inbox.Receive()
 
-                match msg with
-                | Notify (eventEnvelopes, reply) ->
-                    reply.Reply ()
-                    return! loop (eventEnvelopes |> updateState state)
+                        match msg with
+                        | Notify (eventEnvelopes, reply) ->
+                            reply.Reply()
+                            return! loop (eventEnvelopes |> updateState state)
 
-                | State reply ->
-                    reply.Reply state
-                    return! loop state
-              }
+                        | State reply ->
+                            reply.Reply state
+                            return! loop state
+                    }
 
-            loop initState
+                loop initState
 
-          Agent<Msg<_,_>>.Start(eventSubscriber)
+            Agent<Msg<_, _>>.Start (eventSubscriber)
 
-        {
-          EventHandler = fun eventEnvelopes -> agent.PostAndAsyncReply(fun reply -> Notify (eventEnvelopes,reply))
-          State = fun () -> agent.PostAndAsyncReply State |> Async.StartAsTask
-        }
+        { new ReadModel<'Event, 'State> with
+            member _.EventHandler eventEnvelopes =
+                agent.PostAndAsyncReply(fun reply -> Notify(eventEnvelopes, reply))
+
+            member _.State() =
+                agent.PostAndAsyncReply State |> Async.StartAsTask }
