@@ -6,11 +6,13 @@ open System.Collections.Generic
 open System.Runtime.CompilerServices
 open System.Threading.Tasks
 
-
 type Agent<'T> = MailboxProcessor<'T>
 
 type EventSource = System.Guid
-
+type StreamKind =
+    private
+    | SystemType of System.Type
+    static member Of<'E>() = SystemType typeof<'E>
 type EventMetadata =
     { Source: EventSource
       RecordedAt: System.DateTime }
@@ -22,7 +24,8 @@ type EventEnvelope<'Event> =
 type EventEnvelope =
     { Metadata: EventMetadata
       Payload: obj
-      EventType: Type }
+      EventType: System.Type
+      StreamKind: StreamKind }
 
 type Subscription<'E> = EventEnvelope<'E> list -> Async<unit>
 
@@ -32,7 +35,8 @@ module EventEnvelope =
     let box (envelope: EventEnvelope<'E>) =
         { Metadata = envelope.Metadata
           Payload = box envelope.Event
-          EventType = typeof<'E> }
+          EventType = typeof<'E>
+          StreamKind = StreamKind.Of<'E>() }
 
     let unbox (envelope: EventEnvelope) : EventEnvelope<'E> =
         { Metadata = envelope.Metadata
@@ -40,105 +44,102 @@ module EventEnvelope =
 
 type EventResult = Result<EventEnvelope list, string>
 
-type StreamKind =
-    private
-    | SystemType of System.Type
-    static member Of<'E>() = SystemType typeof<'E>
+module Storage =
 
-type StreamIdentifier = EventSource * StreamKind
+    type StreamIdentifier = EventSource * StreamKind
 
-type EventStorage =
-    abstract member Stream : StreamIdentifier -> Async<EventResult>
-    abstract member AllStreamsOf : StreamKind -> Async<EventResult>
-    abstract member Append : EventEnvelope list -> Async<unit>
+    type EventStorage =
+        abstract member Stream : StreamIdentifier -> Async<EventResult>
+        abstract member AllStreamsOf : StreamKind -> Async<EventResult>
+        abstract member Append : EventEnvelope list -> Async<unit>
 
-module InMemoryStorage =
+    module InMemoryStorage =
 
-    type Msg =
-        private
-        | Get of StreamKind * AsyncReplyChannel<EventResult>
-        | GetStream of StreamIdentifier * AsyncReplyChannel<EventResult>
-        | Append of EventEnvelope list * AsyncReplyChannel<unit>
+        type Msg =
+            private
+            | Get of StreamKind * AsyncReplyChannel<EventResult>
+            | GetStream of StreamIdentifier * AsyncReplyChannel<EventResult>
+            | Append of EventEnvelope list * AsyncReplyChannel<unit>
 
-    type private History =
-        { items: Dictionary<StreamIdentifier, EventEnvelope list>
-          byEventType: Dictionary<StreamKind, EventEnvelope list> }
-        static member Empty =
-            { items = Dictionary()
-              byEventType = Dictionary() }
+        type private History =
+            { items: Dictionary<StreamIdentifier, EventEnvelope list>
+              byEventType: Dictionary<StreamKind, EventEnvelope list> }
+            static member Empty =
+                { items = Dictionary()
+                  byEventType = Dictionary() }
 
-    let private stream history source =
-        let (success, events) = history.items.TryGetValue source
-        if success then events else []
+        let private stream history source =
+            let (success, events) = history.items.TryGetValue source
+            if success then events else []
 
-    let private getAllStreamsOf history key : EventEnvelope list =
-        let (success, items) = history.byEventType.TryGetValue key
-        if success then items else []
+        let private getAllStreamsOf history key : EventEnvelope list =
+            let (success, items) = history.byEventType.TryGetValue key
+            if success then items else []
 
-    let private appendToHistory (history: History) (envelope: EventEnvelope) =
-        let source = envelope.Metadata.Source
-        let streamKind = SystemType envelope.EventType
-        let key = (source, streamKind)
+        let private appendToHistory (history: History) (envelope: EventEnvelope) =
+            let source = envelope.Metadata.Source
+            let streamKind = envelope.StreamKind
+            let key = (source, streamKind)
 
-        let fullStream =
-            key |> stream history |> fun s -> s @ [ envelope ]
+            let fullStream =
+                key |> stream history |> fun s -> s @ [ envelope ]
 
-        history.items.[key] <- fullStream
-        let allEvents = getAllStreamsOf history streamKind
-        history.byEventType.[streamKind] <- allEvents @ [ envelope ]
-        history
+            history.items.[key] <- fullStream
+            let allEvents = getAllStreamsOf history streamKind
+            history.byEventType.[streamKind] <- allEvents @ [ envelope ]
+            history
 
-    let initialize (initialEvents: EventEnvelope list) =
-        let proc (inbox: Agent<Msg>) =
-            let rec loop history =
-                async {
-                    let! msg = inbox.Receive()
+        let initialize (initialEvents: EventEnvelope list) =
+            let proc (inbox: Agent<Msg>) =
+                let rec loop history =
+                    async {
+                        let! msg = inbox.Receive()
 
-                    match msg with
-                    | Get (kind, reply) ->
-                        kind
-                        |> getAllStreamsOf history
-                        |> Ok
-                        |> reply.Reply
+                        match msg with
+                        | Get (kind, reply) ->
+                            kind
+                            |> getAllStreamsOf history
+                            |> Ok
+                            |> reply.Reply
 
-                        return! loop history
+                            return! loop history
 
-                    | GetStream (identifier, reply) ->
-                        identifier |> stream history |> Ok |> reply.Reply
+                        | GetStream (identifier, reply) ->
+                            identifier |> stream history |> Ok |> reply.Reply
 
-                        return! loop history
+                            return! loop history
 
-                    | Append (events, reply) ->
-                        reply.Reply()
+                        | Append (events, reply) ->
+                            reply.Reply()
 
-                        let extendedHistory =
-                            events |> List.fold appendToHistory history
+                            let extendedHistory =
+                                events |> List.fold appendToHistory history
 
-                        return! loop extendedHistory
-                }
+                            return! loop extendedHistory
+                    }
 
-            let initialHistory =
-                initialEvents
-                |> List.fold appendToHistory History.Empty
+                let initialHistory =
+                    initialEvents
+                    |> List.fold appendToHistory History.Empty
 
-            loop initialHistory
+                loop initialHistory
 
-        let agent = Agent<Msg>.Start (proc)
+            let agent = Agent<Msg>.Start (proc)
 
-        { new EventStorage with
-            member _.Stream identifier =
-                agent.PostAndAsyncReply(fun reply -> GetStream(identifier, reply))
+            { new EventStorage with
+                member _.Stream identifier =
+                    agent.PostAndAsyncReply(fun reply -> GetStream(identifier, reply))
 
-            member _.AllStreamsOf streamType =
-                agent.PostAndAsyncReply(fun reply -> Get(streamType, reply))
+                member _.AllStreamsOf streamType =
+                    agent.PostAndAsyncReply(fun reply -> Get(streamType, reply))
 
-            member _.Append events =
-                agent.PostAndAsyncReply(fun reply -> Append(events, reply)) }
+                member _.Append events =
+                    agent.PostAndAsyncReply(fun reply -> Append(events, reply)) }
 
 type EventStore
     private
     (
-        storage: EventStorage,
+        storage: Storage.EventStorage,
         subscriptions: ConcurrentDictionary<System.Type, SubscriptionWrapper list>
     ) =
 
@@ -197,10 +198,10 @@ type EventStore
         }
 
     static member Empty =
-        EventStore(InMemoryStorage.initialize List.empty, ConcurrentDictionary())
+        EventStore(Storage.InMemoryStorage.initialize List.empty, ConcurrentDictionary())
 
     static member With(history: EventEnvelope list) =
-        EventStore(InMemoryStorage.initialize history, ConcurrentDictionary())
+        EventStore(Storage.InMemoryStorage.initialize history, ConcurrentDictionary())
 
     member _.Stream name = stream name
     member _.Append items = appendAndNotify items
