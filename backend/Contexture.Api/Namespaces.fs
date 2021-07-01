@@ -42,7 +42,7 @@ module Namespaces =
                     match! Namespace.handle clock database command with
                     | Ok updatedContext ->
                         // for namespaces we don't use redirects ATM
-                        let boundedContext =
+                        let! boundedContext =
                             updatedContext
                             |> ReadModels.Namespace.namespacesOf database
 
@@ -67,15 +67,17 @@ module Namespaces =
     module QueryEndpoints =
 
         let getNamespaces boundedContextId =
-            fun (next: HttpFunc) (ctx: HttpContext) ->
+            fun (next: HttpFunc) (ctx: HttpContext) -> task {
                 let database = ctx.GetService<EventStore>()
-
-                let result =
+                let! namespaces =
                     boundedContextId
                     |> ReadModels.Namespace.namespacesOf database
+                let result =
+                    namespaces
                     |> json
 
-                result next ctx
+                return! result next ctx
+            }
 
         let getAllNamespaces =
             fun (next: HttpFunc) (ctx: HttpContext) ->
@@ -130,16 +132,17 @@ module Namespaces =
                     json namespaces next ctx
 
             let getTemplate templateId =
-                fun (next: HttpFunc) (ctx: HttpContext) ->
+                fun (next: HttpFunc) (ctx: HttpContext) -> task {
                     let database = ctx.GetService<EventStore>()
+                    let! template = ReadModels.Templates.buildTemplate database templateId
 
-                    let template =
-                        templateId
-                        |> ReadModels.Templates.buildTemplate database
+                    let result =
+                        template
                         |> Option.map json
                         |> Option.defaultValue (RequestErrors.NOT_FOUND(sprintf "template %O not found" templateId))
 
-                    template next ctx
+                    return! result next ctx
+                }
 
     module Views =
         open Layout
@@ -186,11 +189,13 @@ module Namespaces =
             let assetsResolver = Asset.resolveAsset pathResolver
 
             let eventStore = ctx.GetService<EventStore>()
-            let! domainState = ctx.GetService<ReadModels.Domain.AllDomainReadModel>().State() 
-
-            let domainOption =
+            let! domainState = ctx.GetService<ReadModels.Domain.AllDomainReadModel>().State()
+            let! boundedContext =
                 boundedContextId
                 |> ReadModels.BoundedContext.buildBoundedContext eventStore
+                
+            let domainOption =
+                boundedContext
                 |> Option.map (fun bc -> bc.DomainId)
                 |> Option.bind (ReadModels.Domain.domain domainState)
 

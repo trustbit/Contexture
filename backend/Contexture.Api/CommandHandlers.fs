@@ -55,10 +55,10 @@ module FileBasedCommandHandlers =
         let handle clock (store: EventStore) command = async {
             let identity = Domain.identify command
             let streamName = Domain.name identity
+            let! stream = store.Stream streamName
 
             let state =
-                streamName
-                |> store.Stream
+                stream
                 |> List.map (fun e -> e.Event)
                 |> List.fold State.evolve State.Initial
 
@@ -142,10 +142,9 @@ module FileBasedCommandHandlers =
         let handle clock (store: EventStore) (command: BoundedContext.Command) = async {
             let identity = BoundedContext.identify command
             let streamName = BoundedContext.name identity
-
+            let! stream = store.Stream streamName
             let state =
-                streamName
-                |> store.Stream
+                stream
                 |> List.map (fun e -> e.Event)
                 |> List.fold BoundedContext.State.Fold BoundedContext.State.Initial
 
@@ -203,10 +202,10 @@ module FileBasedCommandHandlers =
         let handle clock (store: EventStore) command = async {
             let identity = Collaboration.identify command
             let streamName = Collaboration.name identity
+            let! stream = store.Stream streamName
 
             let state =
-                streamName
-                |> store.Stream
+                stream
                 |> List.map (fun e -> e.Event)
                 |> List.fold State.evolve State.Initial
 
@@ -287,10 +286,10 @@ module FileBasedCommandHandlers =
         let handle clock (store: EventStore) command = async {
             let identity = Namespace.identify command
             let streamName = Namespace.name identity
-
+            let! stream = store.Stream streamName
+            
             let state =
-                streamName
-                |> store.Stream
+                stream
                 |> List.map (fun e -> e.Event)
                 |> List.fold State.Fold State.Initial
 
@@ -351,10 +350,10 @@ module FileBasedCommandHandlers =
         let handle clock (store: EventStore) command = async {
             let identity = NamespaceTemplate.identify command
             let streamName = NamespaceTemplate.name identity
+            let! stream = store.Stream streamName
 
             let state =
-                streamName
-                |> store.Stream
+                stream
                 |> List.map (fun e -> e.Event)
                 |> List.fold State.Fold State.Initial
 

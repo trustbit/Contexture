@@ -98,10 +98,12 @@ module BoundedContext =
             |> Map.tryFind domainId
             |> Option.defaultValue []
 
-    let buildBoundedContext (eventStore: EventStore) boundedContextId =
-        boundedContextId
-        |> eventStore.Stream
-        |> project boundedContextProjection
+    let buildBoundedContext (eventStore: EventStore) boundedContextId = async {
+        let! stream = eventStore.Stream boundedContextId
+        return
+            stream
+            |> project boundedContextProjection
+        }
 
 module Collaboration =
     open Contexture.Api.Aggregates.Collaboration
@@ -172,12 +174,14 @@ module Namespace =
         |> Map.toList
         |> List.map snd
 
-    let namespacesOf (eventStore: EventStore) boundedContextId =
-        boundedContextId
-        |> eventStore.Stream
-        |> List.fold (projectIntoMapBySourceId namespacesProjection) Map.empty
-        |> Map.toList
-        |> List.collect snd
+    let namespacesOf (eventStore: EventStore) boundedContextId = async {
+        let! stream = eventStore.Stream boundedContextId
+        return
+            stream
+            |> List.fold (projectIntoMapBySourceId namespacesProjection) Map.empty
+            |> Map.toList
+            |> List.collect snd
+        }
 
     let allNamespacesByContext (eventStore: EventStore) =
         let namespaces =
@@ -190,9 +194,12 @@ module Namespace =
             |> Option.defaultValue []
 
     let buildNamespaces (eventStore: EventStore) boundedContextId =
-        boundedContextId
-        |> eventStore.Stream
-        |> project namespacesProjection
+        async {
+            let! stream = eventStore.Stream boundedContextId
+            return
+                stream
+                |> project namespacesProjection
+        }
 
     module BoundedContexts =
         let private projectNamespaceIdToBoundedContextId state eventEnvelope =
@@ -223,7 +230,9 @@ module Templates =
         |> Map.toList
         |> List.choose snd
 
-    let buildTemplate (eventStore: EventStore) templateId =
-        templateId
-        |> eventStore.Stream
-        |> project projection
+    let buildTemplate (eventStore: EventStore) templateId = async {
+        let! stream = eventStore.Stream templateId
+        return
+            stream
+            |> project projection
+    }

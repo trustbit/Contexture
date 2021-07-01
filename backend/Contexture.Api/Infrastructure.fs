@@ -129,7 +129,11 @@ type EventStore
             ConcurrentDictionary()
         )
 
-    member __.Stream name : EventEnvelope<'E> list = stream (name, typeof<'E>) |> asTyped
+    member __.Stream name : Async<EventEnvelope<'E> list> =
+        async {
+            let events = stream (name, typeof<'E>) |> asTyped
+            return events
+        }
     member __.Append items =
         lock __ (fun () -> append items)
         async { return () }

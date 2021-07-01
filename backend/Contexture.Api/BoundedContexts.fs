@@ -236,10 +236,12 @@ module BoundedContexts =
 
                 let namespacesOf =
                     Namespace.allNamespacesByContext eventStore
-
-                let result =
+                    
+                let! boundedContext = 
                     contextId
                     |> BoundedContext.buildBoundedContext eventStore
+                let result =
+                    boundedContext
                     |> Option.map (Results.convertBoundedContextWithDomain (Domain.domain domainState) namespacesOf)
                     |> Option.map json
                     |> Option.defaultValue (RequestErrors.NOT_FOUND(sprintf "BoundedContext %O not found" contextId))
