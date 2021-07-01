@@ -52,7 +52,7 @@ module FileBasedCommandHandlers =
         open Contexture.Api.Entities
         open BridgeEventSourcingWithFilebasedDatabase
         
-        let handle clock (store: EventStore) command =
+        let handle clock (store: EventStore) command = async {
             let identity = Domain.identify command
             let streamName = Domain.name identity
 
@@ -64,17 +64,19 @@ module FileBasedCommandHandlers =
 
             match handle state command with
             | Ok newEvents ->
-                newEvents
-                |> List.map (fun e ->
-                    { Event = e
-                      Metadata =
-                          { Source = streamName
-                            RecordedAt = clock () } })
-                |> store.Append
+                do!
+                    newEvents
+                    |> List.map (fun e ->
+                        { Event = e
+                          Metadata =
+                              { Source = streamName
+                                RecordedAt = clock () } })
+                    |> store.Append
 
-                Ok identity
+                return Ok identity
             | Error e ->
-                e |> DomainError |> Error
+                return e |> DomainError |> Error
+        }
             
         let asEvents clock (domain: Serialization.Domain) =
             { Metadata =
@@ -137,7 +139,7 @@ module FileBasedCommandHandlers =
         open Contexture.Api.Entities
         open BoundedContext
         
-        let handle clock (store: EventStore) (command: BoundedContext.Command) =
+        let handle clock (store: EventStore) (command: BoundedContext.Command) = async {
             let identity = BoundedContext.identify command
             let streamName = BoundedContext.name identity
 
@@ -149,17 +151,19 @@ module FileBasedCommandHandlers =
 
             match BoundedContext.handle state command with
             | Ok newEvents ->
-                newEvents
-                |> List.map (fun e ->
-                    { Event = e
-                      Metadata =
-                          { Source = streamName
-                            RecordedAt = clock () } })
-                |> store.Append
+                do!
+                    newEvents
+                    |> List.map (fun e ->
+                        { Event = e
+                          Metadata =
+                              { Source = streamName
+                                RecordedAt = clock () } })
+                    |> store.Append
 
-                Ok identity
+                return Ok identity
             | Error e ->
-                e |> DomainError |> Error
+                return e |> DomainError |> Error
+        }
 
         let asEvents clock (collaboration: BoundedContext) =
             { Metadata =
@@ -196,7 +200,7 @@ module FileBasedCommandHandlers =
         open Projections
         open BridgeEventSourcingWithFilebasedDatabase
         
-        let handle clock (store: EventStore) command =
+        let handle clock (store: EventStore) command = async {
             let identity = Collaboration.identify command
             let streamName = Collaboration.name identity
 
@@ -208,17 +212,19 @@ module FileBasedCommandHandlers =
 
             match handle state command with
             | Ok newEvents ->
-                newEvents
-                |> List.map (fun e ->
-                    { Event = e
-                      Metadata =
-                          { Source = streamName
-                            RecordedAt = clock () } })
-                |> store.Append
+                do!
+                    newEvents
+                    |> List.map (fun e ->
+                        { Event = e
+                          Metadata =
+                              { Source = streamName
+                                RecordedAt = clock () } })
+                    |> store.Append
 
-                Ok identity
+                return Ok identity
             | Error e ->
-                e |> DomainError |> Error
+                return e |> DomainError |> Error
+        }
 
         let asEvents clock (collaboration: Serialization.Collaboration) =
             { Metadata =
@@ -278,7 +284,7 @@ module FileBasedCommandHandlers =
         open Namespace
         open BridgeEventSourcingWithFilebasedDatabase
         
-        let handle clock (store: EventStore) command =
+        let handle clock (store: EventStore) command = async {
             let identity = Namespace.identify command
             let streamName = Namespace.name identity
 
@@ -290,17 +296,19 @@ module FileBasedCommandHandlers =
 
             match handle state command with
             | Ok newEvents ->
-                newEvents
-                |> List.map (fun e ->
-                    { Event = e
-                      Metadata =
-                          { Source = streamName
-                            RecordedAt = clock () } })
-                |> store.Append
+                do!
+                    newEvents
+                    |> List.map (fun e ->
+                        { Event = e
+                          Metadata =
+                              { Source = streamName
+                                RecordedAt = clock () } })
+                    |> store.Append
 
-                Ok identity
+                return Ok identity
             | Error e ->
-                e |> DomainError |> Error
+                return e |> DomainError |> Error
+        }
 
         let asEvents clock (boundedContext: BoundedContext) =
             boundedContext.Namespaces
@@ -340,7 +348,7 @@ module FileBasedCommandHandlers =
         open NamespaceTemplate
         open BridgeEventSourcingWithFilebasedDatabase
         
-        let handle clock (store: EventStore) command =
+        let handle clock (store: EventStore) command = async {
             let identity = NamespaceTemplate.identify command
             let streamName = NamespaceTemplate.name identity
 
@@ -352,17 +360,19 @@ module FileBasedCommandHandlers =
 
             match handle state command with
             | Ok newEvents ->
-                newEvents
-                |> List.map (fun e ->
-                    { Event = e
-                      Metadata =
-                          { Source = streamName
-                            RecordedAt = clock () } })
-                |> store.Append
+                do!
+                    newEvents
+                    |> List.map (fun e ->
+                        { Event = e
+                          Metadata =
+                              { Source = streamName
+                                RecordedAt = clock () } })
+                    |> store.Append
 
-                Ok identity
+                return Ok identity
             | Error e ->
-                e |> DomainError |> Error
+                return e |> DomainError |> Error
+        }
 
         let asEvents clock (template: NamespaceTemplate) =
             { Metadata =

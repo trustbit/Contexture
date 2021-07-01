@@ -62,7 +62,7 @@ module BoundedContexts =
                 task {
                     let database = ctx.GetService<EventStore>()
 
-                    match BoundedContext.handle clock database command with
+                    match! BoundedContext.handle clock database command with
                     | Ok updatedContext ->
                         return! redirectTo false (sprintf "/api/boundedcontexts/%O" updatedContext) next ctx
                     | Error (DomainError EmptyName) ->
@@ -102,7 +102,7 @@ module BoundedContexts =
                 task {
                     let database = ctx.GetService<EventStore>()
 
-                    match BoundedContext.handle clock database (RemoveBoundedContext contextId) with
+                    match! BoundedContext.handle clock database (RemoveBoundedContext contextId) with
                     | Ok id -> return! json id next ctx
                     | Error e -> return! ServerErrors.INTERNAL_ERROR e next ctx
                 }

@@ -89,7 +89,7 @@ module Domains =
                 task {
                     let database = ctx.GetService<EventStore>()
 
-                    match Domain.handle clock database (RemoveDomain domainId) with
+                    match! Domain.handle clock database (RemoveDomain domainId) with
                     | Ok domainId -> return! json domainId next ctx
                     | Error e -> return! ServerErrors.INTERNAL_ERROR e next ctx
                 }
@@ -99,7 +99,7 @@ module Domains =
                 task {
                     let database = ctx.GetService<EventStore>()
 
-                    match Domain.handle clock database command with
+                    match! Domain.handle clock database command with
                     | Ok updatedDomain -> return! redirectTo false (sprintf "/api/domains/%O" updatedDomain) next ctx
                     | Error (DomainError EmptyName) ->
                         return! RequestErrors.BAD_REQUEST "Name must not be empty" next ctx
@@ -129,7 +129,7 @@ module Domains =
                 task {
                     let database = ctx.GetService<EventStore>()
 
-                    match BoundedContext.handle clock database (CreateBoundedContext(Guid.NewGuid(), domainId, command)) with
+                    match! BoundedContext.handle clock database (CreateBoundedContext(Guid.NewGuid(), domainId, command)) with
                     | Ok addedContext ->
                         return! redirectTo false (sprintf "/api/boundedcontexts/%O" addedContext) next ctx
                     | Error (DomainError Aggregates.BoundedContext.EmptyName) ->

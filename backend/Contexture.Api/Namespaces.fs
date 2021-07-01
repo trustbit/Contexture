@@ -39,7 +39,7 @@ module Namespaces =
                 task {
                     let database = ctx.GetService<EventStore>()
 
-                    match Namespace.handle clock database command with
+                    match! Namespace.handle clock database command with
                     | Ok updatedContext ->
                         // for namespaces we don't use redirects ATM
                         let boundedContext =
@@ -99,7 +99,7 @@ module Namespaces =
                     task {
                         let database = ctx.GetService<EventStore>()
 
-                        match NamespaceTemplate.handle clock database command with
+                        match! NamespaceTemplate.handle clock database command with
                         | Ok updatedTemplate ->
                             return! redirectTo false (sprintf "/api/namespaces/templates/%O" updatedTemplate) next ctx
                         | Error (DomainError error) ->

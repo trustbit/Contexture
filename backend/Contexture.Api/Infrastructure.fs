@@ -130,7 +130,9 @@ type EventStore
         )
 
     member __.Stream name : EventEnvelope<'E> list = stream (name, typeof<'E>) |> asTyped
-    member __.Append items = lock __ (fun () -> append items)
+    member __.Append items =
+        lock __ (fun () -> append items)
+        async { return () }
     member __.Subscribe(subscription: Subscription<'E>) = subscribe subscription
     member __.SubscribeAsync(subscription: SubscriptionAsync<'E>) = subscribeAsync subscription 
     member __.Get() = get ()

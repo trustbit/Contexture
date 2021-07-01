@@ -196,27 +196,43 @@ let buildHost args =
                     |> ignore)
         .Build()
 
-let importFromDocument (store: EventStore) (database: Document) =
+let importFromDocument (store: EventStore) (database: Document) = async {
+    let runAsync (items: Async<Unit> list) =
+        items
+        |> Async.Sequential
+        |> Async.Ignore
+        
     let clock = fun () -> System.DateTime.UtcNow
-    database.Collaborations.All
-    |> List.map (Collaboration.asEvents clock)
-    |> List.iter store.Append
+    do!
+        database.Collaborations.All
+        |> List.map (Collaboration.asEvents clock)
+        |> List.map store.Append
+        |> runAsync
     
-    database.Domains.All
-    |> List.map (Domain.asEvents clock)
-    |> List.iter store.Append
+    do!
+        database.Domains.All
+        |> List.map (Domain.asEvents clock)
+        |> List.map store.Append
+        |> runAsync
     
-    database.BoundedContexts.All
-    |> List.map (BoundedContext.asEvents clock)
-    |> List.iter store.Append
+    do!
+        database.BoundedContexts.All
+        |> List.map (BoundedContext.asEvents clock)
+        |> List.map store.Append
+        |> runAsync
     
-    database.BoundedContexts.All
-    |> List.map (Namespace.asEvents clock)
-    |> List.iter store.Append
+    do!
+        database.BoundedContexts.All
+        |> List.map (Namespace.asEvents clock)
+        |> List.map store.Append
+        |> runAsync
 
-    database.NamespaceTemplates.All
-    |> List.map (NamespaceTemplate.asEvents clock)
-    |> List.iter store.Append
+    do!
+        database.NamespaceTemplates.All
+        |> List.map (NamespaceTemplate.asEvents clock)
+        |> List.map store.Append
+        |> runAsync
+    }
 
 [<EntryPoint>]
 let main args =
@@ -226,7 +242,7 @@ let main args =
     let database = host.Services.GetRequiredService<FileBased>()
     let store = host.Services.GetRequiredService<EventStore>()
     
-    importFromDocument store database.Read
+    Async.RunSynchronously (importFromDocument store database.Read)
     
     // collaboration subscription is added after initial seeding
     store.Subscribe (Collaboration.subscription database)
