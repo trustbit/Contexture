@@ -156,7 +156,7 @@ module Database =
               Initiator: Collaborator
               Recipient: Collaborator
               RelationshipType: RelationshipType option }
-            
+
         type BoundedContext =
             { Id: BoundedContextId
               DomainId: DomainId
@@ -280,7 +280,6 @@ module Database =
                     let newId =
                         idValue.Value.ToString()
                         |> IdentityHash.generate identityNamespace
-
                     obj.Property(propertyName).Value <- JValue(newId)
                 | None -> ()
 
@@ -435,7 +434,6 @@ module Database =
                    || not
                       <| root.Property("namespaceTemplates").HasValues then
                     root.Add(JProperty("namespaceTemplates", JArray()))
-
                 root.Property("version").Value <- JValue(2)
                 root.ToString()
 
@@ -470,47 +468,74 @@ module Database =
           Collaborations: CollectionOfGuid<Serialization.Collaboration>
           NamespaceTemplates: CollectionOfGuid<Projections.NamespaceTemplate> }
 
+    type SingleFileBasedDatastore =
+        abstract member Read : unit -> Async<Document>
+        abstract member Change : (Document -> Result<Document, string>) -> Async<Result<unit, string>>
 
-    type FileBased(fileName: string, initial: Serialization.Root) =
+    module AgentBased =
+        type Agent<'T> = MailboxProcessor<'T>
 
-        let mutable (version, document) =
-            (initial.Version,
-             { Domains = collectionOfGuid initial.Domains (fun d -> d.Id)
-               BoundedContexts = collectionOfGuid initial.BoundedContexts (fun d -> d.Id)
-               Collaborations = collectionOfGuid initial.Collaborations (fun d -> d.Id)
-               NamespaceTemplates = collectionOfGuid initial.NamespaceTemplates (fun d -> d.Id) })
+        type private Msg =
+            | Read of AsyncReplyChannel<Document>
+            | Write of (Document -> Result<Document, string>) * AsyncReplyChannel<Result<unit, string>>
 
-        let write change =
-            lock
-                fileName
-                (fun () ->
+        let initialize (fileName: string, initial: Serialization.Root) : SingleFileBasedDatastore =
+            let version, initialDocument =
+                (initial.Version,
+                 { Domains = collectionOfGuid initial.Domains (fun d -> d.Id)
+                   BoundedContexts = collectionOfGuid initial.BoundedContexts (fun d -> d.Id)
+                   Collaborations = collectionOfGuid initial.Collaborations (fun d -> d.Id)
+                   NamespaceTemplates = collectionOfGuid initial.NamespaceTemplates (fun d -> d.Id) })
+
+            let filePersistence (inbox: Agent<Msg>) =
+                let rec loop document =
                     async {
-                        match change document with
-                        | Ok (changed: Document, returnValue) ->
-                            do!
-                                { Serialization.Version = version
-                                  Serialization.Domains = changed.Domains.All
-                                  Serialization.BoundedContexts = changed.BoundedContexts.All
-                                  Serialization.Collaborations = changed.Collaborations.All
-                                  Serialization.NamespaceTemplates = changed.NamespaceTemplates.All }
-                                |> Serialization.serialize
-                                |> Persistence.save fileName
-                                |> Async.AwaitTask
+                        let! msg = inbox.Receive()
 
-                            document <- changed
-                            return Ok returnValue
-                        | Error e -> return Error e
-                    })
+                        match msg with
+                        | Read reply ->
+                            reply.Reply document
+                            return! loop document
+                        | Write (change, reply) ->
+                            match change document with
+                            | Ok (changed: Document) ->
+                                do!
+                                    { Serialization.Version = version
+                                      Serialization.Domains = changed.Domains.All
+                                      Serialization.BoundedContexts = changed.BoundedContexts.All
+                                      Serialization.Collaborations = changed.Collaborations.All
+                                      Serialization.NamespaceTemplates = changed.NamespaceTemplates.All }
+                                    |> Serialization.serialize
+                                    |> Persistence.save fileName
+                                    |> Async.AwaitTask
 
-        static member Load(path: string) =
+                                reply.Reply(Ok())
+                                return! loop changed
+                            | Error e ->
+                                reply.Reply(Error e)
+                                return! loop document
+                    }
+
+                loop initialDocument
+
+            let agent = Agent.Start(filePersistence)
+
+            { new SingleFileBasedDatastore with
+                member _.Read() =
+                    agent.PostAndAsyncReply(fun reply -> Read reply)
+
+                member _.Change change =
+                    agent.PostAndAsyncReply(fun reply -> Write(change, reply)) }
+
+        let load (path: string) =
             task {
                 let! content = Persistence.read path
                 let root = content |> Serialization.deserialize
 
-                return FileBased(path, root)
+                return initialize (path, root)
             }
 
-        static member EmptyDatabase(path: string) =
+        let emptyDatabase (path: string) =
             task {
                 match Path.GetDirectoryName path with
                 | "" -> ()
@@ -523,15 +548,14 @@ module Database =
                     |> Serialization.serialize
                     |> Persistence.save path
 
-                return FileBased(path, root)
+                return initialize (path, root)
             }
 
-        static member InitializeDatabase fileName =
+        let initializeDatabase fileName =
             if not (File.Exists fileName) then
-                FileBased.EmptyDatabase(fileName)
+                emptyDatabase (fileName)
             else
-                load(fileName)
-
+                load (fileName)
 
     module Mutable =
         type FileBased(fileName: string, initial: Serialization.Root) =
@@ -561,9 +585,8 @@ module Database =
                                     |> Async.AwaitTask
 
                                 document <- changed
-                                return Ok ()
-                            | Error (e:string) ->
-                                return Error e
+                                return Ok()
+                            | Error (e: string) -> return Error e
                         })
 
             static member Load(path: string) =
@@ -597,5 +620,5 @@ module Database =
                     FileBased.Load(fileName)
 
             interface SingleFileBasedDatastore with
-                member _.Read () = async { return document}
+                member _.Read() = async { return document }
                 member _.Change change = async { return! write change }

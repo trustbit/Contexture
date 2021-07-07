@@ -7,6 +7,7 @@ open Contexture.Api.Aggregates.NamespaceTemplate.Projections
 open Database
 open Contexture.Api.Infrastructure
 open FSharp.Control.Tasks
+open Microsoft.Extensions.Logging
 
 module CommandHandler =
     type CommandHandlerError<'T, 'Id> =
@@ -116,10 +117,10 @@ module FileBasedCommandHandlers =
                     | NoOp -> collection |> Ok
                 | Error e -> Error e
                 
-        let waitForDbChange results = async {
-            do!
-                results
-                |> Async.Ignore
+        let waitForDbChange (logger: ILogger) results = async {
+            match! results with
+            | Ok _ -> return ()
+            | Error (e: string) -> logger.LogCritical("Could not update database: {Error}", e)
         }
 
     module Domain =
@@ -181,7 +182,7 @@ module FileBasedCommandHandlers =
                 State.evolve Initial event
             |> convertToOption 
                 
-        let subscription (database: SingleFileBasedDatastore): Subscription<Domain.Event> =
+        let subscription logger (database: SingleFileBasedDatastore): Subscription<Domain.Event> =
             fun (events: EventEnvelope<Domain.Event> list) ->
                 database.Change(fun document ->
                     events
@@ -190,7 +191,7 @@ module FileBasedCommandHandlers =
                            (Ok document.Domains)
                     |> Result.map (fun c -> { document with Domains = c })
                     |> Result.mapError (fun e -> $"%O{e}"))
-                |> waitForDbChange
+                |> waitForDbChange logger
 
     module BoundedContext =
 
@@ -264,7 +265,7 @@ module FileBasedCommandHandlers =
                 |> Option.map (convertToSerialization [])
             
 
-        let subscription (database: SingleFileBasedDatastore): Subscription<Event> =
+        let subscription logger (database: SingleFileBasedDatastore): Subscription<Event> =
             fun (events: EventEnvelope<Event> list) ->
                 database.Change(fun document ->
                     events
@@ -273,7 +274,7 @@ module FileBasedCommandHandlers =
                            (Ok document.BoundedContexts)
                     |> Result.map (fun c -> { document with BoundedContexts = c })
                     |> Result.mapError (fun e -> $"%O{e}"))
-                |> waitForDbChange
+                |> waitForDbChange logger
 
     module Collaboration =
         
@@ -333,7 +334,7 @@ module FileBasedCommandHandlers =
                 Collaboration.State.evolve Collaboration.Initial event
             |> convertToOption 
 
-        let subscription (database: SingleFileBasedDatastore): Subscription<Collaboration.Event> =
+        let subscription logger (database: SingleFileBasedDatastore): Subscription<Collaboration.Event> =
             fun (events: EventEnvelope<Collaboration.Event> list) -> 
                 database.Change(fun document ->
                     events
@@ -343,7 +344,7 @@ module FileBasedCommandHandlers =
                     |> Result.map (fun c -> { document with Collaborations = c })
                     |> Result.mapError (fun e -> $"%O{e}")
                 )
-                |> waitForDbChange
+                |> waitForDbChange logger
 
     module Namespace =
         open Namespace
@@ -389,7 +390,7 @@ module FileBasedCommandHandlers =
                 { boundedContext with Namespaces = Projections.asNamespaces boundedContext.Namespaces event })
 
 
-        let subscription (database: SingleFileBasedDatastore): Subscription<Event> =
+        let subscription logger (database: SingleFileBasedDatastore): Subscription<Event> =
             fun (events: EventEnvelope<Event> list) ->
                 database.Change(fun document ->
                     events
@@ -398,7 +399,7 @@ module FileBasedCommandHandlers =
                            (Ok document.BoundedContexts)
                     |> Result.map (fun c -> { document with BoundedContexts = c })
                     |> Result.mapError (fun e -> $"%O{e}"))
-                |> waitForDbChange
+                |> waitForDbChange logger
 
     module NamespaceTemplate =
         open NamespaceTemplate
@@ -433,7 +434,7 @@ module FileBasedCommandHandlers =
             }
             |> List.singleton
 
-        let subscription (database: SingleFileBasedDatastore): Subscription<Event> =
+        let subscription logger (database: SingleFileBasedDatastore): Subscription<Event> =
             fun (events: EventEnvelope<Event> list) ->
                 database.Change(fun document ->
                     events
@@ -442,4 +443,4 @@ module FileBasedCommandHandlers =
                            (Ok document.NamespaceTemplates)
                     |> Result.map (fun c -> { document with NamespaceTemplates = c })
                     |> Result.mapError (fun e -> $"%O{e}"))
-                |> waitForDbChange
+                |> waitForDbChange logger

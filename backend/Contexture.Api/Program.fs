@@ -181,7 +181,7 @@ let configureServices (context: HostBuilderContext) (services : IServiceCollecti
     services.AddSingleton<SingleFileBasedDatastore>(fun services ->
         let options = services.GetRequiredService<IOptions<ContextureOptions>>()
         // TODO: danger zone - loading should not be done as part of the initialization
-        Mutable.FileBased.InitializeDatabase(options.Value.DatabasePath)
+        AgentBased.initializeDatabase(options.Value.DatabasePath)
         |> Async.AwaitTask
         |> Async.RunSynchronously
         )
@@ -272,13 +272,16 @@ let runAsync (host: IHost) =
 
         let! document = database.Read()
         do! importFromDocument store document
+        
+        let loggerFactory = host.Services.GetRequiredService<ILoggerFactory>()
+        let subscriptionLogger = loggerFactory.CreateLogger("subscriptions")
 
         // subscriptions for syncing back to the filebased-db are added after initial seeding/loading
-        store.Subscribe(Collaboration.subscription database)
-        store.Subscribe(Domain.subscription database)
-        store.Subscribe(BoundedContext.subscription database)
-        store.Subscribe(Namespace.subscription database)
-        store.Subscribe(NamespaceTemplate.subscription database)
+        store.Subscribe(Collaboration.subscription subscriptionLogger database)
+        store.Subscribe(Domain.subscription subscriptionLogger database)
+        store.Subscribe(BoundedContext.subscription subscriptionLogger database)
+        store.Subscribe(Namespace.subscription subscriptionLogger database)
+        store.Subscribe(NamespaceTemplate.subscription subscriptionLogger database)
 
         return! host.RunAsync()
     }
