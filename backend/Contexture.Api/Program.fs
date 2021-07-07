@@ -25,7 +25,7 @@ module AllRoute =
 
     let getAllData =
         fun (next: HttpFunc) (ctx: HttpContext) -> task {
-            let database = ctx.GetService<FileBased>()
+            let database = ctx.GetService<SingleFileBasedDatastore>()
             let! document = database.Read()
 
             let result =
@@ -47,7 +47,7 @@ module AllRoute =
     let postAllData =
         fun (next: HttpFunc) (ctx: HttpContext) ->
             task {
-                let database = ctx.GetService<FileBased>()
+                let database = ctx.GetService<SingleFileBasedDatastore>()
                 let notEmpty items = not (List.isEmpty items)
                 let! data = ctx.BindJsonAsync<UpdateAllData>()
 
@@ -63,7 +63,7 @@ module AllRoute =
                                       Collaborations = collectionOfGuid data.Collaborations (fun d -> d.Id)
                                       NamespaceTemplates = collectionOfGuid data.NamespaceTemplates (fun d -> d.Id) }
 
-                                Ok(newDocument, ()))
+                                Ok newDocument)
 
                     match result with
                     | Ok _ ->
@@ -178,10 +178,10 @@ let configureServices (context: HostBuilderContext) (services : IServiceCollecti
         .Bind(context.Configuration)
         .Validate((fun options -> not (String.IsNullOrEmpty options.DatabasePath)), "A non-empty DatabasePath configuration is required")
         |> ignore
-    services.AddSingleton<FileBased>(fun services ->
+    services.AddSingleton<SingleFileBasedDatastore>(fun services ->
         let options = services.GetRequiredService<IOptions<ContextureOptions>>()
         // TODO: danger zone - loading should not be done as part of the initialization
-        FileBased.InitializeDatabase(options.Value.DatabasePath)
+        Mutable.FileBased.InitializeDatabase(options.Value.DatabasePath)
         |> Async.AwaitTask
         |> Async.RunSynchronously
         )
@@ -259,7 +259,7 @@ let runAsync (host: IHost) =
     task {
         // make sure the database is loaded
         let database =
-            host.Services.GetRequiredService<FileBased>()
+            host.Services.GetRequiredService<SingleFileBasedDatastore>()
 
         let store =
             host.Services.GetRequiredService<EventStore>()

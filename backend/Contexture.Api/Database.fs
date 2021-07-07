@@ -530,7 +530,72 @@ module Database =
             if not (File.Exists fileName) then
                 FileBased.EmptyDatabase(fileName)
             else
-                FileBased.Load(fileName)
+                load(fileName)
 
-        member _.Read () = async { return document}
-        member _.Change change = async { return! write change }
+
+    module Mutable =
+        type FileBased(fileName: string, initial: Serialization.Root) =
+
+            let mutable (version, document) =
+                (initial.Version,
+                 { Domains = collectionOfGuid initial.Domains (fun d -> d.Id)
+                   BoundedContexts = collectionOfGuid initial.BoundedContexts (fun d -> d.Id)
+                   Collaborations = collectionOfGuid initial.Collaborations (fun d -> d.Id)
+                   NamespaceTemplates = collectionOfGuid initial.NamespaceTemplates (fun d -> d.Id) })
+
+            let write change =
+                lock
+                    fileName
+                    (fun () ->
+                        async {
+                            match change document with
+                            | Ok (changed: Document) ->
+                                do!
+                                    { Serialization.Version = version
+                                      Serialization.Domains = changed.Domains.All
+                                      Serialization.BoundedContexts = changed.BoundedContexts.All
+                                      Serialization.Collaborations = changed.Collaborations.All
+                                      Serialization.NamespaceTemplates = changed.NamespaceTemplates.All }
+                                    |> Serialization.serialize
+                                    |> Persistence.save fileName
+                                    |> Async.AwaitTask
+
+                                document <- changed
+                                return Ok ()
+                            | Error (e:string) ->
+                                return Error e
+                        })
+
+            static member Load(path: string) =
+                task {
+                    let! content = Persistence.read path
+                    let root = content |> Serialization.deserialize
+
+                    return FileBased(path, root) :> SingleFileBasedDatastore
+                }
+
+            static member EmptyDatabase(path: string) =
+                task {
+                    match Path.GetDirectoryName path with
+                    | "" -> ()
+                    | directoryPath -> Directory.CreateDirectory directoryPath |> ignore
+
+                    let root = Serialization.Root.Empty
+
+                    do!
+                        root
+                        |> Serialization.serialize
+                        |> Persistence.save path
+
+                    return FileBased(path, root) :> SingleFileBasedDatastore
+                }
+
+            static member InitializeDatabase fileName =
+                if not (File.Exists fileName) then
+                    FileBased.EmptyDatabase(fileName)
+                else
+                    FileBased.Load(fileName)
+
+            interface SingleFileBasedDatastore with
+                member _.Read () = async { return document}
+                member _.Change change = async { return! write change }

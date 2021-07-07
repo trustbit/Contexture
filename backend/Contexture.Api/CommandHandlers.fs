@@ -181,14 +181,15 @@ module FileBasedCommandHandlers =
                 State.evolve Initial event
             |> convertToOption 
                 
-        let subscription (database: FileBased): Subscription<Domain.Event> =
+        let subscription (database: SingleFileBasedDatastore): Subscription<Domain.Event> =
             fun (events: EventEnvelope<Domain.Event> list) ->
                 database.Change(fun document ->
                     events
                     |> List.fold
                         (applyToCollection mapDomainToSerialization)
                            (Ok document.Domains)
-                    |> Result.map (fun c -> { document with Domains = c }, System.Guid.Empty))
+                    |> Result.map (fun c -> { document with Domains = c })
+                    |> Result.mapError (fun e -> $"%O{e}"))
                 |> waitForDbChange
 
     module BoundedContext =
@@ -263,14 +264,15 @@ module FileBasedCommandHandlers =
                 |> Option.map (convertToSerialization [])
             
 
-        let subscription (database: FileBased): Subscription<Event> =
+        let subscription (database: SingleFileBasedDatastore): Subscription<Event> =
             fun (events: EventEnvelope<Event> list) ->
                 database.Change(fun document ->
                     events
                     |> List.fold
                         (applyToCollection mapSerialization)
                            (Ok document.BoundedContexts)
-                    |> Result.map (fun c -> { document with BoundedContexts = c }, System.Guid.Empty))
+                    |> Result.map (fun c -> { document with BoundedContexts = c })
+                    |> Result.mapError (fun e -> $"%O{e}"))
                 |> waitForDbChange
 
     module Collaboration =
@@ -331,14 +333,15 @@ module FileBasedCommandHandlers =
                 Collaboration.State.evolve Collaboration.Initial event
             |> convertToOption 
 
-        let subscription (database: FileBased): Subscription<Collaboration.Event> =
+        let subscription (database: SingleFileBasedDatastore): Subscription<Collaboration.Event> =
             fun (events: EventEnvelope<Collaboration.Event> list) -> 
                 database.Change(fun document ->
                     events
                     |> List.fold
                         (applyToCollection mapToSerialization)
                            (Ok document.Collaborations)
-                    |> Result.map (fun c -> { document with Collaborations = c }, System.Guid.Empty)
+                    |> Result.map (fun c -> { document with Collaborations = c })
+                    |> Result.mapError (fun e -> $"%O{e}")
                 )
                 |> waitForDbChange
 
@@ -386,14 +389,15 @@ module FileBasedCommandHandlers =
                 { boundedContext with Namespaces = Projections.asNamespaces boundedContext.Namespaces event })
 
 
-        let subscription (database: FileBased): Subscription<Event> =
+        let subscription (database: SingleFileBasedDatastore): Subscription<Event> =
             fun (events: EventEnvelope<Event> list) ->
                 database.Change(fun document ->
                     events
                     |> List.fold
                         (applyToCollection asNamespaceWithBoundedContext)
                            (Ok document.BoundedContexts)
-                    |> Result.map (fun c -> { document with BoundedContexts = c }, System.Guid.Empty))
+                    |> Result.map (fun c -> { document with BoundedContexts = c })
+                    |> Result.mapError (fun e -> $"%O{e}"))
                 |> waitForDbChange
 
     module NamespaceTemplate =
@@ -429,12 +433,13 @@ module FileBasedCommandHandlers =
             }
             |> List.singleton
 
-        let subscription (database: FileBased): Subscription<Event> =
+        let subscription (database: SingleFileBasedDatastore): Subscription<Event> =
             fun (events: EventEnvelope<Event> list) ->
                 database.Change(fun document ->
                     events
                     |> List.fold
                         (applyToCollection Projections.asTemplate)
                            (Ok document.NamespaceTemplates)
-                    |> Result.map (fun c -> { document with NamespaceTemplates = c }, System.Guid.Empty))
+                    |> Result.map (fun c -> { document with NamespaceTemplates = c })
+                    |> Result.mapError (fun e -> $"%O{e}"))
                 |> waitForDbChange
