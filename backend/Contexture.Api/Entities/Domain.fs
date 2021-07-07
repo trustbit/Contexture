@@ -2,8 +2,10 @@ namespace Contexture.Api.Aggregates
 
 module Domain =
     open System
-    open Contexture.Api.Entities
-
+    module ValueObjects =
+        type DomainId = Guid
+        
+    open ValueObjects
     type Command =
         | CreateDomain of DomainId * CreateDomain
         | CreateSubdomain of DomainId * subdomainOf: DomainId * CreateDomain

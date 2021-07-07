@@ -1,8 +1,6 @@
 namespace Contexture.Api
 
 open System
-open Contexture.Api.Entities
-open Contexture.Api.Aggregates.BoundedContext
 open Contexture.Api.Infrastructure
 open Contexture.Api.ReadModels
 open Contexture.Api.ReadModels.Find
@@ -55,6 +53,8 @@ module SearchFor =
                     return None
             }
     module NamespaceId =
+        open Contexture.Api.Aggregates.Namespace
+        open ValueObjects
 
         [<CLIMutable>]
         type NamespaceQuery =

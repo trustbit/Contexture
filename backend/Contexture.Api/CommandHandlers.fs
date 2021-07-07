@@ -2,6 +2,7 @@ namespace Contexture.Api
 
 open System.Threading.Tasks
 open Contexture.Api
+open Contexture.Api.Aggregates.Domain
 open Contexture.Api.Aggregates.NamespaceTemplate.Projections
 open Database
 open Contexture.Api.Infrastructure
@@ -124,7 +125,6 @@ module FileBasedCommandHandlers =
 
     module Domain =
         open Contexture.Api.Aggregates.Domain
-        open Contexture.Api.Entities
         open BridgeEventSourcingWithFilebasedDatabase
         
         let aggregate =
@@ -195,8 +195,6 @@ module FileBasedCommandHandlers =
     module BoundedContext =
 
         open BridgeEventSourcingWithFilebasedDatabase
-        
-        open Contexture.Api.Entities
         open BoundedContext
         
         let aggregate =
@@ -210,7 +208,7 @@ module FileBasedCommandHandlers =
             |> stateBasedHandler BoundedContext.name
             |> CommandHandler.getIdentityFromCommand BoundedContext.identify   
 
-        let asEvents clock (collaboration: BoundedContext) =
+        let asEvents clock (collaboration: Serialization.BoundedContext) =
             { Metadata =
                   { Source = collaboration.Id
                     RecordedAt = clock () }
@@ -228,18 +226,53 @@ module FileBasedCommandHandlers =
                         Name = collaboration.Name }
             }
             |> List.singleton
+            
+            
+        let mapSerialization (boundedContext: Serialization.BoundedContext option) (event: BoundedContext.Event): Serialization.BoundedContext option =
+            let convertToSerialization namespaces (context: Projections.BoundedContext): Serialization.BoundedContext =
+                { Id = context.Id
+                  DomainId = context.DomainId
+                  Key = context.Key
+                  Name = context.Name
+                  Description = context.Description
+                  Classification = context.Classification
+                  BusinessDecisions = context.BusinessDecisions
+                  UbiquitousLanguage = context.UbiquitousLanguage
+                  Messages = context.Messages
+                  DomainRoles = context.DomainRoles
+                  Namespaces = namespaces
+                }
+                
+            match boundedContext with
+            | Some bc ->
+                let mapped: Projections.BoundedContext =
+                    { Id = bc.Id
+                      DomainId = bc.DomainId
+                      Key = bc.Key
+                      Name = bc.Name
+                      Description = bc.Description
+                      Classification = bc.Classification
+                      BusinessDecisions = bc.BusinessDecisions
+                      UbiquitousLanguage = bc.UbiquitousLanguage
+                      Messages = bc.Messages
+                      DomainRoles = bc.DomainRoles                        
+                    }
+                BoundedContext.Projections.asBoundedContext (Some mapped) event
+                |> Option.map (convertToSerialization bc.Namespaces)
+            | None ->
+                BoundedContext.Projections.asBoundedContext None event
+                |> Option.map (convertToSerialization [])
+            
 
         let subscription (database: FileBased): Subscription<Event> =
             fun (events: EventEnvelope<Event> list) ->
                 database.Change(fun document ->
                     events
                     |> List.fold
-                        (applyToCollection BoundedContext.Projections.asBoundedContext)
+                        (applyToCollection mapSerialization)
                            (Ok document.BoundedContexts)
                     |> Result.map (fun c -> { document with BoundedContexts = c }, System.Guid.Empty))
                 |> waitForDbChange
-
-
 
     module Collaboration =
         
@@ -311,8 +344,8 @@ module FileBasedCommandHandlers =
                 |> waitForDbChange
 
     module Namespace =
-        open Entities
         open Namespace
+        open ValueObjects
         open BridgeEventSourcingWithFilebasedDatabase
         
         let aggregate =
@@ -326,7 +359,7 @@ module FileBasedCommandHandlers =
             |> stateBasedHandler Namespace.name
             |> CommandHandler.getIdentityFromCommand Namespace.identify   
 
-        let asEvents clock (boundedContext: BoundedContext) =
+        let asEvents clock (boundedContext: Serialization.BoundedContext) =
             boundedContext.Namespaces
             |> List.map (fun n ->
                 { Metadata =
@@ -348,19 +381,23 @@ module FileBasedCommandHandlers =
                           }
                 }
             )
+        let asNamespaceWithBoundedContext (boundedContextOption: Serialization.BoundedContext option) event =
+            boundedContextOption
+            |> Option.map (fun boundedContext ->
+                { boundedContext with Namespaces = Projections.asNamespaces boundedContext.Namespaces event })
+
 
         let subscription (database: FileBased): Subscription<Event> =
             fun (events: EventEnvelope<Event> list) ->
                 database.Change(fun document ->
                     events
                     |> List.fold
-                        (applyToCollection Projections.asNamespaceWithBoundedContext)
+                        (applyToCollection asNamespaceWithBoundedContext)
                            (Ok document.BoundedContexts)
                     |> Result.map (fun c -> { document with BoundedContexts = c }, System.Guid.Empty))
                 |> waitForDbChange
 
     module NamespaceTemplate =
-        open Entities
         open NamespaceTemplate
         open BridgeEventSourcingWithFilebasedDatabase
         

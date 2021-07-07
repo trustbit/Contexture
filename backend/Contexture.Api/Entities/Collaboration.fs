@@ -1,7 +1,5 @@
 module Contexture.Api.Aggregates.Collaboration
 
-open Contexture.Api.Entities
-
 module ValueObjects =
     type CollaborationId = System.Guid
 
@@ -42,8 +40,8 @@ module ValueObjects =
         | Unknown
 
     type Collaborator =
-        | BoundedContext of BoundedContext: BoundedContextId
-        | Domain of Domain: DomainId
+        | BoundedContext of BoundedContext: BoundedContext.ValueObjects.BoundedContextId
+        | Domain of Domain: Domain.ValueObjects.DomainId
         | ExternalSystem of ExternalSystem: string
         | Frontend of Frontend: string
         | UserInteraction of UserInteraction: string

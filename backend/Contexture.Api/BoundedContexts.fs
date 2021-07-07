@@ -4,8 +4,7 @@ open System
 open Contexture.Api.Aggregates
 open Contexture.Api.Database
 open Contexture.Api.Domains
-open Contexture.Api.Entities
-open Contexture.Api.Aggregates.BoundedContext
+
 open Contexture.Api.Infrastructure
 open Contexture.Api.ReadModels.Find
 open Microsoft.AspNetCore.Http
@@ -14,6 +13,9 @@ open FSharp.Control.Tasks
 open Giraffe
 
 module BoundedContexts =
+    open Contexture.Api.Aggregates.Namespace
+    open Contexture.Api.Aggregates.BoundedContext
+    open ValueObjects
     module Results =
         
         type BoundedContextResult =
@@ -28,12 +30,12 @@ module BoundedContexts =
               Messages: Messages
               DomainRoles: DomainRole list
               Domain: Domain.Domain
-              Namespaces: Namespace list }
+              Namespaces: Projections.Namespace list }
 
         let convertBoundedContextWithDomain
             (findDomain: DomainId -> Domain.Domain option)
-            (findNamespaces: BoundedContextId -> Namespace list)
-            (boundedContext: BoundedContext)
+            (findNamespaces: BoundedContextId -> Projections.Namespace list)
+            (boundedContext: Projections.BoundedContext)
             =
             { Id = boundedContext.Id
               ParentDomainId = boundedContext.DomainId

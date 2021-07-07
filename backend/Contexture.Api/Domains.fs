@@ -1,9 +1,7 @@
 ﻿namespace Contexture.Api
 
 open System
-open Contexture.Api.Aggregates.BoundedContext
-open Contexture.Api.Database
-open Contexture.Api.Entities
+
 open Contexture.Api.Infrastructure
 open Contexture.Api.Infrastructure.Projections
 open Microsoft.AspNetCore.Http
@@ -12,10 +10,13 @@ open FSharp.Control.Tasks
 open Giraffe
 
 module Domains =
+    open Contexture.Api.Aggregates.BoundedContext
+    open Contexture.Api.Aggregates.Namespace
     open Aggregates.Domain
-    
+    open ValueObjects
 
     module Results =
+        
         
         open Projections
 

@@ -1,8 +1,8 @@
 module Contexture.Api.Aggregates.NamespaceTemplate
 
 open System
-open Contexture.Api.Entities
 
+open Namespace.ValueObjects
 type Errors =
     | EmptyName
     | NamespaceNameNotUnique

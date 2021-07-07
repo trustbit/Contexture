@@ -2,9 +2,8 @@ namespace Contexture.Api.ReadModels
 
 open System
 open Contexture.Api
-open Contexture.Api.Aggregates.Namespace
+
 open Contexture.Api.Infrastructure
-open Entities
 
 module Find =
     type Operator =
@@ -186,6 +185,8 @@ module Find =
         |> List.map (Map.toList >> List.map selectResult >> Set.ofList)
 
     module Namespaces =
+        open Contexture.Api.Aggregates.Namespace
+        open ValueObjects
         type NamespaceModel =
             { NamespaceId: NamespaceId
               NamespaceTemplateId: NamespaceTemplateId option }
@@ -234,6 +235,9 @@ module Find =
         }
 
     module Labels =
+        open Contexture.Api.Aggregates.BoundedContext
+        open Contexture.Api.Aggregates.Namespace
+        open ValueObjects
         type LabelAndNamespaceModel =
             { Value: string option
               NamespaceId: NamespaceId
@@ -358,7 +362,7 @@ module Find =
 
     module Domains =
         open Contexture.Api.Aggregates.Domain
-
+        open ValueObjects
         type DomainByKeyAndNameModel =
             { ByKey: Map<string, DomainId>
               ByName: Map<string, Set<DomainId>> }
@@ -427,6 +431,7 @@ module Find =
 
     module BoundedContexts =
         open Contexture.Api.Aggregates.BoundedContext
+        open ValueObjects
 
         type BoundedContextByKeyAndNameModel =
             { ByKey: Map<string, BoundedContextId>

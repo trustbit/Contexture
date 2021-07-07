@@ -5,11 +5,11 @@ open Contexture.Api.Aggregates
 open Contexture.Api.Aggregates.NamespaceTemplate.Projections
 open Contexture.Api.Infrastructure
 open Contexture.Api.Infrastructure.Projections
-open Entities
 
 module Domain =
 
     open Contexture.Api.Aggregates.Domain
+    open ValueObjects
 
     type AllDomainState =
         { Domains: Map<EventSource, Domain.State>
@@ -65,6 +65,9 @@ module Domain =
 
 module BoundedContext =
     open Contexture.Api.Aggregates.BoundedContext
+    open ValueObjects
+    open Projections
+    
 
     type BoundedContextState =
         { BoundedContexts: Map<BoundedContextId, BoundedContext option>
@@ -73,7 +76,7 @@ module BoundedContext =
             { BoundedContexts = Map.empty
               ByDomain = Map.empty }
 
-    type AllBoundedContextsReadModel = ReadModels.ReadModel<Event, BoundedContextState>
+    type AllBoundedContextsReadModel = ReadModels.ReadModel<BoundedContext.Event, BoundedContextState>
 
     let private boundedContextProjection : Projection<BoundedContext option, Aggregates.BoundedContext.Event> =
         { Init = None
@@ -160,12 +163,13 @@ module Collaboration =
 
 module Namespace =
     open Contexture.Api.Aggregates.Namespace
+    open ValueObjects
 
-    let private namespacesProjection : Projection<Namespace list, Aggregates.Namespace.Event> =
+    let private namespacesProjection : Projection<Projections.Namespace list, Aggregates.Namespace.Event> =
         { Init = List.empty
           Update = Projections.asNamespaces }
 
-    let private namespaceProjection : Projection<Namespace option, Aggregates.Namespace.Event> =
+    let private namespaceProjection : Projection<Projections.Namespace option, Aggregates.Namespace.Event> =
         { Init = None
           Update = Projections.asNamespace }
 
@@ -177,7 +181,7 @@ module Namespace =
         | LabelAdded l -> l.NamespaceId
         | LabelRemoved l -> l.NamespaceId
 
-    let namespaceLookup (eventStore: EventStore) : Async<Map<NamespaceId, Namespace>> =
+    let namespaceLookup (eventStore: EventStore) : Async<Map<NamespaceId, Projections.Namespace>> =
         async {
             let! allStreams = eventStore.AllStreams<Aggregates.Namespace.Event>()
 

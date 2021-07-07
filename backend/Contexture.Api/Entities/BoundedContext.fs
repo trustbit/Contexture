@@ -1,7 +1,74 @@
 module Contexture.Api.Aggregates.BoundedContext
 
-open Contexture.Api.Entities
+open Contexture.Api
+open Contexture.Api.Aggregates
 open System
+
+module ValueObjects =
+    type DomainId = Domain.ValueObjects.DomainId
+    type DomainType =
+        | Core
+        | Supporting
+        | Generic
+        | OtherDomainType of string
+
+    type BusinessModel =
+        | Revenue
+        | Engagement
+        | Compliance
+        | CostReduction
+        | OtherBusinessModel of string
+
+    type Evolution =
+        | Genesis
+        | CustomBuilt
+        | Product
+        | Commodity
+
+    type StrategicClassification =
+        { DomainType: DomainType option
+          BusinessModel: BusinessModel list
+          Evolution: Evolution option }
+        static member Unknown =
+            { DomainType = None
+              BusinessModel = []
+              Evolution = None }
+
+    type BusinessDecision = { Name: string; Description: string }
+
+    type UbiquitousLanguageTerm =
+        { Term: string
+          Description: string option }
+
+    type Message = string
+    type Command = Message
+    type Event = Message
+    type Query = Message
+
+    type Messages =
+        { CommandsHandled: Command list
+          CommandsSent: Command list
+          EventsHandled: Event list
+          EventsPublished: Event list
+          QueriesHandled: Query list
+          QueriesInvoked: Query list }
+        static member Empty =
+            { CommandsHandled = []
+              CommandsSent = []
+              EventsHandled = []
+              EventsPublished = []
+              QueriesHandled = []
+              QueriesInvoked = [] }
+
+    type DomainRole =
+        { Name: string
+          Description: string option }
+        
+    type BoundedContextId = Guid
+
+
+open Domain.ValueObjects
+open ValueObjects
 
 type Command =
     | CreateBoundedContext of BoundedContextId * DomainId * CreateBoundedContext
@@ -212,7 +279,18 @@ let decide (command: Command) state =
     |> Result.map List.singleton
 
 module Projections =
-    let asBoundedContext state event =
+    type BoundedContext =
+        { Id: BoundedContextId
+          DomainId: DomainId
+          Key: string option
+          Name: string
+          Description: string option
+          Classification: StrategicClassification
+          BusinessDecisions: BusinessDecision list
+          UbiquitousLanguage: Map<string, UbiquitousLanguageTerm>
+          Messages: Messages
+          DomainRoles: DomainRole list }
+    let asBoundedContext (state: BoundedContext option) event =
         match event with
         | BoundedContextImported c ->
             match state with
@@ -240,8 +318,7 @@ module Projections =
                       UbiquitousLanguage = c.UbiquitousLanguage
                       BusinessDecisions = c.BusinessDecisions
                       Key = c.Key
-                      Name = c.Name
-                      Namespaces = [] }
+                      Name = c.Name }
         | BoundedContextCreated c ->
             Some
                 { Id = c.BoundedContextId
@@ -253,8 +330,7 @@ module Projections =
                   Classification = StrategicClassification.Unknown
                   DomainRoles = []
                   BusinessDecisions = []
-                  UbiquitousLanguage = Map.empty
-                  Namespaces = [] }
+                  UbiquitousLanguage = Map.empty }
         | BoundedContextRemoved c -> None
         | BoundedContextRenamed c ->
             state

@@ -7,7 +7,6 @@ open System.Text.Json.Serialization
 
 open Contexture.Api.Aggregates
 open Contexture.Api.Aggregates.NamespaceTemplate
-open Contexture.Api.Entities
 open Contexture.Api.Aggregates.Collaboration
 open FSharp.Control.Tasks
 
@@ -143,6 +142,8 @@ module Database =
 
         open Newtonsoft.Json.Linq
         open ValueObjects
+        open Domain.ValueObjects
+        open BoundedContext.ValueObjects
 
         type Domain =
             { Id: DomainId
@@ -157,6 +158,19 @@ module Database =
               Initiator: Collaborator
               Recipient: Collaborator
               RelationshipType: RelationshipType option }
+            
+        type BoundedContext =
+            { Id: BoundedContextId
+              DomainId: DomainId
+              Key: string option
+              Name: string
+              Description: string option
+              Classification: StrategicClassification
+              BusinessDecisions: BusinessDecision list
+              UbiquitousLanguage: Map<string, UbiquitousLanguageTerm>
+              Messages: Messages
+              DomainRoles: DomainRole list
+              Namespaces: Namespace.Projections.Namespace list }
 
         type Root =
             { Version: int option
@@ -454,7 +468,7 @@ module Database =
 
     type Document =
         { Domains: CollectionOfGuid<Serialization.Domain>
-          BoundedContexts: CollectionOfGuid<BoundedContext>
+          BoundedContexts: CollectionOfGuid<Serialization.BoundedContext>
           Collaborations: CollectionOfGuid<Serialization.Collaboration>
           NamespaceTemplates: CollectionOfGuid<Projections.NamespaceTemplate> }
 

@@ -2,9 +2,9 @@ namespace Contexture.Api
 
 open System
 open Contexture.Api.Aggregates
+open Contexture.Api.Aggregates.BoundedContext
 open Contexture.Api.Aggregates.Namespace
 open Contexture.Api.Database
-open Contexture.Api.Entities
 open Contexture.Api.Domains
 open Contexture.Api.Infrastructure
 open Contexture.Api.ReadModels
@@ -17,6 +17,7 @@ open Microsoft.Extensions.Hosting
 open Giraffe
 
 module Namespaces =
+    open ValueObjects
 
     let private fetchNamespaces (database: FileBased) boundedContext =
         boundedContext
@@ -24,7 +25,7 @@ module Namespaces =
         |> Option.map
             (fun b ->
                 b.Namespaces
-                |> tryUnbox<Namespace list>
+                |> tryUnbox<Projections.Namespace list>
                 |> Option.defaultValue [])
 
     module CommandEndpoints =

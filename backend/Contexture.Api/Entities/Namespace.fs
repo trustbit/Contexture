@@ -1,7 +1,17 @@
 module Contexture.Api.Aggregates.Namespace
 
 open System
-open Contexture.Api.Entities
+open Contexture.Api.Aggregates.Collaboration
+open BoundedContext.ValueObjects
+
+module ValueObjects =
+    type NamespaceTemplateId = Guid
+    type TemplateLabelId = Guid
+    type LabelId = Guid
+    type NamespaceId = Guid
+    
+        
+open ValueObjects
 
 type Errors =
     | EmptyName
@@ -150,6 +160,16 @@ let decide (command: Command) (state: State) =
 
 
 module Projections =
+    type Label =
+        { Id: LabelId
+          Name: string
+          Value: string
+          Template: TemplateLabelId option }
+    type Namespace =
+        { Id: NamespaceId
+          Template: NamespaceTemplateId option
+          Name: string
+          Labels: Label list }
     let convertLabels (labels: LabelDefinition list): Label list =
         labels
         |> List.map (fun l ->
@@ -235,8 +255,3 @@ module Projections =
                 else
                     n)
             
-            
-    let asNamespaceWithBoundedContext boundedContextOption event =
-        boundedContextOption
-        |> Option.map (fun boundedContext ->
-            { boundedContext with Namespaces = asNamespaces boundedContext.Namespaces event })

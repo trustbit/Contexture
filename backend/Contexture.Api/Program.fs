@@ -36,12 +36,10 @@ module AllRoute =
 
             json result next ctx
 
-    open Entities
-
     [<CLIMutable>]
     type UpdateAllData =
         { Domains: Serialization.Domain list
-          BoundedContexts: BoundedContext list
+          BoundedContexts: Serialization.BoundedContext list
           Collaborations: Serialization.Collaboration list
           NamespaceTemplates: NamespaceTemplate.Projections.NamespaceTemplate list }
 
