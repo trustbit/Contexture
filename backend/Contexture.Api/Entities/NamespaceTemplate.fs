@@ -65,7 +65,7 @@ type State =
     | Templates of Map<NamespaceTemplateId, string>
     static member Initial = Templates Map.empty
 
-    static member Fold (Templates templates) (event: Event) =
+    static member evolve (Templates templates) (event: Event) =
         match event with
         | NamespaceTemplateRemoved e ->
             templates
@@ -132,7 +132,7 @@ let identify =
 
 let name identity = identity
 
-let handle (state: State) (command: Command) =
+let decide (command: Command) (state: State) =
     match command with
     | NewNamespaceTemplate (id, cmd) ->
         addNewTemplate id cmd.Name cmd.Description cmd.Labels state

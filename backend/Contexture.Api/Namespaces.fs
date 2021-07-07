@@ -31,6 +31,7 @@ module Namespaces =
         open System
         open Namespace
         open FileBasedCommandHandlers
+        open CommandHandler
 
         let clock = fun () -> DateTime.UtcNow
 
@@ -38,8 +39,8 @@ module Namespaces =
             fun (next: HttpFunc) (ctx: HttpContext) ->
                 task {
                     let database = ctx.GetService<EventStore>()
-
-                    match! Namespace.handle clock database command with
+                    let eventBasedHandler = EventBased.eventStoreBasedCommandHandler clock database
+                    match! Namespace.useHandler eventBasedHandler command with
                     | Ok updatedContext ->
                         // for namespaces we don't use redirects ATM
                         let! boundedContext =
@@ -93,6 +94,7 @@ module Namespaces =
             open System
             open NamespaceTemplate
             open FileBasedCommandHandlers
+            open CommandHandler
 
             let clock = fun () -> DateTime.UtcNow
 
@@ -100,8 +102,8 @@ module Namespaces =
                 fun (next: HttpFunc) (ctx: HttpContext) ->
                     task {
                         let database = ctx.GetService<EventStore>()
-
-                        match! NamespaceTemplate.handle clock database command with
+                        let eventBasedCommandHandler = EventBased.eventStoreBasedCommandHandler clock database 
+                        match! NamespaceTemplate.useHandler eventBasedCommandHandler command with
                         | Ok updatedTemplate ->
                             return! redirectTo false (sprintf "/api/namespaces/templates/%O" updatedTemplate) next ctx
                         | Error (DomainError error) ->

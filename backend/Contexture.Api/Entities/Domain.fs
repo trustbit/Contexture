@@ -189,7 +189,7 @@ module Domain =
                   |> Option.filter (String.IsNullOrWhiteSpace >> not) }
         |> Ok
 
-    let handle (state: State) (command: Command) =
+    let decide (command: Command) (state: State) =
         match command with
         | CreateDomain (domainId, createDomain) -> newDomain domainId createDomain.Name None
         | CreateSubdomain (domainId, subdomainId, createDomain) ->

@@ -67,7 +67,7 @@ type State =
     | Namespaces of Map<NamespaceId, string>
     static member Initial = Namespaces Map.empty
 
-    static member Fold (Namespaces namespaces) (event: Event) =
+    static member evolve (Namespaces namespaces) (event: Event) =
         match event with
         | NamespaceRemoved e ->
             namespaces
@@ -133,7 +133,7 @@ let identify =
 
 let name identity = identity
 
-let handle (state: State) (command: Command) =
+let decide (command: Command) (state: State) =
     match command with
     | NewNamespace (boundedContextId, namespaceCommand) ->
         addNewNamespace boundedContextId namespaceCommand.Name namespaceCommand.Template namespaceCommand.Labels state

@@ -131,7 +131,7 @@ type State =
     | Initial
     | Existing
     | Deleted
-    static member Fold (state: State) (event: Event) =
+    static member evolve (state: State) (event: Event) =
         match event with
         | BoundedContextRemoved _ -> Deleted
         | _ -> Existing
@@ -166,7 +166,7 @@ let assignKeyToBoundedContext key boundedContextId =
     |> Ok
 
 
-let handle state (command: Command) =
+let decide (command: Command) state =
     match command with
     | CreateBoundedContext (id, domainId, createBc) -> newBoundedContext id domainId createBc.Name
     | RenameBoundedContext (contextId, rename) -> renameBoundedContext rename.Name contextId

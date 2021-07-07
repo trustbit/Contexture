@@ -54,6 +54,7 @@ module BoundedContexts =
     module CommandEndpoints =
         open System
         open FileBasedCommandHandlers
+        open CommandHandler
 
         let clock = fun () -> DateTime.UtcNow
 
@@ -61,8 +62,8 @@ module BoundedContexts =
             fun (next: HttpFunc) (ctx: HttpContext) ->
                 task {
                     let database = ctx.GetService<EventStore>()
-
-                    match! BoundedContext.handle clock database command with
+                    let eventStoreBased = EventBased.eventStoreBasedCommandHandler clock database
+                    match! BoundedContext.useHandler eventStoreBased command with
                     | Ok updatedContext ->
                         return! redirectTo false (sprintf "/api/boundedcontexts/%O" updatedContext) next ctx
                     | Error (DomainError EmptyName) ->
@@ -101,8 +102,8 @@ module BoundedContexts =
             fun (next: HttpFunc) (ctx: HttpContext) ->
                 task {
                     let database = ctx.GetService<EventStore>()
-
-                    match! BoundedContext.handle clock database (RemoveBoundedContext contextId) with
+                    let eventStoreBased = EventBased.eventStoreBasedCommandHandler clock database
+                    match! BoundedContext.useHandler eventStoreBased (RemoveBoundedContext contextId) with
                     | Ok id -> return! json id next ctx
                     | Error e -> return! ServerErrors.INTERNAL_ERROR e next ctx
                 }

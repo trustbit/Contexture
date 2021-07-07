@@ -17,13 +17,14 @@ open Giraffe
 module Collaborations =
     module CommandEndpoints =
         open System
-        let clock =
-            fun () -> DateTime.UtcNow
+        open CommandHandler
         let private updateAndReturnCollaboration command =
             fun (next: HttpFunc) (ctx: HttpContext) ->
                 task {
                     let database = ctx.GetService<EventStore>()
-                    match! Collaboration.handle clock database command with
+                    let clock = ctx.GetService<Clock>()
+                    let eventBasedCommandHandler = CommandHandler.EventBased.eventStoreBasedCommandHandler clock database
+                    match! command |> Collaboration.useHandler eventBasedCommandHandler with
                     | Ok collaborationId ->
                         return! redirectTo false (sprintf "/api/collaborations/%O" collaborationId) next ctx
                     | Error (DomainError error) ->
@@ -44,8 +45,8 @@ module Collaborations =
             fun (next: HttpFunc) (ctx: HttpContext) ->
                 task {
                     let database = ctx.GetService<EventStore>()
-
-                    match! Collaboration.handle clock database (RemoveConnection collaborationId) with
+                    let clock = ctx.GetService<Clock>()
+                    match! Collaboration.useHandler (EventBased.eventStoreBasedCommandHandler clock database) (RemoveConnection collaborationId) with
                     | Ok collaborationId -> return! json collaborationId next ctx
                     | Error e -> return! ServerErrors.INTERNAL_ERROR e next ctx
                 }

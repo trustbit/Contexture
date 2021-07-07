@@ -7,9 +7,7 @@ open Database
 open Contexture.Api.Infrastructure
 open FSharp.Control.Tasks
 
-module FileBasedCommandHandlers =
-    open Contexture.Api.Aggregates
-
+module CommandHandler =
     type CommandHandlerError<'T, 'Id> =
         | DomainError of 'T
         | InfrastructureError of InfrastructureError<'Id>
@@ -18,6 +16,74 @@ module FileBasedCommandHandlers =
         | Exception of exn
         | EntityNotFound of 'Id
 
+    type HandleIdentityAndCommand<'Identity,'Command,'Error> = 'Identity -> 'Command -> Async<Result<'Identity,CommandHandlerError<'Error,'Identity>>>
+    type HandleCommand<'Identity,'Command,'Error> = 'Command -> Async<Result<'Identity,CommandHandlerError<'Error,'Identity>>>
+    
+    let getIdentityFromCommand identifyCommand (handler: HandleIdentityAndCommand<_,_,_>) : HandleCommand<_,_,_> =
+        fun command -> async {
+            let identity = identifyCommand command
+            return! handler identity command
+        }
+    
+    type Aggregate<'State,'Cmd, 'Event, 'Error> =
+        { Decider : 'Cmd -> 'State -> Result<'Event list,'Error>
+          Evolve: 'State -> 'Event -> 'State
+          Initial : 'State }
+        with
+            static member From decider evolve initial : Aggregate<'State, 'Cmd,'Event,'Error>=
+                { Decider = decider
+                  Evolve = evolve
+                  Initial = initial }
+        
+        
+    let handleWithStream loadStream saveStream (aggregate: Aggregate<'State,'Cmd,'Event,'Error>) : HandleIdentityAndCommand<'Identity,'Cmd,'Error> =
+        fun identity (command : 'Cmd) -> async {
+            let! stream = loadStream identity
+            
+            let state =
+                stream
+                |> List.fold aggregate.Evolve aggregate.Initial
+                
+            match aggregate.Decider command state with
+            | Ok newEvents ->
+                do! saveStream identity newEvents
+                return Ok identity
+            | Error e ->
+                return e |> DomainError |> Error
+        }
+    
+    module EventBased =
+        type GetStreamName<'Identity> = 'Identity -> EventSource
+        type StreamBasedCommandHandler<'Identity,'State,'Cmd,'Event,'Error> = GetStreamName<'Identity> -> Aggregate<'State,'Cmd,'Event,'Error> -> HandleIdentityAndCommand<'Identity, 'Cmd,'Error>
+        
+        let eventStoreBasedCommandHandler clock (eventStore:EventStore) : StreamBasedCommandHandler<_,_,_,_,_> =
+            fun getStreamName aggregate  ->
+                let loadStream identity = async {
+                    let streamName = getStreamName identity
+                    let! stream = eventStore.Stream<'Event> streamName
+                    return List.map (fun e -> e.Event) stream
+                    }
+                
+                let saveStream identity newEvents = async {
+                    let name = getStreamName identity
+                    let mappedEvents =
+                        newEvents
+                        |> List.map (fun e ->
+                            { Event = e
+                              Metadata =
+                                  { Source = name
+                                    RecordedAt = clock () } })
+                        
+                    do! eventStore.Append mappedEvents
+                }
+                
+                handleWithStream loadStream saveStream aggregate
+
+module FileBasedCommandHandlers =
+    open Contexture.Api.Aggregates
+    open CommandHandler
+    open CommandHandler.EventBased
+    
     module BridgeEventSourcingWithFilebasedDatabase =
         type ChangeOperation<'Item, 'Id> =
             | Add of 'Item
@@ -61,31 +127,16 @@ module FileBasedCommandHandlers =
         open Contexture.Api.Entities
         open BridgeEventSourcingWithFilebasedDatabase
         
-        let handle clock (store: EventStore) command = async {
-            let identity = Domain.identify command
-            let streamName = Domain.name identity
-            let! stream = store.Stream streamName
-
-            let state =
-                stream
-                |> List.map (fun e -> e.Event)
-                |> List.fold State.evolve State.Initial
-
-            match handle state command with
-            | Ok newEvents ->
-                do!
-                    newEvents
-                    |> List.map (fun e ->
-                        { Event = e
-                          Metadata =
-                              { Source = streamName
-                                RecordedAt = clock () } })
-                    |> store.Append
-
-                return Ok identity
-            | Error e ->
-                return e |> DomainError |> Error
-        }
+        let aggregate =
+                Aggregate.From
+                    Domain.decide
+                    Domain.State.evolve
+                    Domain.State.Initial
+        
+        let useHandler stateBasedHandler =
+            aggregate
+            |> stateBasedHandler Domain.name
+            |> CommandHandler.getIdentityFromCommand Domain.identify   
             
         let asEvents clock (domain: Serialization.Domain) =
             { Metadata =
@@ -148,30 +199,16 @@ module FileBasedCommandHandlers =
         open Contexture.Api.Entities
         open BoundedContext
         
-        let handle clock (store: EventStore) (command: BoundedContext.Command) = async {
-            let identity = BoundedContext.identify command
-            let streamName = BoundedContext.name identity
-            let! stream = store.Stream streamName
-            let state =
-                stream
-                |> List.map (fun e -> e.Event)
-                |> List.fold BoundedContext.State.Fold BoundedContext.State.Initial
-
-            match BoundedContext.handle state command with
-            | Ok newEvents ->
-                do!
-                    newEvents
-                    |> List.map (fun e ->
-                        { Event = e
-                          Metadata =
-                              { Source = streamName
-                                RecordedAt = clock () } })
-                    |> store.Append
-
-                return Ok identity
-            | Error e ->
-                return e |> DomainError |> Error
-        }
+        let aggregate =
+                Aggregate.From
+                    BoundedContext.decide
+                    BoundedContext.State.evolve
+                    BoundedContext.State.Initial
+        
+        let useHandler stateBasedHandler =
+            aggregate
+            |> stateBasedHandler BoundedContext.name
+            |> CommandHandler.getIdentityFromCommand BoundedContext.identify   
 
         let asEvents clock (collaboration: BoundedContext) =
             { Metadata =
@@ -202,44 +239,29 @@ module FileBasedCommandHandlers =
                     |> Result.map (fun c -> { document with BoundedContexts = c }, System.Guid.Empty))
                 |> waitForDbChange
 
+
+
     module Collaboration =
-        open Contexture.Api.Entities
-        open Collaboration
-        open Projections
-        open BridgeEventSourcingWithFilebasedDatabase
         
-        let handle clock (store: EventStore) command = async {
-            let identity = Collaboration.identify command
-            let streamName = Collaboration.name identity
-            let! stream = store.Stream streamName
-
-            let state =
-                stream
-                |> List.map (fun e -> e.Event)
-                |> List.fold State.evolve State.Initial
-
-            match handle state command with
-            | Ok newEvents ->
-                do!
-                    newEvents
-                    |> List.map (fun e ->
-                        { Event = e
-                          Metadata =
-                              { Source = streamName
-                                RecordedAt = clock () } })
-                    |> store.Append
-
-                return Ok identity
-            | Error e ->
-                return e |> DomainError |> Error
-        }
-
+        open BridgeEventSourcingWithFilebasedDatabase
+        let aggregate =
+                Aggregate.From
+                    Collaboration.decide
+                    Collaboration.State.evolve
+                    Collaboration.State.Initial
+        
+        let useHandler stateBasedHandler =
+            aggregate
+            |> stateBasedHandler Collaboration.name
+            |> CommandHandler.getIdentityFromCommand Collaboration.identify               
+            
+        
         let asEvents clock (collaboration: Serialization.Collaboration) =
             { Metadata =
                   { Source = collaboration.Id
                     RecordedAt = clock () }
               Event =
-                  CollaborationImported
+                  Collaboration.CollaborationImported
                       { CollaborationId = collaboration.Id
                         Description = collaboration.Description
                         RelationshipType = collaboration.RelationshipType
@@ -250,8 +272,8 @@ module FileBasedCommandHandlers =
         let mapToSerialization (state: Serialization.Collaboration option) event : Serialization.Collaboration option =
             let convertToOption =
                 function
-                | Initial -> None
-                | Existing s ->
+                | Collaboration.Initial -> None
+                | Collaboration.Existing s ->
                     let mappedState: Serialization.Collaboration =
                         {
                             Id = s.Id
@@ -261,24 +283,24 @@ module FileBasedCommandHandlers =
                             RelationshipType = s.RelationshipType
                         }
                     Some mappedState
-                | Deleted -> None
+                | Collaboration.Deleted -> None
             match state with
             | Some s ->
                 let mappedState =
-                    Existing {
+                    Collaboration.Existing {
                         Id = s.Id
                         Initiator = s.Initiator
                         Recipient = s.Recipient
                         Description = s.Description
                         RelationshipType = s.RelationshipType
                     }
-                State.evolve mappedState event
+                Collaboration.State.evolve mappedState event
             | None ->
-                State.evolve Initial event
+                Collaboration.State.evolve Collaboration.Initial event
             |> convertToOption 
 
-        let subscription (database: FileBased): Subscription<Event> =
-            fun (events: EventEnvelope<Event> list) -> 
+        let subscription (database: FileBased): Subscription<Collaboration.Event> =
+            fun (events: EventEnvelope<Collaboration.Event> list) -> 
                 database.Change(fun document ->
                     events
                     |> List.fold
@@ -293,31 +315,16 @@ module FileBasedCommandHandlers =
         open Namespace
         open BridgeEventSourcingWithFilebasedDatabase
         
-        let handle clock (store: EventStore) command = async {
-            let identity = Namespace.identify command
-            let streamName = Namespace.name identity
-            let! stream = store.Stream streamName
-            
-            let state =
-                stream
-                |> List.map (fun e -> e.Event)
-                |> List.fold State.Fold State.Initial
-
-            match handle state command with
-            | Ok newEvents ->
-                do!
-                    newEvents
-                    |> List.map (fun e ->
-                        { Event = e
-                          Metadata =
-                              { Source = streamName
-                                RecordedAt = clock () } })
-                    |> store.Append
-
-                return Ok identity
-            | Error e ->
-                return e |> DomainError |> Error
-        }
+        let aggregate =
+                Aggregate.From
+                    Namespace.decide
+                    Namespace.State.evolve
+                    Namespace.State.Initial
+        
+        let useHandler stateBasedHandler =
+            aggregate
+            |> stateBasedHandler Namespace.name
+            |> CommandHandler.getIdentityFromCommand Namespace.identify   
 
         let asEvents clock (boundedContext: BoundedContext) =
             boundedContext.Namespaces
@@ -357,31 +364,16 @@ module FileBasedCommandHandlers =
         open NamespaceTemplate
         open BridgeEventSourcingWithFilebasedDatabase
         
-        let handle clock (store: EventStore) command = async {
-            let identity = NamespaceTemplate.identify command
-            let streamName = NamespaceTemplate.name identity
-            let! stream = store.Stream streamName
-
-            let state =
-                stream
-                |> List.map (fun e -> e.Event)
-                |> List.fold State.Fold State.Initial
-
-            match handle state command with
-            | Ok newEvents ->
-                do!
-                    newEvents
-                    |> List.map (fun e ->
-                        { Event = e
-                          Metadata =
-                              { Source = streamName
-                                RecordedAt = clock () } })
-                    |> store.Append
-
-                return Ok identity
-            | Error e ->
-                return e |> DomainError |> Error
-        }
+        let aggregate =
+                Aggregate.From
+                    NamespaceTemplate.decide
+                    NamespaceTemplate.State.evolve
+                    NamespaceTemplate.State.Initial
+        
+        let useHandler stateBasedHandler =
+            aggregate
+            |> stateBasedHandler NamespaceTemplate.name
+            |> CommandHandler.getIdentityFromCommand NamespaceTemplate.identify   
 
         let asEvents clock (template: NamespaceTemplate) =
             { Metadata =

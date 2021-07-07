@@ -8,6 +8,8 @@ open System.Threading.Tasks
 
 type Agent<'T> = MailboxProcessor<'T>
 
+type Clock = unit -> System.DateTime
+
 type EventSource = System.Guid
 type StreamKind =
     private

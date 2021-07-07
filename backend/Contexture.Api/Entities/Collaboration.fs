@@ -138,7 +138,7 @@ let identify =
 
 let name identity = identity
 
-let handle (state: State) (command: Command) =
+let decide (command: Command) (state: State) : Result<Event list,unit> =
     match state, command with
     | Existing _, DefineRelationship (collaborationId, relationship) ->
         match relationship.RelationshipType with
