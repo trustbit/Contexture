@@ -119,7 +119,6 @@ module FileBasedCommandHandlers =
         let waitForDbChange results = async {
             do!
                 results
-                |> Async.AwaitTask
                 |> Async.Ignore
         }
 

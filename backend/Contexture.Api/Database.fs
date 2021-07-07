@@ -64,7 +64,6 @@ module Database =
         member __.Add seed = add seed
         member __.Remove idValue = remove idValue
 
-
     type CollectionOfGuid<'item>(itemsById: Map<Guid, 'item>) =
 
         let getById idValue = itemsById.TryFind idValue
@@ -98,7 +97,6 @@ module Database =
         member __.Update change idValue = update idValue change
         member __.Add newId item = add newId item
         member __.Remove idValue = remove idValue
-
 
     let collectionOfInt (items: _ list) getId =
         let collectionItems =
@@ -486,7 +484,7 @@ module Database =
             lock
                 fileName
                 (fun () ->
-                    task {
+                    async {
                         match change document with
                         | Ok (changed: Document, returnValue) ->
                             do!
@@ -497,6 +495,7 @@ module Database =
                                   Serialization.NamespaceTemplates = changed.NamespaceTemplates.All }
                                 |> Serialization.serialize
                                 |> Persistence.save fileName
+                                |> Async.AwaitTask
 
                             document <- changed
                             return Ok returnValue
@@ -533,5 +532,5 @@ module Database =
             else
                 FileBased.Load(fileName)
 
-        member _.Read = document
-        member _.Change change = write change
+        member _.Read () = async { return document}
+        member _.Change change = async { return! write change }

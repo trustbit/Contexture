@@ -19,15 +19,6 @@ open Giraffe
 module Namespaces =
     open ValueObjects
 
-    let private fetchNamespaces (database: FileBased) boundedContext =
-        boundedContext
-        |> database.Read.BoundedContexts.ById
-        |> Option.map
-            (fun b ->
-                b.Namespaces
-                |> tryUnbox<Projections.Namespace list>
-                |> Option.defaultValue [])
-
     module CommandEndpoints =
         open System
         open Namespace

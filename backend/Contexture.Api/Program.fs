@@ -24,9 +24,9 @@ type ContextureOptions = { DatabasePath: string }
 module AllRoute =
 
     let getAllData =
-        fun (next: HttpFunc) (ctx: HttpContext) ->
+        fun (next: HttpFunc) (ctx: HttpContext) -> task {
             let database = ctx.GetService<FileBased>()
-            let document = database.Read
+            let! document = database.Read()
 
             let result =
                 {| BoundedContexts = document.BoundedContexts.All
@@ -34,7 +34,8 @@ module AllRoute =
                    Collaborations = document.Collaborations.All
                    NamespaceTemplates = document.NamespaceTemplates.All |}
 
-            json result next ctx
+            return! json result next ctx
+        }
 
     [<CLIMutable>]
     type UpdateAllData =
@@ -53,9 +54,9 @@ module AllRoute =
                 if notEmpty data.Domains
                    && notEmpty data.BoundedContexts
                    && notEmpty data.Collaborations then
-                    let document =
+                    let! result =
                         database.Change
-                            (fun document ->
+                            (fun _ ->
                                 let newDocument : Document =
                                     { Domains = collectionOfGuid data.Domains (fun d -> d.Id)
                                       BoundedContexts = collectionOfGuid data.BoundedContexts (fun d -> d.Id)
@@ -64,7 +65,11 @@ module AllRoute =
 
                                 Ok(newDocument, ()))
 
-                    return! text "Successfully imported all data - NOTE: you need to restart the application" next ctx
+                    match result with
+                    | Ok _ ->
+                        return! text "Successfully imported all data - NOTE: you need to restart the application" next ctx
+                    | Error e ->
+                        return! ServerErrors.INTERNAL_ERROR $"Could not import document: %s{e}" next ctx
                 else
                     return! RequestErrors.BAD_REQUEST "Not overwriting with (partly) missing data" next ctx
             }
@@ -265,7 +270,8 @@ let runAsync (host: IHost) =
 
         do! connectAndReplayReadModels readModels
 
-        do! importFromDocument store database.Read
+        let! document = database.Read()
+        do! importFromDocument store document
 
         // subscriptions for syncing back to the filebased-db are added after initial seeding/loading
         store.Subscribe(Collaboration.subscription database)
