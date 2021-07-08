@@ -5,8 +5,10 @@ open System.Text.Encodings.Web
 open System.Text.Json
 open System.Text.Json.Serialization
 
+open Contexture.Api.Aggregates
 open Contexture.Api.Aggregates.NamespaceTemplate
-open Contexture.Api.Entities
+open Contexture.Api.Aggregates.Collaboration
+open FSharp.Control.Tasks
 
 module Database =
 
@@ -62,7 +64,6 @@ module Database =
         member __.Add seed = add seed
         member __.Remove idValue = remove idValue
 
-
     type CollectionOfGuid<'item>(itemsById: Map<Guid, 'item>) =
 
         let getById idValue = itemsById.TryFind idValue
@@ -82,15 +83,14 @@ module Database =
                 newId |> DuplicateKey |> Error
             else
                 let updatedItems = itemsById |> Map.add newId item
-                updatedItems  |> CollectionOfGuid |> Ok
+                updatedItems |> CollectionOfGuid |> Ok
 
         let remove idValue =
             match idValue |> getById with
             | Some _ ->
                 let updatedItems = itemsById |> Map.remove idValue
-                updatedItems  |> CollectionOfGuid |> Ok
-            | None ->
-                itemsById  |> CollectionOfGuid |> Ok
+                updatedItems |> CollectionOfGuid |> Ok
+            | None -> itemsById |> CollectionOfGuid |> Ok
 
         member __.ById idValue = getById idValue
         member __.All = itemsById |> Map.toList |> List.map snd
@@ -98,10 +98,12 @@ module Database =
         member __.Add newId item = add newId item
         member __.Remove idValue = remove idValue
 
-
     let collectionOfInt (items: _ list) getId =
         let collectionItems =
-            if items |> box |> isNull then [] else items
+            if items |> box |> isNull then
+                []
+            else
+                items
 
         let byId =
             collectionItems
@@ -112,7 +114,10 @@ module Database =
 
     let collectionOfGuid (items: _ list) getId =
         let collectionItems =
-            if items |> box |> isNull then [] else items
+            if items |> box |> isNull then
+                []
+            else
+                items
 
         let byId =
             collectionItems
@@ -121,23 +126,49 @@ module Database =
 
         CollectionOfGuid(byId)
 
-    type Document =
-        { Domains: CollectionOfGuid<Domain>
-          BoundedContexts: CollectionOfGuid<BoundedContext>
-          Collaborations: CollectionOfGuid<Collaboration>
-          NamespaceTemplates: CollectionOfGuid<Projections.NamespaceTemplate> }
-
     module Persistence =
-        let read path = path |> File.ReadAllText
+        let read path = path |> File.ReadAllTextAsync
 
         let save path data =
-            let tempFile = Path.GetTempFileName()
-            (tempFile, data) |> File.WriteAllText
-            File.Move(tempFile, path, true)
+            task {
+                let tempFile = Path.GetTempFileName()
+                do! File.WriteAllTextAsync(tempFile, data)
+                File.Move(tempFile, path, true)
+            }
 
     module Serialization =
 
         open Newtonsoft.Json.Linq
+        open ValueObjects
+        open Domain.ValueObjects
+        open BoundedContext.ValueObjects
+
+        type Domain =
+            { Id: DomainId
+              ParentDomainId: DomainId option
+              Key: string option
+              Name: string
+              Vision: string option }
+
+        type Collaboration =
+            { Id: CollaborationId
+              Description: string option
+              Initiator: Collaborator
+              Recipient: Collaborator
+              RelationshipType: RelationshipType option }
+
+        type BoundedContext =
+            { Id: BoundedContextId
+              DomainId: DomainId
+              Key: string option
+              Name: string
+              Description: string option
+              Classification: StrategicClassification
+              BusinessDecisions: BusinessDecision list
+              UbiquitousLanguage: Map<string, UbiquitousLanguageTerm>
+              Messages: Messages
+              DomainRoles: DomainRole list
+              Namespaces: Namespace.Projections.Namespace list }
 
         type Root =
             { Version: int option
@@ -154,20 +185,23 @@ module Database =
 
         let serializerOptions =
             let options =
-                JsonSerializerOptions
-                    (Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping,
-                     PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
-                     IgnoreNullValues = true,
-                     WriteIndented = true,
-                     NumberHandling = JsonNumberHandling.AllowReadingFromString)
+                JsonSerializerOptions(
+                    Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping,
+                    PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+                    IgnoreNullValues = true,
+                    WriteIndented = true,
+                    NumberHandling = JsonNumberHandling.AllowReadingFromString
+                )
 
-            options.Converters.Add
-                (JsonFSharpConverter
-                    (unionEncoding =
+            options.Converters.Add(
+                JsonFSharpConverter(
+                    unionEncoding =
                         (JsonUnionEncoding.Default
                          ||| JsonUnionEncoding.Untagged
                          ||| JsonUnionEncoding.UnwrapRecordCases
-                         ||| JsonUnionEncoding.UnwrapFieldlessTags)))
+                         ||| JsonUnionEncoding.UnwrapFieldlessTags)
+                )
+            )
 
             options
 
@@ -180,47 +214,54 @@ module Database =
                 open System.Text
                 open System.Security.Cryptography
 
-                let private swapByteOrderPairs (bytes: byte []): byte [] =
-                    Array.mapi (fun index value ->
-                        match index with
-                        | 0 -> Array.get bytes 3
-                        | 1 -> Array.get bytes 2
-                        | 2 -> Array.get bytes 1
-                        | 3 -> Array.get bytes 0
-                        | 4 -> Array.get bytes 5
-                        | 5 -> Array.get bytes 4
-                        | 6 -> Array.get bytes 7
-                        | 7 -> Array.get bytes 6
-                        | _ -> value) bytes
+                let private swapByteOrderPairs (bytes: byte []) : byte [] =
+                    Array.mapi
+                        (fun index value ->
+                            match index with
+                            | 0 -> Array.get bytes 3
+                            | 1 -> Array.get bytes 2
+                            | 2 -> Array.get bytes 1
+                            | 3 -> Array.get bytes 0
+                            | 4 -> Array.get bytes 5
+                            | 5 -> Array.get bytes 4
+                            | 6 -> Array.get bytes 7
+                            | 7 -> Array.get bytes 6
+                            | _ -> value)
+                        bytes
 
                 let buildNamespace (namespaceId: Guid) =
                     swapByteOrderPairs (namespaceId.ToByteArray())
 
-                let generate namespaceBytes (identitierName: string): Guid =
+                let generate namespaceBytes (identitierName: string) : Guid =
                     let inputBytes = Encoding.UTF8.GetBytes(identitierName)
 
-                    using (SHA1.Create()) (fun algorithm ->
-                        algorithm.TransformBlock(namespaceBytes, 0, namespaceBytes.Length, null, 0)
-                        |> ignore
+                    using
+                        (SHA1.Create())
+                        (fun algorithm ->
+                            algorithm.TransformBlock(namespaceBytes, 0, namespaceBytes.Length, null, 0)
+                            |> ignore
 
-                        algorithm.TransformFinalBlock(inputBytes, 0, inputBytes.Length)
-                        |> ignore
+                            algorithm.TransformFinalBlock(inputBytes, 0, inputBytes.Length)
+                            |> ignore
 
-                        let result =
-                            Array.truncate 16 algorithm.Hash
-                            |> Array.mapi (fun index (value: byte) ->
-                                match index with
-                                | 6 -> (value &&& 0x0Fuy) ||| (5uy <<< 4)
-                                | 8 -> (value &&& 0x3Fuy) ||| 0x80uy
-                                | _ -> Array.get algorithm.Hash index)
-                            |> swapByteOrderPairs
+                            let result =
+                                Array.truncate 16 algorithm.Hash
+                                |> Array.mapi
+                                    (fun index (value: byte) ->
+                                        match index with
+                                        | 6 -> (value &&& 0x0Fuy) ||| (5uy <<< 4)
+                                        | 8 -> (value &&& 0x3Fuy) ||| 0x80uy
+                                        | _ -> Array.get algorithm.Hash index)
+                                |> swapByteOrderPairs
 
-                        Guid(result))
+                            Guid(result))
 
             let private CollaborationNamespaceBytes =
                 IdentityHash.buildNamespace (Guid("d24eb67c-1aed-4995-986b-5442c074549a"))
+
             let private DomainNamespaceBytes =
                 IdentityHash.buildNamespace (Guid("04DF3500-497C-4973-902A-AED206345B21"))
+
             let private BoundedContextNamespaceBytes =
                 IdentityHash.buildNamespace (Guid("676FA85B-CB26-469C-B7C7-D1C9E4CCC2A3"))
 
@@ -228,10 +269,11 @@ module Database =
                 let idProperty =
                     obj.Property(propertyName)
                     |> Option.ofObj
-                    |> Option.bind (fun p ->
-                        p.Value
-                        |> Option.ofObj
-                        |> Option.bind (tryUnbox<JValue>))
+                    |> Option.bind
+                        (fun p ->
+                            p.Value
+                            |> Option.ofObj
+                            |> Option.bind (tryUnbox<JValue>))
 
                 match idProperty with
                 | Some idValue ->
@@ -240,7 +282,7 @@ module Database =
                         |> IdentityHash.generate identityNamespace
                     obj.Property(propertyName).Value <- JValue(newId)
                 | None -> ()
-                
+
             let toVersion1 (json: string) =
                 let root = JObject.Parse json
 
@@ -290,7 +332,9 @@ module Database =
                     let properties =
                         seq {
                             if tools <> null then yield tools
-                            if deployment <> null then yield deployment
+
+                            if deployment <> null then
+                                yield deployment
                         }
 
                     match properties with
@@ -333,42 +377,55 @@ module Database =
                     let obj = token :?> JObject
 
                     let namespaces = obj.Property("namespaces")
-                    if isNull namespaces then obj.Add("namespaces", JArray())
+
+                    if isNull namespaces then
+                        obj.Add("namespaces", JArray())
 
 
                 let processCollaborations (token: JToken) =
                     let obj = token :?> JObject
-                    obj |> replaceIdProperty "id" CollaborationNamespaceBytes
-                    
+
+                    obj
+                    |> replaceIdProperty "id" CollaborationNamespaceBytes
+
                     let replaceReferences propertyName =
                         obj.Property(propertyName)
                         |> Option.ofObj
-                        |> Option.iter( fun p ->
-                            let propertyObject = p.Value :?> JObject
-                            propertyObject |> replaceIdProperty "domain" DomainNamespaceBytes
-                            propertyObject |> replaceIdProperty "boundedContext" BoundedContextNamespaceBytes
-                        )
-                    
+                        |> Option.iter
+                            (fun p ->
+                                let propertyObject = p.Value :?> JObject
+
+                                propertyObject
+                                |> replaceIdProperty "domain" DomainNamespaceBytes
+
+                                propertyObject
+                                |> replaceIdProperty "boundedContext" BoundedContextNamespaceBytes)
+
                     replaceReferences "initiator"
                     replaceReferences "recipient"
-                    
+
                 let processDomains (token: JToken) =
                     let obj = token :?> JObject
-                    obj |> replaceIdProperty "id" DomainNamespaceBytes 
-                    obj |> replaceIdProperty "parentDomainId" DomainNamespaceBytes 
-                    
+                    obj |> replaceIdProperty "id" DomainNamespaceBytes
+
+                    obj
+                    |> replaceIdProperty "parentDomainId" DomainNamespaceBytes
+
                 let processBoundedContexts (token: JToken) =
                     let obj = token :?> JObject
                     token |> addEmptyNamespaces
-                    obj |> replaceIdProperty "domainId" DomainNamespaceBytes
-                    obj |> replaceIdProperty "id" BoundedContextNamespaceBytes
-                    
+
+                    obj
+                    |> replaceIdProperty "domainId" DomainNamespaceBytes
+
+                    obj
+                    |> replaceIdProperty "id" BoundedContextNamespaceBytes
+
 
                 root.["collaborations"]
                 |> Seq.iter processCollaborations
-                
-                root.["domains"]
-                |> Seq.iter processDomains
+
+                root.["domains"] |> Seq.iter processDomains
 
                 root.["boundedContexts"]
                 |> Seq.iter processBoundedContexts
@@ -405,50 +462,163 @@ module Database =
             |> applyMigrations currentVersion
             |> deserializeWithOptions<Root>
 
+    type Document =
+        { Domains: CollectionOfGuid<Serialization.Domain>
+          BoundedContexts: CollectionOfGuid<Serialization.BoundedContext>
+          Collaborations: CollectionOfGuid<Serialization.Collaboration>
+          NamespaceTemplates: CollectionOfGuid<Projections.NamespaceTemplate> }
 
-    type FileBased(fileName: string) =
+    type SingleFileBasedDatastore =
+        abstract member Read : unit -> Async<Document>
+        abstract member Change : (Document -> Result<Document, string>) -> Async<Result<unit, string>>
 
-        let mutable (version, document) =
-            Persistence.read fileName
-            |> Serialization.deserialize
-            |> fun root ->
-                let document =
-                    { Domains = collectionOfGuid root.Domains (fun d -> d.Id)
-                      BoundedContexts = collectionOfGuid root.BoundedContexts (fun d -> d.Id)
-                      Collaborations = collectionOfGuid root.Collaborations (fun d -> d.Id)
-                      NamespaceTemplates = collectionOfGuid root.NamespaceTemplates (fun d -> d.Id) }
+    module AgentBased =
+        type Agent<'T> = MailboxProcessor<'T>
 
-                root.Version, document
+        type private Msg =
+            | Read of AsyncReplyChannel<Document>
+            | Write of (Document -> Result<Document, string>) * AsyncReplyChannel<Result<unit, string>>
 
-        let write change =
-            lock fileName (fun () ->
-                match change document with
-                | Ok (changed: Document, returnValue) ->
-                    { Serialization.Version = version
-                      Serialization.Domains = changed.Domains.All
-                      Serialization.BoundedContexts = changed.BoundedContexts.All
-                      Serialization.Collaborations = changed.Collaborations.All
-                      Serialization.NamespaceTemplates = changed.NamespaceTemplates.All }
+        let initialize (fileName: string, initial: Serialization.Root) : SingleFileBasedDatastore =
+            let version, initialDocument =
+                (initial.Version,
+                 { Domains = collectionOfGuid initial.Domains (fun d -> d.Id)
+                   BoundedContexts = collectionOfGuid initial.BoundedContexts (fun d -> d.Id)
+                   Collaborations = collectionOfGuid initial.Collaborations (fun d -> d.Id)
+                   NamespaceTemplates = collectionOfGuid initial.NamespaceTemplates (fun d -> d.Id) })
+
+            let filePersistence (inbox: Agent<Msg>) =
+                let rec loop document =
+                    async {
+                        let! msg = inbox.Receive()
+
+                        match msg with
+                        | Read reply ->
+                            reply.Reply document
+                            return! loop document
+                        | Write (change, reply) ->
+                            match change document with
+                            | Ok (changed: Document) ->
+                                do!
+                                    { Serialization.Version = version
+                                      Serialization.Domains = changed.Domains.All
+                                      Serialization.BoundedContexts = changed.BoundedContexts.All
+                                      Serialization.Collaborations = changed.Collaborations.All
+                                      Serialization.NamespaceTemplates = changed.NamespaceTemplates.All }
+                                    |> Serialization.serialize
+                                    |> Persistence.save fileName
+                                    |> Async.AwaitTask
+
+                                reply.Reply(Ok())
+                                return! loop changed
+                            | Error e ->
+                                reply.Reply(Error e)
+                                return! loop document
+                    }
+
+                loop initialDocument
+
+            let agent = Agent.Start(filePersistence)
+
+            { new SingleFileBasedDatastore with
+                member _.Read() =
+                    agent.PostAndAsyncReply(fun reply -> Read reply)
+
+                member _.Change change =
+                    agent.PostAndAsyncReply(fun reply -> Write(change, reply)) }
+
+        let load (path: string) =
+            task {
+                let! content = Persistence.read path
+                let root = content |> Serialization.deserialize
+
+                return initialize (path, root)
+            }
+
+        let emptyDatabase (path: string) =
+            task {
+                match Path.GetDirectoryName path with
+                | "" -> ()
+                | directoryPath -> Directory.CreateDirectory directoryPath |> ignore
+
+                let root = Serialization.Root.Empty
+
+                do!
+                    root
                     |> Serialization.serialize
-                    |> Persistence.save fileName
+                    |> Persistence.save path
 
-                    document <- changed
-                    Ok returnValue
-                | Error e -> Error e)
+                return initialize (path, root)
+            }
 
-        static member EmptyDatabase(path: string) =
-            match Path.GetDirectoryName path with
-            | "" -> ()
-            | directoryPath -> Directory.CreateDirectory directoryPath |> ignore
+        let initializeDatabase fileName =
+            if not (File.Exists fileName) then
+                emptyDatabase (fileName)
+            else
+                load (fileName)
 
-            Serialization.Root.Empty
-            |> Serialization.serialize
-            |> Persistence.save path
+    module Mutable =
+        type FileBased(fileName: string, initial: Serialization.Root) =
 
-            FileBased path
+            let mutable (version, document) =
+                (initial.Version,
+                 { Domains = collectionOfGuid initial.Domains (fun d -> d.Id)
+                   BoundedContexts = collectionOfGuid initial.BoundedContexts (fun d -> d.Id)
+                   Collaborations = collectionOfGuid initial.Collaborations (fun d -> d.Id)
+                   NamespaceTemplates = collectionOfGuid initial.NamespaceTemplates (fun d -> d.Id) })
 
-        static member InitializeDatabase fileName =
-            if not (File.Exists fileName) then FileBased.EmptyDatabase(fileName) else FileBased(fileName)
+            let write change =
+                lock
+                    fileName
+                    (fun () ->
+                        async {
+                            match change document with
+                            | Ok (changed: Document) ->
+                                do!
+                                    { Serialization.Version = version
+                                      Serialization.Domains = changed.Domains.All
+                                      Serialization.BoundedContexts = changed.BoundedContexts.All
+                                      Serialization.Collaborations = changed.Collaborations.All
+                                      Serialization.NamespaceTemplates = changed.NamespaceTemplates.All }
+                                    |> Serialization.serialize
+                                    |> Persistence.save fileName
+                                    |> Async.AwaitTask
 
-        member __.Read = document
-        member __.Change change = write change
+                                document <- changed
+                                return Ok()
+                            | Error (e: string) -> return Error e
+                        })
+
+            static member Load(path: string) =
+                task {
+                    let! content = Persistence.read path
+                    let root = content |> Serialization.deserialize
+
+                    return FileBased(path, root) :> SingleFileBasedDatastore
+                }
+
+            static member EmptyDatabase(path: string) =
+                task {
+                    match Path.GetDirectoryName path with
+                    | "" -> ()
+                    | directoryPath -> Directory.CreateDirectory directoryPath |> ignore
+
+                    let root = Serialization.Root.Empty
+
+                    do!
+                        root
+                        |> Serialization.serialize
+                        |> Persistence.save path
+
+                    return FileBased(path, root) :> SingleFileBasedDatastore
+                }
+
+            static member InitializeDatabase fileName =
+                if not (File.Exists fileName) then
+                    FileBased.EmptyDatabase(fileName)
+                else
+                    FileBased.Load(fileName)
+
+            interface SingleFileBasedDatastore with
+                member _.Read() = async { return document }
+                member _.Change change = async { return! write change }

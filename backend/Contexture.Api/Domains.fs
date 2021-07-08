@@ -1,9 +1,7 @@
 ﻿namespace Contexture.Api
 
 open System
-open Contexture.Api.Aggregates.BoundedContext
-open Contexture.Api.Database
-open Contexture.Api.Entities
+
 open Contexture.Api.Infrastructure
 open Contexture.Api.Infrastructure.Projections
 open Microsoft.AspNetCore.Http
@@ -12,10 +10,15 @@ open FSharp.Control.Tasks
 open Giraffe
 
 module Domains =
+    open Contexture.Api.Aggregates.BoundedContext
+    open Contexture.Api.Aggregates.Namespace
     open Aggregates.Domain
-    
+    open ValueObjects
 
     module Results =
+        
+        
+        open Projections
 
         type BoundedContextResult =
             { Id: BoundedContextId
@@ -80,14 +83,15 @@ module Domains =
 
     module CommandEndpoints =
         open FileBasedCommandHandlers
+        open CommandHandler
         let clock = fun () -> DateTime.UtcNow
 
         let removeAndReturnId domainId =
             fun (next: HttpFunc) (ctx: HttpContext) ->
                 task {
                     let database = ctx.GetService<EventStore>()
-
-                    match Domain.handle clock database (RemoveDomain domainId) with
+                    let eventStoreBased = EventBased.eventStoreBasedCommandHandler clock database
+                    match! Domain.useHandler eventStoreBased (RemoveDomain domainId) with
                     | Ok domainId -> return! json domainId next ctx
                     | Error e -> return! ServerErrors.INTERNAL_ERROR e next ctx
                 }
@@ -96,8 +100,8 @@ module Domains =
             fun (next: HttpFunc) (ctx: HttpContext) ->
                 task {
                     let database = ctx.GetService<EventStore>()
-
-                    match Domain.handle clock database command with
+                    let eventStoreBased = EventBased.eventStoreBasedCommandHandler clock database
+                    match! Domain.useHandler eventStoreBased command with
                     | Ok updatedDomain -> return! redirectTo false (sprintf "/api/domains/%O" updatedDomain) next ctx
                     | Error (DomainError EmptyName) ->
                         return! RequestErrors.BAD_REQUEST "Name must not be empty" next ctx
@@ -126,8 +130,8 @@ module Domains =
             fun (next: HttpFunc) (ctx: HttpContext) ->
                 task {
                     let database = ctx.GetService<EventStore>()
-
-                    match BoundedContext.handle clock database (CreateBoundedContext(Guid.NewGuid(), domainId, command)) with
+                    let eventStoreBased = EventBased.eventStoreBasedCommandHandler clock database
+                    match! BoundedContext.useHandler eventStoreBased (CreateBoundedContext(Guid.NewGuid(), domainId, command)) with
                     | Ok addedContext ->
                         return! redirectTo false (sprintf "/api/boundedcontexts/%O" addedContext) next ctx
                     | Error (DomainError Aggregates.BoundedContext.EmptyName) ->
@@ -137,69 +141,78 @@ module Domains =
 
     module QueryEndpoints =
         open Contexture.Api.ReadModels
+        open ReadModels
 
         let getDomains =
-            fun (next: HttpFunc) (ctx: HttpContext) ->
+            fun (next: HttpFunc) (ctx: HttpContext) -> task {
                 let eventStore = ctx.GetService<EventStore>()
 
-                let domains = Domain.allDomains eventStore
-                let subdomainsOf = Domain.subdomainLookup domains
-                let boundedContextsOf = BoundedContext.allBoundedContextsByDomain eventStore
-                let namespacesOf = Namespace.allNamespacesByContext eventStore
+                let! domainState = ctx.GetService<ReadModels.Domain.AllDomainReadModel>().State()
+                let! boundedContextState = ctx.GetService<ReadModels.BoundedContext.AllBoundedContextsReadModel>().State()
+                let domains = domainState |> Domain.allDomains
+                let subdomainsOf = Domain.subdomainsOf domainState
+                let boundedContextsOf = BoundedContext.boundedContextsByDomain boundedContextState
+                let! namespacesOf = Namespace.allNamespacesByContext eventStore
 
                 let result =
                     domains
                     |> List.map (Results.includingSubdomainsAndBoundedContexts boundedContextsOf subdomainsOf namespacesOf)
 
-                json result next ctx
+                return! json result next ctx
+                }
 
         let getSubDomains domainId =
-            fun (next: HttpFunc) (ctx: HttpContext) ->
+            fun (next: HttpFunc) (ctx: HttpContext) -> task {
                 let eventStore = ctx.GetService<EventStore>()
 
-                let domains = Domain.allDomains eventStore
-                let subdomainsOf = Domain.subdomainLookup domains
-                let boundedContextsOf = BoundedContext.allBoundedContextsByDomain eventStore
-                let namespacesOf = Namespace.allNamespacesByContext eventStore
+                let! domainState =  ctx.GetService<ReadModels.Domain.AllDomainReadModel>().State()
+                let! boundedContextState = ctx.GetService<ReadModels.BoundedContext.AllBoundedContextsReadModel>().State()
+                let domains = Domain.allDomains domainState
+                let subdomainsOf = Domain.subdomainsOf domainState
+                let boundedContextsOf = BoundedContext.boundedContextsByDomain boundedContextState
+                let! namespacesOf = Namespace.allNamespacesByContext eventStore
 
                 let result =
                     domains
                     |> List.filter (fun d -> d.ParentDomainId = Some domainId)
                     |> List.map (Results.includingSubdomainsAndBoundedContexts boundedContextsOf subdomainsOf namespacesOf)
 
-                json result next ctx
-
+                return! json result next ctx
+            }
+         
         let getDomain domainId =
-            fun (next: HttpFunc) (ctx: HttpContext) ->
+            fun (next: HttpFunc) (ctx: HttpContext) -> task {
                 let eventStore = ctx.GetService<EventStore>()
 
-                let subdomains = eventStore |> Domain.allDomains |> Domain.subdomainLookup
-                let boundedContextsOf = BoundedContext.allBoundedContextsByDomain eventStore
-                let namespacesOf = Namespace.allNamespacesByContext eventStore
+                let! domainState = ctx.GetService<ReadModels.Domain.AllDomainReadModel>().State()
+                let! boundedContextState = ctx.GetService<ReadModels.BoundedContext.AllBoundedContextsReadModel>().State()
+                let subdomainsOf = Domain.subdomainsOf domainState
+                let boundedContextsOf = BoundedContext.boundedContextsByDomain boundedContextState
+                let! namespacesOf = Namespace.allNamespacesByContext eventStore
 
                 let result =
                     domainId
-                    |> Domain.buildDomain eventStore
-                    |> Option.map (Results.includingSubdomainsAndBoundedContexts boundedContextsOf subdomains namespacesOf)
+                    |> Domain.domain domainState
+                    |> Option.map (Results.includingSubdomainsAndBoundedContexts boundedContextsOf subdomainsOf namespacesOf)
                     |> Option.map json
                     |> Option.defaultValue (RequestErrors.NOT_FOUND(sprintf "Domain %O not found" domainId))
 
-                result next ctx
+                return! result next ctx
+            }
 
         let getBoundedContextsOf domainId =
-            fun (next: HttpFunc) (ctx: HttpContext) ->
+            fun (next: HttpFunc) (ctx: HttpContext) -> task {
                 let database = ctx.GetService<EventStore>()
-                let boundedContexts = BoundedContext.allBoundedContexts database
-                let boundedContextsOf = BoundedContext.boundedContextsByDomainLookup boundedContexts
-                let namespacesOf = Namespace.allNamespacesByContext database
+                let! boundedContextState = ctx.GetService<ReadModels.BoundedContext.AllBoundedContextsReadModel>().State()
+                let boundedContextsOf = BoundedContext.boundedContextsByDomain boundedContextState
+                let! namespacesOf = Namespace.allNamespacesByContext database
 
                 let boundedContexts =
-                    boundedContextsOf
-                    |> Map.tryFind domainId
-                    |> Option.defaultValue []
+                    boundedContextsOf domainId
                     |> List.map (Results.convertBoundedContext namespacesOf)
 
-                json boundedContexts next ctx
+                return! json boundedContexts next ctx
+            }
 
     let routes: HttpHandler =
         subRoute

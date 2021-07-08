@@ -2,12 +2,7 @@ namespace Contexture.Api
 
 open System
 open Contexture.Api
-open Contexture.Api.Aggregates
 open Contexture.Api.Aggregates.Namespace
-open Contexture.Api.BoundedContexts
-open Contexture.Api.Entities
-open Contexture.Api.ReadModels
-open Contexture.Api.Domains
 open Contexture.Api.Infrastructure
 open Contexture.Api.Views
 open Microsoft.AspNetCore.Http
@@ -19,7 +14,7 @@ open Microsoft.Extensions.Hosting
 
 
 module Search =
-
+    open Projections
     module Views =
 
         open Layout
@@ -57,15 +52,17 @@ module Search =
             htmlView (Views.index jsonEncoder.SerializeToString assetsResolver result) next ctx
 
     let getNamespaces : HttpHandler =
-        fun (next: HttpFunc) (ctx: HttpContext) ->
+        fun (next: HttpFunc) (ctx: HttpContext) -> task {
             let eventStore = ctx.GetService<EventStore>()
+            let! templateState = ctx.GetService<ReadModels.Templates.AllTemplatesReadModel>().State()
 
-            let allNamespaces =
+            let! allNamespaces =
                 ReadModels.Namespace.allNamespaces eventStore
+            let allTemplates =
+                ReadModels.Templates.allTemplates templateState
 
             let templateNamespaces =
-                eventStore
-                |> ReadModels.Templates.allTemplates
+                allTemplates
                 |> List.map (fun t -> t.Id, t)
                 |> Map.ofList
 
@@ -126,7 +123,8 @@ module Search =
                                Map.fold mergeLabels existingLabels templateLabels
                                |> convertLabelsAndValuesToOutput |})
 
-            json namespaces next ctx
+            return! json namespaces next ctx
+        }
 
     let apiRoutes : HttpHandler =
         subRoute "/search/filter" (choose [ route "/namespaces" >=> getNamespaces ])

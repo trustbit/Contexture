@@ -1,8 +1,6 @@
 namespace Contexture.Api
 
 open System
-open Contexture.Api.Entities
-open Contexture.Api.Aggregates.BoundedContext
 open Contexture.Api.Infrastructure
 open Contexture.Api.ReadModels
 open Contexture.Api.ReadModels.Find
@@ -21,7 +19,42 @@ module SearchFor =
             None
         |> Option.defaultValue Set.empty
 
+ 
+    module Async =
+        
+        let map mapper o =
+            async {
+                let! result = o
+                return mapper result
+            }
+        
+        let bindOption o =
+            async {
+                match o with
+                | Some value ->
+                    let! v = value
+                    return Some v
+                | None ->
+                    return None
+            }
+        
+        let optionMap mapper o = async {
+            let! bound = bindOption o
+            return Option.map mapper bound
+        }
+        
+        let optionMap2 mapper o =
+            async {
+                match o with
+                | Some value ->
+                    let! result = value
+                    return Some (mapper result)
+                | None ->
+                    return None
+            }
     module NamespaceId =
+        open Contexture.Api.Aggregates.Namespace
+        open ValueObjects
 
         [<CLIMutable>]
         type NamespaceQuery =
@@ -30,8 +63,8 @@ module SearchFor =
             member this.IsActive =
                 this.Name.Length > 0 || this.Template.Length > 0
 
-        let findRelevantNamespaces (database: EventStore) (item: NamespaceQuery) =
-            let availableNamespaces = Find.namespaces database
+        let findRelevantNamespaces (database: EventStore) (item: NamespaceQuery) = async {
+            let! availableNamespaces = Find.namespaces database
 
             let namespacesByName =
                 item.Name
@@ -43,18 +76,20 @@ module SearchFor =
                 |> SearchArgument.fromValues
                 |> SearchArgument.executeSearch (Find.Namespaces.byTemplate availableNamespaces)
 
-            SearchResult.combineResultsWithAnd
+            return SearchResult.combineResultsWithAnd
                     [ namespacesByName
                       namespacesByTemplate ]
+        }
 
-        let find (database: EventStore) (byNamespace: NamespaceQuery option) =
-            let relevantNamespaceIds =
+        let find (database: EventStore) (byNamespace: NamespaceQuery option) = async {
+            let! relevantNamespaceIds =
                 byNamespace
                 |> Option.map (findRelevantNamespaces database)
-                |> Option.map (SearchResult.map (fun n -> n.NamespaceId))
-                |> SearchResult.fromOption
+                |> Async.optionMap (SearchResult.map (fun n -> n.NamespaceId))
+                |> Async.map SearchResult.fromOption
 
-            relevantNamespaceIds
+            return relevantNamespaceIds
+        }
             
     module Labels =
           
@@ -65,8 +100,8 @@ module SearchFor =
             member this.IsActive =
                 not (Seq.isEmpty (Seq.append this.Name this.Value))
                 
-        let findRelevantLabels (database: EventStore) (item: LabelQuery) =
-            let namespacesByLabel = database |> Find.labels
+        let findRelevantLabels (database: EventStore) (item: LabelQuery) = async {
+            let! namespacesByLabel = database |> Find.labels
 
             let byNameResults =
                 item.Name
@@ -79,15 +114,18 @@ module SearchFor =
                 |> SearchArgument.fromInputs
                 |> SearchArgument.executeSearch (Find.Labels.byLabelValue namespacesByLabel)
 
-            SearchResult.combineResultsWithAnd [ byNameResults; byLabelResults]
+            return SearchResult.combineResultsWithAnd [ byNameResults; byLabelResults]
+        }
 
-        let find (database: EventStore) (byLabel: LabelQuery option) =
-            let relevantLabels =
+        let find (database: EventStore) (byLabel: LabelQuery option) = async {
+            let! relevantLabels =
                 byLabel
                 |> Option.map (findRelevantLabels database)
-                |> SearchResult.fromOption
+                |> Async.bindOption
+                |> Async.map SearchResult.fromOption
 
-            relevantLabels
+            return relevantLabels
+        }
             
 
     module DomainId =
@@ -98,8 +136,8 @@ module SearchFor =
             member this.IsActive =
                 not (Seq.isEmpty (Seq.append this.Name this.Key))
 
-        let findRelevantDomains (database: EventStore) (query: DomainQuery) =
-            let findDomains = database |> Find.domains
+        let findRelevantDomains (database: EventStore) (query: DomainQuery) = async {
+            let! findDomains = database |> Find.domains
 
             let foundByName =
                 query.Name
@@ -111,14 +149,17 @@ module SearchFor =
                 |> SearchArgument.fromInputs
                 |> SearchArgument.executeSearch (Find.Domains.byKey findDomains)
 
-            SearchResult.combineResultsWithAnd
-                [ foundByName
-                  foundByKey ]
+            return
+                SearchResult.combineResultsWithAnd
+                    [ foundByName
+                      foundByKey ]
+            }
                 
         let find (database: EventStore) (query: DomainQuery option) =
             query
             |> Option.map (findRelevantDomains database)
-            |> SearchResult.fromOption
+            |> Async.bindOption
+            |> Async.map SearchResult.fromOption
 
     module BoundedContextId =
         [<CLIMutable>]
@@ -128,8 +169,8 @@ module SearchFor =
             member this.IsActive =
                 not (Seq.isEmpty (Seq.append this.Name this.Key))
 
-        let findRelevantBoundedContexts (database: EventStore) (query: BoundedContextQuery) =
-            let findBoundedContext = database |> Find.boundedContexts
+        let findRelevantBoundedContexts (database: EventStore) (query: BoundedContextQuery) = async {
+            let! findBoundedContext = database |> Find.boundedContexts
 
             let foundByName =
                 query.Name
@@ -141,11 +182,14 @@ module SearchFor =
                 |> SearchArgument.fromInputs
                 |> SearchArgument.executeSearch  (Find.BoundedContexts.byKey findBoundedContext)
 
-            SearchResult.combineResultsWithAnd
-                [ foundByName
-                  foundByKey ]
+            return
+                SearchResult.combineResultsWithAnd
+                    [ foundByName
+                      foundByKey ]
+            }
 
         let find (database: EventStore) (query: BoundedContextQuery option) =
             query
             |> Option.map (findRelevantBoundedContexts database)
-            |> SearchResult.fromOption
+            |> Async.bindOption
+            |> Async.map SearchResult.fromOption

@@ -2,11 +2,12 @@ namespace Contexture.Api
 
 open System
 open Contexture.Api.Aggregates
+open Contexture.Api.Aggregates.BoundedContext
 open Contexture.Api.Aggregates.Namespace
 open Contexture.Api.Database
-open Contexture.Api.Entities
 open Contexture.Api.Domains
 open Contexture.Api.Infrastructure
+open Contexture.Api.ReadModels
 open Contexture.Api.Views
 open Microsoft.AspNetCore.Http
 open FSharp.Control.Tasks
@@ -16,20 +17,13 @@ open Microsoft.Extensions.Hosting
 open Giraffe
 
 module Namespaces =
-
-    let private fetchNamespaces (database: FileBased) boundedContext =
-        boundedContext
-        |> database.Read.BoundedContexts.ById
-        |> Option.map
-            (fun b ->
-                b.Namespaces
-                |> tryUnbox<Namespace list>
-                |> Option.defaultValue [])
+    open ValueObjects
 
     module CommandEndpoints =
         open System
         open Namespace
         open FileBasedCommandHandlers
+        open CommandHandler
 
         let clock = fun () -> DateTime.UtcNow
 
@@ -37,11 +31,11 @@ module Namespaces =
             fun (next: HttpFunc) (ctx: HttpContext) ->
                 task {
                     let database = ctx.GetService<EventStore>()
-
-                    match Namespace.handle clock database command with
+                    let eventBasedHandler = EventBased.eventStoreBasedCommandHandler clock database
+                    match! Namespace.useHandler eventBasedHandler command with
                     | Ok updatedContext ->
                         // for namespaces we don't use redirects ATM
-                        let boundedContext =
+                        let! boundedContext =
                             updatedContext
                             |> ReadModels.Namespace.namespacesOf database
 
@@ -66,15 +60,17 @@ module Namespaces =
     module QueryEndpoints =
 
         let getNamespaces boundedContextId =
-            fun (next: HttpFunc) (ctx: HttpContext) ->
+            fun (next: HttpFunc) (ctx: HttpContext) -> task {
                 let database = ctx.GetService<EventStore>()
-
-                let result =
+                let! namespaces =
                     boundedContextId
                     |> ReadModels.Namespace.namespacesOf database
+                let result =
+                    namespaces
                     |> json
 
-                result next ctx
+                return! result next ctx
+            }
 
         let getAllNamespaces =
             fun (next: HttpFunc) (ctx: HttpContext) ->
@@ -90,6 +86,7 @@ module Namespaces =
             open System
             open NamespaceTemplate
             open FileBasedCommandHandlers
+            open CommandHandler
 
             let clock = fun () -> DateTime.UtcNow
 
@@ -97,8 +94,8 @@ module Namespaces =
                 fun (next: HttpFunc) (ctx: HttpContext) ->
                     task {
                         let database = ctx.GetService<EventStore>()
-
-                        match NamespaceTemplate.handle clock database command with
+                        let eventBasedCommandHandler = EventBased.eventStoreBasedCommandHandler clock database 
+                        match! NamespaceTemplate.useHandler eventBasedCommandHandler command with
                         | Ok updatedTemplate ->
                             return! redirectTo false (sprintf "/api/namespaces/templates/%O" updatedTemplate) next ctx
                         | Error (DomainError error) ->
@@ -120,31 +117,36 @@ module Namespaces =
 
         module QueryEndpoints =
             let getAllTemplates =
-                fun (next: HttpFunc) (ctx: HttpContext) ->
-                    let database = ctx.GetService<EventStore>()
+                fun (next: HttpFunc) (ctx: HttpContext) -> task {
+                    let! templateState = ctx.GetService<ReadModels.Templates.AllTemplatesReadModel>().State()
 
-                    let namespaces =
-                        ReadModels.Templates.allTemplates database
+                    let templates =
+                        ReadModels.Templates.allTemplates templateState
 
-                    json namespaces next ctx
+                    return! json templates next ctx
+                    }
 
             let getTemplate templateId =
-                fun (next: HttpFunc) (ctx: HttpContext) ->
-                    let database = ctx.GetService<EventStore>()
-
+                fun (next: HttpFunc) (ctx: HttpContext) -> task {
+                    let! templateState = ctx.GetService<ReadModels.Templates.AllTemplatesReadModel>().State()
                     let template =
                         templateId
-                        |> ReadModels.Templates.buildTemplate database
+                        |> ReadModels.Templates.template templateState 
+
+                    let result =
+                        template
                         |> Option.map json
                         |> Option.defaultValue (RequestErrors.NOT_FOUND(sprintf "template %O not found" templateId))
 
-                    template next ctx
+                    return! result next ctx
+                }
 
     module Views =
         open Layout
         open Giraffe.ViewEngine
+       
 
-        let breadcrumb (domain: Domain) =
+        let breadcrumb (domain: Domain.Domain) =
             div [ _class "row" ] [
                 div [ _class "col" ] [
                     a [ attr "role" "button"
@@ -155,7 +157,7 @@ module Namespaces =
                 ]
             ]
 
-        let index serialize resolveAssets (boundedContextId: BoundedContextId) (domain: Domain) baseUrl =
+        let index serialize resolveAssets (boundedContextId: BoundedContextId) (domain: Domain.Domain) baseUrl =
             let namespaceSnippet =
                 let flags =
                     {| ApiBase = baseUrl
@@ -175,7 +177,7 @@ module Namespaces =
             documentTemplate (headTemplate resolveAssets) (bodyTemplate content)
 
     let index boundedContextId =
-        fun (next: HttpFunc) (ctx: HttpContext) ->
+        fun (next: HttpFunc) (ctx: HttpContext) -> task {
             let basePath =
                 ctx.GetService<IHostEnvironment>()
                 |> BasePaths.resolve
@@ -184,12 +186,16 @@ module Namespaces =
             let assetsResolver = Asset.resolveAsset pathResolver
 
             let eventStore = ctx.GetService<EventStore>()
-
-            let domainOption =
+            let! domainState = ctx.GetService<ReadModels.Domain.AllDomainReadModel>().State()
+            let! boundedContextState = ctx.GetService<ReadModels.BoundedContext.AllBoundedContextsReadModel>().State()
+            let boundedContext =
                 boundedContextId
-                |> ReadModels.BoundedContext.buildBoundedContext eventStore
+                |> ReadModels.BoundedContext.boundedContext boundedContextState
+                
+            let domainOption =
+                boundedContext
                 |> Option.map (fun bc -> bc.DomainId)
-                |> Option.bind (ReadModels.Domain.buildDomain eventStore)
+                |> Option.bind (ReadModels.Domain.domain domainState)
 
             match domainOption with
             | Some domain ->
@@ -197,11 +203,12 @@ module Namespaces =
 
                 let baseApi = basePath.ApiBase + "/api"
 
-                htmlView
+                return! htmlView
                     (Views.index jsonEncoder.SerializeToString assetsResolver boundedContextId domain baseApi)
                     next
                     ctx
-            | None -> RequestErrors.NOT_FOUND "Unknown" next ctx
+            | None -> return! RequestErrors.NOT_FOUND "Unknown" next ctx
+        }
 
     let routesForBoundedContext boundedContextId : HttpHandler =
         let routesForOneSpecificLabelOfNamespace namespaceId = 

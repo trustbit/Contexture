@@ -128,11 +128,13 @@ module Fixtures =
 
         let givenADomainWithOneBoundedContext domainId contextId =
             Given.noEvents
-            |> Given.andEvents [ domainId
-                                 |> Domain.domainDefinition
-                                 |> Domain.domainCreated
-                                 domainId |> Domain.key |> Domain.keyAssigned ]
-            |> Given.andEvents[
+            |> Given.andEvents [
+                 domainId
+                 |> Domain.domainDefinition
+                 |> Domain.domainCreated
+                 domainId |> Domain.key |> Domain.keyAssigned
+            ]
+            |> Given.andEvents [
                 contextId
                 |> BoundedContext.definition domainId
                 |> BoundedContext.boundedContextCreated

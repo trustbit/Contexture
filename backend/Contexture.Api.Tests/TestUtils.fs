@@ -37,7 +37,11 @@ module TestHost =
     let runServer environmentSimulation testConfiguration =
         let host =
             createHost testConfiguration Contexture.Api.App.configureServices Contexture.Api.App.configureApp
-
+        
+        host.Services.GetServices<ReadModels.ReadModelInitialization>()
+        |> Contexture.Api.App.connectAndReplayReadModels
+        |> Async.RunSynchronously
+        
         host.Start()
         host
 
@@ -110,9 +114,15 @@ module When =
         }
 
     let gettingJson<'t> (url: string) (environment: TestHostEnvironment) =
-        task {
-            let! result = environment.Client.GetFromJsonAsync<'t>(url)
-            return result
+        task {        
+            let! result = environment.Client.GetAsync(url)
+            if result.IsSuccessStatusCode then
+                let! content = result.Content.ReadFromJsonAsync<'t>()
+                return content
+            else
+                let! content = result.Content.ReadAsStringAsync() 
+                raise (Xunit.Sdk.XunitException($"Could not get from %O{url}: %O{result} %s{content}"))
+                return Unchecked.defaultof<'t>
         }
 
 type Then = Xunit.Assert
@@ -135,6 +145,7 @@ module Utils =
                     RecordedAt = environment.Time() } }
             |> EventEnvelope.box
 
-    let singleEvent<'e> (eventStore: EventStore) : EventEnvelope<'e> =
-        let events = eventStore.Get<'e>()
-        Then.Single events
+    let singleEvent<'e> (eventStore: EventStore) : Async<EventEnvelope<'e>> = async {
+        let! events = eventStore.AllStreams<'e>()
+        return Then.Single events
+    }

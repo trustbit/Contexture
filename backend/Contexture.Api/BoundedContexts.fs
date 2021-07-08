@@ -4,8 +4,7 @@ open System
 open Contexture.Api.Aggregates
 open Contexture.Api.Database
 open Contexture.Api.Domains
-open Contexture.Api.Entities
-open Contexture.Api.Aggregates.BoundedContext
+
 open Contexture.Api.Infrastructure
 open Contexture.Api.ReadModels.Find
 open Microsoft.AspNetCore.Http
@@ -14,7 +13,11 @@ open FSharp.Control.Tasks
 open Giraffe
 
 module BoundedContexts =
+    open Contexture.Api.Aggregates.Namespace
+    open Contexture.Api.Aggregates.BoundedContext
+    open ValueObjects
     module Results =
+        
         type BoundedContextResult =
             { Id: BoundedContextId
               ParentDomainId: DomainId
@@ -26,13 +29,13 @@ module BoundedContexts =
               UbiquitousLanguage: Map<string, UbiquitousLanguageTerm>
               Messages: Messages
               DomainRoles: DomainRole list
-              Domain: Domain
-              Namespaces: Namespace list }
+              Domain: Domain.Domain
+              Namespaces: Projections.Namespace list }
 
         let convertBoundedContextWithDomain
-            (findDomain: DomainId -> Domain option)
-            (findNamespaces: BoundedContextId -> Namespace list)
-            (boundedContext: BoundedContext)
+            (findDomain: DomainId -> Domain.Domain option)
+            (findNamespaces: BoundedContextId -> Projections.Namespace list)
+            (boundedContext: Projections.BoundedContext)
             =
             { Id = boundedContext.Id
               ParentDomainId = boundedContext.DomainId
@@ -53,6 +56,7 @@ module BoundedContexts =
     module CommandEndpoints =
         open System
         open FileBasedCommandHandlers
+        open CommandHandler
 
         let clock = fun () -> DateTime.UtcNow
 
@@ -60,8 +64,8 @@ module BoundedContexts =
             fun (next: HttpFunc) (ctx: HttpContext) ->
                 task {
                     let database = ctx.GetService<EventStore>()
-
-                    match BoundedContext.handle clock database command with
+                    let eventStoreBased = EventBased.eventStoreBasedCommandHandler clock database
+                    match! BoundedContext.useHandler eventStoreBased command with
                     | Ok updatedContext ->
                         return! redirectTo false (sprintf "/api/boundedcontexts/%O" updatedContext) next ctx
                     | Error (DomainError EmptyName) ->
@@ -100,8 +104,8 @@ module BoundedContexts =
             fun (next: HttpFunc) (ctx: HttpContext) ->
                 task {
                     let database = ctx.GetService<EventStore>()
-
-                    match BoundedContext.handle clock database (RemoveBoundedContext contextId) with
+                    let eventStoreBased = EventBased.eventStoreBasedCommandHandler clock database
+                    match! BoundedContext.useHandler eventStoreBased (RemoveBoundedContext contextId) with
                     | Ok id -> return! json id next ctx
                     | Error e -> return! ServerErrors.INTERNAL_ERROR e next ctx
                 }
@@ -109,20 +113,21 @@ module BoundedContexts =
     module QueryEndpoints =
         open Contexture.Api.ReadModels
 
-        let private mapToBoundedContext eventStore ids =
-            fun (next: HttpFunc) (ctx: HttpContext) ->
-                let namespacesOf =
+        let private mapToBoundedContext eventStore domainState boundedContextState ids =
+            fun (next: HttpFunc) (ctx: HttpContext) -> task {
+                let! namespacesOf =
                     Namespace.allNamespacesByContext eventStore
 
                 let boundedContextLookup =
-                    ReadModels.BoundedContext.boundedContextLookup eventStore
+                    ReadModels.BoundedContext.boundedContextLookup boundedContextState
 
                 let boundedContexts =
                     ids
                     |> List.choose (fun id -> boundedContextLookup |> Map.tryFind id)
-                    |> List.map (Results.convertBoundedContextWithDomain (Domain.buildDomain eventStore) namespacesOf)
+                    |> List.map (Results.convertBoundedContextWithDomain (Domain.domain domainState) namespacesOf)
 
-                json boundedContexts next ctx
+                return! json boundedContexts next ctx
+            }
 
         [<CLIMutable>]
         type Query =
@@ -140,27 +145,29 @@ module BoundedContexts =
                 |> List.exists id
 
         let getBoundedContextsByQuery (item: Query) =
-            fun (next: HttpFunc) (ctx: HttpContext) ->
+            fun (next: HttpFunc) (ctx: HttpContext) -> task {
                 let database = ctx.GetService<EventStore>()
+                let! domainState = ctx.GetService<ReadModels.Domain.AllDomainReadModel>().State()
+                let! boundedContextState = ctx.GetService<ReadModels.BoundedContext.AllBoundedContextsReadModel>().State()
 
-                let namespaceIds =
+                let! namespaceIds =
                     SearchFor.NamespaceId.find database item.Namespace
 
-                let domainIds =
+                let! domainIds =
                     SearchFor.DomainId.find database item.Domain
 
-                let boundedContextIdsFromLabels =
+                let! boundedContextIdsFromLabels =
                     SearchFor.Labels.find database item.Label
 
-                let boundedContextIdsFromSearch =
+                let! boundedContextIdsFromSearch =
                     SearchFor.BoundedContextId.find database item.BoundedContext
 
-                let boundedContextsByNamespace =
+                let! boundedContextsByNamespace =
                     Namespace.BoundedContexts.byNamespace database
 
                 let boundedContextsByDomain =
-                    database
-                    |> ReadModels.BoundedContext.allBoundedContextsByDomain
+                    boundedContextState
+                    |> ReadModels.BoundedContext.boundedContextsByDomain
 
                 let boundedContextIdsFromNamespace =
                     namespaceIds
@@ -197,22 +204,27 @@ module BoundedContexts =
                     |> Option.map Set.toList
                     |> Option.defaultValue List.empty
 
-                mapToBoundedContext database idsToLoad next ctx
+                return! mapToBoundedContext database domainState boundedContextState idsToLoad next ctx
+            }
 
         let getBoundedContexts =
-            fun (next: HttpFunc) (ctx: HttpContext) ->
+            fun (next: HttpFunc) (ctx: HttpContext) -> task {
                 let eventStore = ctx.GetService<EventStore>()
-
-                let allContexts =
-                    eventStore
+                let! domainState = ctx.GetService<ReadModels.Domain.AllDomainReadModel>().State()
+                let! boundedContextState = ctx.GetService<ReadModels.BoundedContext.AllBoundedContextsReadModel>().State()
+                let lookup =
+                    boundedContextState
                     |> BoundedContext.boundedContextLookup
+                let allContexts =
+                    lookup
                     |> Map.toList
                     |> List.map fst
 
-                mapToBoundedContext eventStore allContexts next ctx
+                return! mapToBoundedContext eventStore domainState boundedContextState allContexts next ctx
+            }
 
         let getOrSearchBoundedContexts =
-            fun (next: HttpFunc) (ctx: HttpContext) ->
+            fun (next: HttpFunc) (ctx: HttpContext) -> task {
                 let nextHandler =
                     if ctx.Request.QueryString.HasValue then
                         match ctx.TryBindQueryString<Query>() with
@@ -221,23 +233,29 @@ module BoundedContexts =
                     else
                         getBoundedContexts
 
-                nextHandler next ctx
+                return! nextHandler next ctx
+            }
 
         let getBoundedContext contextId =
-            fun (next: HttpFunc) (ctx: HttpContext) ->
+            fun (next: HttpFunc) (ctx: HttpContext) -> task {
                 let eventStore = ctx.GetService<EventStore>()
+                let! domainState = ctx.GetService<ReadModels.Domain.AllDomainReadModel>().State()
+                let! boundedContextState = ctx.GetService<ReadModels.BoundedContext.AllBoundedContextsReadModel>().State()
 
-                let namespacesOf =
+                let! namespacesOf =
                     Namespace.allNamespacesByContext eventStore
-
-                let result =
+                    
+                let boundedContext = 
                     contextId
-                    |> BoundedContext.buildBoundedContext eventStore
-                    |> Option.map (Results.convertBoundedContextWithDomain (Domain.buildDomain eventStore) namespacesOf)
+                    |> BoundedContext.boundedContext boundedContextState
+                let result =
+                    boundedContext
+                    |> Option.map (Results.convertBoundedContextWithDomain (Domain.domain domainState) namespacesOf)
                     |> Option.map json
                     |> Option.defaultValue (RequestErrors.NOT_FOUND(sprintf "BoundedContext %O not found" contextId))
 
-                result next ctx
+                return! result next ctx
+            }
 
     let routes : HttpHandler =
         subRouteCi

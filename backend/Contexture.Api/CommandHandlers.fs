@@ -1,13 +1,15 @@
 namespace Contexture.Api
 
+open System.Threading.Tasks
 open Contexture.Api
+open Contexture.Api.Aggregates.Domain
 open Contexture.Api.Aggregates.NamespaceTemplate.Projections
 open Database
 open Contexture.Api.Infrastructure
+open FSharp.Control.Tasks
+open Microsoft.Extensions.Logging
 
-module FileBasedCommandHandlers =
-    open Aggregates
-
+module CommandHandler =
     type CommandHandlerError<'T, 'Id> =
         | DomainError of 'T
         | InfrastructureError of InfrastructureError<'Id>
@@ -16,6 +18,74 @@ module FileBasedCommandHandlers =
         | Exception of exn
         | EntityNotFound of 'Id
 
+    type HandleIdentityAndCommand<'Identity,'Command,'Error> = 'Identity -> 'Command -> Async<Result<'Identity,CommandHandlerError<'Error,'Identity>>>
+    type HandleCommand<'Identity,'Command,'Error> = 'Command -> Async<Result<'Identity,CommandHandlerError<'Error,'Identity>>>
+    
+    let getIdentityFromCommand identifyCommand (handler: HandleIdentityAndCommand<_,_,_>) : HandleCommand<_,_,_> =
+        fun command -> async {
+            let identity = identifyCommand command
+            return! handler identity command
+        }
+    
+    type Aggregate<'State,'Cmd, 'Event, 'Error> =
+        { Decider : 'Cmd -> 'State -> Result<'Event list,'Error>
+          Evolve: 'State -> 'Event -> 'State
+          Initial : 'State }
+        with
+            static member From decider evolve initial : Aggregate<'State, 'Cmd,'Event,'Error>=
+                { Decider = decider
+                  Evolve = evolve
+                  Initial = initial }
+        
+        
+    let handleWithStream loadStream saveStream (aggregate: Aggregate<'State,'Cmd,'Event,'Error>) : HandleIdentityAndCommand<'Identity,'Cmd,'Error> =
+        fun identity (command : 'Cmd) -> async {
+            let! stream = loadStream identity
+            
+            let state =
+                stream
+                |> List.fold aggregate.Evolve aggregate.Initial
+                
+            match aggregate.Decider command state with
+            | Ok newEvents ->
+                do! saveStream identity newEvents
+                return Ok identity
+            | Error e ->
+                return e |> DomainError |> Error
+        }
+    
+    module EventBased =
+        type GetStreamName<'Identity> = 'Identity -> EventSource
+        type StreamBasedCommandHandler<'Identity,'State,'Cmd,'Event,'Error> = GetStreamName<'Identity> -> Aggregate<'State,'Cmd,'Event,'Error> -> HandleIdentityAndCommand<'Identity, 'Cmd,'Error>
+        
+        let eventStoreBasedCommandHandler clock (eventStore:EventStore) : StreamBasedCommandHandler<_,_,_,_,_> =
+            fun getStreamName aggregate  ->
+                let loadStream identity = async {
+                    let streamName = getStreamName identity
+                    let! stream = eventStore.Stream<'Event> streamName
+                    return List.map (fun e -> e.Event) stream
+                    }
+                
+                let saveStream identity newEvents = async {
+                    let name = getStreamName identity
+                    let mappedEvents =
+                        newEvents
+                        |> List.map (fun e ->
+                            { Event = e
+                              Metadata =
+                                  { Source = name
+                                    RecordedAt = clock () } })
+                        
+                    do! eventStore.Append mappedEvents
+                }
+                
+                handleWithStream loadStream saveStream aggregate
+
+module FileBasedCommandHandlers =
+    open Contexture.Api.Aggregates
+    open CommandHandler
+    open CommandHandler.EventBased
+    
     module BridgeEventSourcingWithFilebasedDatabase =
         type ChangeOperation<'Item, 'Id> =
             | Add of 'Item
@@ -46,37 +116,29 @@ module FileBasedCommandHandlers =
                     | Remove id -> collection.Remove id
                     | NoOp -> collection |> Ok
                 | Error e -> Error e
+                
+        let waitForDbChange (logger: ILogger) results = async {
+            match! results with
+            | Ok _ -> return ()
+            | Error (e: string) -> logger.LogCritical("Could not update database: {Error}", e)
+        }
 
     module Domain =
         open Contexture.Api.Aggregates.Domain
-        open Contexture.Api.Entities
         open BridgeEventSourcingWithFilebasedDatabase
         
-        let handle clock (store: EventStore) command =
-            let identity = Domain.identify command
-            let streamName = Domain.name identity
-
-            let state =
-                streamName
-                |> store.Stream
-                |> List.map (fun e -> e.Event)
-                |> List.fold State.Fold State.Initial
-
-            match handle state command with
-            | Ok newEvents ->
-                newEvents
-                |> List.map (fun e ->
-                    { Event = e
-                      Metadata =
-                          { Source = streamName
-                            RecordedAt = clock () } })
-                |> store.Append
-
-                Ok identity
-            | Error e ->
-                e |> DomainError |> Error
+        let aggregate =
+                Aggregate.From
+                    Domain.decide
+                    Domain.State.evolve
+                    Domain.State.Initial
+        
+        let useHandler stateBasedHandler =
+            aggregate
+            |> stateBasedHandler Domain.name
+            |> CommandHandler.getIdentityFromCommand Domain.identify   
             
-        let asEvents clock (domain: Domain) =
+        let asEvents clock (domain: Serialization.Domain) =
             { Metadata =
                   { Source = domain.Id
                     RecordedAt = clock () }
@@ -89,48 +151,65 @@ module FileBasedCommandHandlers =
                         Key = domain.Key } }
             |> List.singleton
 
-        let subscription (database: FileBased): Subscription<Domain.Event> =
+        let mapDomainToSerialization (state: Serialization.Domain option) event : Serialization.Domain option =
+            let convertToOption =
+                function
+                | Initial -> None
+                | Existing state ->
+                    let mappedState: Serialization.Domain =
+                        {
+                            Id = state.Id
+                            Key = state.Key
+                            Name = state.Name
+                            Vision = state.Vision
+                            ParentDomainId = state.ParentDomainId
+                        }
+                    Some mappedState
+                | Deleted -> None
+            
+            match state with
+            | Some s ->
+                let mappedState =
+                    Existing {
+                        Id = s.Id
+                        Key = s.Key
+                        Name = s.Name
+                        Vision = s.Vision
+                        ParentDomainId = s.ParentDomainId
+                    }
+                State.evolve mappedState event
+            | None ->
+                State.evolve Initial event
+            |> convertToOption 
+                
+        let subscription logger (database: SingleFileBasedDatastore): Subscription<Domain.Event> =
             fun (events: EventEnvelope<Domain.Event> list) ->
                 database.Change(fun document ->
                     events
                     |> List.fold
-                        (applyToCollection Projections.asDomain)
+                        (applyToCollection mapDomainToSerialization)
                            (Ok document.Domains)
-                    |> Result.map (fun c -> { document with Domains = c }, System.Guid.Empty))
-                |> ignore
+                    |> Result.map (fun c -> { document with Domains = c })
+                    |> Result.mapError (fun e -> $"%O{e}"))
+                |> waitForDbChange logger
 
     module BoundedContext =
 
         open BridgeEventSourcingWithFilebasedDatabase
-        
-        open Contexture.Api.Entities
         open BoundedContext
         
-        let handle clock (store: EventStore) (command: BoundedContext.Command) =
-            let identity = BoundedContext.identify command
-            let streamName = BoundedContext.name identity
+        let aggregate =
+                Aggregate.From
+                    BoundedContext.decide
+                    BoundedContext.State.evolve
+                    BoundedContext.State.Initial
+        
+        let useHandler stateBasedHandler =
+            aggregate
+            |> stateBasedHandler BoundedContext.name
+            |> CommandHandler.getIdentityFromCommand BoundedContext.identify   
 
-            let state =
-                streamName
-                |> store.Stream
-                |> List.map (fun e -> e.Event)
-                |> List.fold BoundedContext.State.Fold BoundedContext.State.Initial
-
-            match BoundedContext.handle state command with
-            | Ok newEvents ->
-                newEvents
-                |> List.map (fun e ->
-                    { Event = e
-                      Metadata =
-                          { Source = streamName
-                            RecordedAt = clock () } })
-                |> store.Append
-
-                Ok identity
-            | Error e ->
-                e |> DomainError |> Error
-
-        let asEvents clock (collaboration: BoundedContext) =
+        let asEvents clock (collaboration: Serialization.BoundedContext) =
             { Metadata =
                   { Source = collaboration.Id
                     RecordedAt = clock () }
@@ -148,99 +227,142 @@ module FileBasedCommandHandlers =
                         Name = collaboration.Name }
             }
             |> List.singleton
+            
+            
+        let mapSerialization (boundedContext: Serialization.BoundedContext option) (event: BoundedContext.Event): Serialization.BoundedContext option =
+            let convertToSerialization namespaces (context: Projections.BoundedContext): Serialization.BoundedContext =
+                { Id = context.Id
+                  DomainId = context.DomainId
+                  Key = context.Key
+                  Name = context.Name
+                  Description = context.Description
+                  Classification = context.Classification
+                  BusinessDecisions = context.BusinessDecisions
+                  UbiquitousLanguage = context.UbiquitousLanguage
+                  Messages = context.Messages
+                  DomainRoles = context.DomainRoles
+                  Namespaces = namespaces
+                }
+                
+            match boundedContext with
+            | Some bc ->
+                let mapped: Projections.BoundedContext =
+                    { Id = bc.Id
+                      DomainId = bc.DomainId
+                      Key = bc.Key
+                      Name = bc.Name
+                      Description = bc.Description
+                      Classification = bc.Classification
+                      BusinessDecisions = bc.BusinessDecisions
+                      UbiquitousLanguage = bc.UbiquitousLanguage
+                      Messages = bc.Messages
+                      DomainRoles = bc.DomainRoles                        
+                    }
+                BoundedContext.Projections.asBoundedContext (Some mapped) event
+                |> Option.map (convertToSerialization bc.Namespaces)
+            | None ->
+                BoundedContext.Projections.asBoundedContext None event
+                |> Option.map (convertToSerialization [])
+            
 
-        let subscription (database: FileBased): Subscription<Event> =
+        let subscription logger (database: SingleFileBasedDatastore): Subscription<Event> =
             fun (events: EventEnvelope<Event> list) ->
                 database.Change(fun document ->
                     events
                     |> List.fold
-                        (applyToCollection BoundedContext.Projections.asBoundedContext)
+                        (applyToCollection mapSerialization)
                            (Ok document.BoundedContexts)
-                    |> Result.map (fun c -> { document with BoundedContexts = c }, System.Guid.Empty))
-                |> ignore
+                    |> Result.map (fun c -> { document with BoundedContexts = c })
+                    |> Result.mapError (fun e -> $"%O{e}"))
+                |> waitForDbChange logger
 
     module Collaboration =
-        open Contexture.Api.Entities
-        open Collaboration
-        open BridgeEventSourcingWithFilebasedDatabase
         
-        let handle clock (store: EventStore) command =
-            let identity = Collaboration.identify command
-            let streamName = Collaboration.name identity
-
-            let state =
-                streamName
-                |> store.Stream
-                |> List.map (fun e -> e.Event)
-                |> List.fold State.Fold State.Initial
-
-            match handle state command with
-            | Ok newEvents ->
-                newEvents
-                |> List.map (fun e ->
-                    { Event = e
-                      Metadata =
-                          { Source = streamName
-                            RecordedAt = clock () } })
-                |> store.Append
-
-                Ok identity
-            | Error e ->
-                e |> DomainError |> Error
-
-        let asEvents clock (collaboration: Collaboration) =
+        open BridgeEventSourcingWithFilebasedDatabase
+        let aggregate =
+                Aggregate.From
+                    Collaboration.decide
+                    Collaboration.State.evolve
+                    Collaboration.State.Initial
+        
+        let useHandler stateBasedHandler =
+            aggregate
+            |> stateBasedHandler Collaboration.name
+            |> CommandHandler.getIdentityFromCommand Collaboration.identify               
+            
+        
+        let asEvents clock (collaboration: Serialization.Collaboration) =
             { Metadata =
                   { Source = collaboration.Id
                     RecordedAt = clock () }
               Event =
-                  CollaborationImported
+                  Collaboration.CollaborationImported
                       { CollaborationId = collaboration.Id
                         Description = collaboration.Description
                         RelationshipType = collaboration.RelationshipType
                         Initiator = collaboration.Initiator
                         Recipient = collaboration.Recipient } }
             |> List.singleton
+            
+        let mapToSerialization (state: Serialization.Collaboration option) event : Serialization.Collaboration option =
+            let convertToOption =
+                function
+                | Collaboration.Initial -> None
+                | Collaboration.Existing s ->
+                    let mappedState: Serialization.Collaboration =
+                        {
+                            Id = s.Id
+                            Initiator = s.Initiator
+                            Recipient = s.Recipient
+                            Description = s.Description
+                            RelationshipType = s.RelationshipType
+                        }
+                    Some mappedState
+                | Collaboration.Deleted -> None
+            match state with
+            | Some s ->
+                let mappedState =
+                    Collaboration.Existing {
+                        Id = s.Id
+                        Initiator = s.Initiator
+                        Recipient = s.Recipient
+                        Description = s.Description
+                        RelationshipType = s.RelationshipType
+                    }
+                Collaboration.State.evolve mappedState event
+            | None ->
+                Collaboration.State.evolve Collaboration.Initial event
+            |> convertToOption 
 
-        let subscription (database: FileBased): Subscription<Event> =
-            fun (events: EventEnvelope<Event> list) ->
+        let subscription logger (database: SingleFileBasedDatastore): Subscription<Collaboration.Event> =
+            fun (events: EventEnvelope<Collaboration.Event> list) -> 
                 database.Change(fun document ->
                     events
                     |> List.fold
-                        (applyToCollection Projections.asCollaboration)
+                        (applyToCollection mapToSerialization)
                            (Ok document.Collaborations)
-                    |> Result.map (fun c -> { document with Collaborations = c }, System.Guid.Empty))
-                |> ignore
+                    |> Result.map (fun c -> { document with Collaborations = c })
+                    |> Result.mapError (fun e -> $"%O{e}")
+                )
+                |> waitForDbChange logger
 
     module Namespace =
-        open Entities
         open Namespace
+        open ValueObjects
         open BridgeEventSourcingWithFilebasedDatabase
         
-        let handle clock (store: EventStore) command =
-            let identity = Namespace.identify command
-            let streamName = Namespace.name identity
+        let aggregate =
+                Aggregate.From
+                    Namespace.decide
+                    Namespace.State.evolve
+                    Namespace.State.Initial
+        
+        let useHandler stateBasedHandler =
+            aggregate
+            |> stateBasedHandler Namespace.name
+            |> CommandHandler.getIdentityFromCommand Namespace.identify   
 
-            let state =
-                streamName
-                |> store.Stream
-                |> List.map (fun e -> e.Event)
-                |> List.fold State.Fold State.Initial
-
-            match handle state command with
-            | Ok newEvents ->
-                newEvents
-                |> List.map (fun e ->
-                    { Event = e
-                      Metadata =
-                          { Source = streamName
-                            RecordedAt = clock () } })
-                |> store.Append
-
-                Ok identity
-            | Error e ->
-                e |> DomainError |> Error
-
-        let asEvents clock (boundedContext: BoundedContext) =
+        let asEvents clock (boundedContext: Serialization.BoundedContext) =
             boundedContext.Namespaces
             |> List.map (fun n ->
                 { Metadata =
@@ -262,45 +384,37 @@ module FileBasedCommandHandlers =
                           }
                 }
             )
+        let asNamespaceWithBoundedContext (boundedContextOption: Serialization.BoundedContext option) event =
+            boundedContextOption
+            |> Option.map (fun boundedContext ->
+                { boundedContext with Namespaces = Projections.asNamespaces boundedContext.Namespaces event })
 
-        let subscription (database: FileBased): Subscription<Event> =
+
+        let subscription logger (database: SingleFileBasedDatastore): Subscription<Event> =
             fun (events: EventEnvelope<Event> list) ->
                 database.Change(fun document ->
                     events
                     |> List.fold
-                        (applyToCollection Projections.asNamespaceWithBoundedContext)
+                        (applyToCollection asNamespaceWithBoundedContext)
                            (Ok document.BoundedContexts)
-                    |> Result.map (fun c -> { document with BoundedContexts = c }, System.Guid.Empty))
-                |> ignore
+                    |> Result.map (fun c -> { document with BoundedContexts = c })
+                    |> Result.mapError (fun e -> $"%O{e}"))
+                |> waitForDbChange logger
 
     module NamespaceTemplate =
-        open Entities
         open NamespaceTemplate
         open BridgeEventSourcingWithFilebasedDatabase
         
-        let handle clock (store: EventStore) command =
-            let identity = NamespaceTemplate.identify command
-            let streamName = NamespaceTemplate.name identity
-
-            let state =
-                streamName
-                |> store.Stream
-                |> List.map (fun e -> e.Event)
-                |> List.fold State.Fold State.Initial
-
-            match handle state command with
-            | Ok newEvents ->
-                newEvents
-                |> List.map (fun e ->
-                    { Event = e
-                      Metadata =
-                          { Source = streamName
-                            RecordedAt = clock () } })
-                |> store.Append
-
-                Ok identity
-            | Error e ->
-                e |> DomainError |> Error
+        let aggregate =
+                Aggregate.From
+                    NamespaceTemplate.decide
+                    NamespaceTemplate.State.evolve
+                    NamespaceTemplate.State.Initial
+        
+        let useHandler stateBasedHandler =
+            aggregate
+            |> stateBasedHandler NamespaceTemplate.name
+            |> CommandHandler.getIdentityFromCommand NamespaceTemplate.identify   
 
         let asEvents clock (template: NamespaceTemplate) =
             { Metadata =
@@ -320,12 +434,13 @@ module FileBasedCommandHandlers =
             }
             |> List.singleton
 
-        let subscription (database: FileBased): Subscription<Event> =
+        let subscription logger (database: SingleFileBasedDatastore): Subscription<Event> =
             fun (events: EventEnvelope<Event> list) ->
                 database.Change(fun document ->
                     events
                     |> List.fold
                         (applyToCollection Projections.asTemplate)
                            (Ok document.NamespaceTemplates)
-                    |> Result.map (fun c -> { document with NamespaceTemplates = c }, System.Guid.Empty))
-                |> ignore
+                    |> Result.map (fun c -> { document with NamespaceTemplates = c })
+                    |> Result.mapError (fun e -> $"%O{e}"))
+                |> waitForDbChange logger

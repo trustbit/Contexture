@@ -7,13 +7,12 @@ open Contexture.Api.Aggregates
 open Contexture.Api.Aggregates.BoundedContext
 open Contexture.Api.Aggregates.Domain
 open Contexture.Api.Aggregates.Namespace
-open Contexture.Api.Entities
 open Contexture.Api.Infrastructure
 open Xunit
 open FSharp.Control.Tasks
 open Xunit.Sdk
 open Contexture.Api.Tests.EnvironmentSimulation
-
+open ValueObjects
 module Namespaces =
 
     [<Fact>]
@@ -45,7 +44,7 @@ module Namespaces =
             // assert
             let eventStore = testEnvironment.GetService<EventStore>()
 
-            let event =
+            let! event =
                 Utils.singleEvent<Namespace.Event> eventStore
 
             match event.Event with

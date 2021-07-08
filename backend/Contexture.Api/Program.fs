@@ -24,9 +24,9 @@ type ContextureOptions = { DatabasePath: string }
 module AllRoute =
 
     let getAllData =
-        fun (next: HttpFunc) (ctx: HttpContext) ->
-            let database = ctx.GetService<FileBased>()
-            let document = database.Read
+        fun (next: HttpFunc) (ctx: HttpContext) -> task {
+            let database = ctx.GetService<SingleFileBasedDatastore>()
+            let! document = database.Read()
 
             let result =
                 {| BoundedContexts = document.BoundedContexts.All
@@ -34,39 +34,42 @@ module AllRoute =
                    Collaborations = document.Collaborations.All
                    NamespaceTemplates = document.NamespaceTemplates.All |}
 
-            json result next ctx
-
-    open Entities
+            return! json result next ctx
+        }
 
     [<CLIMutable>]
     type UpdateAllData =
-        { Domains: Domain list
-          BoundedContexts: BoundedContext list
-          Collaborations: Collaboration list
+        { Domains: Serialization.Domain list
+          BoundedContexts: Serialization.BoundedContext list
+          Collaborations: Serialization.Collaboration list
           NamespaceTemplates: NamespaceTemplate.Projections.NamespaceTemplate list }
 
     let postAllData =
         fun (next: HttpFunc) (ctx: HttpContext) ->
             task {
-                let database = ctx.GetService<FileBased>()
+                let database = ctx.GetService<SingleFileBasedDatastore>()
                 let notEmpty items = not (List.isEmpty items)
                 let! data = ctx.BindJsonAsync<UpdateAllData>()
 
                 if notEmpty data.Domains
                    && notEmpty data.BoundedContexts
                    && notEmpty data.Collaborations then
-                    let document =
+                    let! result =
                         database.Change
-                            (fun document ->
+                            (fun _ ->
                                 let newDocument : Document =
                                     { Domains = collectionOfGuid data.Domains (fun d -> d.Id)
                                       BoundedContexts = collectionOfGuid data.BoundedContexts (fun d -> d.Id)
                                       Collaborations = collectionOfGuid data.Collaborations (fun d -> d.Id)
                                       NamespaceTemplates = collectionOfGuid data.NamespaceTemplates (fun d -> d.Id) }
 
-                                Ok(newDocument, ()))
+                                Ok newDocument)
 
-                    return! text "Successfully imported all data - NOTE: you need to restart the application" next ctx
+                    match result with
+                    | Ok _ ->
+                        return! text "Successfully imported all data - NOTE: you need to restart the application" next ctx
+                    | Error e ->
+                        return! ServerErrors.INTERNAL_ERROR $"Could not import document: %s{e}" next ctx
                 else
                     return! RequestErrors.BAD_REQUEST "Not overwriting with (partly) missing data" next ctx
             }
@@ -128,6 +131,9 @@ let errorHandler (ex : Exception) (logger : ILogger) =
     logger.LogError(ex, "An unhandled exception has occurred while executing the request.")
     clearResponse >=> setStatusCode 500 >=> text ex.Message
 
+let clock =
+    fun () ->  System.DateTime.UtcNow
+        
 let configureCors (builder : CorsPolicyBuilder) =
     builder
         .AllowAnyOrigin()
@@ -135,7 +141,7 @@ let configureCors (builder : CorsPolicyBuilder) =
         .AllowAnyHeader()
         |> ignore
 
-let configureApp (app : IApplicationBuilder) =
+let configureApp (app : IApplicationBuilder) =    
     let env = app.ApplicationServices.GetService<IWebHostEnvironment>()
     (match env.IsDevelopment() with
     | true  ->
@@ -151,7 +157,20 @@ let configureJsonSerializer (services: IServiceCollection) =
     |> SystemTextJson.Serializer
     |> services.AddSingleton<Json.ISerializer>
     |> ignore
-
+    
+let registerReadModel<'R, 'E, 'S when 'R :> ReadModels.ReadModel<'E,'S> and 'R : not struct> (readModel: 'R) (services: IServiceCollection) =
+    services.AddSingleton<'R>(readModel) |> ignore
+    let initializeReadModel (s: IServiceProvider) =
+        ReadModels.ReadModelInitialization.initializeWith (s.GetRequiredService<EventStore>()) readModel.EventHandler
+    services.AddSingleton<ReadModels.ReadModelInitialization> initializeReadModel
+    
+let configureReadModels (services: IServiceCollection) =
+    services
+    |> registerReadModel (ReadModels.Domain.domainsReadModel())
+    |> registerReadModel (ReadModels.Collaboration.collaborationsReadModel())
+    |> registerReadModel (ReadModels.Templates.templatesReadModel())
+    |> registerReadModel (ReadModels.BoundedContext.boundedContextsReadModel())
+    |> ignore
 
 let configureServices (context: HostBuilderContext) (services : IServiceCollection) =
     services
@@ -159,11 +178,20 @@ let configureServices (context: HostBuilderContext) (services : IServiceCollecti
         .Bind(context.Configuration)
         .Validate((fun options -> not (String.IsNullOrEmpty options.DatabasePath)), "A non-empty DatabasePath configuration is required")
         |> ignore
-    services.AddSingleton<FileBased>(fun services ->
+    services.AddSingleton<SingleFileBasedDatastore>(fun services ->
         let options = services.GetRequiredService<IOptions<ContextureOptions>>()
-        FileBased.InitializeDatabase(options.Value.DatabasePath))
+        // TODO: danger zone - loading should not be done as part of the initialization
+        AgentBased.initializeDatabase(options.Value.DatabasePath)
+        |> Async.AwaitTask
+        |> Async.RunSynchronously
+        )
+        
         |> ignore
-    services.AddSingleton<EventStore> (EventStore.Empty) |> ignore
+    
+    services.AddSingleton<Clock>(clock) |> ignore
+    services.AddSingleton<EventStore> (EventStore.Empty) |> ignore 
+    services |> configureReadModels
+    
     services.AddCors() |> ignore
     services.AddGiraffe() |> ignore
     services |> configureJsonSerializer
@@ -183,44 +211,84 @@ let buildHost args =
                     |> ignore)
         .Build()
 
-let importFromDocument (store: EventStore) (database: Document) =
-    let clock = fun () -> System.DateTime.UtcNow
-    database.Collaborations.All
-    |> List.map (Collaboration.asEvents clock)
-    |> List.iter store.Append
-    
-    database.Domains.All
-    |> List.map (Domain.asEvents clock)
-    |> List.iter store.Append
-    
-    database.BoundedContexts.All
-    |> List.map (BoundedContext.asEvents clock)
-    |> List.iter store.Append
-    
-    database.BoundedContexts.All
-    |> List.map (Namespace.asEvents clock)
-    |> List.iter store.Append
+let connectAndReplayReadModels (readModels: ReadModels.ReadModelInitialization seq) =
+    readModels
+    |> Seq.map (fun r -> r.ReplayAndConnect())
+    |> Async.Sequential
+    |> Async.Ignore
 
-    database.NamespaceTemplates.All
-    |> List.map (NamespaceTemplate.asEvents clock)
-    |> List.iter store.Append
+
+let importFromDocument (store: EventStore) (database: Document) = async {
+    let runAsync (items: Async<Unit> list) =
+        items
+        |> Async.Sequential
+        |> Async.Ignore
+        
+    let clock = fun () -> System.DateTime.UtcNow
+    do!
+        database.Collaborations.All
+        |> List.map (Collaboration.asEvents clock)
+        |> List.map store.Append
+        |> runAsync
+    
+    do!
+        database.Domains.All
+        |> List.map (Domain.asEvents clock)
+        |> List.map store.Append
+        |> runAsync
+    
+    do!
+        database.BoundedContexts.All
+        |> List.map (BoundedContext.asEvents clock)
+        |> List.map store.Append
+        |> runAsync
+    
+    do!
+        database.BoundedContexts.All
+        |> List.map (Namespace.asEvents clock)
+        |> List.map store.Append
+        |> runAsync
+
+    do!
+        database.NamespaceTemplates.All
+        |> List.map (NamespaceTemplate.asEvents clock)
+        |> List.map store.Append
+        |> runAsync
+    }
+let runAsync (host: IHost) =
+    task {
+        // make sure the database is loaded
+        let database =
+            host.Services.GetRequiredService<SingleFileBasedDatastore>()
+
+        let store =
+            host.Services.GetRequiredService<EventStore>()
+
+        // Do replays before we import the document
+        let readModels =
+            host.Services.GetServices<ReadModels.ReadModelInitialization>()
+
+        do! connectAndReplayReadModels readModels
+
+        let! document = database.Read()
+        do! importFromDocument store document
+        
+        let loggerFactory = host.Services.GetRequiredService<ILoggerFactory>()
+        let subscriptionLogger = loggerFactory.CreateLogger("subscriptions")
+
+        // subscriptions for syncing back to the filebased-db are added after initial seeding/loading
+        store.Subscribe(Collaboration.subscription subscriptionLogger database)
+        store.Subscribe(Domain.subscription subscriptionLogger database)
+        store.Subscribe(BoundedContext.subscription subscriptionLogger database)
+        store.Subscribe(Namespace.subscription subscriptionLogger database)
+        store.Subscribe(NamespaceTemplate.subscription subscriptionLogger database)
+
+        return! host.RunAsync()
+    }
 
 [<EntryPoint>]
 let main args =
     let host = buildHost args
-
-    // make sure the database is loaded
-    let database = host.Services.GetRequiredService<FileBased>()
-    let store = host.Services.GetRequiredService<EventStore>()
-    
-    importFromDocument store database.Read
-    
-    // collaboration subscription is added after initial seeding
-    store.Subscribe (Collaboration.subscription database)
-    store.Subscribe (Domain.subscription database)
-    store.Subscribe (BoundedContext.subscription database)
-    store.Subscribe (Namespace.subscription database)
-    store.Subscribe (NamespaceTemplate.subscription database)
-
-    host.Run()
+    let executingHost = runAsync host
+    executingHost.GetAwaiter().GetResult()
     0

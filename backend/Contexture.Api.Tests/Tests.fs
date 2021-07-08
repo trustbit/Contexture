@@ -3,12 +3,13 @@ module Tests
 open Contexture.Api
 open Xunit
 open Database
+open FSharp.Control.Tasks
 
 [<Fact>]
-let ``Unversioned JSON deserialization`` () =
+let ``Unversioned JSON deserialization`` () = task {
     let exampleInputPath = @"../../../../../example/restaurant-db.json"
     
-    let expectedJson = exampleInputPath |> Persistence.read
+    let! expectedJson = exampleInputPath |> Persistence.read
     
     let parsedRoot = expectedJson |> Serialization.deserialize
     
@@ -19,3 +20,4 @@ let ``Unversioned JSON deserialization`` () =
     let resultJson = parsedRoot |> Serialization.serialize
     
     Assert.NotEmpty resultJson
+    }
