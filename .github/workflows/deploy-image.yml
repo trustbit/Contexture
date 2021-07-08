@@ -24,9 +24,9 @@ jobs:
     - run: make prepare-image
       name: Prepares backend & frontend into an image
     - name: Publish to Registry
-      uses: elgohr/Publish-Docker-Github-Action@master
+      uses: elgohr/Publish-Docker-Github-Action@main
       env:
-        GIT_HASH: $GITHUB_SHA
+        GIT_HASH: ${{ github.sha }}
       with:
         name: softwarepark/contexture
         workdir: artifacts/image
