@@ -4,6 +4,8 @@ on:
   push:
     branches:
       - master
+    tags:
+      - '*'
 jobs:
   build-and-deploy:
     name: Build and Deploy
@@ -29,4 +31,4 @@ jobs:
         username: ${{ secrets.DOCKER_USERNAME }}
         password: ${{ secrets.DOCKER_PASSWORD }}
         dockerfile: ../backend/Dockerfile
-        snapshot: true
+        tag_semver: true
