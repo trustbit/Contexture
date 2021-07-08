@@ -19,7 +19,10 @@ open Microsoft.Extensions.Options
 open FSharp.Control.Tasks
 
 [<CLIMutable>]
-type ContextureOptions = { DatabasePath: string }
+type ContextureOptions = 
+    { DatabasePath: string 
+      GitHash: string
+    }
 
 module AllRoute =
 
@@ -79,6 +82,15 @@ module AllRoute =
         >=> choose [ GET >=> getAllData
                      POST >=> postAllData ]
 
+let status : HttpHandler =
+    fun (next: HttpFunc) (ctx: HttpContext) ->
+        let env = ctx.GetService<IOptions<ContextureOptions>>()
+        match env.Value.GitHash with
+        | hash when not (String.IsNullOrEmpty hash) ->
+            json {| GitHash = hash |} next ctx
+        | _ ->
+            text "No status information" next ctx
+
 let webApp hostFrontend =
     choose [
          subRoute "/api"
@@ -91,6 +103,7 @@ let webApp hostFrontend =
                    AllRoute.routes
                    RequestErrors.NOT_FOUND "Not found"
             ])
+         route "/meta" >=> GET >=> status
          Search.routes
          GET
          >=> routef "/boundedContext/%O/namespaces" Namespaces.index
