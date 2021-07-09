@@ -49,10 +49,16 @@ type alias Model =
     { config : Api.Configuration
     , domain : Domain
     , contextItems : List BoundedContextCard.Model
+    , presentation : Presentation
     }
 
 
-init : Api.Configuration -> BoundedContextCard.Presentation -> Domain -> List BoundedContextCard.Item -> Collaboration.Collaborations -> Model
+type Presentation
+    = Full
+    | Condensed
+
+
+init : Api.Configuration -> Presentation -> Domain -> List BoundedContextCard.Item -> Collaboration.Collaborations -> Model
 init config presentation domain items collaborations =
     let
         communication =
@@ -70,15 +76,64 @@ init config presentation domain items collaborations =
         items
             |> List.map
                 (\i ->
-                    BoundedContextCard.init presentation (communicationFor i) i
+                    BoundedContextCard.init (communicationFor i) i
                 )
     , config = config
     , domain = domain
+    , presentation = presentation
     }
 
 
 type Msg
     = NoOp
+
+
+condendsedWithActions : BoundedContextCard.Model -> Html Never
+condendsedWithActions model =
+    let
+        context =
+            model.contextItem.context
+    in
+    Grid.row [ Row.attrs [ Spacing.mb2, class "bounded-context" ] ]
+        [ Grid.col [ Col.md3 ]
+            [ Html.h5 [ class "card-title", Spacing.mb1 ]
+                [ text (context |> BoundedContext.name) ]
+            , Html.small [ class "text-muted" ]
+                [ text (context |> BoundedContext.key |> Maybe.map Key.toString |> Maybe.withDefault "") ]
+            ]
+        , Grid.col [ Col.md7 ]
+            [ ListGroup.ul (BoundedContextCard.namespaceItems model.contextItem.namespaces) ]
+        , Grid.col [ Col.md2 ]
+            [ ButtonGroup.linkButtonGroup [ ButtonGroup.vertical, ButtonGroup.attrs [ class "text-left" ] ]
+                [ ButtonGroup.linkButton
+                    [ Button.roleLink
+                    , Button.attrs
+                        [ href
+                            (model.contextItem.context
+                                |> BoundedContext.id
+                                |> Route.BoundedContextCanvas
+                                |> Route.routeToString
+                            )
+                        , class "text-nowrap"
+                        ]
+                    ]
+                    [ text "Canvas" ]
+                , ButtonGroup.linkButton
+                    [ Button.roleLink
+                    , Button.attrs
+                        [ href
+                            (model.contextItem.context
+                                |> BoundedContext.id
+                                |> Route.Namespaces
+                                |> Route.routeToString
+                            )
+                        , class "text-nowrap"
+                        ]
+                    ]
+                    [ text "Namespaces" ]
+                ]
+            ]
+        ]
 
 
 viewWithActions : BoundedContextCard.Model -> Card.Config Never
@@ -120,20 +175,47 @@ viewWithActions model =
 
 
 view : Model -> Html Msg
-view { contextItems, domain } =
+view { contextItems, domain, presentation } =
     let
-        cards =
-            contextItems
-                |> List.sortBy (\{ contextItem } -> contextItem.context |> BoundedContext.name)
-                |> List.map viewWithActions
-                |> chunksOfLeft 2
-                |> List.map Card.deck
-
         contextCount =
-            contextItems |> List.length |> String.fromInt
+            contextItems |> List.length
+
+        contextCountText =
+            if contextCount == 1 then
+                "1 Bounded Context"
+
+            else
+                (contextCount |> String.fromInt) ++ " Bounded Contexts"
+
+        title =
+            Html.h5 []
+                [ text <|
+                    (domain |> Domain.name)
+                        ++ ": "
+                        ++ contextCountText
+                ]
     in
-    div [ Spacing.mt3 ]
-        [ Html.h5 [] [ text <| contextCount ++ " Bounded Context(s) in Domain '" ++ (domain |> Domain.name) ++ "'" ]
-        , div [] cards
-        ]
-        |> Html.map (\_ -> NoOp)
+    case presentation of
+        Full ->
+            div [ Spacing.mt3 ]
+                [ title
+                , div [ Spacing.mt2 ]
+                    (contextItems
+                        |> List.sortBy (\{ contextItem } -> contextItem.context |> BoundedContext.name)
+                        |> List.map viewWithActions
+                        |> chunksOfLeft 2
+                        |> List.map Card.deck
+                    )
+                ]
+                |> Html.map (\_ -> NoOp)
+
+        Condensed ->
+            div [ Spacing.mt3, Border.rounded, Border.all, Spacing.p2, class "shadow", class "condensed" ]
+                [ title
+                , Html.div [ Spacing.mt3 ]
+                    (contextItems
+                        |> List.sortBy (\{ contextItem } -> contextItem.context |> BoundedContext.name)
+                        |> List.map condendsedWithActions
+                    )
+                ]
+                |> Html.map (\_ -> NoOp)

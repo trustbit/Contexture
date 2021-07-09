@@ -17,7 +17,7 @@ import BoundedContext.Canvas
 import BoundedContext.Namespace as Namespace exposing (NamespaceTemplateId)
 import Browser
 import Components.BoundedContextCard as BoundedContextCard
-import Components.BoundedContextsOfDomain as BoundedContext
+import Components.BoundedContextsOfDomain as BoundedContext exposing(Presentation(..))
 import ContextMapping.Collaboration as Collaboration exposing (Collaborations)
 import Dict
 import Domain exposing (Domain)
@@ -36,7 +36,7 @@ import Url.Parser
 import Url.Parser.Query
 
 
-initSearchResult : Api.Configuration -> BoundedContextCard.Presentation -> Collaboration.Collaborations -> List Domain -> List BoundedContextCard.Item -> List BoundedContext.Model
+initSearchResult : Api.Configuration -> Presentation -> Collaboration.Collaborations -> List Domain -> List BoundedContextCard.Item -> List BoundedContext.Model
 initSearchResult config presentation collaboration domains searchResults =
     let
         groupItemsByDomainId item grouping =
@@ -77,7 +77,7 @@ init apiBase initialQuery =
       , searchResults = RemoteData.NotAsked
       , searchResponse = RemoteData.Loading
       , filter = filterModel
-      , presentation = BoundedContextCard.Full
+      , presentation = Full
       }
     , Cmd.batch
         [ filterCmd |> Cmd.map FilterMsg
@@ -95,7 +95,7 @@ type alias Model =
     , collaboration : RemoteData.WebData Collaborations
     , searchResults : RemoteData.WebData (List BoundedContext.Model)
     , filter : Filter.Model
-    , presentation : BoundedContextCard.Presentation
+    , presentation : Presentation
     }
 
 
@@ -110,7 +110,7 @@ type Msg
     | BoundedContextsFound (Api.ApiResponse (List BoundedContextCard.Item))
     | BoundedContextMsg BoundedContext.Msg
     | FilterMsg Filter.Msg
-    | SwitchPresentation BoundedContextCard.Presentation
+    | SwitchPresentation Presentation
 
 
 updateSearchResults model =
@@ -196,6 +196,7 @@ viewItems searchResults =
             , Grid.row [ Row.attrs [ Spacing.mt2, Border.top ] ]
                 [ Grid.col []
                     (items
+                        |> List.sortBy (\b -> b.domain |> Domain.name)
                         |> List.map BoundedContext.view
                         |> List.map (Html.map BoundedContextMsg)
                     )
@@ -213,12 +214,12 @@ presentationOptionView presentation =
             , Block.text []
                 [ ButtonGroup.radioButtonGroup []
                       [ ButtonGroup.radioButton
-                          (presentation == BoundedContextCard.Full)
-                          [ Button.secondary, Button.onClick <| SwitchPresentation BoundedContextCard.Full ]
+                          (presentation == Full)
+                          [ Button.secondary, Button.onClick <| SwitchPresentation Full ]
                           [ text "Full" ]
                       , ButtonGroup.radioButton
-                          (presentation == BoundedContextCard.Condensed)
-                          [ Button.secondary, Button.onClick <| SwitchPresentation BoundedContextCard.Condensed ]
+                          (presentation == Condensed)
+                          [ Button.secondary, Button.onClick <| SwitchPresentation Condensed ]
                           [ text "Condensed" ]
                       ]
                 ]

@@ -1,4 +1,4 @@
-module Components.BoundedContextCard exposing (Item, Model, Presentation(..), decoder, init, view)
+module Components.BoundedContextCard exposing (Item, Model, decoder, init, view, namespaceItems)
 
 import Bootstrap.Badge as Badge
 import Bootstrap.Button as Button
@@ -37,15 +37,9 @@ type alias Item =
     }
 
 
-type Presentation
-    = Full
-    | Condensed
-
-
 type alias Model =
     { contextItem : Item
     , communication : ScopedCommunication
-    , presentation : Presentation
     }
 
 
@@ -56,13 +50,91 @@ decoder =
         |> JP.optionalAt [ "namespaces" ] (Decode.list Namespace.namespaceDecoder) []
 
 
-init : Presentation -> ScopedCommunication -> Item -> Model
-init presentation communications item =
+init : ScopedCommunication -> Item -> Model
+init communications item =
     { contextItem = item
     , communication = communications
-    , presentation = presentation
     }
 
+
+
+
+
+viewPillMessage : String -> Int -> List (Grid.Column msg)
+viewPillMessage caption value =
+    if value > 0 then
+        [ Grid.col [] [ text caption ]
+        , Grid.col [ Col.lg2 ]
+            [ Badge.pillWarning [] [ text (value |> String.fromInt) ] ]
+        ]
+
+    else
+        []
+
+
+viewClassificationBadges classification =
+    let
+        domainBadge =
+            case classification.domain |> Maybe.map StrategicClassification.domainDescription of
+                Just domain ->
+                    [ Badge.badgePrimary [ title domain.description ] [ text domain.name ] ]
+
+                Nothing ->
+                    []
+
+        businessBadges =
+            classification.business
+                |> List.map StrategicClassification.businessDescription
+                |> List.map (\b -> Badge.badgeSecondary [ title b.description ] [ text b.name ])
+
+        evolutionBadge =
+            case classification.evolution |> Maybe.map StrategicClassification.evolutionDescription of
+                Just evolution ->
+                    [ Badge.badgeInfo [ title evolution.description ] [ text evolution.name ] ]
+
+                Nothing ->
+                    []
+    in
+    List.concat
+        [ domainBadge
+        , businessBadges
+        , evolutionBadge
+        ]
+
+
+viewMessages messages =
+    [ messages.commandsHandled, messages.eventsHandled, messages.queriesHandled ]
+        |> List.map Set.size
+        |> List.sum
+        |> viewPillMessage "Handled Messages"
+        |> List.append
+            ([ messages.commandsSent, messages.eventsPublished, messages.queriesInvoked ]
+                |> List.map Set.size
+                |> List.sum
+                |> viewPillMessage "Published Messages"
+            )
+
+
+viewDependencies communication =
+    communication
+        |> Communication.inboundCommunication
+        |> Communication.collaborators
+        |> List.length
+        |> viewPillMessage "Inbound Communication"
+        |> List.append
+            (communication
+                |> Communication.outboundCommunication
+                |> Communication.collaborators
+                |> List.length
+                |> viewPillMessage "Outbound Communication"
+            )
+
+
+titleContent context =
+    [ text (context |> BoundedContext.name)
+    , Html.small [ class "text-muted", class "float-right" ]
+        [ text (context |> BoundedContext.key |> Maybe.map Key.toString |> Maybe.withDefault "") ]
+    ]
 
 viewLabelAsBadge : Namespace.Label -> Html msg
 viewLabelAsBadge label =
@@ -102,111 +174,45 @@ viewLabelAsBadge label =
                     ]
                 ]
 
-
-viewPillMessage : String -> Int -> List (Grid.Column msg)
-viewPillMessage caption value =
-    if value > 0 then
-        [ Grid.col [] [ text caption ]
-        , Grid.col [ Col.lg2 ]
-            [ Badge.pillWarning [] [ text (value |> String.fromInt) ] ]
-        ]
+namespaceItems : List Namespace -> List(ListGroup.Item msg)
+namespaceItems namespaces =
+    namespaces
+    |> List.map
+        (\namespace ->
+            ListGroup.li []
+                [ Html.h6 []
+                    [ text namespace.name
+                    , Html.small [ class "text-muted" ] [ text " Namespace" ]
+                    ]
+                , div []
+                    (namespace.labels
+                        |> List.map viewLabelAsBadge
+                    )
+                ]
+        )
+            
+namespaceBlock namespaces cardConfig =
+    if List.isEmpty namespaces then
+        cardConfig
 
     else
-        []
+        cardConfig |> Card.listGroup (namespaceItems namespaces)
 
 
 view : Model -> Card.Config msg
 view model =
     let
-        communication =
-            model.communication
-
         { context, canvas, namespaces } =
             model.contextItem
 
-        domainBadge =
-            case canvas.classification.domain |> Maybe.map StrategicClassification.domainDescription of
-                Just domain ->
-                    [ Badge.badgePrimary [ title domain.description ] [ text domain.name ] ]
-
-                Nothing ->
-                    []
-
-        businessBadges =
-            canvas.classification.business
-                |> List.map StrategicClassification.businessDescription
-                |> List.map (\b -> Badge.badgeSecondary [ title b.description ] [ text b.name ])
-
-        evolutionBadge =
-            case canvas.classification.evolution |> Maybe.map StrategicClassification.evolutionDescription of
-                Just evolution ->
-                    [ Badge.badgeInfo [ title evolution.description ] [ text evolution.name ] ]
-
-                Nothing ->
-                    []
-
         badges =
-            List.concat
-                [ domainBadge
-                , businessBadges
-                , evolutionBadge
-                ]
+            viewClassificationBadges canvas.classification
 
         messages =
-            [ canvas.messages.commandsHandled, canvas.messages.eventsHandled, canvas.messages.queriesHandled ]
-                |> List.map Set.size
-                |> List.sum
-                |> viewPillMessage "Handled Messages"
-                |> List.append
-                    ([ canvas.messages.commandsSent, canvas.messages.eventsPublished, canvas.messages.queriesInvoked ]
-                        |> List.map Set.size
-                        |> List.sum
-                        |> viewPillMessage "Published Messages"
-                    )
+            viewMessages canvas.messages
 
         dependencies =
-            communication
-                |> Communication.inboundCommunication
-                |> Communication.collaborators
-                |> List.length
-                |> viewPillMessage "Inbound Communication"
-                |> List.append
-                    (communication
-                        |> Communication.outboundCommunication
-                        |> Communication.collaborators
-                        |> List.length
-                        |> viewPillMessage "Outbound Communication"
-                    )
-
-        namespaceBlocks =
-            namespaces
-                |> List.map
-                    (\namespace ->
-                        ListGroup.li []
-                            [ Html.h6 []
-                                [ text namespace.name
-                                , Html.small [ class "text-muted" ] [ text " Namespace" ]
-                                ]
-                            , div []
-                                (namespace.labels
-                                    |> List.map viewLabelAsBadge
-                                )
-                            ]
-                    )
-
-        titleContent =
-            Block.titleH4 []
-                [ text (context |> BoundedContext.name)
-                , Html.small [ class "text-muted", class "float-right" ]
-                    [ text (context |> BoundedContext.key |> Maybe.map Key.toString |> Maybe.withDefault "") ]
-                ]
-
-        descriptionContent =
-            if String.length canvas.description > 0 then
-                Block.text [ class "text-muted" ] [ text canvas.description ]
-
-            else
-                Block.text [ class "text-muted", class "text-center" ] [ Html.i [] [ text "No description :-(" ] ]
+            viewDependencies model.communication
 
         messagesDependenciesBlock cardConfig =
             if List.append dependencies messages |> List.isEmpty then
@@ -219,26 +225,18 @@ view model =
                         , Block.custom (Grid.row [ Row.attrs [ class "row-cols-2", class "align-items-center" ] ] messages)
                         ]
 
-        namespaceBlock cardConfig =
-            if List.isEmpty namespaceBlocks then
-                cardConfig
+        descriptionContent =
+            if String.length canvas.description > 0 then
+                Block.text [ class "text-muted" ] [ text canvas.description ]
 
             else
-                cardConfig |> Card.listGroup namespaceBlocks
+                Block.text [ class "text-muted", class "text-center" ] [ Html.i [] [ text "No description :-(" ] ]
     in
-    case model.presentation of
-        Full ->
-            Card.config [ Card.attrs [ class "mb-3", class "shadow" ] ]
-                |> Card.block []
-                    [ titleContent
-                    , descriptionContent
-                    , Block.custom (div [] badges)
-                    ]
-                |> messagesDependenciesBlock
-                |> namespaceBlock
-
-        Condensed ->
-            Card.config [ Card.attrs [ class "mb-3", class "shadow" ] ]
-                |> Card.block []
-                    [ titleContent ]
-                |> namespaceBlock
+    Card.config [ Card.attrs [ class "mb-3", class "shadow" ] ]
+        |> Card.block []
+            [ Block.titleH4 [ ] (titleContent context)
+            , descriptionContent
+            , Block.custom (div [] badges)
+            ]
+        |> messagesDependenciesBlock
+        |> namespaceBlock namespaces

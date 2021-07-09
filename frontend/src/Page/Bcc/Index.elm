@@ -135,7 +135,7 @@ updateModel model =
   | contextModels =
       RemoteData.map2
         (\items communication ->
-          items |> List.map(\item -> BoundedContextCard.init BoundedContextCard.Full (Communication.communicationFor (item.context |> BoundedContext.id |> Collaborator.BoundedContext) communication) item)
+          items |> List.map(\item -> BoundedContextCard.init (Communication.communicationFor (item.context |> BoundedContext.id |> Collaborator.BoundedContext) communication) item)
         )
         model.contextItems
         model.communication
