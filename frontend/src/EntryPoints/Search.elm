@@ -2,6 +2,7 @@ module EntryPoints.Search exposing (main)
 
 import Api as Api
 import Browser
+import Components.BoundedContextsOfDomain exposing (Presentation(..))
 import ContextMapping.Collaboration as Collaboration exposing (Collaborations)
 import Domain exposing (Domain)
 import Html exposing (Html, div, text)
@@ -24,7 +25,7 @@ init : Decode.Value -> ( Model, Cmd Msg )
 init flag =
     case flag |> Decode.decodeValue flagsDecoder of
         Ok decoded ->
-            Searching.init decoded.apiBase decoded.initialQuery
+            Searching.init decoded.apiBase decoded.initialQuery decoded.presentation
                 |> Tuple.mapFirst Ok
 
         Err e ->
@@ -34,6 +35,7 @@ init flag =
 type alias Flags =
     { apiBase : Api.Configuration
     , initialQuery : List Filter.FilterParameter
+    , presentation : Presentation
     }
 
 
@@ -60,10 +62,24 @@ queryDecoder =
         (Decode.field "value" Decode.string)
 
 
+presentationDecoder =
+    Decode.string
+        |> Decode.andThen
+            (\s ->
+                case s |> String.toLower of
+                    "condensed" ->
+                        Decode.succeed Condensed
+
+                    _ ->
+                        Decode.succeed Full
+            )
+
+
 flagsDecoder =
-    Decode.map2 Flags
+    Decode.map3 Flags
         (Decode.field "apiBase" baseConfiguration)
         (Decode.field "initialQuery" (Decode.list queryDecoder))
+        (Decode.field "presentation" presentationDecoder)
 
 
 type alias Model =

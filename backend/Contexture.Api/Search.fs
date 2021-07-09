@@ -25,6 +25,15 @@ module Search =
                 div [] [
                     div [ _id "search" ] []
                     initElm jsonEncoder "EntryPoints.Search" "search" flags
+                    script [] [
+                        rawText @"
+                            if(app && app.ports && app.ports.storePresentation) {
+                                app.ports.storePresentation.subscribe(function(mode) {
+                                    document.cookie = 'search_presentation=' + mode + ';max-age=31536000';
+                                });
+                            }
+                        "
+                    ]
                 ]
 
             documentTemplate (headTemplate resolveAssets) (bodyTemplate searchSnipped)
@@ -40,6 +49,10 @@ module Search =
 
             let result =
                 {| ApiBase = basePath.ApiBase + "/api"
+                   Presentation =
+                       ctx.Request.Cookies.Item "search_presentation"
+                       |> Option.ofObj
+                       |> Option.defaultValue "Full"
                    InitialQuery =
                        ctx.Request.Query
                        |> Seq.collect
