@@ -52,8 +52,8 @@ type alias Model =
     }
 
 
-init : Api.Configuration -> Domain -> List BoundedContextCard.Item -> Collaboration.Collaborations -> Model
-init config domain items collaborations =
+init : Api.Configuration -> BoundedContextCard.Presentation -> Domain -> List BoundedContextCard.Item -> Collaboration.Collaborations -> Model
+init config presentation domain items collaborations =
     let
         communication =
             Communication.asCommunication collaborations
@@ -70,7 +70,7 @@ init config domain items collaborations =
         items
             |> List.map
                 (\i ->
-                    BoundedContextCard.init (communicationFor i) i
+                    BoundedContextCard.init presentation (communicationFor i) i
                 )
     , config = config
     , domain = domain

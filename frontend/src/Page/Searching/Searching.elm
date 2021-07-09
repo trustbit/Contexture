@@ -2,12 +2,12 @@ module Page.Searching.Searching exposing (..)
 
 import Api as Api
 import Bootstrap.Button as Button
-import Bootstrap.Form as Form
-import Bootstrap.Form.Input as Input
+import Bootstrap.Card as Card
+import Bootstrap.Card.Block as Block
 import Bootstrap.Grid as Grid
 import Bootstrap.Grid.Col as Col
 import Bootstrap.Grid.Row as Row
-import Bootstrap.Text as Text
+import Bootstrap.ButtonGroup as ButtonGroup
 import Bootstrap.Utilities.Border as Border
 import Bootstrap.Utilities.Spacing as Spacing
 import Bounce exposing (Bounce)
@@ -36,8 +36,8 @@ import Url.Parser
 import Url.Parser.Query
 
 
-initSearchResult : Api.Configuration -> Collaboration.Collaborations -> List Domain -> List BoundedContextCard.Item -> List BoundedContext.Model
-initSearchResult config collaboration domains searchResults =
+initSearchResult : Api.Configuration -> BoundedContextCard.Presentation -> Collaboration.Collaborations -> List Domain -> List BoundedContextCard.Item -> List BoundedContext.Model
+initSearchResult config presentation collaboration domains searchResults =
     let
         groupItemsByDomainId item grouping =
             grouping
@@ -62,7 +62,7 @@ initSearchResult config collaboration domains searchResults =
                 |> Maybe.withDefault []
     in
     domains
-        |> List.map (\domain -> BoundedContext.init config domain (getContexts domain) collaboration)
+        |> List.map (\domain -> BoundedContext.init config presentation domain (getContexts domain) collaboration)
         |> List.filter (\i -> not <| List.isEmpty i.contextItems)
 
 
@@ -77,6 +77,7 @@ init apiBase initialQuery =
       , searchResults = RemoteData.NotAsked
       , searchResponse = RemoteData.Loading
       , filter = filterModel
+      , presentation = BoundedContextCard.Full
       }
     , Cmd.batch
         [ filterCmd |> Cmd.map FilterMsg
@@ -84,6 +85,7 @@ init apiBase initialQuery =
         , getCollaborations apiBase
         ]
     )
+   
 
 
 type alias Model =
@@ -93,6 +95,7 @@ type alias Model =
     , collaboration : RemoteData.WebData Collaborations
     , searchResults : RemoteData.WebData (List BoundedContext.Model)
     , filter : Filter.Model
+    , presentation : BoundedContextCard.Presentation
     }
 
 
@@ -107,13 +110,14 @@ type Msg
     | BoundedContextsFound (Api.ApiResponse (List BoundedContextCard.Item))
     | BoundedContextMsg BoundedContext.Msg
     | FilterMsg Filter.Msg
+    | SwitchPresentation BoundedContextCard.Presentation
 
 
 updateSearchResults model =
     { model
         | searchResults =
             RemoteData.map3
-                (initSearchResult model.configuration)
+                (initSearchResult model.configuration model.presentation)
                 model.collaboration
                 model.domains
                 model.searchResponse
@@ -161,6 +165,12 @@ update msg model =
                        )
                 )
             )
+        
+        SwitchPresentation presentation ->
+            ( updateSearchResults
+                { model | presentation = presentation }
+            , Cmd.none
+            )
 
 
 stickyTopAttributes = [ class "sticky-top", style "top" "5rem", style "height" "calc(100vh - 5rem)"]
@@ -196,13 +206,36 @@ viewItems searchResults =
             [ Grid.simpleRow [ Grid.col [] [ text <| "Could not execute search: " ++ Debug.toString e ] ]
             ]
 
+presentationOptionView presentation =
+    Card.config []
+        |> Card.block []
+            [ Block.titleH5 [] [ text "Presentation mode"]
+            , Block.text []
+                [ ButtonGroup.radioButtonGroup []
+                      [ ButtonGroup.radioButton
+                          (presentation == BoundedContextCard.Full)
+                          [ Button.secondary, Button.onClick <| SwitchPresentation BoundedContextCard.Full ]
+                          [ text "Full" ]
+                      , ButtonGroup.radioButton
+                          (presentation == BoundedContextCard.Condensed)
+                          [ Button.secondary, Button.onClick <| SwitchPresentation BoundedContextCard.Condensed ]
+                          [ text "Condensed" ]
+                      ]
+                ]
+            ]
+        |> Card.view
+     
 
 view : Model -> Html Msg
 view model =
     Grid.containerFluid []
-        [ Grid.row [Row.attrs[]]
+        [ Grid.simpleRow
             [ Grid.col [Col.md4, Col.attrs stickyTopAttributes]
-                [ model.filter |> Filter.view |> Html.map FilterMsg ]
+                [ Grid.row [ Row.attrs [ Spacing.mb3 ] ] 
+                    [ Grid.col [] [ model.filter |> Filter.view |> Html.map FilterMsg]]
+                , Grid.row [ Row.attrs [ Spacing.mb3 ] ]
+                    [ Grid.col [] [ model.presentation |> presentationOptionView ]]
+                ]
             , Grid.col [ Col.attrs [ class "position-relative"]] (viewItems model.searchResults)
             ]
         ]
