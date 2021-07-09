@@ -96,7 +96,7 @@ module Layout =
         script [] [
             rawText
                 $"
-var app = Elm.%s{name}.init({{
+const app = Elm.%s{name}.init({{
     node: document.getElementById('%s{node}'),
     flags: %s{serializeFlags flags}
 }}); "
