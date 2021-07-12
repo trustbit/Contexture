@@ -47,16 +47,23 @@ module AllRoute =
           Collaborations: Serialization.Collaboration list
           NamespaceTemplates: NamespaceTemplate.Projections.NamespaceTemplate list }
 
-    let postAllData =
+    let putReplaceAllData =
         fun (next: HttpFunc) (ctx: HttpContext) ->
             task {
                 let database = ctx.GetService<SingleFileBasedDatastore>()
+                let logger = ctx.GetLogger()
                 let notEmpty items = not (List.isEmpty items)
                 let! data = ctx.BindJsonAsync<UpdateAllData>()
 
                 if notEmpty data.Domains
                    && notEmpty data.BoundedContexts
                    && notEmpty data.Collaborations then
+                    logger.LogWarning(
+                        "Replacing stored data with {Domains}, {BoundedContexts}, {Collaborations}, {NamespaceTemplates}",
+                        data.Domains.Length,
+                        data.BoundedContexts.Length,
+                        data.Collaborations.Length,
+                        data.NamespaceTemplates.Length)
                     let! result =
                         database.Change
                             (fun _ ->
@@ -70,7 +77,10 @@ module AllRoute =
 
                     match result with
                     | Ok _ ->
-                        return! text "Successfully imported all data - NOTE: you need to restart the application" next ctx
+                        let lifetime = ctx.GetService<IHostApplicationLifetime>()
+                        logger.LogInformation("Stopping Application after reseeding of data")
+                        lifetime.StopApplication()                        
+                        return! text "Successfully imported all data - NOTE: an application shutdown was initiated!" next ctx
                     | Error e ->
                         return! ServerErrors.INTERNAL_ERROR $"Could not import document: %s{e}" next ctx
                 else
@@ -80,7 +90,7 @@ module AllRoute =
     let routes =
         route "/all"
         >=> choose [ GET >=> getAllData
-                     POST >=> postAllData ]
+                     PUT >=> putReplaceAllData ]
 
 let status : HttpHandler =
     fun (next: HttpFunc) (ctx: HttpContext) ->
