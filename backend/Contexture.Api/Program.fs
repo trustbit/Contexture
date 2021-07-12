@@ -50,10 +50,17 @@ module AllRoute =
     let putReplaceAllData =
         fun (next: HttpFunc) (ctx: HttpContext) ->
             task {
-                let database = ctx.GetService<SingleFileBasedDatastore>()
+                let database =
+                    ctx.GetService<SingleFileBasedDatastore>()
+
                 let logger = ctx.GetLogger()
                 let notEmpty items = not (List.isEmpty items)
                 let! data = ctx.BindJsonAsync<UpdateAllData>()
+
+                let doNotReturnOldData =
+                    ctx.TryGetQueryStringValue("doNotReturnOldData")
+                    |> Option.map (fun value -> value.ToLowerInvariant() = "true")
+                    |> Option.defaultValue false
 
                 if notEmpty data.Domains
                    && notEmpty data.BoundedContexts
@@ -63,7 +70,11 @@ module AllRoute =
                         data.Domains.Length,
                         data.BoundedContexts.Length,
                         data.Collaborations.Length,
-                        data.NamespaceTemplates.Length)
+                        data.NamespaceTemplates.Length
+                    )
+
+                    let! oldDocument = database.Read()
+
                     let! result =
                         database.Change
                             (fun _ ->
@@ -77,12 +88,27 @@ module AllRoute =
 
                     match result with
                     | Ok _ ->
-                        let lifetime = ctx.GetService<IHostApplicationLifetime>()
+                        let lifetime =
+                            ctx.GetService<IHostApplicationLifetime>()
+
                         logger.LogInformation("Stopping Application after reseeding of data")
-                        lifetime.StopApplication()                        
-                        return! text "Successfully imported all data - NOTE: an application shutdown was initiated!" next ctx
-                    | Error e ->
-                        return! ServerErrors.INTERNAL_ERROR $"Could not import document: %s{e}" next ctx
+                        lifetime.StopApplication()
+
+                        if doNotReturnOldData then
+                            return!
+                                text
+                                    "Successfully imported all data - NOTE: an application shutdown was initiated!"
+                                    next
+                                    ctx
+                        else
+                            return!
+                                json
+                                    {| Message =
+                                           "Successfully imported all data - NOTE: an application shutdown was initiated!"
+                                       OldData = oldDocument |}
+                                    next
+                                    ctx
+                    | Error e -> return! ServerErrors.INTERNAL_ERROR $"Could not import document: %s{e}" next ctx
                 else
                     return! RequestErrors.BAD_REQUEST "Not overwriting with (partly) missing data" next ctx
             }
@@ -91,6 +117,7 @@ module AllRoute =
         route "/all"
         >=> choose [ GET >=> getAllData
                      PUT >=> putReplaceAllData ]
+
 
 let status : HttpHandler =
     fun (next: HttpFunc) (ctx: HttpContext) ->
