@@ -26,13 +26,7 @@ module Search =
                     div [ _id "search" ] []
                     initElm jsonEncoder "EntryPoints.Search" "search" flags
                     script [] [
-                        rawText @"
-                            if(app && app.ports && app.ports.storePresentation) {
-                                app.ports.storePresentation.subscribe(function(mode) {
-                                    document.cookie = 'search_presentation=' + mode + ';max-age=31536000';
-                                });
-                            }
-                        "
+                        rawText "Contexture.searchingPorts(app);"
                     ]
                 ]
 

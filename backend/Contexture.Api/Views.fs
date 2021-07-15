@@ -53,6 +53,7 @@ module Layout =
             ]
             resolveAsset (Asset.css "contexture.css")
             resolveAsset (Asset.js "Contexture.js")
+            resolveAsset (Asset.js "Contexture-Addons.js")
             Asset.stylesheet "https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/css/bootstrap.min.css"
         ]
 
