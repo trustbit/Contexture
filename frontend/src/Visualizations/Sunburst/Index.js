@@ -76,18 +76,20 @@ export class Sunburst extends HTMLElement {
     // things required by Custom Elements
     constructor() {
         super();
-        this.size = calculateSizeFromHint(guessWidthAndHeightFromElement(this.parentElement));
-        this.rebuildSunburstElements();
-
         this.resizeObserver = new ResizeObserver(entries => {
             const sizeHint = {width: entries[0].contentRect.width, maxHeight: entries[0].contentRect.height};
             this.resize(sizeHint)
         });
-        this.resizeObserver.observe(this.parentElement);
     }
 
     connectedCallback() {
+        this.size = calculateSizeFromHint(guessWidthAndHeightFromElement(this.parentElement));
+        this.rebuildSunburstElements();
+        this.resizeObserver.observe(this.parentElement);
         this.buildSunburst();
+    }
+    disconnectedCallback(){
+        this.resizeObserver.disconnect();
     }
 
     attributeChangedCallback() {
