@@ -36,7 +36,7 @@ initActiveFilters =
 
 init : Api.Configuration -> List FilterParameter -> ( Filter, Cmd Msg )
 init config parameters =
-    ( { initialParameters = parameters
+    ( { activeParameters = parameters
       , namespaceFilter = RemoteData.Loading
       , activeFilters = initActiveFilters
       , bounce = Bounce.init
@@ -81,7 +81,7 @@ type alias ActiveFilters =
 
 type alias Filter =
     { namespaceFilter : RemoteData.WebData (List NamespaceFilterDescription)
-    , initialParameters : List FilterParameter
+    , activeParameters : List FilterParameter
     , activeFilters : ActiveFilters
     , bounce : Bounce
     }
@@ -258,7 +258,7 @@ update msg model =
                         |> RemoteData.fromResult
                 , activeFilters =
                     namespaces
-                        |> Result.map (applyExistingFilters model.initialParameters)
+                        |> Result.map (applyExistingFilters model.activeParameters)
                         |> Result.withDefault model.activeFilters
               }
             , applyFiltersCommand
@@ -303,15 +303,15 @@ update msg model =
 
         ApplyFilters ->
             let
-                query =
+                parameters =
                     buildParameters model.activeFilters
             in
             ( { model
-                | initialParameters = query
+                | activeParameters = parameters
                 , bounce = Bounce.init
               }
             , Cmd.none
-            , FilterApplied query
+            , FilterApplied parameters
             )
 
         BounceMsg ->

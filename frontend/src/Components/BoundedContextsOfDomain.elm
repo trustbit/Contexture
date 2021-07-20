@@ -88,8 +88,8 @@ type Msg
     = NoOp
 
 
-condendsedWithActions : BoundedContextCard.Model -> Html Never
-condendsedWithActions model =
+condensedWithActions : BoundedContextCard.Model -> Html Never
+condensedWithActions model =
     let
         context =
             model.contextItem.context
@@ -215,7 +215,7 @@ view { contextItems, domain, presentation } =
                 , Html.div [ Spacing.mt3 ]
                     (contextItems
                         |> List.sortBy (\{ contextItem } -> contextItem.context |> BoundedContext.name)
-                        |> List.map condendsedWithActions
+                        |> List.map condensedWithActions
                     )
                 ]
                 |> Html.map (\_ -> NoOp)
