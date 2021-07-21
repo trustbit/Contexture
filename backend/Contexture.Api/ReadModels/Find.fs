@@ -23,11 +23,11 @@ module Find =
 
     type SearchPhraseResult<'T when 'T: comparison> =
         | Results of Set<'T>
-        | Nothing
+        | NoResult
 
     type SearchResult<'T when 'T: comparison> =
-        | Results of Set<'T>
-        | NoResult
+        | FoundResults of Set<'T>
+        | Nothing
         | NotUsed
 
     module SearchTerm =
@@ -70,7 +70,7 @@ module Find =
     module SearchPhraseResult =
         let fromResults results =
             if Seq.isEmpty results then
-                SearchPhraseResult.Nothing
+                SearchPhraseResult.NoResult
             else
                 results |> Set.ofSeq |> SearchPhraseResult.Results
 
@@ -88,24 +88,24 @@ module Find =
                     | Some (SearchPhraseResult.Results existing), SearchPhraseResult.Results r ->
                         Set.intersect r existing |> fromResults |> Some
                     | None, SearchPhraseResult.Results results -> results |> fromResults |> Some
-                    | _, _ -> Some SearchPhraseResult.Nothing)
+                    | _, _ -> Some SearchPhraseResult.NoResult)
                 None
-            |> Option.defaultValue Nothing
+            |> Option.defaultValue NoResult
 
     module SearchResult =
         let value =
             function
-            | SearchResult.Results results -> Some results
-            | SearchResult.NoResult -> Some Set.empty
+            | SearchResult.FoundResults results -> Some results
+            | SearchResult.Nothing -> Some Set.empty
             | SearchResult.NotUsed -> None
 
         let fromResults results =
             if Seq.isEmpty results then
-                SearchResult.NoResult
+                SearchResult.Nothing
             else
-                results |> Set.ofSeq |> SearchResult.Results
+                results |> Set.ofSeq |> SearchResult.FoundResults
 
-        let takeAllResults results =
+        let fromManyResults results =
             results
             |> Seq.map Set.ofSeq
             |> Set.unionMany
@@ -119,21 +119,21 @@ module Find =
             |> Seq.fold
                 (fun state results ->
                     match state, results with
-                    | SearchResult.Results existing, SearchPhraseResult.Results r ->
+                    | SearchResult.FoundResults existing, SearchPhraseResult.Results r ->
                         Set.intersect r existing |> fromResults
                     | SearchResult.NotUsed, SearchPhraseResult.Results r -> fromResults r
-                    | _, SearchPhraseResult.Nothing -> SearchResult.NoResult
-                    | SearchResult.NoResult, _ -> SearchResult.NoResult)
+                    | _, SearchPhraseResult.NoResult -> SearchResult.Nothing
+                    | SearchResult.Nothing, _ -> SearchResult.Nothing)
                 SearchResult.NotUsed
 
-        let combineSearchResultsWithAnd ids results =
+        let private combineSearchResultsWithAnd ids results =
             match ids, results with
-            | SearchResult.Results existing, SearchResult.Results r -> Set.intersect r existing |> fromResults
-            | SearchResult.NotUsed, SearchResult.Results r -> fromResults r
-            | SearchResult.Results existing, SearchResult.NotUsed -> fromResults existing
+            | SearchResult.FoundResults existing, SearchResult.FoundResults r -> Set.intersect r existing |> fromResults
+            | SearchResult.NotUsed, SearchResult.FoundResults r -> fromResults r
+            | SearchResult.FoundResults existing, SearchResult.NotUsed -> fromResults existing
             | SearchResult.NotUsed, SearchResult.NotUsed -> SearchResult.NotUsed
-            | SearchResult.NoResult, _ -> SearchResult.NoResult
-            | _, SearchResult.NoResult -> SearchResult.NoResult
+            | SearchResult.Nothing, _ -> SearchResult.Nothing
+            | _, SearchResult.Nothing -> SearchResult.Nothing
 
         let combineResults (searchResults: SearchResult<_> seq) =
             searchResults
@@ -141,8 +141,8 @@ module Find =
 
         let map<'a, 'b when 'a: comparison and 'b: comparison> (mapper: 'a -> 'b) result : SearchResult<'b> =
             match result with
-            | SearchResult.Results r -> r |> Set.map mapper |> fromResults
-            | SearchResult.NoResult -> SearchResult.NoResult
+            | SearchResult.FoundResults r -> r |> Set.map mapper |> fromResults
+            | SearchResult.Nothing -> SearchResult.Nothing
             | SearchResult.NotUsed -> SearchResult.NotUsed
 
         let bind<'a, 'b when 'a: comparison and 'b: comparison>
@@ -150,10 +150,9 @@ module Find =
             result
             : SearchResult<'b> =
             match result with
-            | SearchResult.Results r -> mapper r
-            | SearchResult.NoResult -> SearchResult.NoResult
+            | SearchResult.FoundResults r -> mapper r
+            | SearchResult.Nothing -> SearchResult.Nothing
             | SearchResult.NotUsed -> SearchResult.NotUsed
-
 
     module SearchArgument =
         let fromValues (values: _ seq) =
@@ -243,8 +242,7 @@ module Find =
         let byName (namespaces: NamespaceFinder) (name: SearchPhrase) =
             namespaces
             |> findByKey name
-            |> Seq.map SearchResult.fromResults
-            |> SearchResult.combineResultsWithAnd
+            |> SearchPhraseResult.fromManyResults
 
         let byTemplate (namespaces: NamespaceFinder) (templateId: NamespaceTemplateId) =
             namespaces
@@ -447,9 +445,8 @@ module Find =
         let byName (model: DomainByKeyAndNameModel) (phrase: SearchPhrase) =
             model.ByName
             |> findByKey phrase
-            |> Seq.map SearchPhraseResult.fromResults
-            |> SearchPhraseResult.combineResultsWithAnd
-
+            |> SearchPhraseResult.fromManyResults
+            
         let byKey (model: DomainByKeyAndNameModel) (phrase: SearchPhrase) =
             model.ByKey
             |> findByKey phrase
@@ -516,8 +513,7 @@ module Find =
         let byName (model: BoundedContextByKeyAndNameModel) (phrase: SearchPhrase) =
             model.ByName
             |> findByKey phrase
-            |> Seq.map SearchPhraseResult.fromResults
-            |> SearchPhraseResult.combineResultsWithAnd
+            |> SearchPhraseResult.fromManyResults
 
         let byKey (model: BoundedContextByKeyAndNameModel) (phrase: SearchPhrase) =
             model.ByKey

@@ -177,7 +177,7 @@ module BoundedContexts =
                             >> Option.toList
                             >> Set.ofList
                         )
-                       >> SearchResult.takeAllResults
+                       >> SearchResult.fromManyResults
                     )
 
                 let boundedContextIdsFromDomain =
@@ -188,7 +188,7 @@ module BoundedContexts =
                             >> List.map (fun b -> b.Id)
                             >> Set.ofList
                         )
-                        >> SearchResult.takeAllResults
+                        >> SearchResult.fromManyResults
                     )
 
                 let boundedContextIds =
