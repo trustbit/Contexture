@@ -6,8 +6,8 @@ export default {
     output: {
         file: 'assets/js/Contexture-Addons.js',
         format: 'iife',
-        name: 'Contexture'        
+        name: 'Contexture',
+        preserveModulesRoot: 'src'
     },
-    // external:['d3'],
-    plugins: [multi(),nodeResolve()]
+    plugins: [multi(),nodeResolve({browser:true})]
 };
