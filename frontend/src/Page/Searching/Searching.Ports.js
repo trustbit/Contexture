@@ -1,4 +1,5 @@
-import {Sunburst} from "../../Visualizations/Sunburst";
+// ATM wee need to full name reference so the build succeeds
+import {Sunburst} from "../../Visualizations/Sunburst/Index.js";
 
 export function searchingPorts(app) {
     if (app && app.ports && app.ports.storePresentation) {
