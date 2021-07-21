@@ -9,7 +9,7 @@ on:
       - 'backend/**'
 
 jobs:
-  build:
+  build-backend:
     defaults:
       run:
         working-directory: ./

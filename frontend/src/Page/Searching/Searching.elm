@@ -12,12 +12,8 @@ import Bootstrap.Utilities.Border as Border
 import Bootstrap.Utilities.Spacing as Spacing
 import Bounce exposing (Bounce)
 import BoundedContext as BoundedContext
-import BoundedContext.BoundedContextId as BoundedContextId
-import BoundedContext.Canvas
-import BoundedContext.Namespace as Namespace exposing (NamespaceTemplateId)
-import Browser
 import Components.BoundedContextCard as BoundedContextCard
-import Components.BoundedContextsOfDomain as BoundedContext exposing (Presentation(..))
+import Components.BoundedContextsOfDomain as BoundedContext 
 import ContextMapping.Collaboration as Collaboration exposing (Collaborations)
 import Dict
 import Domain exposing (Domain)
@@ -28,7 +24,7 @@ import Http
 import Json.Decode as Decode
 import Json.Decode.Pipeline as JP
 import Page.Searching.Filter as Filter
-import Page.Searching.Ports as Ports
+import Page.Searching.Ports as Ports exposing (SearchResultPresentation(..))
 import RemoteData
 import Task
 import Url
@@ -37,7 +33,7 @@ import Url.Parser
 import Url.Parser.Query
 
 
-initSearchResult : Api.Configuration -> Presentation -> Collaboration.Collaborations -> List Domain -> List BoundedContextCard.Item -> List BoundedContext.Model
+initSearchResult : Api.Configuration -> BoundedContext.Presentation -> Collaboration.Collaborations -> List Domain -> List BoundedContextCard.Item -> List BoundedContext.Model
 initSearchResult config presentation collaboration domains searchResults =
     let
         groupItemsByDomainId item grouping =
@@ -73,12 +69,20 @@ init apiBase initialQuery presentation =
             Filter.init apiBase initialQuery
     in
     ( { configuration = apiBase
-      , domains = RemoteData.Loading
-      , collaboration = RemoteData.Loading
-      , searchResults = RemoteData.NotAsked
-      , searchResponse = RemoteData.Loading
+      , textualModel = 
+            { presentation =
+                case presentation of
+                    Just (Textual p) -> 
+                        p
+                    _ -> 
+                        BoundedContext.Full
+            , domains = RemoteData.Loading
+            , collaboration = RemoteData.Loading
+            , searchResults = RemoteData.NotAsked
+            , searchResponse = RemoteData.Loading
+            }
       , filter = filterModel
-      , presentation = presentation
+      , presentation = presentation |> Maybe.withDefault (Textual BoundedContext.Full)
       }
     , Cmd.batch
         [ filterCmd |> Cmd.map FilterMsg
@@ -88,20 +92,20 @@ init apiBase initialQuery presentation =
     )
 
 
-type alias Model =
-    { configuration : Api.Configuration
+type alias TextualModel =
+    { presentation : BoundedContext.Presentation
     , domains : RemoteData.WebData (List Domain)
     , searchResponse : RemoteData.WebData (List BoundedContextCard.Item)
     , collaboration : RemoteData.WebData Collaborations
     , searchResults : RemoteData.WebData (List BoundedContext.Model)
-    , filter : Filter.Model
-    , presentation : Presentation
     }
 
-
-updateFilter : (Filter.Model -> Filter.Model) -> Model -> Model
-updateFilter apply model =
-    { model | filter = apply model.filter }
+type alias Model =
+    { configuration : Api.Configuration
+    , textualModel : TextualModel
+    , filter : Filter.Model
+    , presentation : SearchResultPresentation
+    }
 
 
 type Msg
@@ -110,18 +114,26 @@ type Msg
     | BoundedContextsFound (Api.ApiResponse (List BoundedContextCard.Item))
     | BoundedContextMsg BoundedContext.Msg
     | FilterMsg Filter.Msg
-    | SwitchPresentation Presentation
+    | SwitchPresentation SearchResultPresentation
 
 
-updateSearchResults model =
-    { model
-        | searchResults =
-            RemoteData.map3
-                (initSearchResult model.configuration model.presentation)
-                model.collaboration
-                model.domains
-                model.searchResponse
-    }
+updateSearchResults :(TextualModel -> TextualModel) -> Model -> Model
+updateSearchResults updater model =
+    let
+        updated = updater model.textualModel
+    in
+        { model 
+        | textualModel = 
+            { updated
+            | searchResults =
+                RemoteData.map3
+                      (initSearchResult model.configuration updated.presentation)
+                      updated.collaboration
+                      updated.domains
+                      updated.searchResponse
+            }
+        }
+
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
@@ -130,21 +142,24 @@ update msg model =
         BoundedContextMsg m ->
             ( model, Cmd.none )
 
-        BoundedContextsFound foundItems ->
+        BoundedContextsFound foundItems->
             ( updateSearchResults
-                { model | searchResponse = foundItems |> RemoteData.fromResult }
+                (\m ->{ m | searchResponse = foundItems |> RemoteData.fromResult })
+                model
             , Cmd.none
             )
 
         DomainsLoaded domains ->
-            ( updateSearchResults
-                { model | domains = domains |> RemoteData.fromResult }
+            ( updateSearchResults 
+                (\m ->{ m | domains = domains |> RemoteData.fromResult })
+                model
             , Cmd.none
             )
 
         CollaborationsLoaded collaborations ->
-            ( updateSearchResults
-                { model | collaboration = collaborations |> RemoteData.fromResult }
+            ( updateSearchResults 
+                (\m ->{ m | collaboration = collaborations |> RemoteData.fromResult })
+                model
             , Cmd.none
             )
 
@@ -166,16 +181,23 @@ update msg model =
                 )
             )
 
-        SwitchPresentation presentation ->
-            ( updateSearchResults
-                { model | presentation = presentation }
-            , Ports.storePresentation <|
-                case presentation of
-                    Full ->
-                        "Full"
-
-                    Condensed ->
-                        "Condensed"
+        SwitchPresentation newPresentation ->
+            ( { model | presentation = newPresentation }
+                |>
+                case newPresentation of
+                    Ports.Textual presentation ->
+                        updateSearchResults (\m -> { m | presentation = presentation})
+                    Ports.Sunburst ->
+                        identity
+            , Cmd.batch
+                ( Ports.store newPresentation 
+                    :: 
+                     case newPresentation of
+                        Ports.Textual _ ->
+                            [ findAll model.configuration model.filter.activeParameters ]
+                        _ ->
+                            []
+                )
             )
 
 
@@ -203,10 +225,11 @@ viewItems searchResults =
                 ]
             , Grid.row [ Row.attrs [ Spacing.mt2, Border.top ] ]
                 [ Grid.col []
-                    (items
-                        |> List.sortBy (\b -> b.domain |> Domain.name)
-                        |> List.map BoundedContext.view
-                        |> List.map (Html.map BoundedContextMsg)
+                    (
+                            items
+                            |> List.sortBy (\b -> b.domain |> Domain.name)
+                            |> List.map BoundedContext.view
+                            |> List.map (Html.map BoundedContextMsg)       
                     )
                 ]
             ]
@@ -214,6 +237,13 @@ viewItems searchResults =
         e ->
             [ Grid.simpleRow [ Grid.col [] [ text <| "Could not execute search: " ++ Debug.toString e ] ]
             ]
+            
+viewSunburst configuration filterParameters =
+     Html.node "visualization-sunburst"
+        [ attribute "baseApi" (Api.withoutQuery [] |> Api.url configuration)
+        , attribute "query" (filterParameters |> filterParametersAsQuery |> Url.Builder.toQuery)
+        ]   
+        []
 
 
 presentationOptionView presentation =
@@ -223,13 +253,17 @@ presentationOptionView presentation =
             , Block.text []
                 [ ButtonGroup.radioButtonGroup []
                     [ ButtonGroup.radioButton
-                        (presentation == Full)
-                        [ Button.secondary, Button.onClick <| SwitchPresentation Full ]
+                        (presentation == Textual BoundedContext.Full)
+                        [ Button.secondary, Button.onClick <| SwitchPresentation (Textual BoundedContext.Full) ]
                         [ text "Full" ]
                     , ButtonGroup.radioButton
-                        (presentation == Condensed)
-                        [ Button.secondary, Button.onClick <| SwitchPresentation Condensed ]
+                        (presentation == Textual BoundedContext.Condensed)
+                        [ Button.secondary, Button.onClick <| SwitchPresentation (Textual BoundedContext.Condensed) ]
                         [ text "Condensed" ]
+                    , ButtonGroup.radioButton
+                        (presentation == Sunburst)
+                        [ Button.secondary, Button.onClick <| SwitchPresentation Sunburst]
+                        [ text "Sunburst" ]
                     ]
                 ]
             ]
@@ -246,17 +280,25 @@ view model =
                 , Grid.row [ Row.attrs [ Spacing.mb3 ] ]
                     [ Grid.col [] [ model.presentation |> presentationOptionView ] ]
                 ]
-            , Grid.col [ Col.attrs [ class "position-relative" ] ] (viewItems model.searchResults)
+            , Grid.col [ Col.attrs [ class "position-relative" ] ] (
+                case model.presentation of
+                    Textual _ ->
+                        viewItems model.textualModel.searchResults
+                    Sunburst ->
+                        [ viewSunburst model.configuration model.filter.activeParameters]
+                )
             ]
         ]
 
+filterParametersAsQuery query =
+    query |> List.map (\q -> Url.Builder.string q.name q.value)
 
 findAll : Api.Configuration -> List Filter.FilterParameter -> Cmd Msg
 findAll config query =
     Http.get
         { url =
             Api.allBoundedContexts []
-                |> Api.urlWithQueryParameters config (query |> List.map (\q -> Url.Builder.string q.name q.value))
+                |> Api.urlWithQueryParameters config (filterParametersAsQuery query)
         , expect = Http.expectJson BoundedContextsFound (Decode.list BoundedContextCard.decoder)
         }
 

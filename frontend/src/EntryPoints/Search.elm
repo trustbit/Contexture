@@ -9,6 +9,7 @@ import Html exposing (Html, div, text)
 import Json.Decode as Decode
 import Page.Searching.Filter as Filter
 import Page.Searching.Searching as Searching
+import Page.Searching.Ports as Searching exposing (SearchResultPresentation(..))
 import Url
 
 
@@ -35,7 +36,7 @@ init flag =
 type alias Flags =
     { apiBase : Api.Configuration
     , initialQuery : List Filter.FilterParameter
-    , presentation : Presentation
+    , presentation : Maybe SearchResultPresentation
     }
 
 
@@ -64,15 +65,7 @@ queryDecoder =
 
 presentationDecoder =
     Decode.string
-        |> Decode.andThen
-            (\s ->
-                case s |> String.toLower of
-                    "condensed" ->
-                        Decode.succeed Condensed
-
-                    _ ->
-                        Decode.succeed Full
-            )
+        |> Decode.map Searching.read
 
 
 flagsDecoder =
