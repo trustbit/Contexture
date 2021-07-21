@@ -18,12 +18,16 @@ module Find =
 
     type SearchArgument<'v> =
         private
-        | Used of 'v list
-        | NotUsed
+        | Arguments of 'v list
+        | Unused
 
-    type SearchResult<'T when 'T: comparison> =
+    type SearchPhraseResult<'T when 'T: comparison> =
         | Results of Set<'T>
         | NoResult
+
+    type SearchResult<'T when 'T: comparison> =
+        | FoundResults of Set<'T>
+        | Nothing
         | NotUsed
 
     module SearchTerm =
@@ -37,7 +41,6 @@ module Find =
         let value (SearchTerm term) = term
 
     module SearchPhrase =
-
         let private operatorAndPhrase (phrase: string) =
             match phrase.StartsWith "*", phrase.EndsWith "*" with
             | true, true -> // *phrase*
@@ -64,79 +67,101 @@ module Find =
             | EndsWith -> value.EndsWith(phrase, StringComparison.OrdinalIgnoreCase)
             | Contains -> value.Contains(phrase, StringComparison.OrdinalIgnoreCase)
 
-    module SearchResult =
-
-        let value =
-            function
-            | SearchResult.Results results -> Some results
-            | SearchResult.NoResult -> Some Set.empty
-            | SearchResult.NotUsed -> None
-
+    module SearchPhraseResult =
         let fromResults results =
             if Seq.isEmpty results then
-                NoResult
+                SearchPhraseResult.NoResult
             else
-                results |> Set.ofSeq |> Results
+                results |> Set.ofSeq |> SearchPhraseResult.Results
 
-        let takeAllResults results =
+        let fromManyResults results =
             results
             |> Seq.map Set.ofSeq
             |> Set.unionMany
             |> fromResults
 
-        let fromOption result = result |> Option.defaultValue NotUsed
+        let combineResultsWithAnd (searchResults: SearchPhraseResult<_> seq) =
+            searchResults
+            |> Seq.fold
+                (fun state results ->
+                    match state, results with
+                    | Some (SearchPhraseResult.Results existing), SearchPhraseResult.Results r ->
+                        Set.intersect r existing |> fromResults |> Some
+                    | None, SearchPhraseResult.Results results -> results |> fromResults |> Some
+                    | _, _ -> Some SearchPhraseResult.NoResult)
+                None
+            |> Option.defaultValue NoResult
+
+    module SearchResult =
+        let value =
+            function
+            | SearchResult.FoundResults results -> Some results
+            | SearchResult.Nothing -> Some Set.empty
+            | SearchResult.NotUsed -> None
+
+        let fromResults results =
+            if Seq.isEmpty results then
+                SearchResult.Nothing
+            else
+                results |> Set.ofSeq |> SearchResult.FoundResults
+
+        let fromManyResults results =
+            results
+            |> Seq.map Set.ofSeq
+            |> Set.unionMany
+            |> fromResults
+
+        let fromOption result =
+            result |> Option.defaultValue SearchResult.NotUsed
+
+        let fromSearchPhrases (searchResults: SearchPhraseResult<_> seq) =
+            searchResults
+            |> Seq.fold
+                (fun state results ->
+                    match state, results with
+                    | SearchResult.FoundResults existing, SearchPhraseResult.Results r ->
+                        Set.intersect r existing |> fromResults
+                    | SearchResult.NotUsed, SearchPhraseResult.Results r -> fromResults r
+                    | _, SearchPhraseResult.NoResult -> SearchResult.Nothing
+                    | SearchResult.Nothing, _ -> SearchResult.Nothing)
+                SearchResult.NotUsed
+
+        let private combineSearchResultsWithAnd ids results =
+            match ids, results with
+            | SearchResult.FoundResults existing, SearchResult.FoundResults r -> Set.intersect r existing |> fromResults
+            | SearchResult.NotUsed, SearchResult.FoundResults r -> fromResults r
+            | SearchResult.FoundResults existing, SearchResult.NotUsed -> fromResults existing
+            | SearchResult.NotUsed, SearchResult.NotUsed -> SearchResult.NotUsed
+            | SearchResult.Nothing, _ -> SearchResult.Nothing
+            | _, SearchResult.Nothing -> SearchResult.Nothing
+
+        let combineResults (searchResults: SearchResult<_> seq) =
+            searchResults
+            |> Seq.fold combineSearchResultsWithAnd SearchResult.NotUsed
 
         let map<'a, 'b when 'a: comparison and 'b: comparison> (mapper: 'a -> 'b) result : SearchResult<'b> =
             match result with
-            | Results r -> r |> Set.map mapper |> fromResults
-            | NoResult -> NoResult
-            | NotUsed -> NotUsed
+            | SearchResult.FoundResults r -> r |> Set.map mapper |> fromResults
+            | SearchResult.Nothing -> SearchResult.Nothing
+            | SearchResult.NotUsed -> SearchResult.NotUsed
 
         let bind<'a, 'b when 'a: comparison and 'b: comparison>
             (mapper: Set<'a> -> SearchResult<'b>)
             result
             : SearchResult<'b> =
             match result with
-            | Results r -> mapper r
-            | NoResult -> NoResult
-            | NotUsed -> NotUsed
-
-        let combineResultsWithAnd (searchResults: SearchResult<_> seq) =
-            searchResults
-            |> Seq.fold
-                (fun ids results ->
-                    match ids, results with
-                    | Results existing, Results r -> Set.intersect r existing |> fromResults
-                    | NotUsed, Results r -> fromResults r
-                    | Results existing, NotUsed -> fromResults existing
-                    | NotUsed, NotUsed -> NotUsed
-                    | NoResult, _ -> NoResult
-                    | _, NoResult -> NoResult)
-                NotUsed
-
-        let combineAllResults searchResults =
-            searchResults
-            |> Seq.fold
-                (fun ids results ->
-                    match ids, results with
-                    | Results existing, Results r -> Set.union r existing |> fromResults
-                    | NotUsed, NotUsed -> NotUsed
-                    | NoResult, NoResult -> NoResult
-                    | NoResult, NotUsed -> NoResult
-                    | NotUsed, NoResult -> NoResult
-                    | _, Results r -> fromResults r
-                    | Results existing, _ -> fromResults existing)
-
-                NotUsed
+            | SearchResult.FoundResults r -> mapper r
+            | SearchResult.Nothing -> SearchResult.Nothing
+            | SearchResult.NotUsed -> SearchResult.NotUsed
 
     module SearchArgument =
         let fromValues (values: _ seq) =
             let valueList = values |> Seq.toList
 
             if List.isEmpty valueList then
-                SearchArgument.NotUsed
+                SearchArgument.Unused
             else
-                SearchArgument.Used valueList
+                SearchArgument.Arguments valueList
 
         let fromInputs (phraseInputs: string seq) =
             let searchPhrases =
@@ -146,11 +171,11 @@ module Find =
 
         let executeSearch search argument =
             match argument with
-            | Used phrases ->
+            | Arguments phrases ->
                 phrases
                 |> Seq.map search
-                |> SearchResult.combineResultsWithAnd
-            | SearchArgument.NotUsed -> SearchResult.NotUsed
+                |> SearchResult.fromSearchPhrases
+            | SearchArgument.Unused -> SearchResult.NotUsed
 
     let private appendToSet items (key, value) =
         items
@@ -187,6 +212,7 @@ module Find =
     module Namespaces =
         open Contexture.Api.Aggregates.Namespace
         open ValueObjects
+
         type NamespaceModel =
             { NamespaceId: NamespaceId
               NamespaceTemplateId: NamespaceTemplateId option }
@@ -216,8 +242,7 @@ module Find =
         let byName (namespaces: NamespaceFinder) (name: SearchPhrase) =
             namespaces
             |> findByKey name
-            |> Seq.map SearchResult.fromResults
-            |> SearchResult.combineResultsWithAnd
+            |> SearchPhraseResult.fromManyResults
 
         let byTemplate (namespaces: NamespaceFinder) (templateId: NamespaceTemplateId) =
             namespaces
@@ -225,19 +250,22 @@ module Find =
             |> List.map snd
             |> Set.unionMany
             |> Set.filter (fun m -> m.NamespaceTemplateId = Some templateId)
-            |> SearchResult.fromResults
+            |> SearchPhraseResult.fromResults
 
-    let namespaces (eventStore: EventStore) : Async<Namespaces.NamespaceFinder> = async {
-        let! allStreams = eventStore.AllStreams<Aggregates.Namespace.Event>()
-        return
-            allStreams
-            |> List.fold Namespaces.projectNamespaceNameToNamespaceId Map.empty
+    let namespaces (eventStore: EventStore) : Async<Namespaces.NamespaceFinder> =
+        async {
+            let! allStreams = eventStore.AllStreams<Aggregates.Namespace.Event>()
+
+            return
+                allStreams
+                |> List.fold Namespaces.projectNamespaceNameToNamespaceId Map.empty
         }
 
     module Labels =
         open Contexture.Api.Aggregates.BoundedContext
         open Contexture.Api.Aggregates.Namespace
         open ValueObjects
+
         type LabelAndNamespaceModel =
             { Value: string option
               NamespaceId: NamespaceId
@@ -345,24 +373,27 @@ module Find =
             namespaces.ByLabelName
             |> findByKey phrase
             |> selectResults fst
-            |> SearchResult.takeAllResults
+            |> SearchPhraseResult.fromManyResults
 
         let byLabelValue (namespaces: NamespacesByLabel) (phrase: SearchPhrase) =
             namespaces.ByLabelValue
             |> findByKey phrase
             |> selectResults fst
-            |> SearchResult.takeAllResults
+            |> SearchPhraseResult.fromManyResults
 
-    let labels (eventStore: EventStore) : Async<Labels.NamespacesByLabel> = async {
-        let! allStreams = eventStore.AllStreams<Aggregates.Namespace.Event>()
-        return
-            allStreams
-            |> List.fold Labels.projectLabelNameToNamespace Labels.NamespacesByLabel.Initial
+    let labels (eventStore: EventStore) : Async<Labels.NamespacesByLabel> =
+        async {
+            let! allStreams = eventStore.AllStreams<Aggregates.Namespace.Event>()
+
+            return
+                allStreams
+                |> List.fold Labels.projectLabelNameToNamespace Labels.NamespacesByLabel.Initial
         }
 
     module Domains =
         open Contexture.Api.Aggregates.Domain
         open ValueObjects
+
         type DomainByKeyAndNameModel =
             { ByKey: Map<string, DomainId>
               ByName: Map<string, Set<DomainId>> }
@@ -414,19 +445,20 @@ module Find =
         let byName (model: DomainByKeyAndNameModel) (phrase: SearchPhrase) =
             model.ByName
             |> findByKey phrase
-            |> Seq.map SearchResult.fromResults
-            |> SearchResult.combineResultsWithAnd
-
+            |> SearchPhraseResult.fromManyResults
+            
         let byKey (model: DomainByKeyAndNameModel) (phrase: SearchPhrase) =
             model.ByKey
             |> findByKey phrase
-            |> SearchResult.fromResults
+            |> SearchPhraseResult.fromResults
 
-    let domains (eventStore: EventStore) : Async<Domains.DomainByKeyAndNameModel> = async {
-        let! allStreams = eventStore.AllStreams<Aggregates.Domain.Event>()
-        return
-            allStreams
-            |> List.fold Domains.projectToDomain Domains.DomainByKeyAndNameModel.Empty
+    let domains (eventStore: EventStore) : Async<Domains.DomainByKeyAndNameModel> =
+        async {
+            let! allStreams = eventStore.AllStreams<Aggregates.Domain.Event>()
+
+            return
+                allStreams
+                |> List.fold Domains.projectToDomain Domains.DomainByKeyAndNameModel.Empty
         }
 
     module BoundedContexts =
@@ -481,17 +513,20 @@ module Find =
         let byName (model: BoundedContextByKeyAndNameModel) (phrase: SearchPhrase) =
             model.ByName
             |> findByKey phrase
-            |> Seq.map SearchResult.fromResults
-            |> SearchResult.combineResultsWithAnd
+            |> SearchPhraseResult.fromManyResults
 
         let byKey (model: BoundedContextByKeyAndNameModel) (phrase: SearchPhrase) =
             model.ByKey
             |> findByKey phrase
-            |> SearchResult.fromResults
+            |> SearchPhraseResult.fromResults
 
-    let boundedContexts (eventStore: EventStore) : Async<BoundedContexts.BoundedContextByKeyAndNameModel> = async {
-        let! allStreams = eventStore.AllStreams<Aggregates.BoundedContext.Event>()
-        return
-            allStreams
-            |> List.fold BoundedContexts.projectToBoundedContext BoundedContexts.BoundedContextByKeyAndNameModel.Empty
+    let boundedContexts (eventStore: EventStore) : Async<BoundedContexts.BoundedContextByKeyAndNameModel> =
+        async {
+            let! allStreams = eventStore.AllStreams<Aggregates.BoundedContext.Event>()
+
+            return
+                allStreams
+                |> List.fold
+                    BoundedContexts.projectToBoundedContext
+                    BoundedContexts.BoundedContextByKeyAndNameModel.Empty
         }

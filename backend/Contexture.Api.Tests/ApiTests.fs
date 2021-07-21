@@ -128,56 +128,7 @@ module BoundedContexts =
             Then.Contains(contextId, result |> Array.map (fun i -> i.Id))
         }
 
-    [<Theory>]
-    [<InlineData("Label.name", "Architect")>]
-    [<InlineData("Label.value", "John Doe")>]
-    [<InlineData("Namespace.name", "Team")>]
-    [<InlineData("Namespace.template", "A9F5D70E-B947-40B6-B7BE-4AC45CFE7F34")>]
-    [<InlineData("Domain.name", "domain")>]
-    [<InlineData("Domain.key", "DO-1")>]
-    [<InlineData("BoundedContext.name", "bounded-context")>]
-    [<InlineData("BoundedContext.key", "BC-1")>]
-    let ``Can find the bounded context when searching with a single, exact parameter``
-        (
-            parameterName: string,
-            parameterValue: string
-        ) =
-        task {
-            let simulation = FixedTimeEnvironment.FromSystemClock()
-
-            let namespaceTemplateId =
-                Guid("A9F5D70E-B947-40B6-B7BE-4AC45CFE7F34")
-
-            let namespaceId = simulation |> PseudoRandom.guid
-            let contextId = simulation |> PseudoRandom.guid
-            let domainId = simulation |> PseudoRandom.guid
-
-            let searchedBoundedContext =
-                Fixtures.Builders.givenADomainWithOneBoundedContext domainId contextId
-                |> Given.andOneEvent (
-                    { Fixtures.Namespace.definition contextId namespaceId with
-                          NamespaceTemplateId = Some namespaceTemplateId }
-                    |> Fixtures.Namespace.appendLabel (Fixtures.Label.newLabel (Guid.NewGuid()))
-                    |> Fixtures.Namespace.namespaceAdded
-                )
-
-            let randomBoundedContext =
-                Fixtures.Builders.givenARandomDomainWithBoundedContextAndNamespace simulation
-
-            let given =
-                searchedBoundedContext @ randomBoundedContext
-
-            use testEnvironment = Prepare.withGiven simulation given
-
-            //act
-            let! result =
-                testEnvironment
-                |> When.searchingFor $"%s{parameterName}=%s{parameterValue}"
-
-            // assert
-            Then.NotEmpty result
-            Then.Collection(result, (fun x -> Then.Equal(contextId, x)))
-        }
+   
         
     [<Fact>]
     let ``When trying to delete a namespace with a malformed namespace-id then the bounded context is not deleted instead``() =
@@ -354,7 +305,7 @@ module BoundedContexts =
             let itShouldContainOnlyTheBoundedContext (contextId: BoundedContextId) result =
                 Then.NotEmpty result
                 Then.Collection(result, (fun x -> Then.Equal(contextId, x)))
-
+                
         let prepareTestEnvironment simulation searchedBoundedContext =
             let randomBoundedContext =
                 Fixtures.Builders.givenARandomDomainWithBoundedContextAndNamespace simulation
@@ -363,6 +314,95 @@ module BoundedContexts =
                 searchedBoundedContext @ randomBoundedContext
 
             Prepare.withGiven simulation given
+     
+        [<Theory>]
+        [<InlineData("Label.name", "Architect")>]
+        [<InlineData("Label.value", "John Doe")>]
+        [<InlineData("Namespace.name", "Team")>]
+        [<InlineData("Namespace.template", "A9F5D70E-B947-40B6-B7BE-4AC45CFE7F34")>]
+        [<InlineData("Domain.name", "domain")>]
+        [<InlineData("Domain.key", "DO-1")>]
+        [<InlineData("BoundedContext.name", "bounded-context")>]
+        [<InlineData("BoundedContext.key", "BC-1")>]
+        let ``with a single, exact parameter then only the bounded context is found``
+            (
+                parameterName: string,
+                parameterValue: string
+            ) =
+            task {
+                let simulation = FixedTimeEnvironment.FromSystemClock()
+
+                let namespaceTemplateId =
+                    Guid("A9F5D70E-B947-40B6-B7BE-4AC45CFE7F34")
+
+                let namespaceId = simulation |> PseudoRandom.guid
+                let contextId = simulation |> PseudoRandom.guid
+                let domainId = simulation |> PseudoRandom.guid
+
+                let searchedBoundedContext =
+                    Fixtures.Builders.givenADomainWithOneBoundedContext domainId contextId
+                    |> Given.andOneEvent (
+                        { Fixtures.Namespace.definition contextId namespaceId with
+                              NamespaceTemplateId = Some namespaceTemplateId }
+                        |> Fixtures.Namespace.appendLabel (Fixtures.Label.newLabel (Guid.NewGuid()))
+                        |> Fixtures.Namespace.namespaceAdded
+                    )
+                    
+                use testEnvironment = prepareTestEnvironment simulation searchedBoundedContext
+                
+                //act
+                let! result =
+                    testEnvironment
+                    |> When.searchingFor $"%s{parameterName}=%s{parameterValue}"
+
+                // assert
+                Then.NotEmpty result
+                Then.Collection(result, (fun x -> Then.Equal(contextId, x)))
+            }
+    
+        [<Fact>]
+        let ``with one single and exact parameter and one non-matching wildcard search, then no bounded context should be found`` () =
+            task {
+                let simulation = FixedTimeEnvironment.FromSystemClock()
+
+                let domainId = simulation |> PseudoRandom.guid
+                
+                let firstContextId = simulation |> PseudoRandom.guid
+                let secondContextId = simulation |> PseudoRandom.guid                
+                
+                let given =
+                    Given.noEvents
+                    |> Given.andEvents [
+                         domainId
+                         |> Domain.domainDefinition
+                         |> Domain.domainCreated
+                         { Domain.key domainId 
+                           with Key = Some "DomainKey" }
+                            |> Domain.keyAssigned
+                    ]
+                    |> Given.andEvents [
+                        { BoundedContext.definition domainId firstContextId
+                            with Name = "First" }
+                        |> BoundedContext.boundedContextCreated
+                        firstContextId |> BoundedContext.key |> BoundedContext.keyAssigned
+                    ]
+                    |> Given.andEvents [
+                        { BoundedContext.definition domainId secondContextId
+                            with Name = "Second" }
+                        |> BoundedContext.boundedContextCreated
+                        secondContextId |> BoundedContext.key |> BoundedContext.keyAssigned
+                    ]                
+                    
+                use testEnvironment = prepareTestEnvironment simulation given
+                
+                //act
+                let! result =
+                    testEnvironment
+                    |> When.searchingFor $"Domain.key=DomainKey&BoundedContext.Name=*Third*"
+
+                // assert
+                Then.Empty result
+            }       
 
         type ``with a single string based parameter``() =
             let simulation = FixedTimeEnvironment.FromSystemClock()
