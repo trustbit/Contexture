@@ -43,15 +43,6 @@ module SearchFor =
             return Option.map mapper bound
         }
         
-        let optionMap2 mapper o =
-            async {
-                match o with
-                | Some value ->
-                    let! result = value
-                    return Some (mapper result)
-                | None ->
-                    return None
-            }
     module NamespaceId =
         open Contexture.Api.Aggregates.Namespace
         open ValueObjects
@@ -76,7 +67,7 @@ module SearchFor =
                 |> SearchArgument.fromValues
                 |> SearchArgument.executeSearch (Find.Namespaces.byTemplate availableNamespaces)
 
-            return SearchResult.combineResultsWithAnd
+            return SearchResult.combineResults
                     [ namespacesByName
                       namespacesByTemplate ]
         }
@@ -114,7 +105,7 @@ module SearchFor =
                 |> SearchArgument.fromInputs
                 |> SearchArgument.executeSearch (Find.Labels.byLabelValue namespacesByLabel)
 
-            return SearchResult.combineResultsWithAnd [ byNameResults; byLabelResults]
+            return SearchResult.combineResults [ byNameResults; byLabelResults]
         }
 
         let find (database: EventStore) (byLabel: LabelQuery option) = async {
@@ -125,8 +116,7 @@ module SearchFor =
                 |> Async.map SearchResult.fromOption
 
             return relevantLabels
-        }
-            
+        }        
 
     module DomainId =
         [<CLIMutable>]
@@ -150,7 +140,7 @@ module SearchFor =
                 |> SearchArgument.executeSearch (Find.Domains.byKey findDomains)
 
             return
-                SearchResult.combineResultsWithAnd
+                SearchResult.combineResults
                     [ foundByName
                       foundByKey ]
             }
@@ -183,7 +173,7 @@ module SearchFor =
                 |> SearchArgument.executeSearch  (Find.BoundedContexts.byKey findBoundedContext)
 
             return
-                SearchResult.combineResultsWithAnd
+                SearchResult.combineResults
                     [ foundByName
                       foundByKey ]
             }

@@ -192,7 +192,7 @@ module BoundedContexts =
                     )
 
                 let boundedContextIds =
-                    SearchResult.combineResultsWithAnd
+                    SearchResult.combineResults
                         [ boundedContextIdsFromSearch
                           boundedContextIdsFromNamespace
                           boundedContextIdsFromDomain
