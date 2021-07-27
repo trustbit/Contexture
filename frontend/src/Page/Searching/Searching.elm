@@ -24,7 +24,7 @@ import Http
 import Json.Decode as Decode
 import Json.Decode.Pipeline as JP
 import Page.Searching.Filter as Filter
-import Page.Searching.Ports as Ports exposing (SearchResultPresentation(..))
+import Page.Searching.Ports as Ports exposing (SearchResultPresentation(..),SunburstPresentation(..))
 import RemoteData
 import Task
 import Url
@@ -187,7 +187,7 @@ update msg model =
                 case newPresentation of
                     Ports.Textual presentation ->
                         updateSearchResults (\m -> { m | presentation = presentation})
-                    Ports.Sunburst ->
+                    Ports.Sunburst _ ->
                         identity
             , Cmd.batch
                 ( Ports.store newPresentation 
@@ -238,10 +238,15 @@ viewItems searchResults =
             [ Grid.simpleRow [ Grid.col [] [ text <| "Could not execute search: " ++ Debug.toString e ] ]
             ]
             
-viewSunburst configuration filterParameters =
+viewSunburst configuration filterParameters mode =
      Html.node "visualization-sunburst"
         [ attribute "baseApi" (Api.withoutQuery [] |> Api.url configuration)
         , attribute "query" (filterParameters |> filterParametersAsQuery |> Url.Builder.toQuery)
+        , attribute "mode" (
+            case mode of
+                Filtered -> "filtered"
+                Highlighted -> "highlighted" 
+            )
         ]   
         []
 
@@ -251,20 +256,34 @@ presentationOptionView presentation =
         |> Card.block []
             [ Block.titleH5 [] [ text "Presentation mode" ]
             , Block.text []
-                [ ButtonGroup.radioButtonGroup []
-                    [ ButtonGroup.radioButton
-                        (presentation == Textual BoundedContext.Full)
-                        [ Button.secondary, Button.onClick <| SwitchPresentation (Textual BoundedContext.Full) ]
-                        [ text "Full" ]
-                    , ButtonGroup.radioButton
-                        (presentation == Textual BoundedContext.Condensed)
-                        [ Button.secondary, Button.onClick <| SwitchPresentation (Textual BoundedContext.Condensed) ]
-                        [ text "Condensed" ]
-                    , ButtonGroup.radioButton
-                        (presentation == Sunburst)
-                        [ Button.secondary, Button.onClick <| SwitchPresentation Sunburst]
-                        [ text "Sunburst" ]
-                    ]
+                [ Html.p [] [text "Text based"]
+                --, ButtonGroup.radioButtonGroupItem[] 
+                , ButtonGroup.radioButtonGroup [ButtonGroup.attrs [ Spacing.ml2]]
+                        [ ButtonGroup.radioButton
+                            (presentation == Textual BoundedContext.Full)
+                            [ Button.secondary, Button.onClick <| SwitchPresentation (Textual BoundedContext.Full) ]
+                            [ text "Full" ]
+                        , ButtonGroup.radioButton
+                            (presentation == Textual BoundedContext.Condensed)
+                            [ Button.secondary, Button.onClick <| SwitchPresentation (Textual BoundedContext.Condensed) ]
+                            [ text "Condensed" ]
+                        ]
+                ]
+            , Block.text []
+                [ Html.p [] [text "Visualisation"] 
+                --, ButtonGroup.radioButtonGroupItem []
+                , ButtonGroup.radioButtonGroup [ButtonGroup.attrs [ Spacing.ml2]] 
+                        [ ButtonGroup.radioButton
+                            (presentation == Sunburst Filtered)
+                            [ Button.secondary, Button.onClick <| SwitchPresentation (Sunburst Filtered)]
+                            [ text "Filtered" ]
+                        , ButtonGroup.radioButton
+                             (presentation == Sunburst Highlighted)
+                             [ Button.secondary, Button.onClick <| SwitchPresentation (Sunburst Highlighted)]
+                             [ text "Highlighted" ]
+                        ]
+                    --]
+                    
                 ]
             ]
         |> Card.view
@@ -284,8 +303,8 @@ view model =
                 case model.presentation of
                     Textual _ ->
                         viewItems model.textualModel.searchResults
-                    Sunburst ->
-                        [ viewSunburst model.configuration model.filter.activeParameters]
+                    Sunburst mode ->
+                        [ viewSunburst model.configuration model.filter.activeParameters mode ]
                 )
             ]
         ]

@@ -1,10 +1,13 @@
-port module Page.Searching.Ports exposing (SearchResultPresentation(..), store, read)
+port module Page.Searching.Ports exposing (SearchResultPresentation(..),SunburstPresentation(..), store, read)
 
 import Components.BoundedContextsOfDomain as BoundedContext
     
+type SunburstPresentation
+    = Filtered
+    | Highlighted
 type SearchResultPresentation
     = Textual BoundedContext.Presentation
-    | Sunburst
+    | Sunburst SunburstPresentation
     
 asText presentation =
     case presentation of
@@ -14,8 +17,12 @@ asText presentation =
         Textual BoundedContext.Condensed ->
             "Textual:Condensed"
         
-        Sunburst ->
-            "Sunburst"
+        Sunburst Filtered ->
+            "Sunburst:Filtered"
+        
+        Sunburst Highlighted ->
+            "Sunburst:Highlighted"
+            
 
 store : SearchResultPresentation -> Cmd msg 
 store presentation =
@@ -30,8 +37,10 @@ read s =
             Just (Textual BoundedContext.Condensed)
         "textual:full" ->
             Just (Textual BoundedContext.Full)
-        "sunburst" ->
-            Just Sunburst
+        "sunburst:filtered" ->
+            Just (Sunburst Filtered)
+        "sunburst:highlighted" ->
+                    Just (Sunburst Highlighted) 
         _ ->
             Nothing
                             

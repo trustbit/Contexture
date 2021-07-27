@@ -88,7 +88,8 @@ export class Sunburst extends HTMLElement {
         this.resizeObserver.observe(this.parentElement);
         this.buildSunburst();
     }
-    disconnectedCallback(){
+
+    disconnectedCallback() {
         this.resizeObserver.disconnect();
     }
 
@@ -97,14 +98,18 @@ export class Sunburst extends HTMLElement {
     }
 
     static get observedAttributes() {
-        return ['query'];
+        return ['query', 'mode'];
+    }
+
+    inHighlightMode() {
+        return this.getAttribute('mode') === 'highlighted';
     }
 
     async buildSunburst() {
         const query = this.getAttribute('query');
         const baseApi = this.getAttribute('baseApi');
 
-        this.data = await fetchData(baseApi, query);
+        this.data = await fetchData(baseApi, query, this.inHighlightMode());
 
         this.renderSunburst();
     }
@@ -147,6 +152,23 @@ export class Sunburst extends HTMLElement {
             d3.quantize(d3.interpolateRainbow, root.children ? root.children.length + 1 : 0)
         );
 
+        const highlightMode = this.inHighlightMode();
+
+        function highlightOpacity(d) {
+            if (highlightMode) {
+                return d.data.wasFound
+                    ? d.data.isBoundedContext
+                        ? 1.0
+                        : 0.7
+                    : 0.3;
+
+            } else {
+                return d.data.isBoundedContext
+                    ? 1.0
+                    : 0.7;
+            }
+        }
+
         this.sunburst.elements
             .selectAll("path")
             .data(root.descendants().filter((d) => d.depth))
@@ -155,7 +177,7 @@ export class Sunburst extends HTMLElement {
                 while (d.depth > 1) d = d.parent;
                 return color(d.data.name);
             })
-            .attr("opacity", d => d.data.isBoundedContext ? 1.0 : 0.7)
+            .attr("opacity", highlightOpacity)
             .attr("d", arc)
             .append("title")
             .text(
@@ -191,6 +213,7 @@ export class Sunburst extends HTMLElement {
                 }) translate(${y},0) rotate(${x < 180 ? 0 : 180})`;
             })
             .attr("dy", "0.35em")
+            .attr("opacity", highlightOpacity)
             .text((d) => d.data.name)
             .call(shortenText, this.size.radius / (root.height + 1));
     }
