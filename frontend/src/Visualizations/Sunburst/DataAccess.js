@@ -1,7 +1,13 @@
-function findRelevantDomainIds(
-    domainDictionary,
+function selectAllParentDomains(
+    domains,
     relevantDomainsIds
 ) {
+    const domainDictionary = Array
+        .from(domains)
+        .reduce((dict, d) => {
+            dict[d.id] = d;
+            return dict;
+        }, {});
     // we need to select all domains relevant for the visualization
     // this is done in iterations, because we might have the following situation:
     // Found Bounded Context -> SubDomain -> SubDomain -> Domain
@@ -39,17 +45,14 @@ async function fetchBoundedContexts(baseApi, query) {
 
 export async function fetchData(baseApi, query, highlightMode) {
     const filteredContexts = await fetchBoundedContexts(baseApi, query);
-    const allContexts = await fetchBoundedContexts(baseApi);
+    const displayContexts =
+        highlightMode
+            ? await fetchBoundedContexts(baseApi)
+            : filteredContexts;
     const domains = await fetchDomains(baseApi);
-
-    const domainDictionary = Array
-        .from(domains)
-        .reduce((dict, d) => {
-            dict[d.id] = d;
-            return dict;
-        }, {});
+    
     const boundedContextsToDisplay = Array
-        .from(highlightMode ? allContexts : filteredContexts)
+        .from(displayContexts)
         .reduce(
             (dict, bc) => {
                 if (!dict[bc.parentDomainId]) dict[bc.parentDomainId] = [];
@@ -58,6 +61,7 @@ export async function fetchData(baseApi, query, highlightMode) {
             },
             {}
         );
+
     const foundBoundedContextIds =
         new Set(Array
             .from(filteredContexts)
@@ -72,9 +76,9 @@ export async function fetchData(baseApi, query, highlightMode) {
 
 
     // starting from the domains of the matched bounded contexts
-    const relevantDomainsIds = findRelevantDomainIds(
-        domainDictionary,
-        highlightMode ? foundDomainIds : new Set(Object.keys(boundedContextsToDisplay))
+    const relevantDomainsIds = selectAllParentDomains(
+        domains,
+        foundDomainIds
     );
 
     function isRelevantDomain(domain) {

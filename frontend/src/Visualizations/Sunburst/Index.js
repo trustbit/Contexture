@@ -152,16 +152,17 @@ export class Sunburst extends HTMLElement {
             d3.quantize(d3.interpolateRainbow, root.children ? root.children.length + 1 : 0)
         );
 
-        const highlightMode = this.inHighlightMode();
+        const inHighlightMode = this.inHighlightMode();
 
         function highlightOpacity(d) {
-            if (highlightMode) {
-                return d.data.wasFound
-                    ? d.data.isBoundedContext
+            if (inHighlightMode) {
+                if (d.data.wasFound) {
+                    return d.data.isBoundedContext
                         ? 1.0
                         : 0.7
-                    : 0.3;
-
+                } else {
+                    return 0.3;
+                }
             } else {
                 return d.data.isBoundedContext
                     ? 1.0
@@ -215,6 +216,6 @@ export class Sunburst extends HTMLElement {
             .attr("dy", "0.35em")
             .attr("opacity", highlightOpacity)
             .text((d) => d.data.name)
-            .call(shortenText, this.size.radius / (root.height + 1));
+            .call(shortenText, Math.ceil(this.size.radius / (root.height + 1)));
     }
 }
