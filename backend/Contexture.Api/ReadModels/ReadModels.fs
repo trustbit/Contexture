@@ -166,8 +166,11 @@ module Namespace =
     open ValueObjects
 
     type NamespaceState =
-        { ByNamespaceId: Map<NamespaceId, Projections.Namespace option> }
-        static member Empty = { ByNamespaceId = Map.empty }
+        { ByNamespaceId: Map<NamespaceId, Projections.Namespace option>
+          ByBoundedContextId: Map<BoundedContext.ValueObjects.BoundedContextId, Projections.Namespace list> }
+        static member Empty =
+            { ByNamespaceId = Map.empty
+              ByBoundedContextId = Map.empty }
 
     type AllNamespacesReadModel = ReadModels.ReadModel<Namespace.Event, NamespaceState>
 
@@ -194,29 +197,28 @@ module Namespace =
         |> Map.toList
         |> List.map snd
 
+    let namespacesOf (state: NamespaceState) boundedContextId =
+        state.ByBoundedContextId
+        |> Map.tryFind boundedContextId
+        |> Option.defaultValue []
+
     let allNamespacesReadModel () =
         let updateState state eventEnvelopes =
-            let namespaces =
+            let byNamespaceId =
                 eventEnvelopes
                 |> List.fold
                     (projectIntoMap (fun e -> selectNamespaceId e.Event) namespaceProjection)
                     state.ByNamespaceId
 
+            let byBoundedContextId =
+                eventEnvelopes
+                |> List.fold (projectIntoMapBySourceId namespacesProjection) state.ByBoundedContextId
+
             { state with
-                  ByNamespaceId = namespaces }
+                  ByNamespaceId = byNamespaceId
+                  ByBoundedContextId = byBoundedContextId }
 
         ReadModels.readModel updateState NamespaceState.Empty
-
-    let namespacesOf (eventStore: EventStore) boundedContextId =
-        async {
-            let! stream = eventStore.Stream boundedContextId
-
-            return
-                stream
-                |> List.fold (projectIntoMapBySourceId namespacesProjection) Map.empty
-                |> Map.toList
-                |> List.collect snd
-        }
 
     let allNamespacesByContext (eventStore: EventStore) =
         async {

@@ -34,10 +34,11 @@ module Namespaces =
                     let eventBasedHandler = EventBased.eventStoreBasedCommandHandler clock database
                     match! Namespace.useHandler eventBasedHandler command with
                     | Ok updatedContext ->
+                        let! namespaceState = ctx.GetService<ReadModels.Namespace.AllNamespacesReadModel>().State()
                         // for namespaces we don't use redirects ATM
-                        let! boundedContext =
+                        let boundedContext =
                             updatedContext
-                            |> ReadModels.Namespace.namespacesOf database
+                            |> ReadModels.Namespace.namespacesOf namespaceState
 
                         return! json boundedContext next ctx
                     | Error (DomainError error) ->
@@ -61,10 +62,10 @@ module Namespaces =
 
         let getNamespaces boundedContextId =
             fun (next: HttpFunc) (ctx: HttpContext) -> task {
-                let database = ctx.GetService<EventStore>()
-                let! namespaces =
+                let! namespaceState = ctx.GetService<ReadModels.Namespace.AllNamespacesReadModel>().State()
+                let namespaces =
                     boundedContextId
-                    |> ReadModels.Namespace.namespacesOf database
+                    |> ReadModels.Namespace.namespacesOf namespaceState
                 let result =
                     namespaces
                     |> json
