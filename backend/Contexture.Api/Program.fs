@@ -220,6 +220,7 @@ let configureReadModels (services: IServiceCollection) =
     |> registerReadModel (ReadModels.Collaboration.collaborationsReadModel())
     |> registerReadModel (ReadModels.Templates.templatesReadModel())
     |> registerReadModel (ReadModels.BoundedContext.boundedContextsReadModel())
+    |> registerReadModel(ReadModels.Namespace.allNamespacesReadModel())
     |> ignore
 
 let configureServices (context: HostBuilderContext) (services : IServiceCollection) =

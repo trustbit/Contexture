@@ -67,7 +67,7 @@ module BoundedContext =
     open Contexture.Api.Aggregates.BoundedContext
     open ValueObjects
     open Projections
-    
+
 
     type BoundedContextState =
         { BoundedContexts: Map<BoundedContextId, BoundedContext option>
@@ -165,6 +165,12 @@ module Namespace =
     open Contexture.Api.Aggregates.Namespace
     open ValueObjects
 
+    type NamespaceState =
+        { ByNamespaceId: Map<NamespaceId, Projections.Namespace option> }
+        static member Empty = { ByNamespaceId = Map.empty }
+
+    type AllNamespacesReadModel = ReadModels.ReadModel<Namespace.Event, NamespaceState>
+
     let private namespacesProjection : Projection<Projections.Namespace list, Aggregates.Namespace.Event> =
         { Init = List.empty
           Update = Projections.asNamespaces }
@@ -181,22 +187,25 @@ module Namespace =
         | LabelAdded l -> l.NamespaceId
         | LabelRemoved l -> l.NamespaceId
 
-    let namespaceLookup (eventStore: EventStore) : Async<Map<NamespaceId, Projections.Namespace>> =
-        async {
-            let! allStreams = eventStore.AllStreams<Aggregates.Namespace.Event>()
+    let allNamespaces (state: NamespaceState) =
+        state.ByNamespaceId
+        |> Map.filter (fun _ v -> Option.isSome v)
+        |> Map.map (fun _ v -> Option.get v)
+        |> Map.toList
+        |> List.map snd
 
-            return
-                allStreams
-                |> List.fold (projectIntoMap (fun e -> selectNamespaceId e.Event) namespaceProjection) Map.empty
-                |> Map.filter (fun _ v -> Option.isSome v)
-                |> Map.map (fun _ v -> Option.get v)
-        }
+    let allNamespacesReadModel () =
+        let updateState state eventEnvelopes =
+            let namespaces =
+                eventEnvelopes
+                |> List.fold
+                    (projectIntoMap (fun e -> selectNamespaceId e.Event) namespaceProjection)
+                    state.ByNamespaceId
 
-    let allNamespaces (eventStore: EventStore) =
-        async {
-            let! lookup = eventStore |> namespaceLookup
-            return lookup |> Map.toList |> List.map snd
-        }
+            { state with
+                  ByNamespaceId = namespaces }
+
+        ReadModels.readModel updateState NamespaceState.Empty
 
     let namespacesOf (eventStore: EventStore) boundedContextId =
         async {

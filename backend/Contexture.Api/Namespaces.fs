@@ -73,13 +73,14 @@ module Namespaces =
             }
 
         let getAllNamespaces =
-            fun (next: HttpFunc) (ctx: HttpContext) ->
-                let database = ctx.GetService<EventStore>()
+            fun (next: HttpFunc) (ctx: HttpContext) -> task {
+                let! state = ctx.GetService<ReadModels.Namespace.AllNamespacesReadModel>().State()
 
                 let namespaces =
-                    ReadModels.Namespace.allNamespaces database
+                    ReadModels.Namespace.allNamespaces state
 
-                json namespaces next ctx
+                return! json namespaces next ctx
+                }
 
     module Templates =
         module CommandEndpoints =
