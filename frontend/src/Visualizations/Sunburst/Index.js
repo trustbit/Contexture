@@ -61,21 +61,39 @@ function calculateSizeFromHint(sizeHint) {
     };
 }
 
-function shortenText(text, width) {
-    text.each(function () {
+function shortenText(text, width, guessedMaxCharsLookup) {
+    let guessedMaxChars = guessedMaxCharsLookup[width];
+
+    function removeLastChar(textContent, length) {
+        return textContent.substr(0, length - 4) + "..."
+    }
+
+    text.each(function (node) {
         const text = d3.select(this)
-        let content = text.text();
-        while (text.node().getComputedTextLength() > width) {
-            content = content.substr(0, content.length - 4) + "..."
+        let content = node.data.name;
+        // caching & guessing max chars is an performance optimization
+        // otherwise calling `text.node().getComputedTextLength()` leads to a lot of expensive layout/rendering calls
+        // which will cause a lagging behavior when filtering/resizing the visualization
+        // current implementation assumes a constant width between all sunburst-radiants
+        if (guessedMaxChars && content.length >= guessedMaxChars) {
+            content = removeLastChar(content, guessedMaxChars)
             text.text(content)
+        } else {
+            while (text.node().getComputedTextLength() > width) {
+                content = removeLastChar(content, content.length)
+                text.text(content)
+                guessedMaxChars = content.length;
+            }
         }
     });
+    guessedMaxCharsLookup[width] = guessedMaxChars;
 }
 
 export class Sunburst extends HTMLElement {
     // things required by Custom Elements
     constructor() {
         super();
+        this.guessedMaxCharsLookup = {};
         this.resizeObserver = new ResizeObserver(entries => {
             const sizeHint = {width: entries[0].contentRect.width, maxHeight: entries[0].contentRect.height};
             this.resize(sizeHint)
@@ -236,6 +254,6 @@ export class Sunburst extends HTMLElement {
             .attr("dy", "0.35em")
             .attr("opacity", highlightOpacity)
             .text((d) => d.data.name)
-            .call(shortenText, Math.ceil(this.size.radius / (root.height + 1)));
+            .call(shortenText, Math.ceil(this.size.radius / (root.height + 1)), this.guessedMaxCharsLookup);
     }
 }
