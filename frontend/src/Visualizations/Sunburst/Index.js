@@ -170,17 +170,37 @@ export class Sunburst extends HTMLElement {
             }
         }
 
-        this.sunburst.elements
-            .selectAll("path")
+        const elements = this.sunburst.elements
+            .selectAll("a")
             .data(root.descendants().filter((d) => d.depth))
-            .join("path")
+            .join(enter => {
+                const a = enter
+                    .append("a")
+
+                a
+                    .attr("target", "_blank")
+                    .append("path")
+                    .append("title");
+
+                return a;
+            });
+
+        elements
+            .attr("xlink:href", d =>
+                d.data.isBoundedContext
+                    ? `/boundedContext/${d.data.id}/canvas`
+                    : `/domain/${d.data.id}`
+            );
+        elements
+            .select("path")
             .attr("fill", (d) => {
                 while (d.depth > 1) d = d.parent;
                 return color(d.data.name);
             })
             .attr("opacity", highlightOpacity)
-            .attr("d", arc)
-            .append("title")
+            .attr("d", arc);
+        elements
+            .select("title")
             .text(
                 (d) => {
                     const ancestors =
@@ -195,8 +215,8 @@ export class Sunburst extends HTMLElement {
                     } else {
                         return `${ancestors}:\n${format(d.value)} Elements`;
                     }
-                }
-            );
+                });
+
 
         this.sunburst.text
             .selectAll("text")

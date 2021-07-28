@@ -93,6 +93,7 @@ export async function fetchData(baseApi, query, highlightMode) {
         // domain.boundedContexts is not filled in subdomains of the domain
         const boundedContexts = boundedContextsToDisplay[domain.id] || [];
         return {
+            id: domain.id,
             name: domain.name,
             wasFound: isRelevantDomain(domain),
             children: [
@@ -104,6 +105,7 @@ export async function fetchData(baseApi, query, highlightMode) {
 
     function mapBoundedContext(boundedContext) {
         return {
+            id: boundedContext.id,
             name: boundedContext.name,
             isBoundedContext: true,
             wasFound: foundBoundedContextIds.has(boundedContext.id),
