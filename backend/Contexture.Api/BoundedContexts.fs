@@ -163,8 +163,8 @@ module BoundedContexts =
                 let! boundedContextIdsFromSearch =
                     SearchFor.BoundedContextId.find database item.BoundedContext
 
-                let! boundedContextsByNamespace =
-                    Namespace.BoundedContexts.byNamespace database
+                let boundedContextsByNamespace =
+                    Namespace.BoundedContexts.byNamespace namespaceState
 
                 let boundedContextsByDomain =
                     boundedContextState

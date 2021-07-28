@@ -166,11 +166,13 @@ module Namespace =
     open ValueObjects
 
     type NamespaceState =
-        { ByNamespaceId: Map<NamespaceId, Projections.Namespace option>
-          ByBoundedContextId: Map<BoundedContext.ValueObjects.BoundedContextId, Projections.Namespace list> }
+        { NamespaceByNamespaceId: Map<NamespaceId, Projections.Namespace option>
+          NamespaceByBoundedContextId: Map<BoundedContext.ValueObjects.BoundedContextId, Projections.Namespace list>
+          BoundedContextIdByNamespaceId: Map<NamespaceId, BoundedContext.ValueObjects.BoundedContextId> }
         static member Empty =
-            { ByNamespaceId = Map.empty
-              ByBoundedContextId = Map.empty }
+            { NamespaceByNamespaceId = Map.empty
+              NamespaceByBoundedContextId = Map.empty
+              BoundedContextIdByNamespaceId = Map.empty }
 
     type AllNamespacesReadModel = ReadModels.ReadModel<Namespace.Event, NamespaceState>
 
@@ -191,37 +193,19 @@ module Namespace =
         | LabelRemoved l -> l.NamespaceId
 
     let allNamespaces (state: NamespaceState) =
-        state.ByNamespaceId
+        state.NamespaceByNamespaceId
         |> Map.filter (fun _ v -> Option.isSome v)
         |> Map.map (fun _ v -> Option.get v)
         |> Map.toList
         |> List.map snd
 
     let namespacesOf (state: NamespaceState) boundedContextId =
-        state.ByBoundedContextId
+        state.NamespaceByBoundedContextId
         |> Map.tryFind boundedContextId
         |> Option.defaultValue []
 
-    let allNamespacesReadModel () =
-        let updateState state eventEnvelopes =
-            let byNamespaceId =
-                eventEnvelopes
-                |> List.fold
-                    (projectIntoMap (fun e -> selectNamespaceId e.Event) namespaceProjection)
-                    state.ByNamespaceId
-
-            let byBoundedContextId =
-                eventEnvelopes
-                |> List.fold (projectIntoMapBySourceId namespacesProjection) state.ByBoundedContextId
-
-            { state with
-                  ByNamespaceId = byNamespaceId
-                  ByBoundedContextId = byBoundedContextId }
-
-        ReadModels.readModel updateState NamespaceState.Empty
-
     module BoundedContexts =
-        let private projectNamespaceIdToBoundedContextId state eventEnvelope =
+        let projectNamespaceIdToBoundedContextId state eventEnvelope =
             match eventEnvelope.Event with
             | NamespaceAdded n -> state |> Map.add n.NamespaceId n.BoundedContextId
             | NamespaceImported n -> state |> Map.add n.NamespaceId n.BoundedContextId
@@ -229,16 +213,32 @@ module Namespace =
             | LabelAdded l -> state
             | LabelRemoved l -> state
 
-        let byNamespace (eventStore: EventStore) =
-            async {
-                let! namespaces = eventStore.AllStreams<Aggregates.Namespace.Event>()
+        let byNamespace (state: NamespaceState) (namespaceId: NamespaceId) =
+            state.BoundedContextIdByNamespaceId
+            |> Map.tryFind namespaceId
 
-                let lookup =
-                    namespaces
-                    |> List.fold projectNamespaceIdToBoundedContextId Map.empty
+    let allNamespacesReadModel () =
+        let updateState state eventEnvelopes =
+            let byNamespaceId =
+                eventEnvelopes
+                |> List.fold
+                    (projectIntoMap (fun e -> selectNamespaceId e.Event) namespaceProjection)
+                    state.NamespaceByNamespaceId
 
-                return fun (namespaceId: NamespaceId) -> lookup |> Map.tryFind namespaceId
-            }
+            let byBoundedContextId =
+                eventEnvelopes
+                |> List.fold (projectIntoMapBySourceId namespacesProjection) state.NamespaceByBoundedContextId
+
+            let boundedContextByNamespaceId =
+                eventEnvelopes
+                |> List.fold (BoundedContexts.projectNamespaceIdToBoundedContextId) state.BoundedContextIdByNamespaceId
+
+            { state with
+                  NamespaceByNamespaceId = byNamespaceId
+                  NamespaceByBoundedContextId = byBoundedContextId
+                  BoundedContextIdByNamespaceId = boundedContextByNamespaceId }
+
+        ReadModels.readModel updateState NamespaceState.Empty
 
 module Templates =
     open Contexture.Api.Aggregates.NamespaceTemplate
