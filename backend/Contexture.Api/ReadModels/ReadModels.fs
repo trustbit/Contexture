@@ -220,27 +220,6 @@ module Namespace =
 
         ReadModels.readModel updateState NamespaceState.Empty
 
-    let allNamespacesByContext (eventStore: EventStore) =
-        async {
-            let! namespaces = eventStore.AllStreams<Aggregates.Namespace.Event>()
-
-            let lookup =
-                namespaces
-                |> List.fold (projectIntoMapBySourceId namespacesProjection) Map.empty
-
-            return
-                fun contextId ->
-                    lookup
-                    |> Map.tryFind contextId
-                    |> Option.defaultValue []
-        }
-
-    let buildNamespaces (eventStore: EventStore) boundedContextId =
-        async {
-            let! stream = eventStore.Stream boundedContextId
-            return stream |> project namespacesProjection
-        }
-
     module BoundedContexts =
         let private projectNamespaceIdToBoundedContextId state eventEnvelope =
             match eventEnvelope.Event with

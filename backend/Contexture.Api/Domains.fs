@@ -145,14 +145,13 @@ module Domains =
 
         let getDomains =
             fun (next: HttpFunc) (ctx: HttpContext) -> task {
-                let eventStore = ctx.GetService<EventStore>()
-
                 let! domainState = ctx.GetService<ReadModels.Domain.AllDomainReadModel>().State()
                 let! boundedContextState = ctx.GetService<ReadModels.BoundedContext.AllBoundedContextsReadModel>().State()
+                let! namespaceState = ctx.GetService<ReadModels.Namespace.AllNamespacesReadModel>().State()
                 let domains = domainState |> Domain.allDomains
                 let subdomainsOf = Domain.subdomainsOf domainState
                 let boundedContextsOf = BoundedContext.boundedContextsByDomain boundedContextState
-                let! namespacesOf = Namespace.allNamespacesByContext eventStore
+                let namespacesOf = Namespace.namespacesOf namespaceState
 
                 let result =
                     domains
@@ -163,14 +162,13 @@ module Domains =
 
         let getSubDomains domainId =
             fun (next: HttpFunc) (ctx: HttpContext) -> task {
-                let eventStore = ctx.GetService<EventStore>()
-
                 let! domainState =  ctx.GetService<ReadModels.Domain.AllDomainReadModel>().State()
                 let! boundedContextState = ctx.GetService<ReadModels.BoundedContext.AllBoundedContextsReadModel>().State()
+                let! namespaceState = ctx.GetService<ReadModels.Namespace.AllNamespacesReadModel>().State()
                 let domains = Domain.allDomains domainState
                 let subdomainsOf = Domain.subdomainsOf domainState
                 let boundedContextsOf = BoundedContext.boundedContextsByDomain boundedContextState
-                let! namespacesOf = Namespace.allNamespacesByContext eventStore
+                let namespacesOf = Namespace.namespacesOf namespaceState
 
                 let result =
                     domains
@@ -182,13 +180,12 @@ module Domains =
          
         let getDomain domainId =
             fun (next: HttpFunc) (ctx: HttpContext) -> task {
-                let eventStore = ctx.GetService<EventStore>()
-
                 let! domainState = ctx.GetService<ReadModels.Domain.AllDomainReadModel>().State()
                 let! boundedContextState = ctx.GetService<ReadModels.BoundedContext.AllBoundedContextsReadModel>().State()
+                let! namespaceState = ctx.GetService<ReadModels.Namespace.AllNamespacesReadModel>().State()
                 let subdomainsOf = Domain.subdomainsOf domainState
                 let boundedContextsOf = BoundedContext.boundedContextsByDomain boundedContextState
-                let! namespacesOf = Namespace.allNamespacesByContext eventStore
+                let namespacesOf = Namespace.namespacesOf namespaceState
 
                 let result =
                     domainId
@@ -202,10 +199,10 @@ module Domains =
 
         let getBoundedContextsOf domainId =
             fun (next: HttpFunc) (ctx: HttpContext) -> task {
-                let database = ctx.GetService<EventStore>()
                 let! boundedContextState = ctx.GetService<ReadModels.BoundedContext.AllBoundedContextsReadModel>().State()
                 let boundedContextsOf = BoundedContext.boundedContextsByDomain boundedContextState
-                let! namespacesOf = Namespace.allNamespacesByContext database
+                let! namespaceState = ctx.GetService<ReadModels.Namespace.AllNamespacesReadModel>().State()
+                let namespacesOf = Namespace.namespacesOf namespaceState
 
                 let boundedContexts =
                     boundedContextsOf domainId
