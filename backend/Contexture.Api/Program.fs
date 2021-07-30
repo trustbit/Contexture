@@ -136,16 +136,13 @@ let webApp hostFrontend =
                    Apis.BoundedContexts.routes
                    Apis.Collaborations.routes
                    Apis.Namespaces.routes
-                   Handlers.Search.apiRoutes
                    AllRoute.routes
-                   RequestErrors.NOT_FOUND "Not found"
             ])
          route "/meta" >=> GET >=> status
-         Handlers.Search.routes
-         GET
-         >=> routef "/boundedContext/%O/namespaces" Apis.Namespaces.index
+         Views.Search.routes
+         Views.Namespaces.routes
          hostFrontend
-         setStatusCode 404 >=> text "Not Found"
+         RequestErrors.NOT_FOUND "Not found"
     ]
 
 let frontendHostRoutes (env: IWebHostEnvironment) : HttpHandler =
@@ -271,7 +268,6 @@ let connectAndReplayReadModels (readModels: ReadModels.ReadModelInitialization s
     |> Seq.map (fun r -> r.ReplayAndConnect())
     |> Async.Parallel
     |> Async.Ignore
-
 
 let importFromDocument (store: EventStore) (database: Document) = async {
     let runAsync (items: Async<Unit> list) =

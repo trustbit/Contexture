@@ -1,4 +1,4 @@
-namespace Contexture.Api.Handlers
+namespace Contexture.Api.Views
 
 open System
 open Contexture.Api
@@ -11,7 +11,6 @@ open FSharp.Control.Tasks
 
 open Giraffe
 open Microsoft.Extensions.Hosting
-
 
 module Search =
     open Projections
@@ -133,8 +132,12 @@ module Search =
             return! json namespaces next ctx
         }
 
-    let apiRoutes : HttpHandler =
-        subRoute "/search/filter" (choose [ route "/namespaces" >=> getNamespaces ])
-
     let routes : HttpHandler =
-        subRoute "/search" (choose [ GET >=> indexHandler ])
+        choose [
+            // TODO: how should we model BFF-APIs?
+            subRoute "/api/search/filter"
+                (choose [
+                    route "/namespaces" >=> getNamespaces
+                ])
+            subRoute "/search" (choose [ GET >=> indexHandler ])
+        ]
