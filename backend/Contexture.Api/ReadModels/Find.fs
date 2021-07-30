@@ -452,14 +452,18 @@ module Find =
             |> findByKey phrase
             |> SearchPhraseResult.fromResults
 
-    let domains (eventStore: EventStore) : Async<Domains.DomainByKeyAndNameModel> =
-        async {
-            let! allStreams = eventStore.AllStreams<Aggregates.Domain.Event>()
+    type FindDomainsReadModel =
+        ReadModels.ReadModel<Aggregates.Domain.Event, Domains.DomainByKeyAndNameModel>
 
-            return
-                allStreams
-                |> List.fold Domains.projectToDomain Domains.DomainByKeyAndNameModel.Empty
-        }
+    let findDomainsReadModel () =
+        let updateState state eventEnvelopes =
+            let newState =
+                eventEnvelopes
+                |> List.fold Domains.projectToDomain state
+
+            newState
+
+        ReadModels.readModel updateState Domains.DomainByKeyAndNameModel.Empty
 
     module BoundedContexts =
         open Contexture.Api.Aggregates.BoundedContext

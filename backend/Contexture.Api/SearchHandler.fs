@@ -126,9 +126,7 @@ module SearchFor =
             member this.IsActive =
                 not (Seq.isEmpty (Seq.append this.Name this.Key))
 
-        let findRelevantDomains (database: EventStore) (query: DomainQuery) = async {
-            let! findDomains = database |> Find.domains
-
+        let findRelevantDomains (findDomains: Domains.DomainByKeyAndNameModel) (query: DomainQuery) =
             let foundByName =
                 query.Name
                 |> SearchArgument.fromInputs
@@ -139,17 +137,15 @@ module SearchFor =
                 |> SearchArgument.fromInputs
                 |> SearchArgument.executeSearch (Find.Domains.byKey findDomains)
 
-            return
-                SearchResult.combineResults
-                    [ foundByName
-                      foundByKey ]
-            }
+            SearchResult.combineResults
+                [ foundByName
+                  foundByKey ]
+            
                 
-        let find (database: EventStore) (query: DomainQuery option) =
+        let find (state:  Domains.DomainByKeyAndNameModel) (query: DomainQuery option) =
             query
-            |> Option.map (findRelevantDomains database)
-            |> Async.bindOption
-            |> Async.map SearchResult.fromOption
+            |> Option.map (findRelevantDomains state)
+            |> SearchResult.fromOption
 
     module BoundedContextId =
         [<CLIMutable>]
