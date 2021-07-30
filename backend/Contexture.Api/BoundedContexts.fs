@@ -150,6 +150,7 @@ module BoundedContexts =
                 let! domainState = ctx.GetService<ReadModels.Domain.AllDomainReadModel>().State()
                 let! boundedContextState = ctx.GetService<ReadModels.BoundedContext.AllBoundedContextsReadModel>().State()
                 let! namespaceState = ctx.GetService<ReadModels.Namespace.AllNamespacesReadModel>().State()
+                let! boundedContextSearchState = ctx.GetService<Find.FindBoundedContextsReadModel>().State()
 
                 let! namespaceIds =
                     SearchFor.NamespaceId.find database item.Namespace
@@ -160,8 +161,8 @@ module BoundedContexts =
                 let! boundedContextIdsFromLabels =
                     SearchFor.Labels.find database item.Label
 
-                let! boundedContextIdsFromSearch =
-                    SearchFor.BoundedContextId.find database item.BoundedContext
+                let boundedContextIdsFromSearch =
+                    SearchFor.BoundedContextId.find boundedContextSearchState item.BoundedContext
 
                 let boundedContextsByNamespace =
                     Namespace.BoundedContexts.byNamespace namespaceState

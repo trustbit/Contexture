@@ -159,9 +159,7 @@ module SearchFor =
             member this.IsActive =
                 not (Seq.isEmpty (Seq.append this.Name this.Key))
 
-        let findRelevantBoundedContexts (database: EventStore) (query: BoundedContextQuery) = async {
-            let! findBoundedContext = database |> Find.boundedContexts
-
+        let findRelevantBoundedContexts (findBoundedContext: Find.BoundedContexts.BoundedContextByKeyAndNameModel) (query: BoundedContextQuery) =
             let foundByName =
                 query.Name
                 |> SearchArgument.fromInputs
@@ -172,14 +170,12 @@ module SearchFor =
                 |> SearchArgument.fromInputs
                 |> SearchArgument.executeSearch  (Find.BoundedContexts.byKey findBoundedContext)
 
-            return
-                SearchResult.combineResults
-                    [ foundByName
-                      foundByKey ]
-            }
+            SearchResult.combineResults
+                [ foundByName
+                  foundByKey ]
+        
 
-        let find (database: EventStore) (query: BoundedContextQuery option) =
+        let find (state: BoundedContexts.BoundedContextByKeyAndNameModel) (query: BoundedContextQuery option) =
             query
-            |> Option.map (findRelevantBoundedContexts database)
-            |> Async.bindOption
-            |> Async.map SearchResult.fromOption
+            |> Option.map (findRelevantBoundedContexts state)
+            |> SearchResult.fromOption

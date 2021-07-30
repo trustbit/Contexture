@@ -446,7 +446,7 @@ module Find =
             model.ByName
             |> findByKey phrase
             |> SearchPhraseResult.fromManyResults
-            
+
         let byKey (model: DomainByKeyAndNameModel) (phrase: SearchPhrase) =
             model.ByKey
             |> findByKey phrase
@@ -520,13 +520,15 @@ module Find =
             |> findByKey phrase
             |> SearchPhraseResult.fromResults
 
-    let boundedContexts (eventStore: EventStore) : Async<BoundedContexts.BoundedContextByKeyAndNameModel> =
-        async {
-            let! allStreams = eventStore.AllStreams<Aggregates.BoundedContext.Event>()
+    type FindBoundedContextsReadModel =
+        ReadModels.ReadModel<Aggregates.BoundedContext.Event, BoundedContexts.BoundedContextByKeyAndNameModel>
 
-            return
-                allStreams
-                |> List.fold
-                    BoundedContexts.projectToBoundedContext
-                    BoundedContexts.BoundedContextByKeyAndNameModel.Empty
-        }
+    let findBoundedContextsReadModel () =
+        let updateState state eventEnvelopes =
+            let newState =
+                eventEnvelopes
+                |> List.fold BoundedContexts.projectToBoundedContext state
+
+            newState
+
+        ReadModels.readModel updateState BoundedContexts.BoundedContextByKeyAndNameModel.Empty
