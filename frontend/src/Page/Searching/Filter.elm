@@ -14,6 +14,7 @@ import Bootstrap.Grid.Row as Row
 import Bootstrap.ListGroup as ListGroup
 import Bootstrap.Text as Text
 import Bootstrap.Utilities.Spacing as Spacing
+import Bootstrap.Popover as Popover
 import Bounce exposing (Bounce)
 import BoundedContext.Namespace as Namespace exposing (NamespaceTemplateId)
 import Dict
@@ -64,11 +65,12 @@ type alias ActiveFilters =
     }
 
 
-type alias Filter =
+type alias Model =
     { namespaceFilter : RemoteData.WebData (List NamespaceFilterDescription)
     , currentParameters : List FilterParameter
     , activeFilters : ActiveFilters
     , bounce : Bounce
+    , help : Popover.State
     }
     
 
@@ -76,12 +78,13 @@ initActiveFilters =
     { byNamespace = Dict.empty, unknown = [] }
 
 
-init : Api.Configuration -> List FilterParameter -> ( Filter, Cmd Msg )
+init : Api.Configuration -> List FilterParameter -> ( Model, Cmd Msg )
 init config parameters =
     ( { currentParameters = parameters
       , namespaceFilter = RemoteData.Loading
       , activeFilters = initActiveFilters
       , bounce = Bounce.init
+      , help = Popover.initialState
       }
     , Cmd.batch [ getNamespaceFilterDescriptions config ]
     )
@@ -97,6 +100,7 @@ initLabelFilter namespace existingFilters =
 
 type Msg
     = NamespaceFilterDescriptionsLoaded (Api.ApiResponse (List NamespaceFilterDescription))
+    | SearchHelpMsg Popover.State 
     | AddNewFilterLabel NamespaceFilterDescription
     | RemoveFilterLabel LabelFilter
     | FilterLabelNameChanged LabelFilter String
@@ -113,9 +117,6 @@ type OutMsg
     = NoOp
     | FilterApplied (List FilterParameter)
 
-
-type alias Model =
-    Filter
 
 
 asNamespaceFilterKey : LabelFilter -> String
@@ -267,6 +268,12 @@ update msg model =
                         |> Result.withDefault model.activeFilters
               }
             , applyFiltersCommand
+            , NoOp
+            )
+
+        SearchHelpMsg popover ->
+            ( { model | help = popover}
+            , Cmd.none
             , NoOp
             )
             
@@ -484,9 +491,36 @@ viewFilterDescription namespace filters =
     ]
 
 
-viewNamespaceFilter : Dict.Dict String LabelFilter -> List NamespaceFilterDescription -> List (Block.Item Msg)
-viewNamespaceFilter activeFilters namespaces =
-    Block.titleH5 [] [ text "Search in Namespaces" ]
+viewNamespaceFilter : Popover.State -> Dict.Dict String LabelFilter -> List NamespaceFilterDescription -> List (Block.Item Msg)
+viewNamespaceFilter popover activeFilters namespaces =
+    Block.titleH5 [] 
+        [ text "Search in Namespaces"
+        , Popover.config
+          ( Button.button
+              [ Button.small
+              , Button.outlinePrimary
+              , Button.attrs <|
+                  Popover.onHover popover SearchHelpMsg
+              , Button.attrs [ Spacing.ml2]
+              ]
+              [ text "?"
+              ]
+          )
+          |> Popover.right
+          |> Popover.titleH4 [] [ text "Searching" ]
+          |> Popover.content []
+              [ Html.p [] [ text "Search different elements by selecting existing elements or enter values manually."]
+              , Html.p [] 
+                [ text "Use the "
+                , Html.b [] [ text "*"]
+                , text " char as wildcard on the beginning or the end. E.g. "
+                , Html.i [] [ text "Foo*"]
+                , text " will find all values starting with "
+                , Html.i [] [ text "Foo"] 
+                ]
+              ]
+          |> Popover.view popover
+      ]
         :: (namespaces
                 |> List.sortBy (\n -> n.namespaceName)
                 |> List.concatMap
@@ -502,13 +536,13 @@ viewNamespaceFilter activeFilters namespaces =
            )
 
 
-view : Filter -> Html Msg
+view : Model -> Html Msg
 view model =
     Card.config []
         |> Card.block [] (viewAppliedFilters model.activeFilters)
         |> Card.block []
             (model.namespaceFilter
-                |> RemoteData.map (viewNamespaceFilter model.activeFilters.byNamespace)
+                |> RemoteData.map (viewNamespaceFilter model.help model.activeFilters.byNamespace)
                 |> RemoteData.withDefault [ Block.text [] [ text "Loading namespaces" ] ]
             )
         |> Card.view
