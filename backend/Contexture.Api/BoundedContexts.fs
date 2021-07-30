@@ -144,16 +144,16 @@ module BoundedContexts =
 
         let getBoundedContextsByQuery (item: Query) =
             fun (next: HttpFunc) (ctx: HttpContext) -> task {
-                let database = ctx.GetService<EventStore>()
                 let! domainState = ctx.GetService<ReadModels.Domain.AllDomainReadModel>().State()
                 let! boundedContextState = ctx.GetService<ReadModels.BoundedContext.AllBoundedContextsReadModel>().State()
                 let! namespaceState = ctx.GetService<ReadModels.Namespace.AllNamespacesReadModel>().State()
                 let! boundedContextFindState = ctx.GetService<Find.BoundedContextsReadModel>().State()
                 let! domainFindState = ctx.GetService<Find.DomainsReadModel>().State()
                 let! labelFindState = ctx.GetService<Find.LabelsReadModel>().State()
+                let! namespaceFindState = ctx.GetService<Find.NamespacesReadModel>().State()
 
-                let! namespaceIds =
-                    SearchFor.NamespaceId.find database item.Namespace
+                let namespaceIds =
+                    SearchFor.NamespaceId.find namespaceFindState item.Namespace
 
                 let domainIds =
                     SearchFor.DomainId.find domainFindState item.Domain

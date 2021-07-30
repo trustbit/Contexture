@@ -54,10 +54,7 @@ module SearchFor =
             member this.IsActive =
                 this.Name.Length > 0 || this.Template.Length > 0
 
-        let findRelevantNamespaces (database: EventStore) (item: NamespaceQuery) =
-            async {
-                let! availableNamespaces = Find.namespaces database
-
+        let findRelevantNamespaces (availableNamespaces: Namespaces.NamespaceFinder) (item: NamespaceQuery) =
                 let namespacesByName =
                     item.Name
                     |> SearchArgument.fromInputs
@@ -68,21 +65,15 @@ module SearchFor =
                     |> SearchArgument.fromValues
                     |> SearchArgument.executeSearch (Find.Namespaces.byTemplate availableNamespaces)
 
-                return
-                    SearchResult.combineResults [ namespacesByName
-                                                  namespacesByTemplate ]
-            }
+                SearchResult.combineResults
+                    [ namespacesByName
+                      namespacesByTemplate ]
 
-        let find (database: EventStore) (byNamespace: NamespaceQuery option) =
-            async {
-                let! relevantNamespaceIds =
-                    byNamespace
-                    |> Option.map (findRelevantNamespaces database)
-                    |> Async.optionMap (SearchResult.map (fun n -> n.NamespaceId))
-                    |> Async.map SearchResult.fromOption
-
-                return relevantNamespaceIds
-            }
+        let find (state:  Namespaces.NamespaceFinder) (byNamespace: NamespaceQuery option) =
+            byNamespace
+            |> Option.map (findRelevantNamespaces state)
+            |> Option.map(SearchResult.map (fun n -> n.NamespaceId))
+            |> SearchResult.fromOption
 
     module Labels =
 

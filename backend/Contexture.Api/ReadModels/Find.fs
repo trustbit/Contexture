@@ -252,14 +252,18 @@ module Find =
             |> Set.filter (fun m -> m.NamespaceTemplateId = Some templateId)
             |> SearchPhraseResult.fromResults
 
-    let namespaces (eventStore: EventStore) : Async<Namespaces.NamespaceFinder> =
-        async {
-            let! allStreams = eventStore.AllStreams<Aggregates.Namespace.Event>()
+    type NamespacesReadModel =
+        ReadModels.ReadModel<Aggregates.Namespace.Event, Namespaces.NamespaceFinder>
 
-            return
-                allStreams
-                |> List.fold Namespaces.projectNamespaceNameToNamespaceId Map.empty
-        }
+    let namespacesReadModel () : NamespacesReadModel =
+        let updateState state eventEnvelopes =
+            let newState =
+                eventEnvelopes
+                |> List.fold Namespaces.projectNamespaceNameToNamespaceId state
+
+            newState
+
+        ReadModels.readModel updateState Map.empty
 
     module Labels =
         open Contexture.Api.Aggregates.BoundedContext
