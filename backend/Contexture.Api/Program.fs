@@ -132,18 +132,18 @@ let webApp hostFrontend =
     choose [
          subRoute "/api"
              (choose [
-                   Domains.routes
-                   BoundedContexts.routes
-                   Collaborations.routes
-                   Namespaces.routes
-                   Search.apiRoutes
+                   Apis.Domains.routes
+                   Apis.BoundedContexts.routes
+                   Apis.Collaborations.routes
+                   Apis.Namespaces.routes
+                   Handlers.Search.apiRoutes
                    AllRoute.routes
                    RequestErrors.NOT_FOUND "Not found"
             ])
          route "/meta" >=> GET >=> status
-         Search.routes
+         Handlers.Search.routes
          GET
-         >=> routef "/boundedContext/%O/namespaces" Namespaces.index
+         >=> routef "/boundedContext/%O/namespaces" Apis.Namespaces.index
          hostFrontend
          setStatusCode 404 >=> text "Not Found"
     ]

@@ -1,4 +1,4 @@
-namespace Contexture.Api
+namespace Contexture.Api.ReadModels.Find
 
 open System
 open Contexture.Api.Infrastructure
@@ -6,43 +6,6 @@ open Contexture.Api.ReadModels
 open Contexture.Api.ReadModels.Find
 
 module SearchFor =
-
-    let combineResultsWithAnd (searchResults: Set<_> option seq) =
-        searchResults
-        |> Seq.fold
-            (fun ids results ->
-                match ids, results with
-                | Some existing, Some r -> Set.intersect r existing |> Some
-                | None, Some r -> Some r
-                | Some existing, None -> Some existing
-                | None, None -> None)
-            None
-        |> Option.defaultValue Set.empty
-
-
-    module Async =
-
-        let map mapper o =
-            async {
-                let! result = o
-                return mapper result
-            }
-
-        let bindOption o =
-            async {
-                match o with
-                | Some value ->
-                    let! v = value
-                    return Some v
-                | None -> return None
-            }
-
-        let optionMap mapper o =
-            async {
-                let! bound = bindOption o
-                return Option.map mapper bound
-            }
-
     module NamespaceId =
         open Contexture.Api.Aggregates.Namespace
         open ValueObjects
@@ -156,7 +119,6 @@ module SearchFor =
 
             SearchResult.combineResults [ foundByName
                                           foundByKey ]
-
 
         let find (state: BoundedContexts.BoundedContextByKeyAndNameModel) (query: BoundedContextQuery option) =
             query

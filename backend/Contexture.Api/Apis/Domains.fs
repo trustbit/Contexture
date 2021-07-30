@@ -1,7 +1,7 @@
-﻿namespace Contexture.Api
+﻿namespace Contexture.Api.Apis
 
 open System
-
+open Contexture.Api
 open Contexture.Api.Infrastructure
 open Contexture.Api.Infrastructure.Projections
 open Microsoft.AspNetCore.Http

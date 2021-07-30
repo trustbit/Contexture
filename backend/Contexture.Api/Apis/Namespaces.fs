@@ -1,11 +1,10 @@
-namespace Contexture.Api
+namespace Contexture.Api.Apis
 
 open System
 open Contexture.Api.Aggregates
 open Contexture.Api.Aggregates.BoundedContext
 open Contexture.Api.Aggregates.Namespace
-open Contexture.Api.Database
-open Contexture.Api.Domains
+open Contexture.Api
 open Contexture.Api.Infrastructure
 open Contexture.Api.ReadModels
 open Contexture.Api.Views

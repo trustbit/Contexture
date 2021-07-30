@@ -1,10 +1,9 @@
-﻿namespace Contexture.Api
+﻿namespace Contexture.Api.Apis
 
 open Contexture.Api
 open Contexture.Api.Aggregates
 open Contexture.Api.Aggregates.Collaboration
-open Contexture.Api.Database
-open Contexture.Api.Domains
+open Contexture.Api
 open Contexture.Api.FileBasedCommandHandlers
 open Contexture.Api.Infrastructure
 

@@ -1,8 +1,8 @@
-namespace Contexture.Api
+namespace Contexture.Api.Apis
 
 open System
 open Contexture.Api.Aggregates
-open Contexture.Api.Domains
+open Contexture.Api
 open Contexture.Api.Infrastructure
 
 open Microsoft.AspNetCore.Http
@@ -110,6 +110,7 @@ module BoundedContexts =
 
     module QueryEndpoints =
         open Contexture.Api.ReadModels
+        open Contexture.Api.ReadModels.Find
 
         let private mapToBoundedContext namespaceState domainState boundedContextState ids =
             fun (next: HttpFunc) (ctx: HttpContext) -> task {

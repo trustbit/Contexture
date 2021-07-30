@@ -1,4 +1,4 @@
-namespace Contexture.Api
+namespace Contexture.Api.Handlers
 
 open System
 open Contexture.Api

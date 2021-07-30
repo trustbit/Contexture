@@ -25,13 +25,13 @@
     <Compile Include="ReadModels\ApplicationReadModels.fs" />
     <Compile Include="ReadModels\Find\Types.fs" />
     <Compile Include="ReadModels\Find\FindReadModels.fs" />
+    <Compile Include="ReadModels\Find\SearchHandler.fs" />
     <Compile Include="Views.fs" />
-    <Compile Include="Domains.fs" />
-    <Compile Include="Namespaces.fs" />
-    <Compile Include="SearchHandler.fs" />
-    <Compile Include="BoundedContexts.fs" />
-    <Compile Include="Collaborations.fs" />
-    <Compile Include="Search.fs" />
+    <Compile Include="Apis\Domains.fs" />
+    <Compile Include="Apis\Namespaces.fs" />
+    <Compile Include="Apis\BoundedContexts.fs" />
+    <Compile Include="Apis\Collaborations.fs" />
+    <Compile Include="Apis\Search.fs" />
     <Compile Include="Program.fs" />
   </ItemGroup>
   <ItemGroup>
