@@ -269,7 +269,7 @@ let buildHost args =
 let connectAndReplayReadModels (readModels: ReadModels.ReadModelInitialization seq) =
     readModels
     |> Seq.map (fun r -> r.ReplayAndConnect())
-    |> Async.Sequential
+    |> Async.Parallel
     |> Async.Ignore
 
 
