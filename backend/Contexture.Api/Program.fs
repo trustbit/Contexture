@@ -221,8 +221,9 @@ let configureReadModels (services: IServiceCollection) =
     |> registerReadModel (ReadModels.Templates.templatesReadModel())
     |> registerReadModel (ReadModels.BoundedContext.boundedContextsReadModel())
     |> registerReadModel (ReadModels.Namespace.allNamespacesReadModel())
-    |> registerReadModel (ReadModels.Find.findBoundedContextsReadModel())
-    |> registerReadModel (ReadModels.Find.findDomainsReadModel())
+    |> registerReadModel (ReadModels.Find.boundedContextsReadModel())
+    |> registerReadModel (ReadModels.Find.domainsReadModel())
+    |> registerReadModel (ReadModels.Find.labelsReadModel())
     |> ignore
 
 let configureServices (context: HostBuilderContext) (services : IServiceCollection) =

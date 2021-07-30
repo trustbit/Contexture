@@ -275,7 +275,7 @@ module Find =
             { Namespaces: Map<NamespaceId, BoundedContextId>
               ByLabelName: Map<String, NamespacesOfBoundedContext>
               ByLabelValue: Map<String, NamespacesOfBoundedContext> }
-            static member Initial =
+            static member Empty =
                 { Namespaces = Map.empty
                   ByLabelName = Map.empty
                   ByLabelValue = Map.empty }
@@ -381,14 +381,18 @@ module Find =
             |> selectResults fst
             |> SearchPhraseResult.fromManyResults
 
-    let labels (eventStore: EventStore) : Async<Labels.NamespacesByLabel> =
-        async {
-            let! allStreams = eventStore.AllStreams<Aggregates.Namespace.Event>()
+    type LabelsReadModel =
+        ReadModels.ReadModel<Aggregates.Namespace.Event, Labels.NamespacesByLabel>
 
-            return
-                allStreams
-                |> List.fold Labels.projectLabelNameToNamespace Labels.NamespacesByLabel.Initial
-        }
+    let labelsReadModel () =
+        let updateState state eventEnvelopes =
+            let newState =
+                eventEnvelopes
+                |> List.fold Labels.projectLabelNameToNamespace state
+
+            newState
+
+        ReadModels.readModel updateState Labels.NamespacesByLabel.Empty
 
     module Domains =
         open Contexture.Api.Aggregates.Domain
@@ -452,10 +456,10 @@ module Find =
             |> findByKey phrase
             |> SearchPhraseResult.fromResults
 
-    type FindDomainsReadModel =
+    type DomainsReadModel =
         ReadModels.ReadModel<Aggregates.Domain.Event, Domains.DomainByKeyAndNameModel>
 
-    let findDomainsReadModel () =
+    let domainsReadModel () =
         let updateState state eventEnvelopes =
             let newState =
                 eventEnvelopes
@@ -524,10 +528,10 @@ module Find =
             |> findByKey phrase
             |> SearchPhraseResult.fromResults
 
-    type FindBoundedContextsReadModel =
+    type BoundedContextsReadModel =
         ReadModels.ReadModel<Aggregates.BoundedContext.Event, BoundedContexts.BoundedContextByKeyAndNameModel>
 
-    let findBoundedContextsReadModel () =
+    let boundedContextsReadModel () =
         let updateState state eventEnvelopes =
             let newState =
                 eventEnvelopes

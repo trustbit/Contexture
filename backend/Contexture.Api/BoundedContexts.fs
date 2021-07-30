@@ -2,11 +2,9 @@ namespace Contexture.Api
 
 open System
 open Contexture.Api.Aggregates
-open Contexture.Api.Database
 open Contexture.Api.Domains
-
 open Contexture.Api.Infrastructure
-open Contexture.Api.ReadModels.Find
+
 open Microsoft.AspNetCore.Http
 open FSharp.Control.Tasks
 
@@ -150,8 +148,9 @@ module BoundedContexts =
                 let! domainState = ctx.GetService<ReadModels.Domain.AllDomainReadModel>().State()
                 let! boundedContextState = ctx.GetService<ReadModels.BoundedContext.AllBoundedContextsReadModel>().State()
                 let! namespaceState = ctx.GetService<ReadModels.Namespace.AllNamespacesReadModel>().State()
-                let! boundedContextFindState = ctx.GetService<Find.FindBoundedContextsReadModel>().State()
-                let! domainFindState = ctx.GetService<Find.FindDomainsReadModel>().State()
+                let! boundedContextFindState = ctx.GetService<Find.BoundedContextsReadModel>().State()
+                let! domainFindState = ctx.GetService<Find.DomainsReadModel>().State()
+                let! labelFindState = ctx.GetService<Find.LabelsReadModel>().State()
 
                 let! namespaceIds =
                     SearchFor.NamespaceId.find database item.Namespace
@@ -159,8 +158,8 @@ module BoundedContexts =
                 let domainIds =
                     SearchFor.DomainId.find domainFindState item.Domain
 
-                let! boundedContextIdsFromLabels =
-                    SearchFor.Labels.find database item.Label
+                let boundedContextIdsFromLabels =
+                    SearchFor.Labels.find labelFindState item.Label
 
                 let boundedContextIdsFromSearch =
                     SearchFor.BoundedContextId.find boundedContextFindState item.BoundedContext
@@ -174,28 +173,28 @@ module BoundedContexts =
 
                 let boundedContextIdsFromNamespace =
                     namespaceIds
-                    |> SearchResult.bind (
+                    |> Find.SearchResult.bind (
                         Set.map (
                             boundedContextsByNamespace
                             >> Option.toList
                             >> Set.ofList
                         )
-                       >> SearchResult.fromManyResults
+                       >> Find.SearchResult.fromManyResults
                     )
 
                 let boundedContextIdsFromDomain =
                     domainIds
-                    |> SearchResult.bind (
+                    |> Find.SearchResult.bind (
                         Set.map (
                             boundedContextsByDomain
                             >> List.map (fun b -> b.Id)
                             >> Set.ofList
                         )
-                        >> SearchResult.fromManyResults
+                        >> Find.SearchResult.fromManyResults
                     )
 
                 let boundedContextIds =
-                    SearchResult.combineResults
+                    Find.SearchResult.combineResults
                         [ boundedContextIdsFromSearch
                           boundedContextIdsFromNamespace
                           boundedContextIdsFromDomain
@@ -203,7 +202,7 @@ module BoundedContexts =
                         
                 let idsToLoad =
                     boundedContextIds
-                    |> SearchResult.value
+                    |> Find.SearchResult.value
                     |> Option.map Set.toList
                     |> Option.defaultValue List.empty
 
