@@ -22,8 +22,9 @@
     <Compile Include="Database.fs" />
     <Compile Include="Infrastructure.fs" />
     <Compile Include="CommandHandlers.fs" />
-    <Compile Include="ReadModels\ReadModels.fs" />
-    <Compile Include="ReadModels\Find.fs" />
+    <Compile Include="ReadModels\ApplicationReadModels.fs" />
+    <Compile Include="ReadModels\Find\Types.fs" />
+    <Compile Include="ReadModels\Find\FindReadModels.fs" />
     <Compile Include="Views.fs" />
     <Compile Include="Domains.fs" />
     <Compile Include="Namespaces.fs" />

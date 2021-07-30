@@ -54,6 +54,7 @@ module Storage =
         abstract member Stream : StreamIdentifier -> Async<EventResult>
         abstract member AllStreamsOf : StreamKind -> Async<EventResult>
         abstract member Append : EventEnvelope list -> Async<unit>
+        abstract member All : unit -> Async<EventResult>
 
     module InMemoryStorage =
 
@@ -61,17 +62,20 @@ module Storage =
             private
             | Get of StreamKind * AsyncReplyChannel<EventResult>
             | GetStream of StreamIdentifier * AsyncReplyChannel<EventResult>
+            | GetAll of AsyncReplyChannel<EventResult>
             | Append of EventEnvelope list * AsyncReplyChannel<unit>
 
         type private History =
-            { items: Dictionary<StreamIdentifier, EventEnvelope list>
+            { items: EventEnvelope list
+              byIdentifier: Dictionary<StreamIdentifier, EventEnvelope list>
               byEventType: Dictionary<StreamKind, EventEnvelope list> }
             static member Empty =
-                { items = Dictionary()
+                { items = []
+                  byIdentifier = Dictionary()
                   byEventType = Dictionary() }
 
         let private stream history source =
-            let (success, events) = history.items.TryGetValue source
+            let (success, events) = history.byIdentifier.TryGetValue source
             if success then events else []
 
         let private getAllStreamsOf history key : EventEnvelope list =
@@ -86,10 +90,11 @@ module Storage =
             let fullStream =
                 key |> stream history |> fun s -> s @ [ envelope ]
 
-            history.items.[key] <- fullStream
+            history.byIdentifier.[key] <- fullStream
             let allEvents = getAllStreamsOf history streamKind
             history.byEventType.[streamKind] <- allEvents @ [ envelope ]
-            history
+            
+            { history with items = envelope :: history.items }
 
         let initialize (initialEvents: EventEnvelope list) =
             let proc (inbox: Agent<Msg>) =
@@ -109,6 +114,11 @@ module Storage =
                         | GetStream (identifier, reply) ->
                             identifier |> stream history |> Ok |> reply.Reply
 
+                            return! loop history
+                            
+                        | GetAll reply ->
+                            history.items |> Ok |> reply.Reply
+                            
                             return! loop history
 
                         | Append (events, reply) ->
@@ -136,7 +146,10 @@ module Storage =
                     agent.PostAndAsyncReply(fun reply -> Get(streamType, reply))
 
                 member _.Append events =
-                    agent.PostAndAsyncReply(fun reply -> Append(events, reply)) }
+                    agent.PostAndAsyncReply(fun reply -> Append(events, reply)) 
+            
+                member _.All () =
+                    agent.PostAndAsyncReply(fun reply -> GetAll(reply)) } 
 
 type EventStore
     private
@@ -199,6 +212,15 @@ type EventStore
                 failwithf "Could not get stream %s" e
                 return List.empty
         }
+        
+    let all toAllStream : Async<EventEnvelope<'E> list> =
+        async {
+            match! storage.All() with
+            | Ok allStreams -> return allStreams |> toAllStream
+            | Error e ->
+                failwithf "Could not get all streams: %s" e
+                return List.empty
+        }
 
     static member Empty =
         EventStore(Storage.InMemoryStorage.initialize List.empty, ConcurrentDictionary())
@@ -210,6 +232,7 @@ type EventStore
     member _.Append items = appendAndNotify items
     member _.AllStreams() = allStreams ()
     member _.Subscribe(subscription: Subscription<'E>) = subscribe subscription
+    member _.All toAllStream = all toAllStream
 
 module Projections =
     type Projection<'State, 'Event> =

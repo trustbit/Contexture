@@ -147,10 +147,10 @@ module BoundedContexts =
                 let! domainState = ctx.GetService<ReadModels.Domain.AllDomainReadModel>().State()
                 let! boundedContextState = ctx.GetService<ReadModels.BoundedContext.AllBoundedContextsReadModel>().State()
                 let! namespaceState = ctx.GetService<ReadModels.Namespace.AllNamespacesReadModel>().State()
-                let! boundedContextFindState = ctx.GetService<Find.BoundedContextsReadModel>().State()
-                let! domainFindState = ctx.GetService<Find.DomainsReadModel>().State()
-                let! labelFindState = ctx.GetService<Find.LabelsReadModel>().State()
-                let! namespaceFindState = ctx.GetService<Find.NamespacesReadModel>().State()
+                let! boundedContextFindState = ctx.GetService<Find.BoundedContexts.ReadModel>().State()
+                let! domainFindState = ctx.GetService<Find.Domains.ReadModel>().State()
+                let! labelFindState = ctx.GetService<Find.Labels.ReadModel>().State()
+                let! namespaceFindState = ctx.GetService<Find.Namespaces.ReadModel>().State()
 
                 let namespaceIds =
                     SearchFor.NamespaceId.find namespaceFindState item.Namespace
