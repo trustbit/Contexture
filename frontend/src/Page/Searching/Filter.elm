@@ -29,22 +29,6 @@ import Task
 applyFiltersCommand =
     Task.perform (\_ -> ApplyFilters) (Task.succeed ())
 
-
-initActiveFilters =
-    { byNamespace = Dict.empty, unknown = [] }
-
-
-init : Api.Configuration -> List FilterParameter -> ( Filter, Cmd Msg )
-init config parameters =
-    ( { activeParameters = parameters
-      , namespaceFilter = RemoteData.Loading
-      , activeFilters = initActiveFilters
-      , bounce = Bounce.init
-      }
-    , Cmd.batch [ getNamespaceFilterDescriptions config ]
-    )
-
-
 type alias FilterParameter =
     { name : String
     , value : String
@@ -58,7 +42,8 @@ type alias LabelFilterOption =
 
 
 type alias LabelFilter =
-    { labelName : String
+    { id: String
+    , labelName : String
     , labelValue : String
     , filterInNamespace : NamespaceFilterDescription
     , basedOnLabel : Maybe LabelFilterOption
@@ -81,14 +66,39 @@ type alias ActiveFilters =
 
 type alias Filter =
     { namespaceFilter : RemoteData.WebData (List NamespaceFilterDescription)
-    , activeParameters : List FilterParameter
+    , currentParameters : List FilterParameter
     , activeFilters : ActiveFilters
     , bounce : Bounce
+    }
+    
+
+initActiveFilters =
+    { byNamespace = Dict.empty, unknown = [] }
+
+
+init : Api.Configuration -> List FilterParameter -> ( Filter, Cmd Msg )
+init config parameters =
+    ( { currentParameters = parameters
+      , namespaceFilter = RemoteData.Loading
+      , activeFilters = initActiveFilters
+      , bounce = Bounce.init
+      }
+    , Cmd.batch [ getNamespaceFilterDescriptions config ]
+    )
+
+initLabelFilter namespace existingFilters =
+    { id = "filter_" ++ (existingFilters |> Dict.size |> String.fromInt)
+    , labelName = ""
+    , labelValue = ""
+    , basedOnLabel = Nothing
+    , filterInNamespace = namespace
     }
 
 
 type Msg
     = NamespaceFilterDescriptionsLoaded (Api.ApiResponse (List NamespaceFilterDescription))
+    | AddNewFilterLabel NamespaceFilterDescription
+    | RemoveFilterLabel LabelFilter
     | FilterLabelNameChanged LabelFilter String
     | RemoveFilterLabelName LabelFilter
     | FilterLabelValueChanged LabelFilter String
@@ -108,14 +118,9 @@ type alias Model =
     Filter
 
 
-asNamespaceFilterKey : NamespaceFilterDescription -> Maybe String -> String
-asNamespaceFilterKey namespace name =
-    case name of
-        Just n ->
-            namespace.namespaceName ++ "---" ++ n
-
-        Nothing ->
-            namespace.namespaceName
+asNamespaceFilterKey : LabelFilter -> String
+asNamespaceFilterKey { filterInNamespace , id } =
+    filterInNamespace.namespaceName ++ "---" ++ id
 
 
 filterByLabelName : LabelFilter -> Maybe FilterParameter
@@ -163,12 +168,11 @@ updateLabelNameFilter basis text model =
         | byNamespace =
             model.byNamespace
                 |> Dict.insert
-                    (asNamespaceFilterKey basis.filterInNamespace Nothing)
+                    (asNamespaceFilterKey basis)
                     { basis
                         | labelName = text
                         , basedOnLabel = basis.filterInNamespace.labels |> findBasedOnValues text
                     }
-                |> removeUnusedNamespaceFilters
     }
 
 
@@ -177,9 +181,8 @@ updateLabelValueFilter label value model =
         | byNamespace =
             model.byNamespace
                 |> Dict.insert
-                    (asNamespaceFilterKey label.filterInNamespace Nothing)
+                    (asNamespaceFilterKey label)
                     { label | labelValue = value }
-                |> removeUnusedNamespaceFilters
     }
 
 
@@ -224,11 +227,13 @@ applyExistingFilters parameters namespaceFilter =
                                         filters.byNamespace
                                             |> Dict.insert
                                                 filterDescription.namespaceName
-                                                { labelName = parameter.value
-                                                , labelValue = ""
-                                                , filterInNamespace = filterDescription
-                                                , basedOnLabel = filterDescription.labels |> findBasedOnValues parameter.value
-                                                }
+                                                ( initLabelFilter filterDescription filters.byNamespace
+                                                    |> \newLabel ->
+                                                        { newLabel 
+                                                        | labelName = parameter.value
+                                                        , basedOnLabel = filterDescription.labels |> findBasedOnValues parameter.value
+                                                        }
+                                                )
                                 }
 
                             Nothing ->
@@ -258,10 +263,21 @@ update msg model =
                         |> RemoteData.fromResult
                 , activeFilters =
                     namespaces
-                        |> Result.map (applyExistingFilters model.activeParameters)
+                        |> Result.map (applyExistingFilters model.currentParameters)
                         |> Result.withDefault model.activeFilters
               }
             , applyFiltersCommand
+            , NoOp
+            )
+            
+        AddNewFilterLabel namespace ->
+            ( model |> updateFilter (updateLabelNameFilter (initLabelFilter namespace model.activeFilters.byNamespace) "")
+            , Bounce.delay 300 BounceMsg
+            , NoOp
+            )
+        RemoveFilterLabel filter ->
+            ( model |> updateFilter (\m -> { m | byNamespace = m.byNamespace |> Dict.remove (asNamespaceFilterKey filter) } )
+            , Bounce.delay 300 BounceMsg
             , NoOp
             )
 
@@ -307,7 +323,7 @@ update msg model =
                     buildParameters model.activeFilters
             in
             ( { model
-                | activeParameters = parameters
+                | currentParameters = parameters
                 , bounce = Bounce.init
               }
             , Cmd.none
@@ -341,19 +357,35 @@ viewAppliedNamespaceFilters query =
                     |> filterByLabelValue
                     |> Maybe.map (Tuple.pair (RemoveFilterLabelValue q))
                 ]
-                    |> List.filterMap
-                        (Maybe.map
-                            (\( removeAction, filter ) ->
-                                Html.a [ class "badge badge-secondary", Spacing.ml1, Attributes.href "#", title "Remove filter", onClick removeAction ] [ text <| filter.name ++ ": " ++ filter.value ]
-                            )
+                |> List.filterMap
+                    (Maybe.map
+                        (\( removeAction, filter ) ->
+                            Html.a 
+                                [ class "badge badge-secondary"
+                                , Spacing.ml1
+                                , Attributes.href "#"
+                                , title "Remove filter"
+                                , onClick removeAction 
+                                ] 
+                                [ text <| filter.name ++ ": " ++ filter.value ]
                         )
+                    )
             )
 
 
 viewAppliedUnknownFilters : List FilterParameter -> List (Html Msg)
 viewAppliedUnknownFilters query =
     query
-        |> List.map (\filter -> Html.a [ class "badge badge-warning", Spacing.ml1, Attributes.href "#", title "Remove unkown filter", onClick (RemoveUnknownFilter filter) ] [ text <| filter.name ++ ": " ++ filter.value ])
+        |> List.map (\filter -> 
+            Html.a 
+                [ class "badge badge-warning"
+                , Spacing.ml1
+                , Attributes.href "#"
+                , title "Remove unknown filter"
+                , onClick (RemoveUnknownFilter filter) 
+                ] 
+                [ text <| filter.name ++ ": " ++ filter.value ]
+            )
 
 
 viewAppliedFilters : ActiveFilters -> List (Block.Item Msg)
@@ -399,8 +431,7 @@ viewFilterInput name options inputAction removeAction value =
                 else
                     inputConfig
                         |> InputGroup.successors
-                            [ InputGroup.button [ Button.outlineSecondary, Button.onClick removeAction ] [ text "x" ]
-                            ]
+                            [ InputGroup.button [ Button.outlineSecondary, Button.onClick removeAction ] [ text "x" ] ]
            )
         |> InputGroup.view
     , Html.datalist
@@ -411,37 +442,45 @@ viewFilterInput name options inputAction removeAction value =
     ]
 
 
-viewFilterDescription : LabelFilter -> List (Block.Item Msg)
-viewFilterDescription filter =
-    let
-        { basedOnLabel, filterInNamespace } =
-            filter
-    in
-    [ Block.text
-        [ title (filterInNamespace.description |> Maybe.withDefault ("Filter in " ++ filterInNamespace.namespaceName)) ]
-        [ Html.span [] [ text "Search in ", Html.b [] [ text filterInNamespace.namespaceName ] ] ]
-    , Block.custom <|
-        Form.row []
-            [ Form.col []
-                (viewFilterInput
-                    filterInNamespace.namespaceName
-                    (filterInNamespace.labels |> List.map .labelName)
-                    (FilterLabelNameChanged filter)
-                    (RemoveFilterLabelName filter)
-                    filter.labelName
+viewFilter : LabelFilter -> Html Msg 
+viewFilter filter =
+    Form.row []
+        [ Form.col []
+            (viewFilterInput
+                filter.id
+                (filter.filterInNamespace.labels |> List.map .labelName)
+                (FilterLabelNameChanged filter)
+                (RemoveFilterLabelName filter)
+                filter.labelName
+            )
+        , Form.col []
+            (viewFilterInput
+                (filter.id ++ "-values")
+                (filter.basedOnLabel
+                    |> Maybe.map .values
+                    |> Maybe.withDefault []
                 )
-            , Form.col []
-                (viewFilterInput
-                    (filterInNamespace.namespaceName ++ "-values")
-                    (basedOnLabel
-                        |> Maybe.map .values
-                        |> Maybe.withDefault []
-                    )
-                    (FilterLabelValueChanged filter)
-                    (RemoveFilterLabelValue filter)
-                    filter.labelValue
-                )
+                (FilterLabelValueChanged filter)
+                (RemoveFilterLabelValue filter)
+                filter.labelValue
+            )
+        , Form.col [ Col.smAuto, Col.attrs [Spacing.p0]]
+            [ Button.button [ Button.roleLink, Button.onClick (RemoveFilterLabel filter)] [ text "x"]
             ]
+        ]
+
+viewFilterDescription : NamespaceFilterDescription -> List LabelFilter -> List (Block.Item Msg)
+viewFilterDescription namespace filters =
+    [ Block.text
+        [ title (namespace.description |> Maybe.withDefault ("Filter in " ++ namespace.namespaceName)) ]
+        [ Button.button 
+            [ Button.outlinePrimary
+            , Button.onClick (AddNewFilterLabel namespace) ] 
+            [ text "+ Search in ", Html.b [] [ text namespace.namespaceName ] ] 
+        ]
+    , Block.custom <|
+        Html.div []
+           (filters |> List.map viewFilter)
     ]
 
 
@@ -453,14 +492,11 @@ viewNamespaceFilter activeFilters namespaces =
                 |> List.concatMap
                     (\t ->
                         viewFilterDescription
+                            t
                             (activeFilters
-                                |> Dict.get (asNamespaceFilterKey t Nothing)
-                                |> Maybe.withDefault
-                                    { labelName = ""
-                                    , labelValue = ""
-                                    , basedOnLabel = Nothing
-                                    , filterInNamespace = t
-                                    }
+                                |> Dict.filter (\key _ -> key |> String.startsWith t.namespaceName)
+                                |> Dict.toList
+                                |> List.map Tuple.second
                             )
                     )
            )

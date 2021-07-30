@@ -194,7 +194,7 @@ update msg model =
                     :: 
                      case newPresentation of
                         Ports.Textual _ ->
-                            [ findAll model.configuration model.filter.activeParameters ]
+                            [ findAll model.configuration model.filter.currentParameters ]
                         _ ->
                             []
                 )
@@ -304,7 +304,7 @@ view model =
                     Textual _ ->
                         viewItems model.textualModel.searchResults
                     Sunburst mode ->
-                        [ viewSunburst model.configuration model.filter.activeParameters mode ]
+                        [ viewSunburst model.configuration model.filter.currentParameters mode ]
                 )
             ]
         ]
