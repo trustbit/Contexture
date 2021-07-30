@@ -84,12 +84,11 @@ module Domains =
     module CommandEndpoints =
         open FileBasedCommandHandlers
         open CommandHandler
-        let clock = fun () -> DateTime.UtcNow
-
         let removeAndReturnId domainId =
             fun (next: HttpFunc) (ctx: HttpContext) ->
                 task {
                     let database = ctx.GetService<EventStore>()
+                    let clock = ctx.GetService<Clock>()
                     let eventStoreBased = EventBased.eventStoreBasedCommandHandler clock database
                     match! Domain.useHandler eventStoreBased (RemoveDomain domainId) with
                     | Ok domainId -> return! json domainId next ctx
@@ -100,6 +99,7 @@ module Domains =
             fun (next: HttpFunc) (ctx: HttpContext) ->
                 task {
                     let database = ctx.GetService<EventStore>()
+                    let clock = ctx.GetService<Clock>()
                     let eventStoreBased = EventBased.eventStoreBasedCommandHandler clock database
                     match! Domain.useHandler eventStoreBased command with
                     | Ok updatedDomain -> return! redirectTo false (sprintf "/api/domains/%O" updatedDomain) next ctx
@@ -130,6 +130,7 @@ module Domains =
             fun (next: HttpFunc) (ctx: HttpContext) ->
                 task {
                     let database = ctx.GetService<EventStore>()
+                    let clock = ctx.GetService<Clock>()
                     let eventStoreBased = EventBased.eventStoreBasedCommandHandler clock database
                     match! BoundedContext.useHandler eventStoreBased (CreateBoundedContext(Guid.NewGuid(), domainId, command)) with
                     | Ok addedContext ->

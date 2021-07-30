@@ -21,12 +21,11 @@ module Namespaces =
         open FileBasedCommandHandlers
         open CommandHandler
 
-        let clock = fun () -> DateTime.UtcNow
-
         let private updateAndReturnNamespaces command =
             fun (next: HttpFunc) (ctx: HttpContext) ->
                 task {
                     let database = ctx.GetService<EventStore>()
+                    let clock = ctx.GetService<Clock>()
                     let eventBasedHandler = EventBased.eventStoreBasedCommandHandler clock database
                     match! Namespace.useHandler eventBasedHandler command with
                     | Ok updatedContext ->
@@ -86,12 +85,11 @@ module Namespaces =
             open FileBasedCommandHandlers
             open CommandHandler
 
-            let clock = fun () -> DateTime.UtcNow
-
             let private updateAndReturnTemplate command =
                 fun (next: HttpFunc) (ctx: HttpContext) ->
                     task {
                         let database = ctx.GetService<EventStore>()
+                        let clock = ctx.GetService<Clock>()
                         let eventBasedCommandHandler = EventBased.eventStoreBasedCommandHandler clock database 
                         match! NamespaceTemplate.useHandler eventBasedCommandHandler command with
                         | Ok updatedTemplate ->

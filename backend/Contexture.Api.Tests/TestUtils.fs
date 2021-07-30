@@ -4,6 +4,7 @@ open System
 open System.IO
 open System.Net
 open System.Net.Http
+open Contexture.Api.Tests.EnvironmentSimulation
 open Microsoft.AspNetCore.Hosting
 open Microsoft.Extensions.Hosting
 open Microsoft.Extensions.Http
@@ -34,9 +35,17 @@ module TestHost =
             .ConfigureLogging(configureLogging)
             .Build()
 
+    let useClockFromEnvironment (env: ISimulateEnvironment) (services: IServiceCollection) =
+        services.AddSingleton<Contexture.Api.Infrastructure.Clock>(env.Time)
+
     let runServer environmentSimulation testConfiguration =
+        let configureTest (services: IServiceCollection) =
+            services
+            |> useClockFromEnvironment environmentSimulation
+            |> testConfiguration
+            
         let host =
-            createHost testConfiguration Contexture.Api.App.configureServices Contexture.Api.App.configureApp
+            createHost configureTest Contexture.Api.App.configureServices Contexture.Api.App.configureApp
         
         host.Services.GetServices<ReadModels.ReadModelInitialization>()
         |> Contexture.Api.App.connectAndReplayReadModels
@@ -77,11 +86,14 @@ module Prepare =
     let buildServerWithEvents events = events |> registerEvents
 
     let withGiven environment eventBuilders =
-        let testHost =
+        let givenEvents =
             eventBuilders
             |> buildEvents environment
-            |> buildServerWithEvents
-            |> TestHost.runServer environment
+            
+        let testConfiguration =
+           buildServerWithEvents givenEvents
+        let testHost =
+            TestHost.runServer environment testConfiguration
             |> TestHost.asTestHost
 
         testHost

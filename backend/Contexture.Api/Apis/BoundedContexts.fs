@@ -56,12 +56,11 @@ module BoundedContexts =
         open FileBasedCommandHandlers
         open CommandHandler
 
-        let clock = fun () -> DateTime.UtcNow
-
         let private updateAndReturnBoundedContext command =
             fun (next: HttpFunc) (ctx: HttpContext) ->
                 task {
                     let database = ctx.GetService<EventStore>()
+                    let clock = ctx.GetService<Clock>()
                     let eventStoreBased = EventBased.eventStoreBasedCommandHandler clock database
                     match! BoundedContext.useHandler eventStoreBased command with
                     | Ok updatedContext ->
@@ -102,6 +101,7 @@ module BoundedContexts =
             fun (next: HttpFunc) (ctx: HttpContext) ->
                 task {
                     let database = ctx.GetService<EventStore>()
+                    let clock = ctx.GetService<Clock>()
                     let eventStoreBased = EventBased.eventStoreBasedCommandHandler clock database
                     match! BoundedContext.useHandler eventStoreBased (RemoveBoundedContext contextId) with
                     | Ok id -> return! json id next ctx

@@ -178,7 +178,7 @@ let errorHandler (ex : Exception) (logger : ILogger) =
     logger.LogError(ex, "An unhandled exception has occurred while executing the request.")
     clearResponse >=> setStatusCode 500 >=> text ex.Message
 
-let clock =
+let utcNowClock =
     fun () ->  System.DateTime.UtcNow
         
 let configureCors (builder : CorsPolicyBuilder) =
@@ -240,7 +240,7 @@ let configureServices (context: HostBuilderContext) (services : IServiceCollecti
         
         |> ignore
     
-    services.AddSingleton<Clock>(clock) |> ignore
+    services.AddSingleton<Clock>(utcNowClock) |> ignore
     services.AddSingleton<EventStore> (EventStore.Empty) |> ignore 
     services |> configureReadModels
     
@@ -269,13 +269,12 @@ let connectAndReplayReadModels (readModels: ReadModels.ReadModelInitialization s
     |> Async.Parallel
     |> Async.Ignore
 
-let importFromDocument (store: EventStore) (database: Document) = async {
+let importFromDocument clock (store: EventStore) (database: Document) = async {
     let runAsync (items: Async<Unit> list) =
         items
         |> Async.Sequential
         |> Async.Ignore
-        
-    let clock = fun () -> System.DateTime.UtcNow
+
     do!
         database.Collaborations.All
         |> List.map (Collaboration.asEvents clock)
@@ -314,15 +313,17 @@ let runAsync (host: IHost) =
 
         let store =
             host.Services.GetRequiredService<EventStore>()
+            
+        let clock = host.Services.GetRequiredService<Clock>()
 
-        // Do replays before we import the document
+        // connect and replay before we start import the document
         let readModels =
             host.Services.GetServices<ReadModels.ReadModelInitialization>()
 
         do! connectAndReplayReadModels readModels
 
         let! document = database.Read()
-        do! importFromDocument store document
+        do! importFromDocument clock store document
         
         let loggerFactory = host.Services.GetRequiredService<ILoggerFactory>()
         let subscriptionLogger = loggerFactory.CreateLogger("subscriptions")
