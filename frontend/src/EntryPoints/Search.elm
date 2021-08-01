@@ -26,7 +26,7 @@ init : Decode.Value -> ( Model, Cmd Msg )
 init flag =
     case flag |> Decode.decodeValue flagsDecoder of
         Ok decoded ->
-            Searching.init decoded.apiBase decoded.initialQuery decoded.presentation
+            Searching.init decoded.apiBase decoded.presentation
                 |> Tuple.mapFirst Ok
 
         Err e ->
@@ -95,8 +95,13 @@ update msg model =
 
 
 subscriptions : Model -> Sub Msg
-subscriptions _ =
-    Sub.none
+subscriptions model =
+    case model of
+            Ok model_ ->
+                Searching.subscriptions model_
+    
+            Err _ ->
+                Sub.none
 
 
 view : Model -> Html Msg

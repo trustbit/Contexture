@@ -1,4 +1,4 @@
-module Page.Searching.Filter exposing (FilterParameter, Model, Msg, OutMsg(..), init, update, view)
+module Page.Searching.Filter exposing (FilterParameter, Model, Msg, OutMsg(..), init, update, view,subscriptions, filterParameterDecoder)
 
 import Api as Api
 import Bootstrap.Badge as Badge
@@ -23,9 +23,10 @@ import Html.Attributes as Attributes exposing (..)
 import Html.Events exposing (onClick)
 import Http
 import Json.Decode as Decode
+import Json.Encode as Encode
+import Page.Searching.Ports as Ports
 import RemoteData
 import Task
-
 
 applyFiltersCommand =
     Task.perform (\_ -> ApplyFilters) (Task.succeed ())
@@ -78,9 +79,9 @@ initActiveFilters =
     { byNamespace = Dict.empty, unknown = [] }
 
 
-init : Api.Configuration -> List FilterParameter -> ( Model, Cmd Msg )
-init config parameters =
-    ( { currentParameters = parameters
+init : Api.Configuration  -> ( Model, Cmd Msg )
+init config  =
+    ( { currentParameters = []
       , namespaceFilter = RemoteData.Loading
       , activeFilters = initActiveFilters
       , bounce = Bounce.init
@@ -110,7 +111,9 @@ type Msg
     | RemoveUnknownFilter FilterParameter
     | RemoveAllFilters
     | ApplyFilters
+    | ChangeFiltersTo (List FilterParameter)
     | BounceMsg
+    | QueryStringChanged String
 
 
 type OutMsg
@@ -153,11 +156,6 @@ buildParameters selectedFilters =
         |> List.append selectedFilters.unknown
 
 
-removeUnusedNamespaceFilters byNamespace =
-    byNamespace
-        |> Dict.filter (\_ { labelName, labelValue } -> not (String.isEmpty labelName && String.isEmpty labelValue))
-
-
 findBasedOnValues text labels =
     labels
         |> List.filter (\l -> String.toLower l.labelName == String.toLower text)
@@ -193,6 +191,12 @@ updateFilter action model =
             action model.activeFilters
         , bounce = Bounce.push model.bounce
     }
+    
+    
+type alias LoadedFilterParameters =
+    { labelName : List String
+    , labelValue : List String
+    }
 
 
 applyExistingFilters : List FilterParameter -> List NamespaceFilterDescription -> ActiveFilters
@@ -223,18 +227,18 @@ applyExistingFilters parameters namespaceFilter =
                     "label.name" ->
                         case namespaceLookup |> Dict.get parameter.value |> Maybe.map List.reverse |> Maybe.andThen List.head of
                             Just filterDescription ->
+                                let
+                                    newLabel = initLabelFilter filterDescription filters.byNamespace
+                                in 
                                 { filters
                                     | byNamespace =
                                         filters.byNamespace
                                             |> Dict.insert
-                                                filterDescription.namespaceName
-                                                ( initLabelFilter filterDescription filters.byNamespace
-                                                    |> \newLabel ->
-                                                        { newLabel 
-                                                        | labelName = parameter.value
-                                                        , basedOnLabel = filterDescription.labels |> findBasedOnValues parameter.value
-                                                        }
-                                                )
+                                                (asNamespaceFilterKey newLabel)
+                                                { newLabel 
+                                                | labelName = parameter.value
+                                                , basedOnLabel = filterDescription.labels |> findBasedOnValues parameter.value
+                                                }
                                 }
 
                             Nothing ->
@@ -243,7 +247,7 @@ applyExistingFilters parameters namespaceFilter =
                     "label.value" ->
                         case filters.byNamespace |> Dict.values |> List.filter (\l -> l.filterInNamespace.labels |> List.concatMap (\label -> label.values) |> List.member parameter.value) |> List.head of
                             Just filter ->
-                                { filters | byNamespace = filters.byNamespace |> Dict.insert filter.filterInNamespace.namespaceName { filter | labelValue = parameter.value } }
+                                { filters | byNamespace = filters.byNamespace |> Dict.insert (asNamespaceFilterKey filter) { filter | labelValue = parameter.value } }
 
                             Nothing ->
                                 { filters | unknown = parameter :: filters.unknown }
@@ -267,6 +271,35 @@ update msg model =
                         |> Result.map (applyExistingFilters model.currentParameters)
                         |> Result.withDefault model.activeFilters
               }
+            , applyFiltersCommand
+            , NoOp
+            )
+            
+        QueryStringChanged q ->
+            case q |> Decode.decodeString (Decode.list filterParameterDecoder) of
+                Ok decoded ->
+                    ( { model 
+                        | currentParameters = decoded
+                        , activeFilters = 
+                            model.namespaceFilter
+                            |> RemoteData.map(applyExistingFilters decoded)
+                            |> RemoteData.withDefault model.activeFilters   
+                        }
+                    , Cmd.none
+                    , NoOp
+                    )
+                Err e ->
+                    (model, Cmd.none, NoOp)
+                            
+            
+        ChangeFiltersTo filters ->
+            ( { model 
+                | currentParameters = filters
+                , activeFilters = 
+                    model.namespaceFilter
+                    |> RemoteData.map(applyExistingFilters filters)
+                    |> RemoteData.withDefault model.activeFilters
+                } 
             , applyFiltersCommand
             , NoOp
             )
@@ -333,7 +366,7 @@ update msg model =
                 | currentParameters = parameters
                 , bounce = Bounce.init
               }
-            , Cmd.none
+            , Ports.changeQueryString (parameters |> Encode.list filterParameterEncoder |> Encode.encode 4)
             , FilterApplied parameters
             )
 
@@ -568,3 +601,20 @@ namespaceFilterDescriptionDecoder =
         (Decode.maybe (Decode.field "description" Decode.string))
         (Decode.maybe (Decode.field "templateId" Decode.string))
         (Decode.field "labels" (Decode.list labelFilterDecoder))
+
+
+
+filterParameterDecoder =
+    Decode.map2 FilterParameter
+        (Decode.field "name" Decode.string)
+        (Decode.field "value" Decode.string)
+        
+filterParameterEncoder filter =
+    Encode.object 
+        [ ("name", Encode.string filter.name)
+        , ("value", Encode.string filter.value)
+        ]
+
+subscriptions : Model -> Sub Msg
+subscriptions model =
+  Ports.onQueryStringChanged QueryStringChanged

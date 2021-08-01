@@ -25,7 +25,7 @@ module Search =
                     div [ _id "search" ] []
                     initElm jsonEncoder "EntryPoints.Search" "search" flags
                     script [] [
-                        rawText "Contexture.searchingPorts(app);"
+                        rawText "Contexture.searchPorts(app);"
                     ]
                 ]
 

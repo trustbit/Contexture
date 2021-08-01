@@ -22,6 +22,7 @@ import Html exposing (Html, div, text)
 import Html.Attributes as Attributes exposing (..)
 import Http
 import Json.Decode as Decode
+import Json.Encode as Encode
 import Json.Decode.Pipeline as JP
 import Page.Searching.Filter as Filter
 import Page.Searching.Ports as Ports exposing (SearchResultPresentation(..),SunburstPresentation(..))
@@ -63,10 +64,10 @@ initSearchResult config presentation collaboration domains searchResults =
         |> List.filter (\i -> not <| List.isEmpty i.contextItems)
 
 
-init apiBase initialQuery presentation =
+init apiBase presentation =
     let
         ( filterModel, filterCmd ) =
-            Filter.init apiBase initialQuery
+            Filter.init apiBase
     in
     ( { configuration = apiBase
       , textualModel = 
@@ -115,6 +116,7 @@ type Msg
     | BoundedContextMsg BoundedContext.Msg
     | FilterMsg Filter.Msg
     | SwitchPresentation SearchResultPresentation
+    | QueryStringChanged String
 
 
 updateSearchResults :(TextualModel -> TextualModel) -> Model -> Model
@@ -141,6 +143,14 @@ update msg model =
     case msg of
         BoundedContextMsg m ->
             ( model, Cmd.none )
+            
+        QueryStringChanged q ->
+            case q |> Decode.decodeString (Decode.list Filter.filterParameterDecoder) of
+                Ok decoded ->
+                    (model, findAll model.configuration decoded)
+                Err e ->
+                    (model, Cmd.none)
+                
 
         BoundedContextsFound foundItems->
             ( updateSearchResults
@@ -176,7 +186,10 @@ update msg model =
                                 []
 
                             Filter.FilterApplied query ->
-                                [ findAll model.configuration query ]
+                                [ 
+                                --Ports.changeQueryString (query |> filterParametersAsQuery |> Url.Builder.toQuery) 
+                                --, findAll model.configuration query
+                                ]
                        )
                 )
             )
@@ -309,6 +322,8 @@ view model =
             ]
         ]
 
+
+
 filterParametersAsQuery query =
     query |> List.map (\q -> Url.Builder.string q.name q.value)
 
@@ -336,3 +351,10 @@ getCollaborations config =
         { url = Api.collaborations |> Api.url config
         , expect = Http.expectJson CollaborationsLoaded (Decode.list Collaboration.decoder)
         }
+
+subscriptions : Model -> Sub Msg
+subscriptions model =
+  Sub.batch 
+    [ Filter.subscriptions model.filter |> Sub.map FilterMsg
+    , Ports.onQueryStringChanged QueryStringChanged
+    ]
