@@ -11,8 +11,8 @@ export function searchPorts(app) {
         if (app.ports.changeQueryString && app.ports.onQueryStringChanged) {
             // see https://github.com/elm/browser/blob/1.0.0/notes/navigation-in-elements.md
 
-            function extractSearchParams() {
-                const params = new URLSearchParams(location.search);
+            function extractSearchParams(queryString) {
+                const params = new URLSearchParams(queryString);
                 return Array
                     .from(params.entries())
                     .map(([key, value]) => {
@@ -29,7 +29,7 @@ export function searchPorts(app) {
             }
 
             function notifyQueryStringChange() {
-                app.ports.onQueryStringChanged.send(JSON.stringify(extractSearchParams()));
+                app.ports.onQueryStringChanged.send(JSON.stringify(extractSearchParams(location.search)));
             }
 
             // Inform app of browser navigation (the BACK and FORWARD buttons)
@@ -42,10 +42,11 @@ export function searchPorts(app) {
                 const queryString = asSearchParams(JSON.parse(queryParameters));
                 if (new URLSearchParams(location.search).toString() !== queryString) {
                     history.pushState({}, '', queryString.startsWith("?") ? queryString : "?" + queryString);
-                    // app.ports.onQueryStringChanged.send(location.search);
+                    notifyQueryStringChange();
                 }
             });
 
+            // send initial query string to application
             notifyQueryStringChange();
         }
 

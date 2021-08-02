@@ -2,12 +2,8 @@ module EntryPoints.Search exposing (main)
 
 import Api as Api
 import Browser
-import Components.BoundedContextsOfDomain exposing (Presentation(..))
-import ContextMapping.Collaboration as Collaboration exposing (Collaborations)
-import Domain exposing (Domain)
 import Html exposing (Html, div, text)
 import Json.Decode as Decode
-import Page.Searching.Filter as Filter
 import Page.Searching.Searching as Searching
 import Page.Searching.Ports as Searching exposing (SearchResultPresentation(..))
 import Url
@@ -35,7 +31,6 @@ init flag =
 
 type alias Flags =
     { apiBase : Api.Configuration
-    , initialQuery : List Filter.FilterParameter
     , presentation : Maybe SearchResultPresentation
     }
 
@@ -57,21 +52,14 @@ baseConfiguration =
             )
 
 
-queryDecoder =
-    Decode.map2 Filter.FilterParameter
-        (Decode.field "name" Decode.string)
-        (Decode.field "value" Decode.string)
-
-
 presentationDecoder =
     Decode.string
         |> Decode.map Searching.read
 
 
 flagsDecoder =
-    Decode.map3 Flags
+    Decode.map2 Flags
         (Decode.field "apiBase" baseConfiguration)
-        (Decode.field "initialQuery" (Decode.list queryDecoder))
         (Decode.field "presentation" presentationDecoder)
 
 

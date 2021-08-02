@@ -46,12 +46,7 @@ module Search =
                        ctx.Request.Cookies.Item "search_presentation"
                        |> Option.ofObj
                        |> Option.defaultValue "Full"
-                   InitialQuery =
-                       ctx.Request.Query
-                       |> Seq.collect
-                           (fun q ->
-                               q.Value
-                               |> Seq.map (fun value -> {| Name = q.Key; Value = value |})) |}
+                |}
 
             let jsonEncoder = ctx.GetJsonSerializer()
 

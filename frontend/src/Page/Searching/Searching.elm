@@ -174,25 +174,10 @@ update msg model =
             )
 
         FilterMsg msg_ ->
-            let
-                ( filterModel, filterCmd, outMsg ) =
-                    Filter.update msg_ model.filter
-            in
-            ( { model | filter = filterModel }
-            , Cmd.batch
-                (Cmd.map FilterMsg filterCmd
-                    :: (case outMsg of
-                            Filter.NoOp ->
-                                []
+            Filter.update msg_ model.filter
+            |> Tuple.mapFirst (\m -> { model | filter = m })
+            |> Tuple.mapSecond (Cmd.map FilterMsg)
 
-                            Filter.FilterApplied query ->
-                                [ 
-                                --Ports.changeQueryString (query |> filterParametersAsQuery |> Url.Builder.toQuery) 
-                                --, findAll model.configuration query
-                                ]
-                       )
-                )
-            )
 
         SwitchPresentation newPresentation ->
             ( { model | presentation = newPresentation }
