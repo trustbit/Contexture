@@ -28,8 +28,6 @@ import Page.Searching.Ports as Ports
 import RemoteData
 import Task
 
-applyFiltersCommand =
-    Task.perform (\_ -> ApplyFilters) (Task.succeed ())
 
 type alias FilterParameter =
     { name : String
@@ -89,6 +87,7 @@ init config  =
       }
     , Cmd.batch [ getNamespaceFilterDescriptions config ]
     )
+
 
 initLabelFilter namespace existingFilters =
     { id = "filter_" ++ (existingFilters |> Dict.size |> String.fromInt)
@@ -272,7 +271,13 @@ applyExistingFilters parameters namespaceFilter =
             )
             initActiveFilters
 
+
 delayApplyFilter = Bounce.delay 300 BounceMsg
+
+
+applyFiltersCommand =
+    Task.perform (\_ -> ApplyFilters) (Task.succeed ())
+
 
 update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
@@ -309,7 +314,7 @@ update msg model =
                     (model, Cmd.none)
 
         SearchHelpMsg popover ->
-            ( { model | help = popover}
+            ( { model | help = popover }
             , Cmd.none
             )
             
@@ -334,7 +339,7 @@ update msg model =
 
         FilterLabelValueChanged label value ->
             ( model |> updateFilter (updateLabelValueFilter label value)
-            ,delayApplyFilter
+            , delayApplyFilter
             )
 
         RemoveFilterLabelValue label ->

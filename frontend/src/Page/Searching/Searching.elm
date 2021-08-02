@@ -10,7 +10,6 @@ import Bootstrap.Grid.Col as Col
 import Bootstrap.Grid.Row as Row
 import Bootstrap.Utilities.Border as Border
 import Bootstrap.Utilities.Spacing as Spacing
-import Bounce exposing (Bounce)
 import BoundedContext as BoundedContext
 import Components.BoundedContextCard as BoundedContextCard
 import Components.BoundedContextsOfDomain as BoundedContext 
@@ -23,16 +22,10 @@ import Html.Attributes as Attributes exposing (..)
 import Http
 import Json.Decode as Decode
 import Json.Encode as Encode
-import Json.Decode.Pipeline as JP
 import Page.Searching.Filter as Filter
 import Page.Searching.Ports as Ports exposing (SearchResultPresentation(..),SunburstPresentation(..))
 import RemoteData
-import Task
-import Url
 import Url.Builder
-import Url.Parser
-import Url.Parser.Query
-
 
 initSearchResult : Api.Configuration -> BoundedContext.Presentation -> Collaboration.Collaborations -> List Domain -> List BoundedContextCard.Item -> List BoundedContext.Model
 initSearchResult config presentation collaboration domains searchResults =
@@ -64,26 +57,21 @@ initSearchResult config presentation collaboration domains searchResults =
         |> List.filter (\i -> not <| List.isEmpty i.contextItems)
 
 
-init apiBase presentation =
+init apiBase =
     let
         ( filterModel, filterCmd ) =
             Filter.init apiBase
     in
     ( { configuration = apiBase
       , textualModel = 
-            { presentation =
-                case presentation of
-                    Just (Textual p) -> 
-                        p
-                    _ -> 
-                        BoundedContext.Full
+            { presentation = BoundedContext.Full
             , domains = RemoteData.Loading
             , collaboration = RemoteData.Loading
             , searchResults = RemoteData.NotAsked
             , searchResponse = RemoteData.Loading
             }
       , filter = filterModel
-      , presentation = presentation |> Maybe.withDefault (Textual BoundedContext.Full)
+      , presentation = Textual BoundedContext.Full
       }
     , Cmd.batch
         [ filterCmd |> Cmd.map FilterMsg
@@ -117,6 +105,7 @@ type Msg
     | FilterMsg Filter.Msg
     | SwitchPresentation SearchResultPresentation
     | QueryStringChanged String
+    | PresentationLoaded (Maybe SearchResultPresentation) 
 
 
 updateSearchResults :(TextualModel -> TextualModel) -> Model -> Model
@@ -135,7 +124,6 @@ updateSearchResults updater model =
                       updated.searchResponse
             }
         }
-
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
@@ -177,7 +165,20 @@ update msg model =
             Filter.update msg_ model.filter
             |> Tuple.mapFirst (\m -> { model | filter = m })
             |> Tuple.mapSecond (Cmd.map FilterMsg)
-
+        
+        PresentationLoaded loadedPresentation ->
+            loadedPresentation 
+            |> Maybe.withDefault (Ports.Textual BoundedContext.Full)
+            |> (\presentation -> 
+                    ( { model | presentation = presentation }
+                        |> case presentation of
+                             Ports.Textual p ->
+                                 updateSearchResults (\m -> { m | presentation = p })
+                             Ports.Sunburst _ ->
+                                 identity
+                    , Cmd.none
+                    )
+            )
 
         SwitchPresentation newPresentation ->
             ( { model | presentation = newPresentation }
@@ -188,7 +189,7 @@ update msg model =
                     Ports.Sunburst _ ->
                         identity
             , Cmd.batch
-                ( Ports.store newPresentation 
+                ( Ports.savePresentation newPresentation 
                     :: 
                      case newPresentation of
                         Ports.Textual _ ->
@@ -342,4 +343,5 @@ subscriptions model =
   Sub.batch 
     [ Filter.subscriptions model.filter |> Sub.map FilterMsg
     , Ports.onQueryStringChanged QueryStringChanged
+    , Ports.presentationLoaded PresentationLoaded
     ]

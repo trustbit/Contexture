@@ -1,15 +1,30 @@
-port module Page.Searching.Ports exposing (SearchResultPresentation(..),SunburstPresentation(..), store, read,changeQueryString,onQueryStringChanged)
+port module Page.Searching.Ports exposing (SearchResultPresentation(..),SunburstPresentation(..), savePresentation, presentationLoaded, changeQueryString,onQueryStringChanged)
 
 import Components.BoundedContextsOfDomain as BoundedContext
     
 type SunburstPresentation
     = Filtered
     | Highlighted
+
+
 type SearchResultPresentation
     = Textual BoundedContext.Presentation
     | Sunburst SunburstPresentation
-    
-asText presentation =
+            
+
+savePresentation : SearchResultPresentation -> Cmd msg 
+savePresentation presentation =
+    presentation
+    |> toString
+    |> storePresentation
+
+
+presentationLoaded : (Maybe SearchResultPresentation -> msg) -> Sub msg
+presentationLoaded toMsg =
+    onPresentationChanged (readFromString >> toMsg)
+
+
+toString presentation =
     case presentation of
         Textual BoundedContext.Full ->
             "Textual:Full"
@@ -22,16 +37,10 @@ asText presentation =
         
         Sunburst Highlighted ->
             "Sunburst:Highlighted"
-            
 
-store : SearchResultPresentation -> Cmd msg 
-store presentation =
-    presentation
-    |> asText
-    |> storePresentation
     
-read : String -> Maybe SearchResultPresentation
-read s =
+readFromString : String -> Maybe SearchResultPresentation
+readFromString s =
     case s |> String.toLower of
         "textual:condensed" ->
             Just (Textual BoundedContext.Condensed)
@@ -43,9 +52,10 @@ read s =
                     Just (Sunburst Highlighted) 
         _ ->
             Nothing
-                            
+            
     
 port storePresentation : String -> Cmd msg
+port onPresentationChanged : (String -> msg) -> Sub msg
 
 port changeQueryString : String -> Cmd msg
 port onQueryStringChanged : (String -> msg) -> Sub msg

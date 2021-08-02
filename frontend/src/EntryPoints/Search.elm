@@ -5,7 +5,6 @@ import Browser
 import Html exposing (Html, div, text)
 import Json.Decode as Decode
 import Page.Searching.Searching as Searching
-import Page.Searching.Ports as Searching exposing (SearchResultPresentation(..))
 import Url
 
 
@@ -22,7 +21,7 @@ init : Decode.Value -> ( Model, Cmd Msg )
 init flag =
     case flag |> Decode.decodeValue flagsDecoder of
         Ok decoded ->
-            Searching.init decoded.apiBase decoded.presentation
+            Searching.init decoded.apiBase
                 |> Tuple.mapFirst Ok
 
         Err e ->
@@ -31,7 +30,6 @@ init flag =
 
 type alias Flags =
     { apiBase : Api.Configuration
-    , presentation : Maybe SearchResultPresentation
     }
 
 
@@ -52,15 +50,9 @@ baseConfiguration =
             )
 
 
-presentationDecoder =
-    Decode.string
-        |> Decode.map Searching.read
-
-
 flagsDecoder =
-    Decode.map2 Flags
+    Decode.map Flags
         (Decode.field "apiBase" baseConfiguration)
-        (Decode.field "presentation" presentationDecoder)
 
 
 type alias Model =

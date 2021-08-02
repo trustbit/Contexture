@@ -3,11 +3,15 @@ import {Sunburst} from "../Visualizations/Sunburst/Index.js";
 
 export function searchPorts(app) {
     if (app && app.ports) {
-        if (app.ports.storePresentation) {
+        if (app.ports.storePresentation && app.ports.onPresentationChanged) {
             app.ports.storePresentation.subscribe(function (mode) {
-                document.cookie = 'search_presentation=' + mode + ';max-age=31536000';
+                localStorage.setItem("search_presentation", mode);
             });
+
+            const searchPresentation = localStorage.getItem('search_presentation')
+            app.ports.onPresentationChanged.send(searchPresentation || "unknown")
         }
+
         if (app.ports.changeQueryString && app.ports.onQueryStringChanged) {
             // see https://github.com/elm/browser/blob/1.0.0/notes/navigation-in-elements.md
 

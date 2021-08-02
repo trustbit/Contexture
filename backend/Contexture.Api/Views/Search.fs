@@ -41,11 +41,8 @@ module Search =
             let assetsResolver = Asset.resolveAsset pathResolver
 
             let result =
-                {| ApiBase = basePath.ApiBase + "/api"
-                   Presentation =
-                       ctx.Request.Cookies.Item "search_presentation"
-                       |> Option.ofObj
-                       |> Option.defaultValue "Full"
+                {|
+                    ApiBase = basePath.ApiBase + "/api"
                 |}
 
             let jsonEncoder = ctx.GetJsonSerializer()
