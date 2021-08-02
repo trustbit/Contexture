@@ -1,4 +1,4 @@
-module Page.Searching.Filter exposing (FilterParameter, Model, Msg, init, update, view,subscriptions, filterParameterDecoder)
+module Page.Searching.Filter exposing (Model, Msg, init, update, view,subscriptions)
 
 import Api as Api
 import Bootstrap.Badge as Badge
@@ -24,15 +24,9 @@ import Html.Events exposing (onClick)
 import Http
 import Json.Decode as Decode
 import Json.Encode as Encode
-import Page.Searching.Ports as Ports
+import Page.Searching.Ports.FilterParameter as FilterParameter exposing (FilterParameter)
 import RemoteData
 import Task
-
-
-type alias FilterParameter =
-    { name : String
-    , value : String
-    }
 
 
 type alias LabelFilterOption =
@@ -111,7 +105,7 @@ type Msg
     | RemoveAllFilters
     | ApplyFilters
     | BounceMsg
-    | QueryStringChanged String
+    | FiltersChanged (Result Decode.Error (List FilterParameter))
 
 
 asNamespaceFilterKey : LabelFilter -> String
@@ -295,8 +289,8 @@ update msg model =
             , applyFiltersCommand
             )
             
-        QueryStringChanged q ->
-            case q |> Decode.decodeString (Decode.list filterParameterDecoder) of
+        FiltersChanged q ->
+            case q of
                 Ok decoded ->
                     if model.currentParameters /= decoded then
                         ( { model 
@@ -366,7 +360,7 @@ update msg model =
                 | currentParameters = parameters
                 , bounce = Bounce.init
               }
-            , Ports.changeQueryString (parameters |> Encode.list filterParameterEncoder |> Encode.encode 4)
+            , FilterParameter.changeFilter parameters
             )
 
         BounceMsg ->
@@ -601,19 +595,6 @@ namespaceFilterDescriptionDecoder =
         (Decode.field "labels" (Decode.list labelFilterDecoder))
 
 
-filterParameterDecoder =
-    Decode.map2 FilterParameter
-        (Decode.field "name" Decode.string)
-        (Decode.field "value" Decode.string)
-
-        
-filterParameterEncoder filter =
-    Encode.object 
-        [ ("name", Encode.string filter.name)
-        , ("value", Encode.string filter.value)
-        ]
-
-
 subscriptions : Model -> Sub Msg
 subscriptions _ =
-  Ports.onQueryStringChanged QueryStringChanged
+  FilterParameter.filterParametersChanged FiltersChanged

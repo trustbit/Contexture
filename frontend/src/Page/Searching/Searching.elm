@@ -23,7 +23,8 @@ import Http
 import Json.Decode as Decode
 import Json.Encode as Encode
 import Page.Searching.Filter as Filter
-import Page.Searching.Ports as Ports exposing (SearchResultPresentation(..),SunburstPresentation(..))
+import Page.Searching.Ports.Presentation as Presentation exposing (SearchResultPresentation(..),SunburstPresentation(..))
+import Page.Searching.Ports.FilterParameter as FilterParameter
 import RemoteData
 import Url.Builder
 
@@ -104,7 +105,7 @@ type Msg
     | BoundedContextMsg BoundedContext.Msg
     | FilterMsg Filter.Msg
     | SwitchPresentation SearchResultPresentation
-    | QueryStringChanged String
+    | FilterParametersChanged (Result Decode.Error (List FilterParameter.FilterParameter))
     | PresentationLoaded (Maybe SearchResultPresentation) 
 
 
@@ -132,13 +133,12 @@ update msg model =
         BoundedContextMsg m ->
             ( model, Cmd.none )
             
-        QueryStringChanged q ->
-            case q |> Decode.decodeString (Decode.list Filter.filterParameterDecoder) of
+        FilterParametersChanged q ->
+            case q of
                 Ok decoded ->
                     (model, findAll model.configuration decoded)
                 Err e ->
                     (model, Cmd.none)
-                
 
         BoundedContextsFound foundItems->
             ( updateSearchResults
@@ -168,13 +168,13 @@ update msg model =
         
         PresentationLoaded loadedPresentation ->
             loadedPresentation 
-            |> Maybe.withDefault (Ports.Textual BoundedContext.Full)
+            |> Maybe.withDefault (Presentation.Textual BoundedContext.Full)
             |> (\presentation -> 
                     ( { model | presentation = presentation }
                         |> case presentation of
-                             Ports.Textual p ->
+                             Presentation.Textual p ->
                                  updateSearchResults (\m -> { m | presentation = p })
-                             Ports.Sunburst _ ->
+                             Presentation.Sunburst _ ->
                                  identity
                     , Cmd.none
                     )
@@ -184,15 +184,15 @@ update msg model =
             ( { model | presentation = newPresentation }
                 |>
                 case newPresentation of
-                    Ports.Textual presentation ->
+                    Presentation.Textual presentation ->
                         updateSearchResults (\m -> { m | presentation = presentation})
-                    Ports.Sunburst _ ->
+                    Presentation.Sunburst _ ->
                         identity
             , Cmd.batch
-                ( Ports.savePresentation newPresentation 
+                ( Presentation.savePresentation newPresentation 
                     :: 
                      case newPresentation of
-                        Ports.Textual _ ->
+                        Presentation.Textual _ ->
                             [ findAll model.configuration model.filter.currentParameters ]
                         _ ->
                             []
@@ -256,7 +256,6 @@ presentationOptionView presentation =
             [ Block.titleH5 [] [ text "Presentation mode" ]
             , Block.text []
                 [ Html.p [] [text "Text based"]
-                --, ButtonGroup.radioButtonGroupItem[] 
                 , ButtonGroup.radioButtonGroup [ButtonGroup.attrs [ Spacing.ml2]]
                         [ ButtonGroup.radioButton
                             (presentation == Textual BoundedContext.Full)
@@ -270,7 +269,6 @@ presentationOptionView presentation =
                 ]
             , Block.text []
                 [ Html.p [] [text "Visualisation"] 
-                --, ButtonGroup.radioButtonGroupItem []
                 , ButtonGroup.radioButtonGroup [ButtonGroup.attrs [ Spacing.ml2]] 
                         [ ButtonGroup.radioButton
                             (presentation == Sunburst Filtered)
@@ -281,8 +279,6 @@ presentationOptionView presentation =
                              [ Button.secondary, Button.onClick <| SwitchPresentation (Sunburst Highlighted)]
                              [ text "Highlighted" ]
                         ]
-                    --]
-                    
                 ]
             ]
         |> Card.view
@@ -309,11 +305,11 @@ view model =
         ]
 
 
-
 filterParametersAsQuery query =
     query |> List.map (\q -> Url.Builder.string q.name q.value)
 
-findAll : Api.Configuration -> List Filter.FilterParameter -> Cmd Msg
+
+findAll : Api.Configuration -> List FilterParameter.FilterParameter -> Cmd Msg
 findAll config query =
     Http.get
         { url =
@@ -338,10 +334,11 @@ getCollaborations config =
         , expect = Http.expectJson CollaborationsLoaded (Decode.list Collaboration.decoder)
         }
 
+
 subscriptions : Model -> Sub Msg
 subscriptions model =
   Sub.batch 
     [ Filter.subscriptions model.filter |> Sub.map FilterMsg
-    , Ports.onQueryStringChanged QueryStringChanged
-    , Ports.presentationLoaded PresentationLoaded
+    , FilterParameter.filterParametersChanged FilterParametersChanged
+    , Presentation.presentationLoaded PresentationLoaded
     ]

@@ -1,7 +1,7 @@
-port module Page.Searching.Ports exposing (SearchResultPresentation(..),SunburstPresentation(..), savePresentation, presentationLoaded, changeQueryString,onQueryStringChanged)
+port module Page.Searching.Ports.Presentation exposing (SearchResultPresentation(..),SunburstPresentation(..), savePresentation, presentationLoaded)
 
 import Components.BoundedContextsOfDomain as BoundedContext
-    
+
 type SunburstPresentation
     = Filtered
     | Highlighted
@@ -56,6 +56,3 @@ readFromString s =
     
 port storePresentation : String -> Cmd msg
 port onPresentationChanged : (String -> msg) -> Sub msg
-
-port changeQueryString : String -> Cmd msg
-port onQueryStringChanged : (String -> msg) -> Sub msg
