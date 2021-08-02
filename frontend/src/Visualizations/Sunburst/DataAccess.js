@@ -37,7 +37,7 @@ async function fetchDomains(baseApi) {
 
 async function fetchBoundedContexts(baseApi, query) {
     const response = await fetch(
-        `${baseApi}boundedContexts${query}`
+        `${baseApi}boundedContexts${query || ""}`
     );
 
     return await response.json();

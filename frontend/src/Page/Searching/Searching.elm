@@ -240,13 +240,13 @@ viewItems searchResults =
 viewSunburst configuration filterParameters mode =
      Html.node "visualization-sunburst"
         [ attribute "baseApi" (Api.withoutQuery [] |> Api.url configuration)
-        , attribute "query" (filterParameters |> filterParametersAsQuery |> Url.Builder.toQuery)
         , attribute "mode" (
-            case mode of
-                Filtered -> "filtered"
-                Highlighted -> "highlighted" 
-            )
-        ]   
+                    case mode of
+                        Filtered -> "filtered"
+                        Highlighted -> "highlighted" 
+                    )       
+        , attribute "query" (filterParameters |> filterParametersAsQuery |> Url.Builder.toQuery)
+        ]           
         []
 
 
