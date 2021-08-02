@@ -77,11 +77,11 @@ update msg model =
 subscriptions : Model -> Sub Msg
 subscriptions model =
     case model of
-            Ok model_ ->
-                Searching.subscriptions model_
-    
-            Err _ ->
-                Sub.none
+        Ok model_ ->
+            Searching.subscriptions model_
+
+        Err _ ->
+            Sub.none
 
 
 view : Model -> Html Msg
