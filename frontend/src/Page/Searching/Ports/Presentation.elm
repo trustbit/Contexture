@@ -1,48 +1,65 @@
-port module Page.Searching.Ports exposing (SearchResultPresentation(..),SunburstPresentation(..), store, read)
+port module Page.Searching.Ports.Presentation exposing (SearchResultPresentation(..), SunburstPresentation(..), presentationLoaded, savePresentation)
 
 import Components.BoundedContextsOfDomain as BoundedContext
-    
+
+
 type SunburstPresentation
     = Filtered
     | Highlighted
+
+
 type SearchResultPresentation
     = Textual BoundedContext.Presentation
     | Sunburst SunburstPresentation
-    
-asText presentation =
+
+
+savePresentation : SearchResultPresentation -> Cmd msg
+savePresentation presentation =
+    presentation
+        |> toString
+        |> storePresentation
+
+
+presentationLoaded : (Maybe SearchResultPresentation -> msg) -> Sub msg
+presentationLoaded toMsg =
+    onPresentationChanged (readFromString >> toMsg)
+
+
+toString presentation =
     case presentation of
         Textual BoundedContext.Full ->
             "Textual:Full"
 
         Textual BoundedContext.Condensed ->
             "Textual:Condensed"
-        
+
         Sunburst Filtered ->
             "Sunburst:Filtered"
-        
+
         Sunburst Highlighted ->
             "Sunburst:Highlighted"
-            
 
-store : SearchResultPresentation -> Cmd msg 
-store presentation =
-    presentation
-    |> asText
-    |> storePresentation
-    
-read : String -> Maybe SearchResultPresentation
-read s =
+
+readFromString : String -> Maybe SearchResultPresentation
+readFromString s =
     case s |> String.toLower of
         "textual:condensed" ->
             Just (Textual BoundedContext.Condensed)
+
         "textual:full" ->
             Just (Textual BoundedContext.Full)
+
         "sunburst:filtered" ->
             Just (Sunburst Filtered)
+
         "sunburst:highlighted" ->
-                    Just (Sunburst Highlighted) 
+            Just (Sunburst Highlighted)
+
         _ ->
             Nothing
-                            
-    
+
+
 port storePresentation : String -> Cmd msg
+
+
+port onPresentationChanged : (String -> msg) -> Sub msg

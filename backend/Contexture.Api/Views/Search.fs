@@ -25,7 +25,7 @@ module Search =
                     div [ _id "search" ] []
                     initElm jsonEncoder "EntryPoints.Search" "search" flags
                     script [] [
-                        rawText "Contexture.searchingPorts(app);"
+                        rawText "Contexture.searchPorts(app);"
                     ]
                 ]
 
@@ -41,17 +41,9 @@ module Search =
             let assetsResolver = Asset.resolveAsset pathResolver
 
             let result =
-                {| ApiBase = basePath.ApiBase + "/api"
-                   Presentation =
-                       ctx.Request.Cookies.Item "search_presentation"
-                       |> Option.ofObj
-                       |> Option.defaultValue "Full"
-                   InitialQuery =
-                       ctx.Request.Query
-                       |> Seq.collect
-                           (fun q ->
-                               q.Value
-                               |> Seq.map (fun value -> {| Name = q.Key; Value = value |})) |}
+                {|
+                    ApiBase = basePath.ApiBase + "/api"
+                |}
 
             let jsonEncoder = ctx.GetJsonSerializer()
 
