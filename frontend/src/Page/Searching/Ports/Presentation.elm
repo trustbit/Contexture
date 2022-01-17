@@ -11,6 +11,7 @@ type SunburstPresentation
 type SearchResultPresentation
     = Textual BoundedContext.Presentation
     | Sunburst SunburstPresentation
+    | Hierarchical
 
 
 savePresentation : SearchResultPresentation -> Cmd msg
@@ -39,6 +40,9 @@ toString presentation =
         Sunburst Highlighted ->
             "Sunburst:Highlighted"
 
+        Hierarchical ->
+            "Hierarchical"
+
 
 readFromString : String -> Maybe SearchResultPresentation
 readFromString s =
@@ -54,6 +58,9 @@ readFromString s =
 
         "sunburst:highlighted" ->
             Just (Sunburst Highlighted)
+
+        "Hierarchical" ->
+            Just (Hierarchical)
 
         _ ->
             Nothing

@@ -181,6 +181,9 @@ update msg model =
 
                                     Presentation.Sunburst _ ->
                                         identity
+
+                                    Presentation.Hierarchical ->
+                                        identity
                                )
                         , Cmd.none
                         )
@@ -193,6 +196,9 @@ update msg model =
                             updateSearchResults (\m -> { m | presentation = presentation })
 
                         Presentation.Sunburst _ ->
+                            identity
+
+                        Presentation.Hierarchical ->
                             identity
                    )
             , Cmd.batch
@@ -261,6 +267,14 @@ viewSunburst configuration filterParameters mode =
         []
 
 
+viewHierarchical configuration filterParameters =
+    Html.node "hierarchical-edge"
+        [ attribute "baseApi" (Api.withoutQuery [] |> Api.url configuration)
+        , attribute "query" (filterParameters |> filterParametersAsQuery |> Url.Builder.toQuery)
+        ]
+        []
+
+
 presentationOptionView presentation =
     Card.config []
         |> Card.block []
@@ -279,16 +293,24 @@ presentationOptionView presentation =
                     ]
                 ]
             , Block.text []
-                [ Html.p [] [ text "Visualisation" ]
-                , ButtonGroup.radioButtonGroup [ ButtonGroup.attrs [ Spacing.ml2 ] ]
-                    [ ButtonGroup.radioButton
-                        (presentation == Sunburst Filtered)
-                        [ Button.secondary, Button.onClick <| SwitchPresentation (Sunburst Filtered) ]
-                        [ text "Filtered" ]
-                    , ButtonGroup.radioButton
-                        (presentation == Sunburst Highlighted)
-                        [ Button.secondary, Button.onClick <| SwitchPresentation (Sunburst Highlighted) ]
-                        [ text "Highlighted" ]
+                [ Html.p [] [ text "Visualisations" ]
+                , ButtonGroup.toolbar []
+                    [ ButtonGroup.radioButtonGroupItem [ ButtonGroup.attrs [ Spacing.ml2 ] ]
+                        [ ButtonGroup.radioButton
+                            (presentation == Sunburst Filtered)
+                            [ Button.secondary, Button.onClick <| SwitchPresentation (Sunburst Filtered) ]
+                            [ text "Sunburst Filtered" ]
+                        , ButtonGroup.radioButton
+                            (presentation == Sunburst Highlighted)
+                            [ Button.secondary, Button.onClick <| SwitchPresentation (Sunburst Highlighted) ]
+                            [ text "Sunburst Highlighted" ]
+                        ]
+                    , ButtonGroup.radioButtonGroupItem  [ ButtonGroup.attrs [ Spacing.ml2 ] ]
+                        [ ButtonGroup.radioButton
+                            (presentation == Hierarchical)
+                            [ Button.secondary, Button.onClick <| SwitchPresentation (Hierarchical) ]
+                            [ text "Hierarchical Edges" ]
+                        ]
                     ]
                 ]
             ]
@@ -312,6 +334,9 @@ view model =
 
                     Sunburst mode ->
                         [ viewSunburst model.configuration model.filter.currentParameters mode ]
+
+                    Hierarchical ->
+                        [ viewHierarchical model.configuration model.filter.currentParameters ]
                 )
             ]
         ]

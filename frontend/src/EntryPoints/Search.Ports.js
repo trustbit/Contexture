@@ -1,5 +1,6 @@
 // ATM wee need to full name reference so the build succeeds
-import {Sunburst} from "../Visualizations/Sunburst/Index.js";
+import {Sunburst} from "../Visualizations/Sunburst.js";
+import {HierarchicalEdge} from "../Visualizations/HierarchicalEdge.js";
 
 export function searchPorts(app) {
     if (app && app.ports) {
@@ -56,5 +57,6 @@ export function searchPorts(app) {
 
 
         customElements.define('visualization-sunburst', Sunburst);
+        customElements.define('hierarchical-edge', HierarchicalEdge);
     }
 }
