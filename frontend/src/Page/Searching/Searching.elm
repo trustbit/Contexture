@@ -24,7 +24,7 @@ import Json.Decode as Decode
 import Json.Encode as Encode
 import Page.Searching.Filter as Filter
 import Page.Searching.Ports.FilterParameter as FilterParameter
-import Page.Searching.Ports.Presentation as Presentation exposing (SearchResultPresentation(..), SunburstPresentation(..))
+import Page.Searching.Ports.Presentation as Presentation exposing (SearchResultPresentation(..), VisualPresentation(..), SunburstPresentation(..))
 import RemoteData
 import Url.Builder
 
@@ -179,10 +179,7 @@ update msg model =
                                     Presentation.Textual p ->
                                         updateSearchResults (\m -> { m | presentation = p })
 
-                                    Presentation.Sunburst _ ->
-                                        identity
-
-                                    Presentation.Hierarchical ->
+                                    Presentation.Visual _ ->
                                         identity
                                )
                         , Cmd.none
@@ -195,10 +192,7 @@ update msg model =
                         Presentation.Textual presentation ->
                             updateSearchResults (\m -> { m | presentation = presentation })
 
-                        Presentation.Sunburst _ ->
-                            identity
-
-                        Presentation.Hierarchical ->
+                        Presentation.Visual _ ->
                             identity
                    )
             , Cmd.batch
@@ -297,18 +291,18 @@ presentationOptionView presentation =
                 , ButtonGroup.toolbar []
                     [ ButtonGroup.radioButtonGroupItem [ ButtonGroup.attrs [ Spacing.ml2 ] ]
                         [ ButtonGroup.radioButton
-                            (presentation == Sunburst Filtered)
-                            [ Button.secondary, Button.onClick <| SwitchPresentation (Sunburst Filtered) ]
+                            (presentation == Visual (Sunburst Filtered))
+                            [ Button.secondary, Button.onClick <| SwitchPresentation (Visual (Sunburst Filtered)) ]
                             [ text "Sunburst Filtered" ]
                         , ButtonGroup.radioButton
-                            (presentation == Sunburst Highlighted)
-                            [ Button.secondary, Button.onClick <| SwitchPresentation (Sunburst Highlighted) ]
+                            (presentation == Visual (Sunburst Highlighted))
+                            [ Button.secondary, Button.onClick <| SwitchPresentation (Visual (Sunburst Highlighted)) ]
                             [ text "Sunburst Highlighted" ]
                         ]
                     , ButtonGroup.radioButtonGroupItem  [ ButtonGroup.attrs [ Spacing.ml2 ] ]
                         [ ButtonGroup.radioButton
-                            (presentation == Hierarchical)
-                            [ Button.secondary, Button.onClick <| SwitchPresentation (Hierarchical) ]
+                            (presentation == Visual Hierarchical)
+                            [ Button.secondary, Button.onClick <| SwitchPresentation (Visual Hierarchical) ]
                             [ text "Hierarchical Edges" ]
                         ]
                     ]
@@ -332,10 +326,10 @@ view model =
                     Textual _ ->
                         viewItems model.textualModel.searchResults
 
-                    Sunburst mode ->
+                    Visual (Sunburst mode) ->
                         [ viewSunburst model.configuration model.filter.currentParameters mode ]
 
-                    Hierarchical ->
+                    Visual Hierarchical ->
                         [ viewHierarchical model.configuration model.filter.currentParameters ]
                 )
             ]

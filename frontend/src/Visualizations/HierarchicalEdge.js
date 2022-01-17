@@ -210,19 +210,21 @@ export class HierarchicalEdge extends HTMLElement {
         this.shadow = this.attachShadow({mode: 'open'});
     }
 
-    connectedCallback() {
+    async connectedCallback() {
         this.size = calculateSizeFromHint(guessWidthAndHeightFromElement(this.parentElement));
-        this.rebuildHierarchicalEdgeElements();
-        this.resizeObserver.observe(this.parentElement);
-        this.buildHierarchicalEdge();
+        if(this.isConnected) {
+            this.rebuildHierarchicalEdgeElements();
+            this.resizeObserver.observe(this.parentElement);
+            await this.buildHierarchicalEdge();
+        }
     }
 
     disconnectedCallback() {
         this.resizeObserver.disconnect();
     }
 
-    attributeChangedCallback() {
-        this.buildHierarchicalEdge();
+    async attributeChangedCallback() {
+        await this.buildHierarchicalEdge();
     }
 
     static get observedAttributes() {

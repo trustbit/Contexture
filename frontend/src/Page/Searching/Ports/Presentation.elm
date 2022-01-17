@@ -1,4 +1,4 @@
-port module Page.Searching.Ports.Presentation exposing (SearchResultPresentation(..), SunburstPresentation(..), presentationLoaded, savePresentation)
+port module Page.Searching.Ports.Presentation exposing (SearchResultPresentation(..), VisualPresentation(..), SunburstPresentation(..), presentationLoaded, savePresentation)
 
 import Components.BoundedContextsOfDomain as BoundedContext
 
@@ -8,10 +8,14 @@ type SunburstPresentation
     | Highlighted
 
 
+type VisualPresentation
+    = Sunburst SunburstPresentation
+    | Hierarchical
+
+
 type SearchResultPresentation
     = Textual BoundedContext.Presentation
-    | Sunburst SunburstPresentation
-    | Hierarchical
+    | Visual VisualPresentation
 
 
 savePresentation : SearchResultPresentation -> Cmd msg
@@ -34,13 +38,13 @@ toString presentation =
         Textual BoundedContext.Condensed ->
             "Textual:Condensed"
 
-        Sunburst Filtered ->
+        Visual (Sunburst Filtered) ->
             "Sunburst:Filtered"
 
-        Sunburst Highlighted ->
+        Visual (Sunburst Highlighted) ->
             "Sunburst:Highlighted"
 
-        Hierarchical ->
+        Visual Hierarchical ->
             "Hierarchical"
 
 
@@ -54,13 +58,13 @@ readFromString s =
             Just (Textual BoundedContext.Full)
 
         "sunburst:filtered" ->
-            Just (Sunburst Filtered)
+            Just (Visual (Sunburst Filtered))
 
         "sunburst:highlighted" ->
-            Just (Sunburst Highlighted)
+            Just (Visual (Sunburst Highlighted))
 
         "Hierarchical" ->
-            Just (Hierarchical)
+            Just (Visual Hierarchical)
 
         _ ->
             Nothing

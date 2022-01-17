@@ -100,19 +100,21 @@ export class Sunburst extends HTMLElement {
         });
     }
 
-    connectedCallback() {
+    async connectedCallback() {
         this.size = calculateSizeFromHint(guessWidthAndHeightFromElement(this.parentElement));
-        this.rebuildSunburstElements();
-        this.resizeObserver.observe(this.parentElement);
-        this.buildSunburst();
+        if(this.isConnected) {
+            this.rebuildSunburstElements();
+            this.resizeObserver.observe(this.parentElement);
+            await this.buildSunburst();
+        }
     }
 
     disconnectedCallback() {
         this.resizeObserver.disconnect();
     }
 
-    attributeChangedCallback() {
-        this.buildSunburst();
+    async attributeChangedCallback() {
+        await this.buildSunburst();
     }
 
     static get observedAttributes() {
