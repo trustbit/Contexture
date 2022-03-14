@@ -15,7 +15,7 @@ import Bootstrap.Utilities.Spacing as Spacing
 import Route exposing ( Route)
 import Api
 
-import Page.Domain.Index
+import Page.Domain.IndexRoot
 import Page.Domain.Edit
 import Page.Bcc.CanvasV3 as CanvasV3
 
@@ -46,7 +46,7 @@ type alias Flags =
 
 type Page
   = NotFoundPage
-  | Domains Page.Domain.Index.Model
+  | Domains Page.Domain.IndexRoot.Model
   | DomainsEdit Page.Domain.Edit.Model
   | BoundedContextCanvas CanvasV3.Model
 
@@ -67,7 +67,7 @@ initCurrentPage ( model, existingCmds ) =
 
           Route.Home ->
             let
-              ( pageModel, pageCmds ) = Page.Domain.Index.initWithoutSubdomains (Api.config model.baseUrl) model.key
+              ( pageModel, pageCmds ) = Page.Domain.IndexRoot.initWithoutSubdomains (Api.config model.baseUrl) model.key
             in
               ( Domains pageModel, Cmd.map DomainMsg pageCmds )
           Route.Domain id ->
@@ -131,7 +131,7 @@ type Msg
   = LinkClicked Browser.UrlRequest
   | UrlChanged Url.Url
   | NavMsg Navbar.State
-  | DomainMsg Page.Domain.Index.Msg
+  | DomainMsg Page.Domain.IndexRoot.Msg
   | DomainEditMsg Page.Domain.Edit.Msg
   | BccMsg CanvasV3.Msg
 
@@ -165,7 +165,7 @@ update msg model =
       )
     (DomainMsg m, Domains overview) ->
       let
-        (updatedModel, updatedMsg) = Page.Domain.Index.update m overview
+        (updatedModel, updatedMsg) = Page.Domain.IndexRoot.update m overview
       in
         ({ model | page = Domains updatedModel}, updatedMsg |> Cmd.map DomainMsg)
     (DomainEditMsg m, DomainsEdit edit) ->
@@ -218,7 +218,7 @@ view model =
         BoundedContextCanvas m ->
           CanvasV3.view m |> Html.map BccMsg
         Domains o ->
-          Page.Domain.Index.view o |> Html.map DomainMsg
+          Page.Domain.IndexRoot.view o |> Html.map DomainMsg
         DomainsEdit o ->
           Page.Domain.Edit.view o |> Html.map DomainEditMsg
         NotFoundPage ->

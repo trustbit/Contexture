@@ -1,4 +1,4 @@
-// import * as d3 from 'd3';
+import * as d3 from 'd3';
 // import {fetchData} from "./DataAccess";
 
 function createMatrix(length) {
@@ -63,7 +63,7 @@ var BrowserText = (function () {
 function getFontSize(text, max_width) {
     let name_font_size = 1;
     for (let j = 1; j < 22; j++) {
-        name_width = BrowserText.getWidth(text, j);
+        let name_width = BrowserText.getWidth(text, j);
         if (max_width < name_width)
             break;
         name_font_size = j;
@@ -73,7 +73,7 @@ function getFontSize(text, max_width) {
 }
 
 function addTextToCircleCenter(svg, text_array, diameter, circle_index, x, y, class_name) {
-    words = [];
+    let words = [];
     for (let i = 0; i < text_array.length; i++) {
         text_array[i].split(' ').forEach(e => {
             words.push(e)
@@ -86,7 +86,7 @@ function addTextToCircleCenter(svg, text_array, diameter, circle_index, x, y, cl
         if (e.length > longer_text.length) longer_text = e;
     });
 
-    line_words = [];
+    let line_words = [];
     line_words.push('');
     words.forEach(e => {
         if (e.length + line_words[line_words.length - 1].length < longer_text.length) {
@@ -100,7 +100,7 @@ function addTextToCircleCenter(svg, text_array, diameter, circle_index, x, y, cl
     let name_font_size = getFontSize(longer_text, diameter * 0.75);
     name_font_size = Math.min(name_font_size, diameter * 0.75 / (line_words.length + 1));
 
-    text_element = svg.append('text')
+    let text_element = svg.append('text')
         .attr('x', x)
         .attr('y', y - line_words.length * name_font_size / 2)
         .attr('font-size', name_font_size + 'px');
@@ -116,7 +116,7 @@ function addTextToCircleCenter(svg, text_array, diameter, circle_index, x, y, cl
 }
 
 function addTextToCircleTop(svg, text_array, diameter, circle_index, x, y, class_name) {
-    words = [];
+    let words = [];
     for (let i = 0; i < text_array.length; i++) {
         text_array[i].split(' ').forEach(e => {
             words.push(e)
@@ -127,7 +127,7 @@ function addTextToCircleTop(svg, text_array, diameter, circle_index, x, y, class
     let longer_text = words[0];
     let longer_text_length = longer_text.length;
 
-    line_words = [];
+    let line_words = [];
     line_words.push('');
     words.forEach(e => {
         if (e.length + line_words[line_words.length - 1].length <= longer_text_length) {
@@ -141,12 +141,12 @@ function addTextToCircleTop(svg, text_array, diameter, circle_index, x, y, class
     let radius = diameter / 2;
     let topPadding = radius * 0.1;
 
-    chordaSize = 2 * Math.sqrt(radius * radius - (radius - topPadding) * (radius - topPadding));
+    let chordaSize = 2 * Math.sqrt(radius * radius - (radius - topPadding) * (radius - topPadding));
 
     let name_font_size = getFontSize(longer_text, chordaSize * 0.9);
     // name_font_size = Math.min(name_font_size, diameter * 0.75 / (line_words.length + 1));
 
-    text_element = svg.append('text')
+    let text_element = svg.append('text')
         .attr('x', x)
         .attr('y', y - radius + line_words.length * name_font_size / 2)
         .attr('font-size', name_font_size + 'px');
@@ -173,15 +173,15 @@ function addTextToRectangle(svg, text_array, max_width, x, y, class_name) {
 
     let name_font_size = getFontSize(longer_text, max_width);
 
-    rect_padding = 3;
+    let rect_padding = 3;
     let rect_width = max_width + rect_padding * 2;
-    rect = svg.append('rect').transition().duration(500).attr('width', rect_width)
+    let rect = svg.append('rect').transition().duration(500).attr('width', rect_width)
         .attr('height', name_font_size * text_array.length + rect_padding * 2)
         .attr('x', x - rect_width / 2)
         .attr('y', y - rect_padding - name_font_size / 2)
         .attr("class", class_name);
 
-    text_element = svg.append('text')
+    let text_element = svg.append('text')
         .attr('x', x - rect_width / 2)
         .attr('y', y - name_font_size / 2)
         .attr('font-size', name_font_size + 'px')
@@ -557,14 +557,14 @@ function showSubdomainPage(state, select_domain_key, select_subdomain_key) {
     state.svg.selectAll(".chord").remove();
     console.log(select_domain_key + ' -> ' + select_subdomain_key);
 
-    selec_doamin = state.domain_keys[select_domain_key];
-    subdomain_items = selec_doamin["subdomain_items"];
+    let selec_doamin = state.domain_keys[select_domain_key];
+    let subdomain_items = selec_doamin["subdomain_items"];
     let width = state.size;
 
     let text_height = addTextToCircleTop(state.svg, [selec_doamin['name'], '(' + subdomain_items.length + ')'], width / 2, 0, width / 2, width / 2, '');
 
-    subdomain_diameter = 3 / 4 * (width / 2 - text_height);
-    subdomain_y = width / 2;
+    let subdomain_diameter = 3 / 4 * (width / 2 - text_height);
+    let subdomain_y = width / 2;
 
     state.svg.append("circle")
         .attr("cx", width / 2)
@@ -574,16 +574,16 @@ function showSubdomainPage(state, select_domain_key, select_subdomain_key) {
         .attr("data-domain", select_domain_key)
         .attr("data-key", select_subdomain_key);
 
-    alfa = 0;
-    delta_alfa = 180 / (Math.max(1, subdomain_items.length - 2));
-    R = subdomain_diameter / 2;
-    r = subdomain_diameter / 8;
+    let alfa = 0;
+    let delta_alfa = 180 / (Math.max(1, subdomain_items.length - 2));
+    let R = subdomain_diameter / 2;
+    let r = subdomain_diameter / 8;
 
     subdomain_items.forEach(e => {
         if (e['key'] == select_subdomain_key) {
             let subdomain_text_height = addTextToCircleTop(state.svg, [e['name'], '(' + e['boundedContexts'].length + ')'], subdomain_diameter, 0, width / 2, subdomain_y, 'select-subdomain');
 
-            context_owner_circle = {
+            let context_owner_circle = {
                 'diameter': subdomain_diameter - subdomain_text_height,
                 'x': width / 2,
             }
@@ -595,29 +595,29 @@ function showSubdomainPage(state, select_domain_key, select_subdomain_key) {
             //     .attr("r", 0.9 * context_owner_circle['diameter'] / 2 - 5)
             //     .attr("class", 'debug')
 
-            context_alfa = 0;
-            context_delta_alfa = 360 / Math.max(1, e['boundedContexts'].length);
+            let context_alfa = 0;
+            let context_delta_alfa = 360 / Math.max(1, e['boundedContexts'].length);
 
-            context_owner_circle_radius = context_owner_circle['diameter'] / 2;
-            context_circle_radius = context_owner_circle_radius / 2;
+            let context_owner_circle_radius = context_owner_circle['diameter'] / 2;
+            let context_circle_radius = context_owner_circle_radius / 2;
 
-            bx0 = context_owner_circle['x'] + (context_owner_circle_radius - context_circle_radius - 5) * Math.cos(context_alfa * Math.PI / 180);
-            by0 = context_owner_circle['y'] + (context_owner_circle_radius - context_circle_radius - 5) * Math.sin(context_alfa * Math.PI / 180);
+            let bx0 = context_owner_circle['x'] + (context_owner_circle_radius - context_circle_radius - 5) * Math.cos(context_alfa * Math.PI / 180);
+            let by0 = context_owner_circle['y'] + (context_owner_circle_radius - context_circle_radius - 5) * Math.sin(context_alfa * Math.PI / 180);
 
-            bx1 = context_owner_circle['x'] + (context_owner_circle_radius - context_circle_radius - 5) * Math.cos((context_alfa + context_delta_alfa) * Math.PI / 180);
-            by1 = context_owner_circle['y'] + (context_owner_circle_radius - context_circle_radius - 5) * Math.sin((context_alfa + context_delta_alfa) * Math.PI / 180);
+            let bx1 = context_owner_circle['x'] + (context_owner_circle_radius - context_circle_radius - 5) * Math.cos((context_alfa + context_delta_alfa) * Math.PI / 180);
+            let by1 = context_owner_circle['y'] + (context_owner_circle_radius - context_circle_radius - 5) * Math.sin((context_alfa + context_delta_alfa) * Math.PI / 180);
 
-            bd = Math.sqrt(Math.pow(bx0 - bx1, 2) + Math.pow(by0 - by1, 2));
+            let bd = Math.sqrt(Math.pow(bx0 - bx1, 2) + Math.pow(by0 - by1, 2));
             context_circle_radius = Math.min(context_circle_radius, 0.6 * bd);
 
             e['boundedContexts'].forEach(ce => {
-                bx = context_owner_circle['x'] + (context_owner_circle_radius - context_circle_radius - 5) * Math.cos(context_alfa * Math.PI / 180);
-                by = context_owner_circle['y'] + (context_owner_circle_radius - context_circle_radius - 5) * Math.sin(context_alfa * Math.PI / 180);
+                let bx = context_owner_circle['x'] + (context_owner_circle_radius - context_circle_radius - 5) * Math.cos(context_alfa * Math.PI / 180);
+                let by = context_owner_circle['y'] + (context_owner_circle_radius - context_circle_radius - 5) * Math.sin(context_alfa * Math.PI / 180);
 
                 if (e['boundedContexts'].length == 1) {
-                    bx = context_owner_circle['x'];
-                    by = context_owner_circle['y']
-                    br = context_owner_circle_radius * 0.9;
+                    let bx = context_owner_circle['x'];
+                    let by = context_owner_circle['y']
+                    let br = context_owner_circle_radius * 0.9;
                 }
 
                 state.svg.append("circle")
@@ -656,8 +656,8 @@ function showSubdomainPage(state, select_domain_key, select_subdomain_key) {
                 });
 
         } else {
-            x = width / 2 + (R + r - 5) * Math.cos(alfa * Math.PI / 180);
-            y = subdomain_y + (R + r - 5) * Math.sin(alfa * Math.PI / 180);
+            let x = width / 2 + (R + r - 5) * Math.cos(alfa * Math.PI / 180);
+            let y = subdomain_y + (R + r - 5) * Math.sin(alfa * Math.PI / 180);
 
             state.svg.append("circle")
                 .attr("cx", x)
@@ -683,7 +683,7 @@ function showSubdomainPage(state, select_domain_key, select_subdomain_key) {
 function boundcontext_mouseovered(state, select_key, x, y) {
     state.svg.selectAll(".chord").remove();
 
-    connected_circles = []
+    let connected_circles = []
     state.domain_connections.forEach(e => {
         if (e['initiator'] == select_key || e['recipient'] == select_key) {
             if (state.out_circle_coordinates.hasOwnProperty(e['recipient'])) {
@@ -737,8 +737,8 @@ function showBoundedContextConnections(state, select_key, x, y) {
     state.svg.selectAll(".bound-context-name").remove();
 
 
-    connected_circles = [];
-    texts = {};
+    let connected_circles = [];
+    let texts = {};
     state.domain_connections.forEach(e => {
         if (e['initiator'] == select_key || e['recipient'] == select_key) {
             let distance = 0;

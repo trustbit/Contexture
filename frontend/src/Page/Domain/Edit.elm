@@ -31,7 +31,7 @@ import Domain
 import Domain.DomainId exposing (DomainId)
 
 import Page.ChangeKey as ChangeKey
-import Page.Domain.Index as Index
+import Page.Domain.IndexRoot as Index
 import Page.Bcc.Index
 
 
