@@ -74,10 +74,16 @@ viewBubble configuration =
         ]
         []
         
-viewSwitch current =
+viewGridSwitch current =
+    ButtonGroup.radioButtonGroup []
+        [ ButtonGroup.radioButton (current == Grid) [ Button.primary, Button.onClick <| ChangeVisualization Grid ] [ Html.text "Grid" ]
+        , ButtonGroup.radioButton (current == Bubble) [ Button.secondary, Button.onClick <| ChangeVisualization Bubble ] [ Html.text "Bubble" ]
+        ]
+
+viewBubbleSwitch current =
     ButtonGroup.radioButtonGroup []
         [ ButtonGroup.radioButton (current == Grid) [ Button.secondary, Button.onClick <| ChangeVisualization Grid ] [ Html.text "Grid" ]
-        , ButtonGroup.radioButton (current == Bubble) [ Button.secondary, Button.onClick <| ChangeVisualization Bubble ] [ Html.text "Bubble" ]
+        , ButtonGroup.radioButton (current == Bubble) [ Button.primary, Button.onClick <| ChangeVisualization Bubble ] [ Html.text "Bubble" ]
         ]
 
 view : Model -> Html Msg
@@ -91,7 +97,12 @@ view model =
             Grid.containerFluid [] 
                 [ Grid.row []
                     [ Grid.col [Col.xs1]   
-                        [ viewSwitch model.visualization] 
+                        [ case model.visualization of
+                            Grid ->
+                                viewGridSwitch model.visualization
+                            Bubble ->
+                                viewBubbleSwitch model.visualization
+                        ]
                     , Grid.col []
                         [ case model.visualization of
                             Grid ->

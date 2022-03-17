@@ -1,4 +1,5 @@
 import * as d3 from 'd3';
+
 // import {fetchData} from "./DataAccess";
 
 function createMatrix(length) {
@@ -28,16 +29,6 @@ function copyMatrix(old_matrix, new_matrix) {
 
     return new_matrix;
 }
-
-var el = document.getElementById('showGridView');
-el && el.addEventListener('click', function () {
-alert('grid')
-});
-
-el = document.getElementById('showBubbleView');
-el && el.addEventListener('click', function () {
-    alert('bubble')
-});
 
 var BrowserText = (function () {
     var canvas = document.createElement('canvas'),
@@ -175,7 +166,8 @@ function addTextToRectangle(svg, text_array, max_width, x, y, class_name) {
 
     let rect_padding = 3;
     let rect_width = max_width + rect_padding * 2;
-    let rect = svg.append('rect').transition().duration(500).attr('width', rect_width)
+    svg.append('rect')
+        .attr('width', rect_width + 40)
         .attr('height', name_font_size * text_array.length + rect_padding * 2)
         .attr('x', x - rect_width / 2)
         .attr('y', y - rect_padding - name_font_size / 2)
@@ -189,7 +181,7 @@ function addTextToRectangle(svg, text_array, max_width, x, y, class_name) {
 
     text_array.forEach(e => {
         text_element.append('tspan')
-            .attr('x', x - BrowserText.getWidth(e, name_font_size) / 2)
+            .attr('x', x - max_width / 2)
             .attr('dy', name_font_size)
             .attr("class", class_name)
             .text(e)
@@ -243,6 +235,7 @@ function showAllConnections(state) {
 
 function showMainPage(state) {
     state.svg.selectAll("*").remove();
+    state.shadow.getElementById('show_all_content').style.display = 'inline';
 
     var sorted_domains = state.domains.slice(0);
     sorted_domains.sort(function (a, b) {
@@ -389,6 +382,8 @@ function mouseouted(state) {
 
 
 function showDomainPage(state, select_domain) {
+    state.shadow.getElementById('show_all_content').style.display = 'none';
+
     state.svg.selectAll("*").remove();
     console.log(select_domain)
     let width = state.size;
@@ -551,10 +546,15 @@ function showSubdomainPage(state, select_domain_key, select_subdomain_key) {
     state.svg.selectAll(".subdomain-circle").remove();
     state.svg.selectAll(".select-subdomain").remove();
     state.svg.selectAll(".context-circle").remove();
+    state.svg.selectAll(".context-circle-view").remove();
+    state.svg.selectAll(".bound-context-name").remove();
+
     state.svg.selectAll(".debug").remove();
 
 
     state.svg.selectAll(".chord").remove();
+    state.svg.selectAll(".chord-view").remove();
+
     console.log(select_domain_key + ' -> ' + select_subdomain_key);
 
     let selec_doamin = state.domain_keys[select_domain_key];
@@ -589,11 +589,6 @@ function showSubdomainPage(state, select_domain_key, select_subdomain_key) {
             }
             context_owner_circle['y'] = subdomain_y + subdomain_text_height / 2;
 
-            // svg.append("circle")
-            //     .attr("cx", context_owner_circle['x'])
-            //     .attr("cy", context_owner_circle['y'])
-            //     .attr("r", 0.9 * context_owner_circle['diameter'] / 2 - 5)
-            //     .attr("class", 'debug')
 
             let context_alfa = 0;
             let context_delta_alfa = 360 / Math.max(1, e['boundedContexts'].length);
@@ -615,21 +610,24 @@ function showSubdomainPage(state, select_domain_key, select_subdomain_key) {
                 let by = context_owner_circle['y'] + (context_owner_circle_radius - context_circle_radius - 5) * Math.sin(context_alfa * Math.PI / 180);
 
                 if (e['boundedContexts'].length == 1) {
-                    let bx = context_owner_circle['x'];
-                    let by = context_owner_circle['y']
-                    let br = context_owner_circle_radius * 0.9;
+                    bx = context_owner_circle['x'];
+                    by = context_owner_circle['y']
+                    context_circle_radius = context_owner_circle_radius * 0.9;
                 }
 
                 state.svg.append("circle")
                     .attr("cx", bx)
                     .attr("cy", by)
                     .attr("r", 0.9 * context_circle_radius)
+                    .attr("owner_x", context_owner_circle['x'])
+                    .attr("owner_y", context_owner_circle['y'])
+                    .attr("owner_r", context_owner_circle_radius)
                     .attr("data-domain", select_domain_key)
                     .attr("data-subdomain", select_subdomain_key)
                     .attr("data-key", ce['key'])
                     .attr("class", 'context-circle');
 
-                addTextToCircleCenter(state.svg, [ce['name']], 0.9 * context_circle_radius, 0, bx, by, '');
+                addTextToCircleCenter(state.svg, [ce['name']], 0.9 * context_circle_radius, 0, bx, by, 'context-circle');
 
                 context_alfa += context_delta_alfa;
             });
@@ -645,10 +643,15 @@ function showSubdomainPage(state, select_domain_key, select_subdomain_key) {
                     boundcontext_mouseout(state);
                 })
                 .on("mousedown", function () {
-                    let key = d3.select(this).attr('data-key');
+                    let select_context_key = d3.select(this).attr('data-key');
+                    let select_domain_key = d3.select(this).attr('data-domain');
+                    let select_subdomain_key = d3.select(this).attr('data-subdomain');
                     let cx = d3.select(this).attr('cx');
                     let cy = d3.select(this).attr('cy');
-                    showBoundedContextConnections(state, key, parseFloat(cx), parseFloat(cy))
+                    let owner_x = d3.select(this).attr('owner_x');
+                    let owner_y = d3.select(this).attr('owner_y');
+                    let owner_r = d3.select(this).attr('owner_r');
+                    showBoundedContextConnections(state, select_domain_key, select_subdomain_key, select_context_key, parseFloat(cx), parseFloat(cy), parseFloat(owner_x), parseFloat(owner_y), parseFloat(owner_r))
                     // let sel_domain = d3.select(this).attr('data-domain')
                     // let sel_subdomain = d3.select(this).attr('data-key')
                     // showSubdomainPage(sel_domain, sel_subdomain);
@@ -732,109 +735,183 @@ function boundcontext_mouseout(state) {
     state.svg.selectAll(".chord").remove();
 }
 
-function showBoundedContextConnections(state, select_key, x, y) {
+function showBoundedContextConnections(state, select_domain_key, select_subdomain_key, select_context_key, x, y, owner_x, owner_y, owner_r) {
     state.svg.selectAll(".chord").remove();
     state.svg.selectAll(".bound-context-name").remove();
+    state.svg.selectAll(".context-circle").remove();
+    state.svg.selectAll(".context-circle-view").remove();
+    state.svg.selectAll(".chord-view").remove();
 
+    let selec_doamin = state.domain_keys[select_domain_key];
+    let subdomain_items = selec_doamin["subdomain_items"];
 
-    let connected_circles = [];
-    let texts = {};
-    state.domain_connections.forEach(e => {
-        if (e['initiator'] == select_key || e['recipient'] == select_key) {
-            let distance = 0;
-            let xc, yc;
-            if (state.out_circle_coordinates.hasOwnProperty(e['recipient'])) {
-                let it = {
-                    'x1': state.out_circle_coordinates[e['recipient']]['cx'],
-                    'y1': state.out_circle_coordinates[e['recipient']]['cy'],
-                    'x2': x,
-                    'y2': y,
-                    'name': e['name']
-                };
-                connected_circles.push(it);
+    subdomain_items.forEach(e => {
+        if (e['key'] == select_subdomain_key) {
+            let contextCount = Math.max(1, e['boundedContexts'].length - 1);
+            let context_alfa = -20;
+            if (contextCount == 1) context_alfa = 90;
 
-                let desc = '(recipient)';
-                if (e['name'] !== undefined)
-                    desc = e['name'] + desc;
+            let context_delta_alfa = 220 / Math.max(1, contextCount - 1);
 
-                distance = Math.sqrt(Math.pow(it['x1'] - it['x2'], 2) + Math.pow(it['y1'] - it['y2'], 2));
-                xc = (it['x1'] + it['x2']) / 2;
-                yc = (it['y1'] + it['y2']) / 2;
-
-                if (!(e['recipient'] in texts)) {
-                    texts[e['recipient']] = {
-                        'distance': distance,
-                        'xc': xc,
-                        'yc': yc,
-                        'text': []
-                    }
+            let boundedContexts = e['boundedContexts'];
+            let selContext;
+            for (let i = 0; i < boundedContexts.length; i++) {
+                if (boundedContexts[i]['key'] == select_context_key) {
+                    selContext = boundedContexts[i];
+                    boundedContexts.splice(i, 1);
+                    boundedContexts.push(selContext);
+                    break;
                 }
-
-                texts[e['recipient']]['text'].push(desc);
-
-                console.log('select_key:' + select_key + '\nrecipient:' + e['recipient']);
             }
 
-            if (state.out_circle_coordinates.hasOwnProperty(e['initiator'])) {
-                let it = {
-                    'x1': x,
-                    'y1': y,
-                    'x2': state.out_circle_coordinates[e['initiator']]['cx'],
-                    'y2': state.out_circle_coordinates[e['initiator']]['cy'],
-                    'name': e['name']
-                };
-                connected_circles.push(it);
-                distance = Math.sqrt(Math.pow(it['x1'] - it['x2'], 2) + Math.pow(it['y1'] - it['y2'], 2));
-                xc = (it['x1'] + it['x2']) / 2;
-                yc = (it['y1'] + it['y2']) / 2;
 
-                let desc = '(initiator)';
-                if (e['name'] !== undefined)
-                    desc = e['name'] + desc;
+            boundedContexts.forEach(ce => {
+                if (ce['key'] == select_context_key) {
+                    let select_context_cx = owner_x;
+                    let select_context_cy = owner_y - owner_r / 2;
 
-                if (!(e['initiator'] in texts)) {
-                    texts[e['initiator']] = {
-                        'distance': distance,
-                        'xc': xc,
-                        'yc': yc,
-                        'text': []
-                    }
+                    state.svg.append("circle")
+                        .attr("cx", select_context_cx)
+                        .attr("cy", select_context_cy)
+                        .attr("class", 'context-circle')
+                        .attr("r", owner_r / 2 - 10);
+
+                    addTextToCircleCenter(state.svg, [ce['name']], owner_r - 5, 0, select_context_cx, select_context_cy, 'context-circle');
+
+                    let connected_circles = [];
+                    let texts = {};
+                    state.domain_connections.forEach(e => {
+                        if (e['initiator'] == select_context_key || e['recipient'] == select_context_key) {
+                            let distance = 0;
+                            let xc, yc;
+                            if (state.out_circle_coordinates.hasOwnProperty(e['recipient'])) {
+                                let it = {
+                                    'x1': state.out_circle_coordinates[e['recipient']]['cx'],
+                                    'y1': state.out_circle_coordinates[e['recipient']]['cy'],
+                                    'x2': select_context_cx,
+                                    'y2': select_context_cy,
+                                    'name': e['name']
+                                };
+                                connected_circles.push(it);
+
+                                let desc = '(recipient)';
+                                if (e['name'] !== undefined)
+                                    desc = e['name'] + desc;
+
+                                distance = Math.sqrt(Math.pow(it['x1'] - it['x2'], 2) + Math.pow(it['y1'] - it['y2'], 2));
+                                xc = (it['x1'] + it['x2']) / 2;
+                                yc = (it['y1'] + it['y2']) / 2;
+
+                                if (!(e['recipient'] in texts)) {
+                                    texts[e['recipient']] = {
+                                        'distance': distance,
+                                        'xc': xc,
+                                        'yc': yc,
+                                        'text': []
+                                    }
+                                }
+
+                                texts[e['recipient']]['text'].push(desc);
+
+                                console.log('select_key:' + select_context_key + '\nrecipient:' + e['recipient']);
+                            }
+
+                            if (state.out_circle_coordinates.hasOwnProperty(e['initiator'])) {
+                                let it = {
+                                    'x1': select_context_cx,
+                                    'y1': select_context_cy,
+                                    'x2': state.out_circle_coordinates[e['initiator']]['cx'],
+                                    'y2': state.out_circle_coordinates[e['initiator']]['cy'],
+                                    'name': e['name']
+                                };
+                                connected_circles.push(it);
+                                distance = Math.sqrt(Math.pow(it['x1'] - it['x2'], 2) + Math.pow(it['y1'] - it['y2'], 2));
+                                xc = (it['x1'] + it['x2']) / 2;
+                                yc = (it['y1'] + it['y2']) / 2;
+
+                                let desc = '(initiator)';
+                                if (e['name'] !== undefined)
+                                    desc = e['name'] + desc;
+
+                                if (!(e['initiator'] in texts)) {
+                                    texts[e['initiator']] = {
+                                        'distance': distance,
+                                        'xc': xc,
+                                        'yc': yc,
+                                        'text': []
+                                    }
+                                }
+
+                                texts[e['initiator']]['text'].push(desc);
+                                console.log('select_key:' + select_context_key + '\ninitiator:' + e['initiator']);
+
+                            }
+
+
+                        }
+
+                    });
+
+                    state.svg.selectAll(".chord-view")
+                        .data(connected_circles)
+                        .enter()
+                        .append('line')
+                        .attr('class', 'chord-view')
+                        .attr('x1', d => d.x1)
+                        .attr('y1', d => d.y1)
+                        .attr('x2', d => d.x2)
+                        .attr('y2', d => d.y2)
+                        .attr("opacity", 0.2)
+                        .style('stroke-width', "1px")
+                        .style('stroke', "#0362fc")
+                    ;
+
+                    let key_list = Object.keys(texts);
+                    key_list.forEach(k => {
+                        addTextToRectangle(state.svg, texts[k]['text'], texts[k]['distance'] / 2, texts[k]['xc'], texts[k]['yc'], 'bound-context-name')
+                    });
+
+                } else {
+
+
+                    let bx = owner_x + (owner_r - owner_r / 4 - 5) * Math.cos(context_alfa * Math.PI / 180);
+                    let by = owner_y + (owner_r - owner_r / 4 - 5) * Math.sin(context_alfa * Math.PI / 180);
+
+                    state.svg.append("circle")
+                        .attr("cx", bx)
+                        .attr("cy", by)
+                        .attr("r", owner_r / 4)
+                        .attr("class", 'context-circle-view')
+                        .attr("owner_x", owner_x)
+                        .attr("owner_y", owner_y)
+                        .attr("owner_r", owner_r)
+                        .attr("data-domain", select_domain_key)
+                        .attr("data-subdomain", select_subdomain_key)
+                        .attr("data-key", ce['key'])
+                        .on("mousedown", function () {
+                            showBoundedContextConnections(state, select_domain_key, select_subdomain_key, ce['key'], x, y, owner_x, owner_y, owner_r)
+                        });
+
+                    addTextToCircleCenter(state.svg, [ce['name']], owner_r / 2, 0, bx, by, 'context-circle-view');
+
+
+                    context_alfa += context_delta_alfa;
                 }
+            });
 
-                texts[e['initiator']]['text'].push(desc);
-                console.log('select_key:' + select_key + '\ninitiator:' + e['initiator']);
-
-            }
-
+            state.svg.selectAll("circle.context-circle-view")
+                .on("mouseover", function () {
+                    let key = d3.select(this).attr('data-key');
+                    let cx = d3.select(this).attr('cx');
+                    let cy = d3.select(this).attr('cy');
+                    boundcontext_mouseovered(state, key, cx, cy);
+                })
+                .on("mouseout", function () {
+                    boundcontext_mouseout(state);
+                });
 
         }
-
-    });
-
-    let key_list = Object.keys(texts);
-    key_list.forEach(k => {
-
-        addTextToRectangle(state.svg, texts[k]['text'], texts[k]['distance'] / 2, texts[k]['xc'], texts[k]['yc'], 'bound-context-name')
     })
-
-    if (texts.length > 0) {
-
-    }
-
-
-    state.svg.selectAll(".chord")
-        .data(connected_circles)
-        .enter()
-        .append('line')
-        .attr('class', 'chord')
-        .attr('x1', d => d.x1)
-        .attr('y1', d => d.y1)
-        .attr('x2', d => d.x2)
-        .attr('y2', d => d.y2)
-        .attr("opacity", 0.2)
-        .style('stroke-width', "1px")
-        .style('stroke', "#0362fc")
-    ;
 
 
 }
@@ -961,22 +1038,31 @@ template.innerHTML = `
         opacity: 0.5;
     }
 
-    .big-circle {
-        fill: #0dcaf0;
+    circle.big-circle {
+        fill: #e8f1fd;
     }
 
-    .out-circle {
-        fill: #adb5bd;
+    circle.out-circle {
+        fill: #f1f1f1;
     }
+    
+    circle.main-page{
+        fill: #f1f1f1;
+    }
+    
+    circle.main-page:hover{
+        fill: #e8f1fd;
+    }
+    
 
     circle.subdomain-circle {
-        fill: #0d6efd;
+        fill: #add0ff;
     }
 
     circle.not-select-circle {
         stroke-dasharray: 4px;
         stroke-width: 2px;
-        fill: #0dcaf0;
+        fill: #e8f1fd;
         stroke: #d2d2d2;
     }
 
@@ -985,16 +1071,56 @@ template.innerHTML = `
     }
 
     circle.context-circle {
-        fill: #270cdd;
+        fill: #017cff;
+    }
+    
+    tspan.context-circle{
+        fill: white;
+    }
+    
+    circle.context-circle-view{
+        fill: #017cff;
+    }
+    
+    tspan.context-circle-view{
+        fill: white;
     }
     
     tspan.bound-context-name{
         fill:white;
     }
     rect.bound-context-name{
-        fill:rgb(39 60 249);
+        fill:#0058d3;
         stroke: white;
     }
+    
+    .btn {
+    display: inline-block;
+    font-weight: 400;
+    line-height: 1.5;
+    color: #212529;
+    text-align: center;
+    text-decoration: none;
+    vertical-align: middle;
+    cursor: pointer;
+    -webkit-user-select: none;
+    -moz-user-select: none;
+    user-select: none;
+    background-color: transparent;
+    border: 1px solid transparent;
+    padding: 0 0;
+    font-size: 1rem;
+    border-radius: 0.25rem;
+    transition: color .15s ease-in-out,background-color .15s ease-in-out,border-color .15s ease-in-out,box-shadow .15s ease-in-out;
+}
+
+
+    
+    .btn-link {
+    font-weight: 400;
+    color: #0d6efd;
+    text-decoration: underline;
+}
 
 </style>
 `;
@@ -1003,18 +1129,13 @@ export class Bubble extends HTMLElement {
     bubbleState = new BubbleState();
 
     constructor() {
-        // Always call super first in constructor
         super();
 
-        // this.resizeObserver = new ResizeObserver(entries => {
-        //     const sizeHint = {width: entries[0].contentRect.width, maxHeight: entries[0].contentRect.height};
-        //     this.resize(sizeHint)
-        // });
 
         this.bubbleState.shadow = this.attachShadow({mode: 'open'});
         this.bubbleState.shadow.appendChild(template.content.cloneNode(true));
-        this.bubbleState.shadow.innerHTML += '<input id="show_all" type="checkbox">\n' +
-            '<input type="button" id="go_home" value="home">';
+        this.bubbleState.shadow.innerHTML += '<label id="show_all_content"><input id="show_all" type="checkbox">Show all connections</label><br>' +
+            '<button type="button" class="btn btn-link" id="go_home">Home</button></br>';
     }
 
 
@@ -1038,12 +1159,6 @@ export class Bubble extends HTMLElement {
         };
 
         showMainPage(state);
-
-        // if (this.isConnected) {
-        //     this.rebuildHierarchicalEdgeElements();
-        //     this.resizeObserver.observe(this.parentElement);
-        //     await this.buildHierarchicalEdge();
-        // }
     }
 
     disconnectedCallback() {
@@ -1205,20 +1320,8 @@ export class Bubble extends HTMLElement {
         this.bubbleState.subdomain_domains = subdomain_domains;
         this.bubbleState.domain_connections = domain_connections;
         this.bubbleState.out_circle_coordinates = out_circle_coordinates;
-
-        // return {
-        //     'show_all_connections': show_all_connections,
-        //     'domains': domains,
-        //     'domain_keys': domain_keys,
-        //     'bounded_context_subdomains': bounded_context_subdomains,
-        //     'bounded_context_domains': bounded_context_domains,
-        //     'subdomain_domains': subdomain_domains,
-        //     'domain_connections': domain_connections,
-        //     'out_circle_coordinates': out_circle_coordinates
-        // }
     }
 
 
 }
 
-// customElements.define('bubble-view', Bubble);
