@@ -300,7 +300,7 @@ function showMainPage(state) {
 
     // draw circles and texts
     for (let i = 0; i < sorted_domains.length; i++) {
-        let diameter = Math.max(1,sorted_domains[i]['subdomains']) * state.size / box_size;
+        let diameter = Math.max(3,sorted_domains[i]['subdomains']) * state.size / box_size;
         let x = sorted_domains[i]['x'] * state.size / box_size + diameter / 2;
         let y = sorted_domains[i]['y'] * state.size / box_size + diameter / 2;
 
