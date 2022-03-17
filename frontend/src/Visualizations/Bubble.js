@@ -251,11 +251,12 @@ function showMainPage(state) {
     //calculate circle coordinates
     for (let i = 0; i < sorted_domains.length; i++) {
         let found_domain_coords = false;
-        for (let j = 0; j <= box_size - sorted_domains[i].subdomains; j++) {
-            for (let k = 0; k <= box_size - sorted_domains[i].subdomains; k++) {
+        let subdomains_count = Math.max(3,sorted_domains[i].subdomains);
+        for (let j = 0; j <= box_size - subdomains_count; j++) {
+            for (let k = 0; k <= box_size - subdomains_count; k++) {
                 let is_empty = true;
-                for (let l = j; l < j + sorted_domains[i].subdomains; l++) {
-                    for (let m = k; m < k + sorted_domains[i].subdomains; m++) {
+                for (let l = j; l < j + subdomains_count; l++) {
+                    for (let m = k; m < k + subdomains_count; m++) {
                         if (used_cells[l][m]) {
                             is_empty = false;
                             break;
@@ -270,11 +271,11 @@ function showMainPage(state) {
                 if (is_empty) {
                     found_domain_coords = true;
 
-                    sorted_domains[i]["x"] = j;
-                    sorted_domains[i]["y"] = k;
+                    sorted_domains[i]["x"] = k;
+                    sorted_domains[i]["y"] = j;
 
-                    for (let l = j; l < j + sorted_domains[i].subdomains; l++) {
-                        for (let m = k; m < k + sorted_domains[i].subdomains; m++) {
+                    for (let l = j; l < j + subdomains_count; l++) {
+                        for (let m = k; m < k + subdomains_count; m++) {
                             used_cells[l][m] = true;
                         }
                     }
@@ -288,7 +289,7 @@ function showMainPage(state) {
         }
 
         if (!found_domain_coords) {
-            box_size += sorted_domains[i].subdomains;
+            box_size += subdomains_count;
             let tmp_matrix = createMatrix(box_size, box_size);
             used_cells = copyMatrix(used_cells, tmp_matrix);
             i--;
@@ -299,13 +300,15 @@ function showMainPage(state) {
 
     // draw circles and texts
     for (let i = 0; i < sorted_domains.length; i++) {
-        let diameter = sorted_domains[i]['subdomains'] * state.size / box_size;
+        let diameter = Math.max(1,sorted_domains[i]['subdomains']) * state.size / box_size;
         let x = sorted_domains[i]['x'] * state.size / box_size + diameter / 2;
         let y = sorted_domains[i]['y'] * state.size / box_size + diameter / 2;
 
         state.domain_keys[sorted_domains[i]['key']]['cx'] = x;
         state.domain_keys[sorted_domains[i]['key']]['cy'] = y;
 
+        let className='main-page';
+        if(sorted_domains[i]['key']=='000-000')className+=' external-circle';
         state.svg.append("circle")
             .attr("cx", x)
             .attr("cy", y)
@@ -313,7 +316,7 @@ function showMainPage(state) {
             .attr("opacity", 0.5)
             .attr("data-i", i)
             .attr("data-key", sorted_domains[i]['key'])
-            .attr("class", 'main-page')
+            .attr("class", className)
             .on("mousedown", function () {
                 let key = d3.select(this).attr('data-key')
                 showDomainPageFn(state, key);
@@ -440,10 +443,12 @@ function showDomainPage(state, select_domain) {
             console.log('alfa:' + alfa)
             console.log('key:' + item['key'])
             alfa += delta_alfa;
+            let className='out-circle';
+            if(item['key']=='000-000') className+=' external-circle';
             state.svg.append("circle")
                 .attr("cx", x)
                 .attr("cy", y)
-                .attr("class", 'out-circle')
+                .attr("class", className)
                 .attr("r", r - 5)
                 .attr("data-key", item['key'])
                 .on("mousedown", function () {
@@ -1046,6 +1051,13 @@ template.innerHTML = `
         fill: #f1f1f1;
     }
     
+    circle.external-circle{
+        fill: white !important;
+        stroke-dasharray: 4px;
+        stroke-width: 2px;
+        stroke: #d2d2d2;
+    }
+    
     circle.main-page{
         fill: #f1f1f1;
     }
@@ -1199,6 +1211,13 @@ export class Bubble extends HTMLElement {
             }
         });
 
+        domain_keys['000-000'] = {
+            'name': 'External Systems',
+            'key': '000-000',
+            'subdomain_items': [],
+            'subdomains': 0,
+        };
+
 
         //subdomain
         domain_data.forEach(e => {
@@ -1269,6 +1288,16 @@ export class Bubble extends HTMLElement {
                 });
             } else {
                 //add externalSystem
+                let externalKeys = Object.keys(e.initiator);
+                if (externalKeys.length > 0) {
+                    initiatorId.push({
+                        'id': '000-000',
+                        'type': 'external system',
+                        'name': e.initiator[externalKeys[0]],
+                        'parent': ''
+                    });
+                }
+
             }
 
             if (e.recipient.hasOwnProperty('domain')) recipient.push({
@@ -1295,6 +1324,15 @@ export class Bubble extends HTMLElement {
                 });
             } else {
                 //add externalSystem
+                let externalKeys = Object.keys(e.recipient);
+                if (externalKeys.length > 0) {
+                    recipient.push({
+                        'id': '000-000',
+                        'type': 'external system',
+                        'name': e.recipient[externalKeys[0]],
+                        'parent': ''
+                    });
+                }
             }
 
             initiatorId.forEach(i_conn => {
