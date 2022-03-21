@@ -70,7 +70,7 @@ update msg model =
  
 viewBubble configuration =
     Html.node "bubble-visualization"
-        [ attribute "baseApi" (Api.withoutQuery [] |> Api.url configuration)
+        [ attribute "baseApi" (Api.withoutQuery [] |> Api.url configuration), attribute "moreinfo" ""
         ]
         []
         

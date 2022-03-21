@@ -385,10 +385,11 @@ function mouseouted(state) {
 
 
 function showDomainPage(state, select_domain) {
+    state.rootThis.setAttribute("moreinfo",select_domain);
     state.shadow.getElementById('show_all_content').style.display = 'none';
 
     state.svg.selectAll("*").remove();
-    console.log(select_domain)
+    console.log(select_domain);
     let width = state.size;
     let key_arr = Object.keys(state.domain_keys)
     let out_circle_count = key_arr.length - 1;
@@ -548,6 +549,8 @@ function subdomain_mouseout(state) {
 }
 
 function showSubdomainPage(state, select_domain_key, select_subdomain_key) {
+    state.rootThis.setAttribute("moreinfo",select_domain_key+"/"+select_subdomain_key);
+
     state.svg.selectAll(".subdomain-circle").remove();
     state.svg.selectAll(".select-subdomain").remove();
     state.svg.selectAll(".context-circle").remove();
@@ -741,6 +744,8 @@ function boundcontext_mouseout(state) {
 }
 
 function showBoundedContextConnections(state, select_domain_key, select_subdomain_key, select_context_key, x, y, owner_x, owner_y, owner_r) {
+    state.rootThis.setAttribute("moreinfo",select_domain_key+"/"+select_subdomain_key+"/"+select_context_key);
+
     state.svg.selectAll(".chord").remove();
     state.svg.selectAll(".bound-context-name").remove();
     state.svg.selectAll(".context-circle").remove();
@@ -1144,6 +1149,7 @@ export class Bubble extends HTMLElement {
         super();
 
 
+        this.bubbleState.rootThis = this;
         this.bubbleState.shadow = this.attachShadow({mode: 'open'});
         this.bubbleState.shadow.appendChild(template.content.cloneNode(true));
         this.bubbleState.shadow.innerHTML += '<label id="show_all_content"><input id="show_all" type="checkbox">Show all connections</label><br>' +
