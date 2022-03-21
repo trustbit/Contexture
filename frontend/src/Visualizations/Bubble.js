@@ -385,7 +385,10 @@ function mouseouted(state) {
 
 
 function showDomainPage(state, select_domain) {
-    state.rootThis.setAttribute("moreinfo",select_domain);
+    sendMessageToMoreInfo({ 
+        Domain : select_domain,
+    });
+    // state.rootThis.setAttribute("moreinfo",select_domain);
     state.shadow.getElementById('show_all_content').style.display = 'none';
 
     state.svg.selectAll("*").remove();
@@ -549,7 +552,11 @@ function subdomain_mouseout(state) {
 }
 
 function showSubdomainPage(state, select_domain_key, select_subdomain_key) {
-    state.rootThis.setAttribute("moreinfo",select_domain_key+"/"+select_subdomain_key);
+    sendMessageToMoreInfo({ 
+        Domain : select_domain_key,
+        SubDomain: select_subdomain_key
+    });
+    // state.rootThis.setAttribute("moreinfo",select_domain_key+"/"+select_subdomain_key);
 
     state.svg.selectAll(".subdomain-circle").remove();
     state.svg.selectAll(".select-subdomain").remove();
@@ -743,8 +750,19 @@ function boundcontext_mouseout(state) {
     state.svg.selectAll(".chord").remove();
 }
 
+function sendMessageToMoreInfo(message){
+    if(app && app.ports && app.ports.onMoreInfoChanged){
+        app.ports.onMoreInfoChanged.send(JSON.stringify(message));
+    }
+}
+
 function showBoundedContextConnections(state, select_domain_key, select_subdomain_key, select_context_key, x, y, owner_x, owner_y, owner_r) {
-    state.rootThis.setAttribute("moreinfo",select_domain_key+"/"+select_subdomain_key+"/"+select_context_key);
+    sendMessageToMoreInfo({ 
+        Domain : select_context_key,
+        SubDomain: select_subdomain_key,
+        BoundedContext: select_context_key
+    });
+    // state.rootThis.setAttribute("moreinfo",select_domain_key+"/"+select_subdomain_key+"/"+select_context_key);
 
     state.svg.selectAll(".chord").remove();
     state.svg.selectAll(".bound-context-name").remove();

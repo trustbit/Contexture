@@ -1,4 +1,4 @@
-module Page.Domain.IndexRoot exposing (Model, initWithSubdomains, initWithoutSubdomains, Msg, update,view)
+module Page.Domain.IndexRoot exposing (Model, initWithSubdomains, initWithoutSubdomains, Msg, update,view, subscriptions)
 
 import Api
 import Bootstrap.Grid as Grid
@@ -14,6 +14,9 @@ import Bootstrap.Button as Button
 import Bootstrap.ButtonGroup as ButtonGroup
 
 import Page.Domain.Index as Index
+import Page.Domain.Ports as Ports
+
+import Json.Decode as Decode exposing (Error)
 
 type Visualization 
     = Bubble
@@ -25,8 +28,9 @@ type alias Model =
   , domainPosition : Domain.DomainRelation
   , index : Index.Model
   , visualization : Visualization
-  , moreInfo : String
-   }
+  , selectedElement : Maybe Ports.MoreInfoParameters
+  , moreInfo : Maybe Ports.MoreInfoParameters
+  }
    
 
 initWithSubdomains : Api.Configuration -> Nav.Key -> DomainId -> (Model, Cmd Msg)
@@ -49,7 +53,8 @@ init config key domainPosition =
     , domainPosition = domainPosition
     , index = indexModel
     , visualization = Grid
-    , moreInfo = ""
+    , selectedElement = Nothing
+    , moreInfo = Nothing
     }
   , indexCmd |> Cmd.map DomainMsg 
   )
@@ -57,7 +62,8 @@ init config key domainPosition =
 type Msg
   = DomainMsg Index.Msg
   | ChangeVisualization Visualization
-  | ShowMoreInfo String
+  | ShowMoreInfo Ports.MoreInfoParameters
+  | MoreInfoChanged (Result Decode.Error Ports.MoreInfoParameters)
   
 update : Msg -> Model -> (Model, Cmd Msg)
 update msg model =
@@ -73,9 +79,18 @@ update msg model =
             )
 
         ShowMoreInfo id ->
-            ( { model | moreInfo = id }
+            ( { model | moreInfo = Just id }
                         , Cmd.none
                         )
+
+        MoreInfoChanged (Ok result) ->
+            ( { model | selectedElement = Just result}
+            , Cmd.none)
+        
+        MoreInfoChanged (Err error) ->
+            Debug.todo <| "Decoding failed: " ++ (Debug.toString error)
+
+
 
  
 viewBubble configuration =
@@ -84,20 +99,19 @@ viewBubble configuration =
            ]
            []
 
-
-
         
-viewGridSwitch current =
+viewSwitch current =
     ButtonGroup.radioButtonGroup []
-        [ ButtonGroup.radioButton (current == Grid) [ Button.primary, Button.onClick <| ChangeVisualization Grid ] [ Html.text "Grid" ]
-        , ButtonGroup.radioButton (current == Bubble) [ Button.secondary, Button.onClick <| ChangeVisualization Bubble ] [ Html.text "Bubble" ]
+        [ ButtonGroup.radioButton (current == Grid) [ (if current == Grid then Button.primary else Button.secondary), Button.onClick <| ChangeVisualization Grid ] [ Html.text "Grid" ]
+        , ButtonGroup.radioButton (current == Bubble) [(if current == Grid then Button.secondary else Button.primary), Button.onClick <| ChangeVisualization Bubble ] [ Html.text "Bubble" ]
         ]
 
-viewBubbleSwitch current =
-    ButtonGroup.radioButtonGroup []
-        [ ButtonGroup.radioButton (current == Grid) [ Button.secondary, Button.onClick <| ChangeVisualization Grid ] [ Html.text "Grid" ]
-        , ButtonGroup.radioButton (current == Bubble) [ Button.primary, Button.onClick <| ChangeVisualization Bubble ] [ Html.text "Bubble" ]
-        ]
+viewMore { selectedElement, moreInfo} =
+    case selectedElement of
+        Just element ->
+            Html.button[ class "btn btn-primary" , onClick <| ShowMoreInfo element ][Html.text "More"]
+        Nothing ->
+            Html.button[ class "btn btn-primary btn-disabled" ] [Html.text "More"]
 
 view : Model -> Html Msg
 view model =
@@ -110,12 +124,7 @@ view model =
             Grid.containerFluid [] 
                 [ Grid.row []
                     [ Grid.col [Col.xs1]   
-                        [ case model.visualization of
-                            Grid ->
-                                viewGridSwitch model.visualization
-                            Bubble ->
-                                viewBubbleSwitch model.visualization
-                        ]
+                        [ viewSwitch model.visualization ]
                     , Grid.col []
                         [ case model.visualization of
                             Grid ->
@@ -126,12 +135,15 @@ view model =
                                 viewBubble model.configuration
                         ]
                      , Grid.col [Col.xs1]
-                               [
-                               if model.visualization == Bubble then
-                                       Html.button[ class "btn btn-primary" , onClick <| ShowMoreInfo model.moreInfo ][Html.text "More"]
+                               [ if model.visualization == Bubble then
+                                       viewMore model
                                else
                                     Html.p[][]
                                ]
                     ]                       
                 ]
     
+
+subscriptions : Model -> Sub Msg
+subscriptions _ =
+    Ports.moreInfoChanged MoreInfoChanged

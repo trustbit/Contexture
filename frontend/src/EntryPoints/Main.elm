@@ -189,8 +189,13 @@ subscriptions model =
     List.append
       [ Navbar.subscriptions model.navState NavMsg ]
       ( case model.page of
-        _ ->
-          []
+          Domains d ->
+            d 
+            |> Page.Domain.IndexRoot.subscriptions 
+            |> Sub.map DomainMsg
+            |> List.singleton
+          _ ->
+            []
       )
     |> Sub.batch
 
