@@ -7,6 +7,8 @@ import Browser.Navigation as Nav
 import Domain
 import Domain.DomainId exposing (DomainId)
 import Html exposing (Html)
+import Html exposing (Html, button, div, text)
+import Html.Events exposing (onClick)
 import Html.Attributes exposing (..)
 import Bootstrap.Button as Button
 import Bootstrap.ButtonGroup as ButtonGroup
@@ -23,6 +25,7 @@ type alias Model =
   , domainPosition : Domain.DomainRelation
   , index : Index.Model
   , visualization : Visualization
+  , moreInfo : String
    }
    
 
@@ -46,6 +49,7 @@ init config key domainPosition =
     , domainPosition = domainPosition
     , index = indexModel
     , visualization = Grid
+    , moreInfo = ""
     }
   , indexCmd |> Cmd.map DomainMsg 
   )
@@ -53,6 +57,7 @@ init config key domainPosition =
 type Msg
   = DomainMsg Index.Msg
   | ChangeVisualization Visualization
+  | ShowMoreInfo String
   
 update : Msg -> Model -> (Model, Cmd Msg)
 update msg model =
@@ -67,12 +72,20 @@ update msg model =
             , Cmd.none 
             )
 
+        ShowMoreInfo id ->
+            ( { model | moreInfo = id }
+                        , Cmd.none
+                        )
+
  
 viewBubble configuration =
-    Html.node "bubble-visualization"
-        [ attribute "baseApi" (Api.withoutQuery [] |> Api.url configuration), attribute "moreinfo" ""
-        ]
-        []
+            Html.node "bubble-visualization"
+           [ attribute "baseApi" (Api.withoutQuery [] |> Api.url configuration), attribute "moreinfo" ""
+           ]
+           []
+
+
+
         
 viewGridSwitch current =
     ButtonGroup.radioButtonGroup []
@@ -112,6 +125,13 @@ view model =
                             Bubble ->
                                 viewBubble model.configuration
                         ]
+                     , Grid.col [Col.xs1]
+                               [
+                               if model.visualization == Bubble then
+                                       Html.button[ class "btn btn-primary" , onClick <| ShowMoreInfo model.moreInfo ][Html.text "More"]
+                               else
+                                    Html.p[][]
+                               ]
                     ]                       
                 ]
     
