@@ -3,14 +3,17 @@ module Page.Domain.Bubble exposing (..)
 import Api exposing (ApiResponse, ApiResult)
 import Bootstrap.Button as Button
 import Bootstrap.ButtonGroup as ButtonGroup
+import Bootstrap.Card as Card
 import Bootstrap.Grid as Grid
 import Bootstrap.Grid.Col as Col
 import Bootstrap.Modal as Modal
+import BoundedContext
 import BoundedContext.BoundedContextId exposing (BoundedContextId)
 import Browser.Navigation as Nav
-import Components.BoundedContextCard as BoundedContextCard
+import Components.BoundedContextCard as BCC
 import ContextMapping.Collaboration as Collaboration
 import ContextMapping.Communication as Communication
+import ContextMapping.Collaborator as Collaborator
 import Domain
 import Domain.DomainId exposing (DomainId)
 import Html exposing (Html, button, div, text)
@@ -32,19 +35,20 @@ type alias Model =
     , selectedElement : Ports.MoreInfoParameters
     , moreInfo : Maybe MoreInfoDetails
     , modalVisibility : Modal.Visibility
-    , contextItems : RemoteData.WebData (List BoundedContextCard.Item)
+    }
+
+
+type alias BoundedContextModel =
+    { contextItems : RemoteData.WebData BCC.Item
     , communication : RemoteData.WebData Communication.Communication
-    , contextModels : RemoteData.WebData (List BoundedContextCard.Model)
+    , model : RemoteData.WebData BCC.Model
     }
 
 
 type MoreInfoDetails
     = Domain Index.Model
     | SubDomain Edit.Model
-
-
-
--- | BoundedContext BoundedContextId
+    | BoundedContext BoundedContextModel
 
 
 init : Nav.Key -> Api.Configuration -> ( Model, Cmd Msg )
@@ -54,10 +58,7 @@ init key config =
       , selectedElement = Ports.None
       , moreInfo = Nothing
       , modalVisibility = Modal.hidden
-      , communication = RemoteData.NotAsked
-      , contextItems = RemoteData.NotAsked
-      , contextModels = RemoteData.NotAsked
-      }
+     }
     , Cmd.none
     )
 
@@ -65,12 +66,23 @@ init key config =
 type Msg
     = MoreInfoChanged (Result Decode.Error Ports.MoreInfoParameters)
     | ShowMoreInfo Ports.MoreInfoParameters
-    | Loaded (ApiResponse (List BoundedContextCard.Item))
+    | Loaded (ApiResponse BCC.Item)
     | CommunicationLoaded (ApiResponse Collaboration.Collaborations)
     | DomainIndexMsg Index.Msg
     | DomainEditMsg Edit.Msg
     | CloseModal
 
+
+updateBoundedContext bcModel =
+    { bcModel
+    | model =
+        RemoteData.map2
+            (\item communication ->
+            BCC.init (Communication.communicationFor (item.context |> BoundedContext.id |> Collaborator.BoundedContext) communication) item
+            )
+            bcModel.contextItems
+            bcModel.communication
+    }
 
 update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
@@ -100,10 +112,15 @@ update msg model =
                                 |> Tuple.mapFirst (SubDomain >> Just)
                                 |> Tuple.mapSecond (Cmd.map DomainEditMsg)
 
-                        Ports.BoundedContext _ subdomainId _ ->
-                            Index.init model.configuration model.navKey (Domain.Subdomain subdomainId)
-                                |> Tuple.mapFirst (Domain >> Just)
-                                |> Tuple.mapSecond (Cmd.map DomainIndexMsg)
+                        Ports.BoundedContext _ subdomainId contextId ->
+                            ( { communication = RemoteData.Loading
+                              , contextItems = RemoteData.Loading
+                              , model = RemoteData.NotAsked
+                              }
+                                |> BoundedContext
+                                |> Just
+                            , Cmd.batch [ loadAll model.configuration subdomainId contextId, loadAllConnections model.configuration ]
+                            )
             in
             ( { model
                 | moreInfo = m
@@ -139,21 +156,41 @@ update msg model =
                     ( model, Cmd.none )
 
         Loaded items ->
-            ( { model
-                | contextItems = items |> RemoteData.fromResult
-              }
-            , Cmd.none
-            )
+            case model.moreInfo of
+                Just (BoundedContext bc) ->
+                    ( { model
+                      | moreInfo =
+                         { bc
+                         | contextItems = items |> RemoteData.fromResult
+                         }
+                         |> updateBoundedContext
+                         |> BoundedContext
+                         |> Just
+                      }
+                    , Cmd.none
+                    )
+                _ ->
+                    ( model, Cmd.none )
 
         CommunicationLoaded collaborations ->
-            ( { model
-                | communication =
-                    collaborations
-                        |> RemoteData.fromResult
-                        |> RemoteData.map Communication.asCommunication
-              }
-            , Cmd.none
-            )
+            case model.moreInfo of
+                Just (BoundedContext bc) ->
+                    ( { model
+                    | moreInfo =
+                        { bc    
+                        | communication =
+                            collaborations
+                                |> RemoteData.fromResult
+                                |> RemoteData.map Communication.asCommunication
+                        }
+                         |> updateBoundedContext
+                         |> BoundedContext
+                         |> Just
+                    }
+                    , Cmd.none
+                    )
+                _ ->
+                    ( model, Cmd.none )
 
         CloseModal ->
             ( { model | modalVisibility = Modal.hidden }
@@ -180,6 +217,15 @@ viewMoreDetails item =
             d
                 |> Edit.view
                 |> Html.map DomainEditMsg
+
+        BoundedContext bc ->
+            case bc.model of
+                RemoteData.Success m ->
+                    m
+                    |> BCC.view
+                    |> Card.view
+                _ ->
+                    text "Loading..."
 
 
 view model =
@@ -223,11 +269,29 @@ subscriptions _ =
     Ports.moreInfoChanged MoreInfoChanged
 
 
-loadAll : Api.Configuration -> DomainId -> Cmd Msg
-loadAll config domain =
+loadAll : Api.Configuration -> DomainId -> BoundedContextId -> Cmd Msg
+loadAll config domain context =
+    let
+        filter bccs =
+            bccs
+                |> List.filter (\bc -> (bc.context |> BoundedContext.id) == context)
+                |> List.head
+
+        decoder =
+            Decode.list BCC.decoder
+                |> Decode.andThen
+                    (\bccs ->
+                        case filter bccs of
+                            Just bc ->
+                                Decode.succeed bc
+
+                            Nothing ->
+                                Decode.fail "Could not find single context"
+                    )
+    in
     Http.get
         { url = Api.boundedContexts domain |> Api.url config
-        , expect = Http.expectJson Loaded (Decode.list BoundedContextCard.decoder)
+        , expect = Http.expectJson Loaded decoder
         }
 
 
