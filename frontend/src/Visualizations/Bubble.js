@@ -236,6 +236,7 @@ function showAllConnections(state) {
 function showMainPage(state) {
     state.svg.selectAll("*").remove();
     state.shadow.getElementById('show_all_content').style.display = 'inline';
+    sendMessageToMoreInfo({})
 
     var sorted_domains = state.domains.slice(0);
     sorted_domains.sort(function (a, b) {
