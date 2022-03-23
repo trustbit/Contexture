@@ -1,8 +1,7 @@
-module Page.Domain.Bubble exposing (..)
+module Page.Domain.Bubble exposing (Model, Msg, init, subscriptions, update, view)
 
 import Api exposing (ApiResponse, ApiResult)
 import Bootstrap.Button as Button
-import Bootstrap.ButtonGroup as ButtonGroup
 import Bootstrap.Card as Card
 import Bootstrap.Grid as Grid
 import Bootstrap.Grid.Col as Col
@@ -12,8 +11,8 @@ import BoundedContext.BoundedContextId exposing (BoundedContextId)
 import Browser.Navigation as Nav
 import Components.BoundedContextCard as BCC
 import ContextMapping.Collaboration as Collaboration
-import ContextMapping.Communication as Communication
 import ContextMapping.Collaborator as Collaborator
+import ContextMapping.Communication as Communication
 import Domain
 import Domain.DomainId exposing (DomainId)
 import Html exposing (Html, button, div, text)
@@ -25,8 +24,6 @@ import Page.Domain.Edit as Edit
 import Page.Domain.Index as Index
 import Page.Domain.Ports as Ports
 import RemoteData
-import Route
-import Url
 
 
 type alias Model =
@@ -58,7 +55,7 @@ init key config =
       , selectedElement = Ports.None
       , moreInfo = Nothing
       , modalVisibility = Modal.hidden
-     }
+      }
     , Cmd.none
     )
 
@@ -66,7 +63,7 @@ init key config =
 type Msg
     = MoreInfoChanged (Result Decode.Error Ports.MoreInfoParameters)
     | ShowMoreInfo Ports.MoreInfoParameters
-    | Loaded (ApiResponse BCC.Item)
+    | BoundedContextLoaded (ApiResponse BCC.Item)
     | CommunicationLoaded (ApiResponse Collaboration.Collaborations)
     | DomainIndexMsg Index.Msg
     | DomainEditMsg Edit.Msg
@@ -75,14 +72,15 @@ type Msg
 
 updateBoundedContext bcModel =
     { bcModel
-    | model =
-        RemoteData.map2
-            (\item communication ->
-            BCC.init (Communication.communicationFor (item.context |> BoundedContext.id |> Collaborator.BoundedContext) communication) item
-            )
-            bcModel.contextItems
-            bcModel.communication
+        | model =
+            RemoteData.map2
+                (\item communication ->
+                    BCC.init (Communication.communicationFor (item.context |> BoundedContext.id |> Collaborator.BoundedContext) communication) item
+                )
+                bcModel.contextItems
+                bcModel.communication
     }
+
 
 update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
@@ -155,20 +153,21 @@ update msg model =
                 _ ->
                     ( model, Cmd.none )
 
-        Loaded items ->
+        BoundedContextLoaded items ->
             case model.moreInfo of
                 Just (BoundedContext bc) ->
                     ( { model
-                      | moreInfo =
-                         { bc
-                         | contextItems = items |> RemoteData.fromResult
-                         }
-                         |> updateBoundedContext
-                         |> BoundedContext
-                         |> Just
+                        | moreInfo =
+                            { bc
+                                | contextItems = items |> RemoteData.fromResult
+                            }
+                                |> updateBoundedContext
+                                |> BoundedContext
+                                |> Just
                       }
                     , Cmd.none
                     )
+
                 _ ->
                     ( model, Cmd.none )
 
@@ -176,19 +175,20 @@ update msg model =
             case model.moreInfo of
                 Just (BoundedContext bc) ->
                     ( { model
-                    | moreInfo =
-                        { bc    
-                        | communication =
-                            collaborations
-                                |> RemoteData.fromResult
-                                |> RemoteData.map Communication.asCommunication
-                        }
-                         |> updateBoundedContext
-                         |> BoundedContext
-                         |> Just
-                    }
+                        | moreInfo =
+                            { bc
+                                | communication =
+                                    collaborations
+                                        |> RemoteData.fromResult
+                                        |> RemoteData.map Communication.asCommunication
+                            }
+                                |> updateBoundedContext
+                                |> BoundedContext
+                                |> Just
+                      }
                     , Cmd.none
                     )
+
                 _ ->
                     ( model, Cmd.none )
 
@@ -222,12 +222,14 @@ viewMoreDetails item =
             case bc.model of
                 RemoteData.Success m ->
                     m
-                    |> BCC.view
-                    |> Card.view
+                        |> BCC.view
+                        |> Card.view
+
                 _ ->
                     text "Loading..."
 
 
+view : Model -> Html Msg
 view model =
     Grid.row []
         [ Grid.col []
@@ -272,7 +274,7 @@ subscriptions _ =
 loadAll : Api.Configuration -> DomainId -> BoundedContextId -> Cmd Msg
 loadAll config domain context =
     let
-        filter bccs =
+        findSingleContext bccs =
             bccs
                 |> List.filter (\bc -> (bc.context |> BoundedContext.id) == context)
                 |> List.head
@@ -281,7 +283,7 @@ loadAll config domain context =
             Decode.list BCC.decoder
                 |> Decode.andThen
                     (\bccs ->
-                        case filter bccs of
+                        case findSingleContext bccs of
                             Just bc ->
                                 Decode.succeed bc
 
@@ -291,7 +293,7 @@ loadAll config domain context =
     in
     Http.get
         { url = Api.boundedContexts domain |> Api.url config
-        , expect = Http.expectJson Loaded decoder
+        , expect = Http.expectJson BoundedContextLoaded decoder
         }
 
 
@@ -301,15 +303,3 @@ loadAllConnections config =
         { url = Api.collaborations |> Api.url config
         , expect = Http.expectJson CommunicationLoaded (Decode.list Collaboration.decoder)
         }
-
-
-findAllDomains : Api.Configuration -> ApiResult (List Domain.Domain) msg
-findAllDomains base =
-    let
-        request toMsg =
-            Http.get
-                { url = Api.domains [] |> Api.url base
-                , expect = Http.expectJson toMsg Domain.domainsDecoder
-                }
-    in
-    request

@@ -1,30 +1,21 @@
 module Page.Domain.IndexRoot exposing (Model, Msg, initWithSubdomains, initWithoutSubdomains, subscriptions, update, view)
 
-import Api exposing (ApiResponse, ApiResult)
+import Api
 import Bootstrap.Button as Button
 import Bootstrap.ButtonGroup as ButtonGroup
 import Bootstrap.Grid as Grid
 import Bootstrap.Grid.Col as Col
-import Bootstrap.Modal as Modal
 import BoundedContext.BoundedContextId exposing (BoundedContextId)
 import Browser.Navigation as Nav
-import Components.BoundedContextCard as BoundedContextCard
-import ContextMapping.Collaboration as Collaboration
-import ContextMapping.Communication as Communication
 import Domain
 import Domain.DomainId exposing (DomainId)
 import Html exposing (Html, button, div, text)
 import Html.Attributes as Attr exposing (..)
 import Html.Events exposing (onClick)
-import Http
 import Json.Decode as Decode exposing (Error)
 import Page.Domain.Bubble as Bubble
 import Page.Domain.Edit as Edit
 import Page.Domain.Index as Index
-import Page.Domain.Ports as Ports
-import RemoteData
-import Route
-import Url
 
 
 type Visualization
@@ -32,16 +23,15 @@ type Visualization
     | Grid Index.Model
 
 
-type VisualizationPosition
-    = GridOrBubble Domain.DomainRelation
+type VisualizationOption
+    = GridOrBubble Visualization Domain.DomainRelation
     | GridOnly Index.Model
 
 
 type alias Model =
     { navKey : Nav.Key
     , configuration : Api.Configuration
-    , domainPosition : VisualizationPosition
-    , visualization : Visualization
+    , options : VisualizationOption
     }
 
 
@@ -64,57 +54,64 @@ init config key domainPosition =
         position =
             case domainPosition of
                 Domain.Root ->
-                    GridOrBubble domainPosition
+                    GridOrBubble (Grid indexModel) domainPosition
 
                 Domain.Subdomain _ ->
                     GridOnly indexModel
     in
     ( { navKey = key
       , configuration = config
-      , domainPosition = position
-      , visualization = Grid indexModel
+      , options = position
       }
-    , indexCmd |> Cmd.map DomainMsg
+    , indexCmd |> Cmd.map GridDomainMsg
     )
 
 
 type Msg
     = ChangeToBubble
     | ChangeToGrid
-    | DomainMsg Index.Msg
+    | GridDomainMsg Index.Msg
     | BubbleMsg Bubble.Msg
+    | GridOnlyDomainMsg Index.Msg
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
-    case ( model.visualization, msg ) of
-        ( Grid gridModel, DomainMsg domainMsg ) ->
-            Index.update domainMsg gridModel
-                |> Tuple.mapFirst (\m -> { model | visualization = Grid m })
-                |> Tuple.mapSecond (Cmd.map DomainMsg)
+    case model.options of
+        GridOrBubble visualisation domainPosition ->
+            case ( visualisation, msg ) of
+                ( Grid gridModel, GridDomainMsg domainMsg ) ->
+                    Index.update domainMsg gridModel
+                        |> Tuple.mapFirst (\m -> { model | options = GridOrBubble (Grid m) domainPosition })
+                        |> Tuple.mapSecond (Cmd.map GridDomainMsg)
 
-        ( _, ChangeToGrid ) ->
-            case model.domainPosition of
-                GridOrBubble position ->
-                    Index.init model.configuration model.navKey position
-                        |> Tuple.mapFirst (\m -> { model | visualization = Grid m })
-                        |> Tuple.mapSecond (Cmd.map DomainMsg)
+                ( _, ChangeToGrid ) ->
+                    Index.init model.configuration model.navKey domainPosition
+                        |> Tuple.mapFirst (\m -> { model | options = GridOrBubble (Grid m) domainPosition })
+                        |> Tuple.mapSecond (Cmd.map GridDomainMsg)
 
-                _ ->
-                    ( model, Cmd.none )
+                ( _, ChangeToBubble ) ->
+                    Bubble.init model.navKey model.configuration
+                        |> Tuple.mapFirst (\m -> { model | options = GridOrBubble (Bubble m) domainPosition })
+                        |> Tuple.mapSecond (Cmd.map BubbleMsg)
 
-        ( _, ChangeToBubble ) ->
-            Bubble.init model.navKey model.configuration
-                |> Tuple.mapFirst (\m -> { model | visualization = Bubble m })
-                |> Tuple.mapSecond (Cmd.map BubbleMsg)
+                ( Bubble bubbleModel, BubbleMsg infoMsg ) ->
+                    Bubble.update infoMsg bubbleModel
+                        |> Tuple.mapFirst (\m -> { model | options = GridOrBubble (Bubble m) domainPosition })
+                        |> Tuple.mapSecond (Cmd.map BubbleMsg)
 
-        ( Bubble bubbleModel, BubbleMsg infoMsg ) ->
-            Bubble.update infoMsg bubbleModel
-                |> Tuple.mapFirst (\m -> { model | visualization = Bubble m })
-                |> Tuple.mapSecond (Cmd.map BubbleMsg)
+                other ->
+                    Debug.todo ("This should never happen " ++ Debug.toString other)
 
-        other ->
-            Debug.todo ("This should never happen " ++ Debug.toString other)
+        GridOnly gridModel ->
+            case msg of
+                GridOnlyDomainMsg domainMsg ->
+                    Index.update domainMsg gridModel
+                        |> Tuple.mapFirst (\m -> { model | options = GridOnly m })
+                        |> Tuple.mapSecond (Cmd.map GridOnlyDomainMsg)
+
+                other ->
+                    Debug.todo ("This should never happen either " ++ Debug.toString other)
 
 
 isGrid visualization =
@@ -143,23 +140,23 @@ viewSwitch current =
 
 view : Model -> Html Msg
 view model =
-    case model.domainPosition of
+    case model.options of
         GridOnly m ->
             m
                 |> Index.view
-                |> Html.map DomainMsg
+                |> Html.map GridDomainMsg
 
-        GridOrBubble _ ->
+        GridOrBubble visualisation _ ->
             Grid.containerFluid []
                 [ Grid.row []
                     [ Grid.col [ Col.xs1 ]
-                        [ viewSwitch model.visualization ]
+                        [ viewSwitch visualisation ]
                     , Grid.col []
-                        [ case model.visualization of
+                        [ case visualisation of
                             Grid m ->
                                 m
                                     |> Index.view
-                                    |> Html.map DomainMsg
+                                    |> Html.map GridDomainMsg
 
                             Bubble m ->
                                 m
@@ -172,11 +169,11 @@ view model =
 
 subscriptions : Model -> Sub Msg
 subscriptions model =
-    case model.visualization of
-        Bubble m ->
+    case model.options of
+        GridOrBubble (Bubble m) _ ->
             m
                 |> Bubble.subscriptions
                 |> Sub.map BubbleMsg
 
-        Grid _ ->
+        _ ->
             Sub.none
