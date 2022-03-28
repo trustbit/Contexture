@@ -226,7 +226,7 @@ function doShowAllConnections(state, flag) {
         .attr('y2', d => d.y2)
         .attr('z', 0)
         .attr("opacity", 0.2)
-        .style('stroke-width', "1px")
+        .style('stroke-width', "2px")
         .style('stroke', "#0362fc")
     ;
 }
@@ -372,7 +372,7 @@ function mouseovered(state, select_key) {
         .attr('x2', d => d.x2)
         .attr('y2', d => d.y2)
         .attr("opacity", 0.2)
-        .style('stroke-width', "1px")
+        .style('stroke-width', "2px")
         .style('stroke', "#0362fc")
     ;
 }
@@ -538,7 +538,7 @@ function subdomain_mouseovered(state, select_key, x, y) {
         .attr('x2', d => d.x2)
         .attr('y2', d => d.y2)
         .attr("opacity", 0.2)
-        .style('stroke-width', "1px")
+        .style('stroke-width', "2px")
         .style('stroke', "#0362fc")
     ;
 }
@@ -737,7 +737,7 @@ function boundcontext_mouseovered(state, select_key, x, y) {
         .attr('x2', d => d.x2)
         .attr('y2', d => d.y2)
         .attr("opacity", 0.2)
-        .style('stroke-width', "1px")
+        .style('stroke-width', "2px")
         .style('stroke', "#0362fc")
     ;
 }
@@ -885,7 +885,7 @@ function showBoundedContextConnections(state, select_domain_key, select_subdomai
                         .attr('x2', d => d.x2)
                         .attr('y2', d => d.y2)
                         .attr("opacity", 0.2)
-                        .style('stroke-width', "1px")
+                        .style('stroke-width', "2px")
                         .style('stroke', "#0362fc")
                     ;
 
@@ -950,7 +950,6 @@ function calculateSizeFromHint(sizeHint) {
 
 function guessWidthAndHeightFromElement(element) {
     const parentStyle = window.getComputedStyle(element);
-    const rect = element.getBoundingClientRect();
 
     const width =
         element.clientWidth
@@ -959,7 +958,8 @@ function guessWidthAndHeightFromElement(element) {
     const maxHeight =
         window.visualViewport.height
         - window.visualViewport.offsetTop
-        - rect.top
+        - element.clientHeight
+        - 20
         - parseFloat(parentStyle.paddingTop)
         - parseFloat(parentStyle.paddingBottom)
     ;
@@ -1067,11 +1067,11 @@ template.innerHTML = `
     }
 
     circle.big-circle {
-        fill: #e8f1fd;
+        fill: #f1f1f1;
     }
 
     circle.out-circle {
-        fill: #f1f1f1;
+        fill: #c2c2c2;
     }
     
     circle.external-circle{
@@ -1082,7 +1082,7 @@ template.innerHTML = `
     }
     
     circle.main-page{
-        fill: #f1f1f1;
+        fill: #c2c2c2;
     }
     
     circle.main-page:hover{
@@ -1106,19 +1106,19 @@ template.innerHTML = `
     }
 
     circle.context-circle {
-        fill: #017cff;
+        fill: #3094ff;
     }
     
     tspan.context-circle{
-        fill: white;
+        fill: black;
     }
     
     circle.context-circle-view{
-        fill: #017cff;
+        fill: #3094ff;
     }
     
     tspan.context-circle-view{
-        fill: white;
+        fill: black;
     }
     
     tspan.bound-context-name{

@@ -2,10 +2,12 @@ module Page.Bubble.Bubble exposing (Model, Msg, init, subscriptions, update, vie
 
 import Api exposing (ApiResponse, ApiResult)
 import Bootstrap.Button as Button
+import Bootstrap.ButtonGroup as ButtonGroup
 import Bootstrap.Card as Card
 import Bootstrap.Grid as Grid
 import Bootstrap.Grid.Col as Col
 import Bootstrap.Modal as Modal
+import Bootstrap.Utilities.Spacing as Spacing
 import BoundedContext
 import BoundedContext.BoundedContextId exposing (BoundedContextId)
 import Browser.Navigation as Nav
@@ -20,9 +22,9 @@ import Html.Attributes as Attr exposing (..)
 import Html.Events exposing (onClick)
 import Http
 import Json.Decode as Decode exposing (Error)
+import Page.Bubble.Ports as Ports
 import Page.Domain.Edit as Edit
 import Page.Domain.Index as Index
-import Page.Bubble.Ports as Ports
 import RemoteData
 
 
@@ -101,12 +103,11 @@ update msg model =
             ( model
             , Ports.showHome ()
             )
-        
+
         ShowAllConnections value ->
             ( { model | showAllConnections = value }
             , Ports.showAllConnections value
-             )
-
+            )
 
         ShowMoreInfo id ->
             let
@@ -247,22 +248,23 @@ viewMoreDetails item =
 view : Model -> Html Msg
 view model =
     Grid.row []
-        [ Grid.col []
-            [ model.configuration
-                |> viewBubble
-            ]
-        , Grid.col [ Col.xs1 ]
+        [ Grid.col [ Col.xs1, Col.attrs [ Spacing.pt3 ] ]
             (case model.selectedElement of
                 Ports.None ->
                     [ Button.button [ Button.primary, Button.onClick ShowHome ] [ Html.text "Home" ]
-                    , Button.checkboxButton model.showAllConnections [ Button.secondary, Button.onClick <| ShowAllConnections (not model.showAllConnections)] [ text "Connections" ]
+                    , ButtonGroup.checkboxButtonGroup [ ButtonGroup.attrs [ Spacing.pt1 ] ]
+                        [ ButtonGroup.checkboxButton model.showAllConnections
+                            [ Button.secondary, Button.onClick <| ShowAllConnections (not model.showAllConnections) ]
+                            [ text "Connections" ]
+                        ]
                     ]
 
                 other ->
                     [ Grid.row []
                         [ Grid.col []
                             [ Button.button [ Button.primary, Button.onClick ShowHome ] [ Html.text "Home" ]
-                            , Button.button [ Button.primary, Button.onClick <| ShowMoreInfo other ] [ Html.text "More" ] 
+                            , Button.button [ Button.secondary, Button.onClick <| ShowMoreInfo other, Button.attrs [ Spacing.mt1 ] ]
+                                [ Html.text "Details" ]
                             ]
                         ]
                     , Grid.row []
@@ -282,6 +284,10 @@ view model =
                         ]
                     ]
             )
+        , Grid.col []
+            [ model.configuration
+                |> viewBubble
+            ]
         ]
 
 

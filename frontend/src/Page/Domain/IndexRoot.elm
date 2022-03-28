@@ -147,23 +147,31 @@ view model =
 
         GridOrBubble visualisation _ ->
             Grid.containerFluid []
-                [ Grid.row []
-                    [ Grid.col [ Col.xs1 ]
-                        [ viewSwitch visualisation ]
-                    , Grid.col []
-                        [ case visualisation of
-                            Grid m ->
-                                m
+                (case visualisation of
+                    Grid m ->
+                        [ Grid.row []
+                            [ Grid.col [ Col.xs1 ]
+                                [ viewSwitch visualisation ]
+                            , Grid.col []
+                                [ m
                                     |> Index.view
                                     |> Html.map GridDomainMsg
 
-                            Bubble m ->
-                                m
-                                    |> Bubble.view
-                                    |> Html.map BubbleMsg
+                                ]
+                            ]
                         ]
-                    ]
-                ]
+                    Bubble m ->
+                        [ Grid.row []
+                            [ Grid.col [ Col.xs1 ]
+                                [ viewSwitch visualisation
+                                ]
+                            ]
+                        , m
+                            |> Bubble.view
+                            |> Html.map BubbleMsg
+                        ]
+                )
+                
 
 
 subscriptions : Model -> Sub Msg
