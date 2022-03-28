@@ -65,7 +65,7 @@ init : Nav.Key -> Api.Configuration -> DomainId -> (Model, Cmd Msg)
 init key config domain =
   let
     (contexts, contextCmd) = Page.Bcc.Index.init config key domain
-    (subDomainsModel, subDomainsCmd) = Index.initWithSubdomains config key domain
+    (subDomainsModel, subDomainsCmd) = Index.init config key (Domain.Subdomain domain)
     model =
       { key = key
       , config = config

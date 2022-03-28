@@ -1,4 +1,4 @@
-module Page.Domain.Index exposing (Msg, Model, update, view, initWithSubdomains, initWithoutSubdomains)
+module Page.Domain.Index exposing (Msg, Model, update, view, init)
 
 import Browser.Navigation as Nav
 
@@ -117,15 +117,6 @@ init config key domainPosition =
   , Cmd.batch
     [ domainsOf config domainPosition Loaded
     , createCmd |> Cmd.map CreateMsg ] )
-
-initWithSubdomains : Api.Configuration -> Nav.Key -> DomainId -> (Model, Cmd Msg)
-initWithSubdomains baseUrl key parentDomain =
-  init baseUrl key (Domain.Subdomain parentDomain)
-
-initWithoutSubdomains : Api.Configuration -> Nav.Key -> (Model, Cmd Msg)
-initWithoutSubdomains baseUrl key =
-  init baseUrl key Domain.Root
-
 
 -- UPDATE
 
