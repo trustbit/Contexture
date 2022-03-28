@@ -13,8 +13,7 @@ import Html exposing (Html, button, div, text)
 import Html.Attributes as Attr exposing (..)
 import Html.Events exposing (onClick)
 import Json.Decode as Decode exposing (Error)
-import Page.Domain.Bubble as Bubble
-import Page.Domain.Edit as Edit
+import Page.Bubble.Bubble as Bubble
 import Page.Domain.Index as Index
 
 

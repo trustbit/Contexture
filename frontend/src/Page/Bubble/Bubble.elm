@@ -1,4 +1,4 @@
-module Page.Domain.Bubble exposing (Model, Msg, init, subscriptions, update, view)
+module Page.Bubble.Bubble exposing (Model, Msg, init, subscriptions, update, view)
 
 import Api exposing (ApiResponse, ApiResult)
 import Bootstrap.Button as Button
@@ -22,7 +22,7 @@ import Http
 import Json.Decode as Decode exposing (Error)
 import Page.Domain.Edit as Edit
 import Page.Domain.Index as Index
-import Page.Domain.Ports as Ports
+import Page.Bubble.Ports as Ports
 import RemoteData
 
 
@@ -32,6 +32,7 @@ type alias Model =
     , selectedElement : Ports.MoreInfoParameters
     , moreInfo : Maybe MoreInfoDetails
     , modalVisibility : Modal.Visibility
+    , showAllConnections : Bool
     }
 
 
@@ -55,6 +56,7 @@ init key config =
       , selectedElement = Ports.None
       , moreInfo = Nothing
       , modalVisibility = Modal.hidden
+      , showAllConnections = False
       }
     , Cmd.none
     )
@@ -68,6 +70,8 @@ type Msg
     | DomainIndexMsg Index.Msg
     | DomainEditMsg Edit.Msg
     | CloseModal
+    | ShowHome
+    | ShowAllConnections Bool
 
 
 updateBoundedContext bcModel =
@@ -92,6 +96,17 @@ update msg model =
 
         MoreInfoChanged (Err error) ->
             Debug.todo <| "Decoding failed: " ++ Debug.toString error
+
+        ShowHome ->
+            ( model
+            , Ports.showHome ()
+            )
+        
+        ShowAllConnections value ->
+            ( { model | showAllConnections = value }
+            , Ports.showAllConnections value
+             )
+
 
         ShowMoreInfo id ->
             let
@@ -236,15 +251,19 @@ view model =
             [ model.configuration
                 |> viewBubble
             ]
-        , Grid.col []
+        , Grid.col [ Col.xs1 ]
             (case model.selectedElement of
                 Ports.None ->
-                    [ Button.button [ Button.primary, Button.disabled True ] [ Html.text "More" ] ]
+                    [ Button.button [ Button.primary, Button.onClick ShowHome ] [ Html.text "Home" ]
+                    , Button.checkboxButton model.showAllConnections [ Button.secondary, Button.onClick <| ShowAllConnections (not model.showAllConnections)] [ text "Connections" ]
+                    ]
 
                 other ->
                     [ Grid.row []
                         [ Grid.col []
-                            [ Button.button [ Button.primary, Button.onClick <| ShowMoreInfo other ] [ Html.text "More" ] ]
+                            [ Button.button [ Button.primary, Button.onClick ShowHome ] [ Html.text "Home" ]
+                            , Button.button [ Button.primary, Button.onClick <| ShowMoreInfo other ] [ Html.text "More" ] 
+                            ]
                         ]
                     , Grid.row []
                         [ Grid.col []

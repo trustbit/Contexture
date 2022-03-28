@@ -1,4 +1,4 @@
-port module Page.Domain.Ports exposing (MoreInfoParameters(..), moreInfoChanged)
+port module Page.Bubble.Ports exposing (MoreInfoParameters(..), moreInfoChanged, showHome,showAllConnections)
 
 import BoundedContext.BoundedContextId exposing (BoundedContextId)
 import Domain.DomainId exposing (DomainId)
@@ -18,7 +18,8 @@ moreInfoChanged toMsg =
 
 
 port onMoreInfoChanged : (String -> msg) -> Sub msg
-
+port showHome : () -> Cmd msg
+port showAllConnections : Bool -> Cmd msg
 
 decoder =
     Decode.oneOf

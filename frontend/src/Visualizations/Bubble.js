@@ -189,7 +189,7 @@ function addTextToRectangle(svg, text_array, max_width, x, y, class_name) {
 
 }
 
-function showAllConnections(state) {
+function doShowAllConnections(state, flag) {
     let shadow = state.shadow;
     let rootSvg = state.svg;
     let domain_connections = state.domain_connections;
@@ -197,8 +197,7 @@ function showAllConnections(state) {
 
 
     rootSvg.selectAll(".chord").remove();
-    let show_all_connections = shadow.getElementById('show_all').checked;
-    if (!show_all_connections) {
+    if (!flag) {
         return;
     }
 
@@ -234,8 +233,7 @@ function showAllConnections(state) {
 
 function showMainPage(state) {
     state.svg.selectAll("*").remove();
-    state.shadow.getElementById('show_all_content').style.display = 'inline';
-    sendMessageToMoreInfo({});
+    sendMessageToMoreInfo({})
 
     var sorted_domains = state.domains.slice(0);
     sorted_domains.sort(function (a, b) {
@@ -307,8 +305,8 @@ function showMainPage(state) {
         state.domain_keys[sorted_domains[i]['key']]['cx'] = x;
         state.domain_keys[sorted_domains[i]['key']]['cy'] = y;
 
-        let className = 'main-page';
-        if (sorted_domains[i]['key'] == '000-000') className += ' external-circle';
+        let className='main-page';
+        if(sorted_domains[i]['key']=='000-000')className+=' external-circle';
         state.svg.append("circle")
             .attr("cx", x)
             .attr("cy", y)
@@ -380,7 +378,7 @@ function mouseovered(state, select_key) {
 }
 
 function mouseouted(state) {
-    showAllConnections(state);
+    doShowAllConnections(state);
 }
 
 
@@ -388,8 +386,6 @@ function showDomainPage(state, select_domain) {
     sendMessageToMoreInfo({
         Domain: select_domain,
     });
-    // state.rootThis.setAttribute("moreinfo",select_domain);
-    state.shadow.getElementById('show_all_content').style.display = 'none';
 
     state.svg.selectAll("*").remove();
     console.log(select_domain);
@@ -954,14 +950,18 @@ function calculateSizeFromHint(sizeHint) {
 
 function guessWidthAndHeightFromElement(element) {
     const parentStyle = window.getComputedStyle(element);
+    const rect = element.getBoundingClientRect();
+
     const width =
         element.clientWidth
         - parseFloat(parentStyle.paddingLeft)
         - parseFloat(parentStyle.paddingRight);
-    const maxHeight = Math.max(400,
-        element.clientHeight
+    const maxHeight =
+        window.visualViewport.height
+        - window.visualViewport.offsetTop
+        - rect.top
         - parseFloat(parentStyle.paddingTop)
-        - parseFloat(parentStyle.paddingBottom))
+        - parseFloat(parentStyle.paddingBottom)
     ;
     return {width: width, maxHeight: maxHeight};
 }
@@ -1170,8 +1170,6 @@ export class Bubble extends HTMLElement {
         this.bubbleState.rootThis = this;
         this.bubbleState.shadow = this.attachShadow({mode: 'open'});
         this.bubbleState.shadow.appendChild(template.content.cloneNode(true));
-        this.bubbleState.shadow.innerHTML += '<label id="show_all_content"><input id="show_all" type="checkbox">Show all connections</label><br>' +
-            '<button type="button" class="btn btn-link" id="go_home">Home</button></br>';
     }
 
 
@@ -1182,23 +1180,21 @@ export class Bubble extends HTMLElement {
 
         await this.buildData();
 
-        let element = this.bubbleState.shadow.getElementById('show_all');
-
-        let state = this.bubbleState;
-        element.onclick = function () {
-            showAllConnections(state);
-        };
-
-        element = this.bubbleState.shadow.getElementById('go_home');
-        element.onclick = function () {
-            showMainPage(state);
-        };
-
+        const state = this.bubbleState;
         showMainPage(state);
     }
 
     disconnectedCallback() {
         // this.resizeObserver.disconnect();
+    }
+
+    showAllConnections(flag) {
+        doShowAllConnections(this.bubbleState, flag);
+    }
+    
+
+    showMain() {
+        showMainPage(this.bubbleState);
     }
 
     async buildData() {
