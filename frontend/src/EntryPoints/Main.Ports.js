@@ -12,5 +12,14 @@ export function mainPorts(app) {
             const bubble = document.querySelector('bubble-visualization');
             bubble.showAllConnections(flag);
         });
+
+        if (app.ports.storeVisualization && app.ports.onVisualizationChanged) {
+            app.ports.storeVisualization.subscribe(function (mode) {
+                localStorage.setItem("domainIndex_visualization", mode);
+            });
+
+            const vizualization = localStorage.getItem('domainIndex_visualization')
+            app.ports.onVisualizationChanged.send(vizualization || "unknown")
+        }
     }
 }

@@ -14,6 +14,7 @@ import Html.Attributes as Attr exposing (..)
 import Html.Events exposing (onClick)
 import Json.Decode as Decode exposing (Error)
 import Page.Bubble.Bubble as Bubble
+import Page.Bubble.Ports as Ports
 import Page.Domain.Index as Index
 
 
@@ -69,6 +70,7 @@ init config key domainPosition =
 type Msg
     = ChangeToBubble
     | ChangeToGrid
+    | VisualizationLoaded (Maybe Ports.Visualization)
     | GridDomainMsg Index.Msg
     | BubbleMsg Bubble.Msg
     | GridOnlyDomainMsg Index.Msg
@@ -88,11 +90,28 @@ update msg model =
                     Index.init model.configuration model.navKey domainPosition
                         |> Tuple.mapFirst (\m -> { model | options = GridOrBubble (Grid m) domainPosition })
                         |> Tuple.mapSecond (Cmd.map GridDomainMsg)
+                        |> Tuple.mapSecond (\c -> Cmd.batch [c, Ports.savePresentation Ports.Grid])
 
                 ( _, ChangeToBubble ) ->
                     Bubble.init model.navKey model.configuration
                         |> Tuple.mapFirst (\m -> { model | options = GridOrBubble (Bubble m) domainPosition })
                         |> Tuple.mapSecond (Cmd.map BubbleMsg)
+                        |> Tuple.mapSecond (\c -> Cmd.batch [c, Ports.savePresentation Ports.Bubble])
+                
+                ( _, VisualizationLoaded maybeVisualization) ->
+                    case maybeVisualization of
+                        Just Ports.Grid -> 
+                            Index.init model.configuration model.navKey domainPosition
+                                |> Tuple.mapFirst (\m -> { model | options = GridOrBubble (Grid m) domainPosition })
+                                |> Tuple.mapSecond (Cmd.map GridDomainMsg)
+                        
+                        Just Ports.Bubble -> 
+                            Bubble.init model.navKey model.configuration
+                                |> Tuple.mapFirst (\m -> { model | options = GridOrBubble (Bubble m) domainPosition })
+                                |> Tuple.mapSecond (Cmd.map BubbleMsg)
+                            
+                        Nothing ->
+                            ( model, Cmd.none)
 
                 ( Bubble bubbleModel, BubbleMsg infoMsg ) ->
                     Bubble.update infoMsg bubbleModel
@@ -178,9 +197,12 @@ subscriptions : Model -> Sub Msg
 subscriptions model =
     case model.options of
         GridOrBubble (Bubble m) _ ->
-            m
-                |> Bubble.subscriptions
-                |> Sub.map BubbleMsg
+            Sub.batch 
+                [ Ports.visualizationLoaded VisualizationLoaded
+                , m
+                    |> Bubble.subscriptions
+                    |> Sub.map BubbleMsg
+                ]
 
         _ ->
             Sub.none

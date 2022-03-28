@@ -1,4 +1,4 @@
-port module Page.Bubble.Ports exposing (MoreInfoParameters(..), moreInfoChanged, showHome,showAllConnections)
+port module Page.Bubble.Ports exposing (MoreInfoParameters(..), moreInfoChanged, showHome,showAllConnections, savePresentation, visualizationLoaded, Visualization(..))
 
 import BoundedContext.BoundedContextId exposing (BoundedContextId)
 import Domain.DomainId exposing (DomainId)
@@ -34,3 +34,46 @@ decoder =
             (Decode.field "Domain" Domain.DomainId.idDecoder)
         , Decode.succeed None
         ]
+
+
+port storeVisualization : String -> Cmd msg
+
+
+port onVisualizationChanged : (String -> msg) -> Sub msg
+
+
+type Visualization
+    = Grid
+    | Bubble
+
+savePresentation : Visualization -> Cmd msg
+savePresentation visualization =
+    visualization
+        |> toString
+        |> storeVisualization
+
+
+visualizationLoaded : (Maybe Visualization -> msg) -> Sub msg
+visualizationLoaded toMsg =
+    onVisualizationChanged (readFromString >> toMsg)
+
+
+toString visualization =
+    case visualization of
+        Grid ->
+            "Grid"
+
+        Bubble ->
+            "Bubble"
+
+readFromString : String -> Maybe Visualization
+readFromString s =
+    case s |> String.toLower of
+        "grid" ->
+            Just Grid
+
+        "bubble" ->
+            Just Bubble
+
+        _ ->
+            Nothing
