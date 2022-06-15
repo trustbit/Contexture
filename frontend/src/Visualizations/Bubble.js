@@ -39,7 +39,7 @@ var BrowserText = (function () {
      * @param {string} fontFace The font face ("Arial", "Helvetica", etc.)
      * @returns {number} The width of the text
      **/
-    function getWidth(text, fontSize, fontFace='') {
+    function getWidth(text, fontSize, fontFace='System') {
         context.font = fontSize + 'px ' + fontFace;
         return context.measureText(text).width;
     }
@@ -50,8 +50,8 @@ var BrowserText = (function () {
 })();
 
 function getFontSize(text, max_width) {
-    let name_font_size = 1;
-    for (let j = 1; j < 22; j++) {
+    let name_font_size = 12;
+    for (let j = 12; j < 22; j++) {
         let name_width = BrowserText.getWidth(text, j);
         if (max_width < name_width)
             break;
@@ -88,6 +88,7 @@ function addTextToCircleCenter(svg, text_array, diameter, circle_index, x, y, cl
 
     let name_font_size = getFontSize(longer_text, diameter * 0.75);
     name_font_size = Math.min(name_font_size, diameter * 0.75 / (line_words.length + 1));
+    name_font_size = Math.max(name_font_size,12);
 
     let text_element = svg.append('text')
         .attr('x', x)
@@ -555,6 +556,7 @@ function showSubdomainPage(state, select_domain_key, select_subdomain_key) {
     // state.rootThis.setAttribute("moreinfo",select_domain_key+"/"+select_subdomain_key);
 
     state.svg.selectAll(".subdomain-circle").remove();
+    state.svg.selectAll(".not-select-subdomain").remove();
     state.svg.selectAll(".select-subdomain").remove();
     state.svg.selectAll(".context-circle").remove();
     state.svg.selectAll(".context-circle-view").remove();
