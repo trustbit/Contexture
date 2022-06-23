@@ -9,7 +9,7 @@
   <ItemGroup>
     <PackageReference Include="FSharp.SystemTextJson" Version="0.16.6" />
     <PackageReference Include="Giraffe" Version="5.0.0-rc-6" />
-    <PackageReference Include="Newtonsoft.Json" Version="12.0.3" />
+    <PackageReference Include="Newtonsoft.Json" Version="13.0.1" />
     <PackageReference Include="Ply" Version="0.3.*" />
   </ItemGroup>
 
