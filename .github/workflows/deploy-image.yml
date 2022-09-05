@@ -3,15 +3,16 @@ name: Deploy docker image
 on:
   push:
     branches:
-      - master
+      - main
     tags:
       - '*'
+
 jobs:
   build-and-deploy:
     name: Build and Deploy
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@master
+    - uses: actions/checkout@v3
     - uses: actions/setup-dotnet@v2
       with:
         dotnet-version: '6.0.x'
