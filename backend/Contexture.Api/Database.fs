@@ -146,7 +146,7 @@ module Database =
         type Domain =
             { Id: DomainId
               ParentDomainId: DomainId option
-              Key: string option
+              ShortName: string option
               Name: string
               Vision: string option }
 
@@ -160,7 +160,7 @@ module Database =
         type BoundedContext =
             { Id: BoundedContextId
               DomainId: DomainId
-              Key: string option
+              ShortName: string option
               Name: string
               Description: string option
               Classification: StrategicClassification

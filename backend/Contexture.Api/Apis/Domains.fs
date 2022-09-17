@@ -23,7 +23,7 @@ module Domains =
         type BoundedContextResult =
             { Id: BoundedContextId
               ParentDomainId: DomainId
-              Key: string option
+              ShortName: string option
               Name: string
               Description: string option
               Classification: StrategicClassification
@@ -36,7 +36,7 @@ module Domains =
         type DomainResult =
             { Id: DomainId
               ParentDomainId: DomainId option
-              Key: string option
+              ShortName: string option
               Name: string
               Vision: string option
               Subdomains: DomainResult list
@@ -46,7 +46,7 @@ module Domains =
         let convertBoundedContext (findNamespaces: BoundedContextId -> Namespace list ) (boundedContext: BoundedContext) =
             { Id = boundedContext.Id
               ParentDomainId = boundedContext.DomainId
-              Key = boundedContext.Key
+              ShortName = boundedContext.ShortName
               Name = boundedContext.Name
               Description = boundedContext.Description
               Classification = boundedContext.Classification
@@ -59,7 +59,7 @@ module Domains =
         let convertDomain (domain: Domain) =
             { Id = domain.Id
               ParentDomainId = domain.ParentDomainId
-              Key = domain.Key
+              ShortName = domain.ShortName
               Name = domain.Name
               Vision = domain.Vision
               Subdomains = []
@@ -123,8 +123,8 @@ module Domains =
         let refineVision domainId (command: RefineVision) =
             updateAndReturnDomain (RefineVision(domainId, command))
 
-        let assignKey domainId (command: AssignKey) =
-            updateAndReturnDomain (AssignKey(domainId, command))
+        let assignShortName domainId (command: AssignShortName) =
+            updateAndReturnDomain (AssignShortName(domainId, command))
 
         let newBoundedContextOn domainId (command: CreateBoundedContext) =
             fun (next: HttpFunc) (ctx: HttpContext) ->
@@ -239,8 +239,8 @@ module Domains =
                                     >=> route "/vision"
                                     >=> bindJson (CommandEndpoints.refineVision domainId)
                                     POST
-                                    >=> route "/key"
-                                    >=> bindJson (CommandEndpoints.assignKey domainId)
+                                    >=> route "/shortName"
+                                    >=> bindJson (CommandEndpoints.assignShortName domainId)
 
                                     DELETE
                                     >=> CommandEndpoints.removeAndReturnId domainId

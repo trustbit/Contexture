@@ -12,7 +12,7 @@ module Domain =
         | RenameDomain of DomainId * RenameDomain
         | MoveDomain of DomainId * MoveDomain
         | RefineVision of DomainId * RefineVision
-        | AssignKey of DomainId * AssignKey
+        | AssignShortName of DomainId * AssignShortName
         | RemoveDomain of DomainId
 
     and CreateDomain = { Name: string }
@@ -23,7 +23,7 @@ module Domain =
 
     and RefineVision = { Vision: string }
 
-    and AssignKey = { Key: string }
+    and AssignShortName = { ShortName: string }
 
     type Event =
         | DomainImported of DomainImported
@@ -34,12 +34,12 @@ module Domain =
         | PromotedToDomain of PromotedToDomain
         | VisionRefined of VisionRefined
         | DomainRemoved of DomainRemoved
-        | KeyAssigned of KeyAssigned
+        | ShortNameAssigned of ShortNameAssigned
 
     and DomainImported =
         { DomainId: DomainId
           ParentDomainId: DomainId option
-          Key: string option
+          ShortName: string option
           Name: string
           Vision: string option }
 
@@ -64,9 +64,9 @@ module Domain =
 
     and DomainRemoved = { DomainId: DomainId }
 
-    and KeyAssigned =
+    and ShortNameAssigned =
         { DomainId: DomainId
-          Key: string option }
+          ShortName: string option }
 
     type Errors =
         | EmptyName
@@ -81,7 +81,7 @@ module Domain =
         | CreateSubdomain (domainId, _, _) -> domainId
         | RenameDomain (domainId, _) -> domainId
         | RefineVision (domainId, _) -> domainId
-        | AssignKey (domainId, _) -> domainId
+        | AssignShortName (domainId, _) -> domainId
         | MoveDomain (domainId, _) -> domainId
         | RemoveDomain (domainId) -> domainId
 
@@ -90,9 +90,10 @@ module Domain =
     type Domain =
         { Id: DomainId
           ParentDomainId: DomainId option
-          Key: string option
+          ShortName: string option
           Name: string
-          Vision: string option }
+          Vision: string option
+        }
 
     type State =
         | Initial
@@ -108,7 +109,7 @@ module Domain =
                     { Id = c.DomainId
                       Vision = c.Vision
                       ParentDomainId = c.ParentDomainId
-                      Key = c.Key
+                      ShortName = c.ShortName
                       Name = c.Name }
             |  Initial, DomainCreated c ->
                 Existing
@@ -116,14 +117,15 @@ module Domain =
                       Vision = None
                       ParentDomainId = None
                       Name = c.Name
-                      Key = None }
+                      ShortName = None
+                    }
             | Initial, SubDomainCreated c ->
                 Existing
                     { Id = c.DomainId
                       Vision = None
                       ParentDomainId = Some c.ParentDomainId
                       Name = c.Name
-                      Key = None }
+                      ShortName = None }
             | Existing domain, CategorizedAsSubdomain c ->
                 Existing
                     { domain with
@@ -134,8 +136,8 @@ module Domain =
                 Existing { domain with Name = c.Name }
             | Existing domain, VisionRefined c ->
                 Existing { domain with Vision = c.Vision }
-            | Existing domain, KeyAssigned c ->
-                Existing { domain with Key = c.Key }
+            | Existing domain, ShortNameAssigned c ->
+                Existing { domain with ShortName = c.ShortName }
             | _ -> state
 
     let newDomain id name parentDomain =
@@ -182,11 +184,11 @@ module Domain =
         | _ ->
             Error DomainAlreadyDeleted 
 
-    let assignKeyToDomain key domainId =
-        KeyAssigned
+    let assignShortNameToDomain shortName domainId =
+        ShortNameAssigned
             { DomainId = domainId
-              Key =
-                  key
+              ShortName =
+                  shortName
                   |> Option.ofObj
                   |> Option.filter (String.IsNullOrWhiteSpace >> not) }
         |> Ok
@@ -200,7 +202,7 @@ module Domain =
         | MoveDomain (domainId, move) -> moveDomain move.ParentDomainId domainId
         | RenameDomain (domainId, rename) -> renameDomain rename.Name domainId state
         | RefineVision (domainId, refineVision) -> refineVisionOfDomain refineVision.Vision domainId
-        | AssignKey (domainId, assignKey) -> assignKeyToDomain assignKey.Key domainId
+        | AssignShortName (domainId, assignShortName) -> assignShortNameToDomain assignShortName.ShortName domainId
         |> Result.map List.singleton
 
    

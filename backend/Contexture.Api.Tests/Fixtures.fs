@@ -13,7 +13,7 @@ module Fixtures =
         let Name = "domain"
 
         [<Literal>]
-        let Key = "DO-1"
+        let ShortName = "DO-1"
 
         let domainDefinition domainId : DomainCreated = { DomainId = domainId; Name = Name }
 
@@ -21,10 +21,10 @@ module Fixtures =
             DomainCreated definition
             |> Utils.asEvent definition.DomainId
 
-        let key domainId : KeyAssigned = { DomainId = domainId; Key = Some Key }
+        let shortName domainId : ShortNameAssigned = { DomainId = domainId; ShortName = Some ShortName }
 
-        let keyAssigned key =
-            KeyAssigned key |> Utils.asEvent key.DomainId
+        let shortNameAssigned shortName =
+            ShortNameAssigned shortName |> Utils.asEvent shortName.DomainId
 
     module BoundedContext =
         open BoundedContext
@@ -33,7 +33,7 @@ module Fixtures =
         let Name = "bounded-context"
 
         [<Literal>]
-        let Key = "BC-1"
+        let ShortName = "BC-1"
 
         let definition domainId contextId =
             { BoundedContextId = contextId
@@ -44,13 +44,13 @@ module Fixtures =
             BoundedContextCreated definition
             |> Utils.asEvent definition.BoundedContextId
 
-        let key domainId : KeyAssigned =
+        let shortName domainId : ShortNameAssigned =
             { BoundedContextId = domainId
-              Key = Some Key }
+              ShortName = Some ShortName }
 
-        let keyAssigned key =
-            KeyAssigned key
-            |> Utils.asEvent key.BoundedContextId
+        let shortNameAssigned shortName =
+            ShortNameAssigned shortName
+            |> Utils.asEvent shortName.BoundedContextId
 
     module Label =
 
@@ -132,13 +132,13 @@ module Fixtures =
                  domainId
                  |> Domain.domainDefinition
                  |> Domain.domainCreated
-                 domainId |> Domain.key |> Domain.keyAssigned
+                 domainId |> Domain.shortName |> Domain.shortNameAssigned
             ]
             |> Given.andEvents [
                 contextId
                 |> BoundedContext.definition domainId
                 |> BoundedContext.boundedContextCreated
-                contextId |> BoundedContext.key |> BoundedContext.keyAssigned
+                contextId |> BoundedContext.shortName |> BoundedContext.shortNameAssigned
             ]
 
         let givenADomainWithOneBoundedContextAndOneNamespace domainId contextId namespaceId =

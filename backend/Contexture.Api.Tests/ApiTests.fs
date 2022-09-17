@@ -321,9 +321,9 @@ module BoundedContexts =
         [<InlineData("Namespace.name", "Team")>]
         [<InlineData("Namespace.template", "A9F5D70E-B947-40B6-B7BE-4AC45CFE7F34")>]
         [<InlineData("Domain.name", "domain")>]
-        [<InlineData("Domain.key", "DO-1")>]
+        [<InlineData("Domain.shortName", "DO-1")>]
         [<InlineData("BoundedContext.name", "bounded-context")>]
-        [<InlineData("BoundedContext.key", "BC-1")>]
+        [<InlineData("BoundedContext.shortName", "BC-1")>]
         let ``with a single, exact parameter then only the bounded context is found``
             (
                 parameterName: string,
@@ -376,21 +376,21 @@ module BoundedContexts =
                          domainId
                          |> Domain.domainDefinition
                          |> Domain.domainCreated
-                         { Domain.key domainId 
-                           with Key = Some "DomainKey" }
-                            |> Domain.keyAssigned
+                         { Domain.shortName domainId 
+                           with ShortName = Some "DomainShortName" }
+                            |> Domain.shortNameAssigned
                     ]
                     |> Given.andEvents [
                         { BoundedContext.definition domainId firstContextId
                             with Name = "First" }
                         |> BoundedContext.boundedContextCreated
-                        firstContextId |> BoundedContext.key |> BoundedContext.keyAssigned
+                        firstContextId |> BoundedContext.shortName |> BoundedContext.shortNameAssigned
                     ]
                     |> Given.andEvents [
                         { BoundedContext.definition domainId secondContextId
                             with Name = "Second" }
                         |> BoundedContext.boundedContextCreated
-                        secondContextId |> BoundedContext.key |> BoundedContext.keyAssigned
+                        secondContextId |> BoundedContext.shortName |> BoundedContext.shortNameAssigned
                     ]                
                     
                 use testEnvironment = prepareTestEnvironment simulation given
@@ -398,7 +398,7 @@ module BoundedContexts =
                 //act
                 let! result =
                     testEnvironment
-                    |> When.searchingFor $"Domain.key=DomainKey&BoundedContext.Name=*Third*"
+                    |> When.searchingFor $"Domain.shortName=DomainShortName&BoundedContext.Name=*Third*"
 
                 // assert
                 Then.Empty result

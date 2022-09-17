@@ -148,7 +148,7 @@ module FileBasedCommandHandlers =
                         Name = domain.Name
                         ParentDomainId = domain.ParentDomainId
                         Vision = domain.Vision
-                        Key = domain.Key } }
+                        ShortName = domain.ShortName } }
             |> List.singleton
 
         let mapDomainToSerialization (state: Serialization.Domain option) event : Serialization.Domain option =
@@ -159,7 +159,7 @@ module FileBasedCommandHandlers =
                     let mappedState: Serialization.Domain =
                         {
                             Id = state.Id
-                            Key = state.Key
+                            ShortName = state.ShortName
                             Name = state.Name
                             Vision = state.Vision
                             ParentDomainId = state.ParentDomainId
@@ -172,7 +172,7 @@ module FileBasedCommandHandlers =
                 let mappedState =
                     Existing {
                         Id = s.Id
-                        Key = s.Key
+                        ShortName = s.ShortName
                         Name = s.Name
                         Vision = s.Vision
                         ParentDomainId = s.ParentDomainId
@@ -223,7 +223,7 @@ module FileBasedCommandHandlers =
                         DomainRoles = collaboration.DomainRoles
                         UbiquitousLanguage = collaboration.UbiquitousLanguage
                         BusinessDecisions = collaboration.BusinessDecisions
-                        Key = collaboration.Key
+                        ShortName = collaboration.ShortName
                         Name = collaboration.Name }
             }
             |> List.singleton
@@ -233,7 +233,7 @@ module FileBasedCommandHandlers =
             let convertToSerialization namespaces (context: Projections.BoundedContext): Serialization.BoundedContext =
                 { Id = context.Id
                   DomainId = context.DomainId
-                  Key = context.Key
+                  ShortName = context.ShortName
                   Name = context.Name
                   Description = context.Description
                   Classification = context.Classification
@@ -249,7 +249,7 @@ module FileBasedCommandHandlers =
                 let mapped: Projections.BoundedContext =
                     { Id = bc.Id
                       DomainId = bc.DomainId
-                      Key = bc.Key
+                      ShortName = bc.ShortName
                       Name = bc.Name
                       Description = bc.Description
                       Classification = bc.Classification
