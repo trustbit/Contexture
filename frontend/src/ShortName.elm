@@ -1,7 +1,7 @@
-module Key exposing(
-  Key, Problem(..),
+module ShortName exposing(
+  ShortName, Problem(..),
   fromString, toString,
-  keyDecoder, keyEncoder)
+  shortNameDecoder, shortNameEncoder)
 
 import Json.Decode as Decode exposing(Decoder)
 import Json.Encode as Encode
@@ -9,8 +9,8 @@ import Json.Encode as Encode
 
 import Set exposing (Set)
 
-type Key =
-  Key String
+type ShortName =
+  ShortName String
 
 type Problem
   = Empty
@@ -23,7 +23,7 @@ invalidWhitespace =
   [ ' ', '\n', '\r' ]
   |> Set.fromList
 
-checkNonEmpty : List Char -> Result Problem Key
+checkNonEmpty : List Char -> Result Problem ShortName
 checkNonEmpty chars =
   let
     startsWithNumber =
@@ -49,26 +49,26 @@ checkNonEmpty chars =
     else if not (Set.isEmpty specialChars) then
       Err <| ContainsSpecialChars specialChars
     else
-      chars |> String.fromList |> Key |> Ok
+      chars |> String.fromList |> ShortName |> Ok
 
-fromString : String -> Result Problem Key
-fromString potentialKey =
-  if potentialKey |> String.isEmpty then
+fromString : String -> Result Problem ShortName
+fromString potentialShortName =
+  if potentialShortName |> String.isEmpty then
     Err Empty
   else
-    potentialKey
+    potentialShortName
     |> String.toList
     |> checkNonEmpty
 
-toString : Key -> String
-toString (Key value) =
+toString : ShortName -> String
+toString (ShortName value) =
   value
 
-keyDecoder : Decoder Key
-keyDecoder =
-  Decode.map Key Decode.string
+shortNameDecoder : Decoder ShortName
+shortNameDecoder =
+  Decode.map ShortName Decode.string
 
 
-keyEncoder : Key -> Encode.Value
-keyEncoder (Key value) =
+shortNameEncoder : ShortName -> Encode.Value
+shortNameEncoder (ShortName value) =
   Encode.string value

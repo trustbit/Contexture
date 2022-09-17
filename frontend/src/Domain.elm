@@ -1,8 +1,8 @@
 module Domain exposing (
   Domain, DomainRelation(..), Problem(..), Name,
-  domainRelation, asName, isNameValid, name, id, vision, key,
+  domainRelation, asName, isNameValid, name, id, vision, shortName,
   domainDecoder, domainsDecoder,
-  newDomain, moveDomain, remove, renameDomain, updateVision, assignKey)
+  newDomain, moveDomain, remove, renameDomain, updateVision, assignShortName)
 
 import Json.Decode as Decode exposing(Decoder)
 import Json.Decode.Pipeline as JP
@@ -11,7 +11,7 @@ import Json.Encode as Encode
 import Url
 import Http
 
-import Key exposing (Key)
+import ShortName exposing (ShortName)
 import Domain.DomainId exposing(DomainId(..), idDecoder)
 import Api exposing(ApiResult)
 
@@ -27,7 +27,7 @@ type alias Internal =
   { id : DomainId
   , name : String
   , vision : String
-  , key : Maybe Key
+  , shortName : Maybe ShortName
   , parentDomain : Maybe DomainId
   }
 
@@ -70,9 +70,9 @@ domainRelation (Domain domain) =
     Nothing -> Root
     Just subId -> Subdomain subId
 
-key : Domain -> Maybe Key
-key (Domain domain) =
-  domain.key
+shortName : Domain -> Maybe ShortName
+shortName (Domain domain) =
+  domain.shortName
 
 -- CONVERSIONS
 
@@ -94,7 +94,7 @@ domainDecoder =
     |> JP.custom idFieldDecoder
     |> JP.custom nameFieldDecoder
     |> JP.optional "vision" Decode.string ""
-    |> JP.optional "key" (Decode.maybe Key.keyDecoder) Nothing
+    |> JP.optional "shortName" (Decode.maybe ShortName.shortNameDecoder) Nothing
     |> JP.optional "parentDomainId" (Decode.maybe idDecoder) Nothing
   ) |> Decode.map Domain
 
@@ -190,19 +190,19 @@ remove base domainId =
   in
     request
 
-assignKey : Api.Configuration -> DomainId -> Maybe Key -> ApiResult Domain msg
-assignKey base domainId domainKey =
+assignShortName : Api.Configuration -> DomainId -> Maybe ShortName -> ApiResult Domain msg
+assignShortName base domainId domainShortName =
   let
-    encodedKey =
-      case domainKey of
-        Just v -> Key.keyEncoder v
+    encodedShortName =
+      case domainShortName of
+        Just v -> ShortName.shortNameEncoder v
         Nothing -> Encode.null
     request toMsg =
       Http.request
       { method = "POST"
       , headers = []
-      , url = domainId |> Api.domain [] |> Api.url base |> (\u -> u ++ "/key")
-      , body = Http.jsonBody <| Encode.object[ ("key", encodedKey) ]
+      , url = domainId |> Api.domain [] |> Api.url base |> (\u -> u ++ "/shortName")
+      , body = Http.jsonBody <| Encode.object[ ("shortName", encodedShortName) ]
       , expect = Http.expectJson toMsg domainDecoder
       , timeout = Nothing
       , tracker = Nothing

@@ -1,4 +1,4 @@
-module Page.Bcc.Edit.Key exposing (
+module Page.Bcc.Edit.ShortName exposing (
     init, Model,
     update, Msg,
     view)
@@ -22,13 +22,13 @@ import Bootstrap.Utilities.Spacing as Spacing
 import Bootstrap.Utilities.Flex as Flex
 
 import Api
-import Page.ChangeKey as ChangeKey
+import Page.ChangeShortName as ChangeShortName
 import BoundedContext as BoundedContext exposing(BoundedContext, Name)
-import Key as Key
+import ShortName as ShortName
 
 
 type alias Model =
-  { changingName : Maybe ChangeKey.Model
+  { changingName : Maybe ChangeShortName.Model
   , config : Api.Configuration
   , boundedContext : BoundedContext
   }
@@ -47,8 +47,8 @@ init configuration model =
 type Msg
   = Saved (Api.ApiResponse BoundedContext)
   | StartChanging
-  | KeyMsg ChangeKey.Msg
-  | ChangeKey (Maybe Key.Key)
+  | ShortNameMsg ChangeShortName.Msg
+  | ChangeShortName (Maybe ShortName.ShortName)
   | CancelChanging
   | NoOp
 
@@ -60,18 +60,18 @@ update : Msg -> Model -> (Model, Cmd Msg)
 update msg model =
   case msg of
     StartChanging ->
-      model.boundedContext |> BoundedContext.key |> ChangeKey.init model.config
+      model.boundedContext |> BoundedContext.shortName |> ChangeShortName.init model.config
       |> Tuple.mapFirst (\m -> { model | changingName = Just m })
-      |> Tuple.mapSecond (Cmd.map KeyMsg)
-      |> Tuple.mapSecond(\c -> Cmd.batch [ c, Task.attempt (\_ -> NoOp) (Dom.focus "key")])
+      |> Tuple.mapSecond (Cmd.map ShortNameMsg)
+      |> Tuple.mapSecond(\c -> Cmd.batch [ c, Task.attempt (\_ -> NoOp) (Dom.focus "shortName")])
 
 
     CancelChanging ->
       noCommand { model | changingName = Nothing }
 
-    ChangeKey key ->
+    ChangeShortName shortName ->
       ( model
-      , BoundedContext.assignKey model.config (model.boundedContext |> BoundedContext.id) key Saved
+      , BoundedContext.assignShortName model.config (model.boundedContext |> BoundedContext.id) shortName Saved
       )
 
     Saved (Ok context) ->
@@ -85,12 +85,12 @@ update msg model =
       Debug.todo "Error"
       -- noCommand <| Debug.log "Error on save " model
 
-    KeyMsg name ->
+    ShortNameMsg name ->
       case model.changingName of
-        Just keyModel ->
-          ChangeKey.update name keyModel
+        Just shortNameModel ->
+          ChangeShortName.update name shortNameModel
           |> Tuple.mapFirst (\m -> { model | changingName = Just m})
-          |> Tuple.mapSecond(Cmd.map KeyMsg)
+          |> Tuple.mapSecond(Cmd.map ShortNameMsg)
         Nothing ->
           (model, Cmd.none)
 
@@ -107,8 +107,8 @@ view model =
           let
             (events, disabled) =
               case m.value of
-                Ok key ->
-                  ([ onSubmit (ChangeKey key)],False)
+                Ok shortName ->
+                  ([ onSubmit (ChangeShortName shortName)],False)
                 Err _ ->
                   ([], True)
           in [
@@ -116,14 +116,14 @@ view model =
             [ Grid.row []
               [ Grid.col []
                 [ viewCaption
-                  [ text "Key"
+                  [ text "Short name"
                   , ButtonGroup.buttonGroup []
                     [ ButtonGroup.button
                       [ Button.primary
                       , Button.small
                       , Button.disabled disabled
                       ]
-                      [ text "Assign new key" ]
+                      [ text "Assign new short name" ]
                     , ButtonGroup.button [ Button.secondary, Button.small, Button.onClick CancelChanging] [ text "X" ]
                     ]
                   ]
@@ -131,8 +131,8 @@ view model =
               ]
             , Grid.row [ Row.attrs [ Spacing.pt2, style "min-height" "80px" ] ]
               [ Grid.col []
-                [ ChangeKey.view m
-                  |> Html.map KeyMsg
+                [ ChangeShortName.view m
+                  |> Html.map ShortNameMsg
                 ]
               ]
             ]
@@ -142,16 +142,16 @@ view model =
           [ Grid.row []
             [ Grid.col []
               [ viewCaption
-                [ text "Key"
-                , Button.button [ Button.outlinePrimary, Button.small, Button.onClick StartChanging] [ text "Assign key" ]
+                [ text "Short name"
+                , Button.button [ Button.outlinePrimary, Button.small, Button.onClick StartChanging] [ text "Assign short name" ]
                 ]
               ]
             ]
           , Grid.row [ Row.attrs [ Spacing.pt2, style "min-height" "80px"] ]
             [ Grid.col [ ]
               [ model.boundedContext
-                |> BoundedContext.key
-                |> Maybe.map Key.toString
+                |> BoundedContext.shortName
+                |> Maybe.map ShortName.toString
                 |> Maybe.withDefault ""
                 |> text
               ]

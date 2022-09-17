@@ -22,7 +22,7 @@ import Html.Attributes exposing (..)
 import Html.Events exposing (onClick)
 import Json.Decode as Decode
 import Json.Decode.Pipeline as JP
-import Key
+import ShortName
 import List
 import Route
 import Set
@@ -133,7 +133,7 @@ viewDependencies communication =
 titleContent context =
     [ text (context |> BoundedContext.name)
     , Html.small [ class "text-muted", class "float-right" ]
-        [ text (context |> BoundedContext.key |> Maybe.map Key.toString |> Maybe.withDefault "") ]
+        [ text (context |> BoundedContext.shortName |> Maybe.map ShortName.toString |> Maybe.withDefault "") ]
     ]
 
 viewLabelAsBadge : Namespace.Label -> Html msg
