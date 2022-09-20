@@ -139,7 +139,7 @@ languageTerms : UbiquitousLanguage -> List LanguageTerm
 languageTerms (UbiquitousLanguage terms) =
   terms
   |> Dict.toList
-  |> List.map (\(key, { term, description }) -> LanguageTerm (DomainTermId key) term description)
+  |> List.map (\(shortName, { term, description }) -> LanguageTerm (DomainTermId shortName) term description)
 
 
 id : LanguageTerm -> DomainTermId

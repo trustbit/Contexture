@@ -73,7 +73,7 @@ open ValueObjects
 type Command =
     | CreateBoundedContext of BoundedContextId * DomainId * CreateBoundedContext
     | RenameBoundedContext of BoundedContextId * RenameBoundedContext
-    | AssignKey of BoundedContextId * AssignKey
+    | AssignShortName of BoundedContextId * AssignShortName
     | RemoveBoundedContext of BoundedContextId
     | MoveBoundedContextToDomain of BoundedContextId * MoveBoundedContextToDomain
     | ReclassifyBoundedContext of BoundedContextId * ReclassifyBoundedContext
@@ -87,7 +87,7 @@ type Command =
 and CreateBoundedContext = { Name: string }
 and RenameBoundedContext = { Name: string }
 
-and AssignKey = { Key: string }
+and AssignShortName = { ShortName: string }
 
 and MoveBoundedContextToDomain = { ParentDomainId: DomainId }
 
@@ -110,7 +110,7 @@ type Event =
     | BoundedContextImported of BoundedContextImported
     | BoundedContextCreated of BoundedContextCreated
     | BoundedContextRenamed of BoundedContextRenamed
-    | KeyAssigned of KeyAssigned
+    | ShortNameAssigned of ShortNameAssigned
     | BoundedContextRemoved of BoundedContextRemoved
     | BoundedContextMovedToDomain of BoundedContextMovedToDomain
     | BoundedContextReclassified of BoundedContextReclassified
@@ -124,7 +124,7 @@ type Event =
 and BoundedContextImported =
     { BoundedContextId: BoundedContextId
       DomainId: DomainId
-      Key: string option
+      ShortName: string option
       Name: string
       Description: string option
       Classification: StrategicClassification
@@ -152,9 +152,9 @@ and DescriptionChanged =
     { BoundedContextId: BoundedContextId
       Description: string option }
 
-and KeyAssigned =
+and ShortNameAssigned =
     { BoundedContextId: BoundedContextId
-      Key: string option }
+      ShortName: string option }
 
 and BoundedContextReclassified =
     { BoundedContextId: BoundedContextId
@@ -189,7 +189,7 @@ let identify =
     | UpdateMessages (contextId, _) -> contextId
     | UpdateBusinessDecisions (contextId, _) -> contextId
     | ReclassifyBoundedContext (contextId, _) -> contextId
-    | AssignKey (contextId, _) -> contextId
+    | AssignShortName (contextId, _) -> contextId
     | MoveBoundedContextToDomain (contextId, _) -> contextId
 
 let name identity = identity
@@ -223,11 +223,11 @@ let renameBoundedContext potentialName boundedContextId =
             { Name = name
               BoundedContextId = boundedContextId })
 
-let assignKeyToBoundedContext key boundedContextId =
-    KeyAssigned
+let assignShortNameToBoundedContext shortName boundedContextId =
+    ShortNameAssigned
         { BoundedContextId = boundedContextId
-          Key =
-              key
+          ShortName =
+              shortName
               |> Option.ofObj
               |> Option.filter (String.IsNullOrWhiteSpace >> not) }
     |> Ok
@@ -237,7 +237,7 @@ let decide (command: Command) state =
     match command with
     | CreateBoundedContext (id, domainId, createBc) -> newBoundedContext id domainId createBc.Name
     | RenameBoundedContext (contextId, rename) -> renameBoundedContext rename.Name contextId
-    | AssignKey (contextId, key) -> assignKeyToBoundedContext key.Key contextId
+    | AssignShortName (contextId, shortName) -> assignShortNameToBoundedContext shortName.ShortName contextId
     | RemoveBoundedContext contextId ->
         BoundedContextRemoved { BoundedContextId = contextId }
         |> Ok
@@ -282,7 +282,7 @@ module Projections =
     type BoundedContext =
         { Id: BoundedContextId
           DomainId: DomainId
-          Key: string option
+          ShortName: string option
           Name: string
           Description: string option
           Classification: StrategicClassification
@@ -305,7 +305,7 @@ module Projections =
                           DomainRoles = c.DomainRoles
                           UbiquitousLanguage = c.UbiquitousLanguage
                           BusinessDecisions = c.BusinessDecisions
-                          Key = c.Key
+                          ShortName = c.ShortName
                           Name = c.Name }
             | None ->
                 Some
@@ -317,7 +317,7 @@ module Projections =
                       DomainRoles = c.DomainRoles
                       UbiquitousLanguage = c.UbiquitousLanguage
                       BusinessDecisions = c.BusinessDecisions
-                      Key = c.Key
+                      ShortName = c.ShortName
                       Name = c.Name }
         | BoundedContextCreated c ->
             Some
@@ -325,7 +325,7 @@ module Projections =
                   DomainId = c.DomainId
                   Description = None
                   Name = c.Name
-                  Key = None
+                  ShortName = None
                   Messages = Messages.Empty
                   Classification = StrategicClassification.Unknown
                   DomainRoles = []
@@ -357,9 +357,9 @@ module Projections =
         | DescriptionChanged c ->
             state
             |> Option.map (fun o -> { o with Description = c.Description })
-        | KeyAssigned c ->
+        | ShortNameAssigned c ->
             state
-            |> Option.map (fun o -> { o with Key = c.Key })
+            |> Option.map (fun o -> { o with ShortName = c.ShortName })
         | UbiquitousLanguageUpdated c ->
             state
             |> Option.map (fun o ->

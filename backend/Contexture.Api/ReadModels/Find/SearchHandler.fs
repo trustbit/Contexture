@@ -71,26 +71,26 @@ module SearchFor =
         [<CLIMutable>]
         type DomainQuery =
             { Name: string []
-              Key: string [] }
+              ShortName: string [] }
             member this.IsActive =
-                not (Seq.isEmpty (Seq.append this.Name this.Key))
+                not (Seq.isEmpty (Seq.append this.Name this.ShortName))
 
-        let findRelevantDomains (findDomains: Domains.DomainByKeyAndNameModel) (query: DomainQuery) =
+        let findRelevantDomains (findDomains: Domains.DomainByShortNameAndNameModel) (query: DomainQuery) =
             let foundByName =
                 query.Name
                 |> SearchArgument.fromInputs
                 |> SearchArgument.executeSearch (Find.Domains.byName findDomains)
 
-            let foundByKey =
-                query.Key
+            let foundByShortName =
+                query.ShortName
                 |> SearchArgument.fromInputs
-                |> SearchArgument.executeSearch (Find.Domains.byKey findDomains)
+                |> SearchArgument.executeSearch (Find.Domains.byShortName findDomains)
 
             SearchResult.combineResults [ foundByName
-                                          foundByKey ]
+                                          foundByShortName ]
 
 
-        let find (state: Domains.DomainByKeyAndNameModel) (query: DomainQuery option) =
+        let find (state: Domains.DomainByShortNameAndNameModel) (query: DomainQuery option) =
             query
             |> Option.map (findRelevantDomains state)
             |> SearchResult.fromOption
@@ -99,12 +99,12 @@ module SearchFor =
         [<CLIMutable>]
         type BoundedContextQuery =
             { Name: string []
-              Key: string [] }
+              ShortName: string [] }
             member this.IsActive =
-                not (Seq.isEmpty (Seq.append this.Name this.Key))
+                not (Seq.isEmpty (Seq.append this.Name this.ShortName))
 
         let findRelevantBoundedContexts
-            (findBoundedContext: Find.BoundedContexts.BoundedContextByKeyAndNameModel)
+            (findBoundedContext: Find.BoundedContexts.BoundedContextByShortNameAndNameModel)
             (query: BoundedContextQuery)
             =
             let foundByName =
@@ -112,15 +112,15 @@ module SearchFor =
                 |> SearchArgument.fromInputs
                 |> SearchArgument.executeSearch (Find.BoundedContexts.byName findBoundedContext)
 
-            let foundByKey =
-                query.Key
+            let foundByShortName =
+                query.ShortName
                 |> SearchArgument.fromInputs
-                |> SearchArgument.executeSearch (Find.BoundedContexts.byKey findBoundedContext)
+                |> SearchArgument.executeSearch (Find.BoundedContexts.byShortName findBoundedContext)
 
             SearchResult.combineResults [ foundByName
-                                          foundByKey ]
+                                          foundByShortName ]
 
-        let find (state: BoundedContexts.BoundedContextByKeyAndNameModel) (query: BoundedContextQuery option) =
+        let find (state: BoundedContexts.BoundedContextByShortNameAndNameModel) (query: BoundedContextQuery option) =
             query
             |> Option.map (findRelevantBoundedContexts state)
             |> SearchResult.fromOption

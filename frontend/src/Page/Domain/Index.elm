@@ -34,7 +34,7 @@ import Http
 import Route
 import Api exposing (ApiResult, ApiResponse)
 
-import Key
+import ShortName
 import Domain exposing (DomainRelation, Domain)
 import Domain.DomainId exposing (DomainId)
 import BoundedContext exposing (BoundedContext)
@@ -246,7 +246,7 @@ viewDomain item =
       [ Block.titleH4 []
         [ text (item.domain |> Domain.name)
         , Html.small [ class "text-muted", class "float-right"]
-          [ text (item.domain |> Domain.key |> Maybe.map Key.toString |> Maybe.withDefault "") ] 
+          [ text (item.domain |> Domain.shortName |> Maybe.map ShortName.toString |> Maybe.withDefault "") ] 
         ]
       , item.domain
         |> Domain.vision

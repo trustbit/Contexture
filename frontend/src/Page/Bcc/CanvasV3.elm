@@ -34,7 +34,7 @@ import Page.Bcc.Edit.UbiquitousLanguage as UbiquitousLanguage
 import Page.Bcc.Edit.StrategicClassification as StrategicClassification
 import Page.Bcc.Edit.Description as Description
 import Page.Bcc.Edit.Name as Name
-import Page.Bcc.Edit.Key as Key
+import Page.Bcc.Edit.ShortName as ShortName
 import Page.Bcc.Edit.BusinessDecision as BusinessDecisionView
 import Page.Bcc.Edit.DomainRoles as DomainRolesView
 import Domain
@@ -52,7 +52,7 @@ type alias EditingCanvas =
   { edit : CanvasModel
     -- TODO: discuss we want this in edit or BCC - it's not persisted after all!
   , name : Name.Model
-  , key : Key.Model
+  , shortName : ShortName.Model
   , addingMessage : Messages.Model
   , addingDependencies : Dependencies.Model
   , ubiquitousLanguage : UbiquitousLanguage.Model
@@ -63,7 +63,7 @@ type alias EditingCanvas =
   }
 
 type alias Model =
-  { key: Nav.Key
+  { shortName: Nav.Key
   , self : Api.Configuration
   , edit: RemoteData.WebData EditingCanvas
   }
@@ -72,7 +72,7 @@ initWithCanvas : Api.Configuration -> CanvasModel -> (EditingCanvas, Cmd Editing
 initWithCanvas config model =
   let
     (addingDependency, addingDependencyCmd) = Dependencies.init config model.boundedContext
-    (changeKeyModel, changeKeyCmd) = Key.init config model.boundedContext
+    (changeShortNameModel, changeShortNameCmd) = ShortName.init config model.boundedContext
     (ubiquitousLanguageModel, ubiquitousLanguageCmd) = UbiquitousLanguage.init config (model.boundedContext |> BoundedContext.id)
     (businessDecisionsModel, businessDecisionsCmd) = BusinessDecisionView.init config (model.boundedContext |> BoundedContext.id)
     (domainRolesModel, domainRolesCmd) = DomainRolesView.init config (model.boundedContext |> BoundedContext.id)
@@ -85,7 +85,7 @@ initWithCanvas config model =
       , addingDependencies = addingDependency
       , ubiquitousLanguage = ubiquitousLanguageModel
       , name = nameModel
-      , key = changeKeyModel
+      , shortName = changeShortNameModel
       , edit = model
       , businessDecisions = businessDecisionsModel
       , domainRoles = domainRolesModel
@@ -94,7 +94,7 @@ initWithCanvas config model =
       }
     , Cmd.batch
       [ addingDependencyCmd |> Cmd.map DependencyField
-      , changeKeyCmd |> Cmd.map KeyField
+      , changeShortNameCmd |> Cmd.map ShortNameField
       , domainRolesCmd |> Cmd.map DomainRolesField
       , ubiquitousLanguageCmd |> Cmd.map UbiquitousLanguageField
       , businessDecisionsCmd |> Cmd.map BusinessDecisionField
@@ -106,10 +106,10 @@ initWithCanvas config model =
     )
 
 init : Nav.Key -> Api.Configuration -> BoundedContextId -> (Model, Cmd Msg)
-init key config contextId =
+init shortName config contextId =
   let
     model =
-      { key = key
+      { shortName = shortName
       , self = config
       , edit = RemoteData.Loading
       }
@@ -125,7 +125,7 @@ type EditingMsg
   = DescriptionField Description.Msg
   -- TODO the editing is actually part of the BoundedContext - move there or to the index page?!
   | NameField Name.Msg
-  | KeyField Key.Msg
+  | ShortNameField ShortName.Msg
   | DependencyField Dependencies.Msg
   | MessageField Messages.Msg
   | UbiquitousLanguageField UbiquitousLanguage.Msg
@@ -176,10 +176,10 @@ updateEdit msg model =
       |> Tuple.mapFirst(\d -> { model | classification = d })
       |> Tuple.mapSecond(Cmd.map StrategicClassificationField)
 
-    KeyField changeMsg ->
-      Key.update changeMsg model.key
-      |> Tuple.mapFirst(\d -> { model | key = d })
-      |> Tuple.mapSecond(Cmd.map KeyField)
+    ShortNameField changeMsg ->
+      ShortName.update changeMsg model.shortName
+      |> Tuple.mapFirst(\d -> { model | shortName = d })
+      |> Tuple.mapSecond(Cmd.map ShortNameField)
 
     DependencyField dependency ->
       Dependencies.update dependency model.addingDependencies
@@ -271,9 +271,9 @@ viewLeftside canvas =
   [ canvas.name
     |> Name.view
     |> Html.map NameField
-  , canvas.key
-    |> Key.view
-    |> Html.map KeyField
+  , canvas.shortName
+    |> ShortName.view
+    |> Html.map ShortNameField
   , canvas.description
     |> Description.view
     |> Html.map DescriptionField

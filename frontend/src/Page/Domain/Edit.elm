@@ -26,11 +26,11 @@ import Http
 import Api
 import Route
 
-import Key
+import ShortName
 import Domain
 import Domain.DomainId exposing (DomainId)
 
-import Page.ChangeKey as ChangeKey
+import Page.ChangeShortName as ChangeShortName
 import Page.Domain.Index as Index
 import Page.Bcc.Index
 
@@ -40,7 +40,7 @@ import Page.Bcc.Index
 type EditDomain
   = ChangingName String
   | ChangingVision String
-  | ChangingKey ChangeKey.Model
+  | ChangingShortName ChangeShortName.Model
 
 type alias EditableDomain =
   { domain : Domain.Domain
@@ -48,7 +48,7 @@ type alias EditableDomain =
   }
 
 type alias Model =
-  { key : Nav.Key
+  { shortName : Nav.Key
   , config : Api.Configuration
   , edit : RemoteData.WebData EditableDomain
   , subDomains : Index.Model
@@ -62,12 +62,12 @@ initEdit domain =
   }
 
 init : Nav.Key -> Api.Configuration -> DomainId -> (Model, Cmd Msg)
-init key config domain =
+init shortName config domain =
   let
-    (contexts, contextCmd) = Page.Bcc.Index.init config key domain
-    (subDomainsModel, subDomainsCmd) = Index.init config key (Domain.Subdomain domain)
+    (contexts, contextCmd) = Page.Bcc.Index.init config shortName domain
+    (subDomainsModel, subDomainsCmd) = Index.init config shortName (Domain.Subdomain domain)
     model =
-      { key = key
+      { shortName = shortName
       , config = config
       , edit = RemoteData.Loading
       , contexts = contexts
@@ -95,9 +95,9 @@ type Msg
   | StartToChangeVision
   | UpdateVision String
   | RefineVision String
-  | StartToChangeKey
-  | ChangeKeyMsg ChangeKey.Msg
-  | AssignKey (Maybe Key.Key)
+  | StartToChangeShortName
+  | ChangeShortNameMsg ChangeShortName.Msg
+  | AssignShortName (Maybe ShortName.ShortName)
   | StopToEdit
   | NoOp
 
@@ -150,43 +150,43 @@ update msg model =
           Debug.log ("Cannot save unloaded model: " ++ Debug.toString msg ++ " " ++ Debug.toString model)
           (model, Cmd.none)
 
-    StartToChangeKey ->
+    StartToChangeShortName ->
       case model.edit of
         RemoteData.Success editable ->
           let
             (changeModel, changeCmd) =
               editable.domain
-              |> Domain.key
-              |> ChangeKey.init model.config
+              |> Domain.shortName
+              |> ChangeShortName.init model.config
           in
-            ( model |> changeEdit (\e -> { e | editDomain = Just (ChangingKey changeModel) } )
+            ( model |> changeEdit (\e -> { e | editDomain = Just (ChangingShortName changeModel) } )
             , Cmd.batch
-              [ Task.attempt (\_ -> NoOp) (Dom.focus "key")
-              , changeCmd |> Cmd.map ChangeKeyMsg
+              [ Task.attempt (\_ -> NoOp) (Dom.focus "shortName")
+              , changeCmd |> Cmd.map ChangeShortNameMsg
               ]
             )
         _ ->
           (model, Cmd.none)
 
-    ChangeKeyMsg changeMsg ->
+    ChangeShortNameMsg changeMsg ->
       case model.edit of
         RemoteData.Success { editDomain } ->
           case editDomain of
-            Just (ChangingKey changingModel) ->
+            Just (ChangingShortName changingModel) ->
               let
-                (changeModel, changeCmd) = ChangeKey.update changeMsg changingModel
+                (changeModel, changeCmd) = ChangeShortName.update changeMsg changingModel
               in
-                (model |> changeEdit (\e -> { e | editDomain = Just (ChangingKey changeModel) })
-                , changeCmd |> Cmd.map ChangeKeyMsg
+                (model |> changeEdit (\e -> { e | editDomain = Just (ChangingShortName changeModel) })
+                , changeCmd |> Cmd.map ChangeShortNameMsg
                 )
             _ -> (model, Cmd.none)
         _ -> (model, Cmd.none)
 
-    AssignKey newKey ->
+    AssignShortName newShortName ->
       case model.edit of
         RemoteData.Success { domain } ->
           ( model
-          , Domain.assignKey model.config (domain |> Domain.id) newKey Saved
+          , Domain.assignShortName model.config (domain |> Domain.id) newShortName Saved
           )
         _ ->
           Debug.log ("Cannot save unloaded model: " ++ Debug.toString msg ++ " " ++ Debug.toString model)
@@ -300,28 +300,28 @@ viewEditName name =
       ]
     ]
 
-viewEditKey : ChangeKey.Model -> Html Msg
-viewEditKey model =
+viewEditShortName : ChangeShortName.Model -> Html Msg
+viewEditShortName model =
   let
-    keyIsValid =
+    shortNameIsValid =
       case model.value of
       Ok _ -> True
       Err _ -> False
     submit =
       case model.value of
-        Ok v -> [ onSubmit (AssignKey v) ]
+        Ok v -> [ onSubmit (AssignShortName v) ]
         Err _ -> []
   in
   Form.form submit
     [ Grid.row [ Row.betweenXs ]
       [ Grid.col []
-        [ ChangeKey.view model |> Html.map ChangeKeyMsg ]
+        [ ChangeShortName.view model |> Html.map ChangeShortNameMsg ]
       , Grid.col [ Col.sm3 ]
         [ Button.submitButton
           [ Button.primary
-          , Button.disabled (keyIsValid |> not)
+          , Button.disabled (shortNameIsValid |> not)
           ]
-          [ text "Assign Key"]
+          [ text "Assign short name"]
         , Button.button
           [ Button.secondary, Button.onClick StopToEdit ]
           [ text "X"]
@@ -375,38 +375,38 @@ viewDomain model =
         , Grid.col [ Col.sm3 ]
           [ Button.button [ Button.outlinePrimary, Button.onClick StartToChangeVision ] [ text "Refine Vision" ] ]
         ]
-    displayKey =
+    displayShortName =
       Grid.simpleRow
         [ Grid.col []
           [ model.domain
-            |> Domain.key
-            |> Maybe.map (\v -> Html.p [] [ text <| Key.toString v])
-            |> Maybe.withDefault (Html.p [ class "text-muted", class "text-center" ] [Html.i [] [text "No key assigned" ] ] )
+            |> Domain.shortName
+            |> Maybe.map (\v -> Html.p [] [ text <| ShortName.toString v])
+            |> Maybe.withDefault (Html.p [ class "text-muted", class "text-center" ] [Html.i [] [text "No short name assigned" ] ] )
           ]
         , Grid.col [ Col.sm3 ]
-          [ Button.button [ Button.outlinePrimary, Button.onClick StartToChangeKey ] [ text "Assign Key"] ]
+          [ Button.button [ Button.outlinePrimary, Button.onClick StartToChangeShortName ] [ text "Assign short name"] ]
         ]
   in
     ( case model.editDomain of
         Just (ChangingName name) ->
           [ viewEditName name
           , displayVision
-          , displayKey
+          , displayShortName
           ]
         Just (ChangingVision vision) ->
           [ displayDomain
           , viewEditVision vision
-          , displayKey
+          , displayShortName
           ]
-        Just (ChangingKey keyModel) ->
+        Just (ChangingShortName shortNameModel) ->
           [ displayDomain
           , displayVision
-          , viewEditKey keyModel
+          , viewEditShortName shortNameModel
           ]
         _ ->
           [ displayDomain
           , displayVision
-          , displayKey
+          , displayShortName
           ]
     )
     |> div [ class "shadow", class "border", Spacing.p3 ]
