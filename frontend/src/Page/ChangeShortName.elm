@@ -171,7 +171,10 @@ view model =
         []
         [ text <| "The short name '" ++ model.enteredShortName ++ "' is invalid because "  ++
           ( case model.value of
+              Err (Problem ShortName.ExceedsMaxLength) -> "a short name must not be longer than 16 characters"
               Err (Problem ShortName.StartsWithNumber) -> "a short name must not start with a number"
+              Err (Problem ShortName.StartsWithHyphen) -> "a short name must not start with a hyphen"
+              Err (Problem ShortName.EndsWithHyphen) -> "a short name must not end with a hyphen"
               Err (Problem ShortName.ContainsWhitespace) -> "a short name should not contain any whitespaces"
               Err (Problem (ShortName.ContainsSpecialChars chars)) ->
                 "a short name should not contain the following charachters: " ++ String.join " " (chars |> Set.toList |> List.map String.fromChar)
