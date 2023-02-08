@@ -1,9 +1,11 @@
+[<Xunit.Collection(nameof (Contexture.Api.Tests.SqlDockerSupport.MsSqlCollection))>]
 module Contexture.Api.Tests.EventStore
 
 open System.Diagnostics.Tracing
 open System.Threading.Tasks
 open Contexture.Api.Infrastructure
 open Contexture.Api.Infrastructure.Storage
+open Contexture.Api.Tests.SqlDockerSupport
 open Microsoft.FSharp.Control
 open Xunit
 

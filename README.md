@@ -90,6 +90,10 @@ ASPNETCORE_URLS=http://*:8080 DATABASEPATH=data/mydb.json dotnet Contexture.Api.
 
         curl -X DELETE http://localhost:5000/api/namespaces/templates/<template-id>
 
+### Testing the backend
+
+Integration tests supported by a Docker based on MS-SQL image exist. On an ARM-based Mac (M1/M2) [this Docker-Feature](https://github.com/microsoft/mssql-docker/issues/668#issuecomment-1412206521) must be enabled
+
 ## Contexture frontend application
 
 The application is developed with [Vue.js](https://vuejs.org/) and connects to the backend via the API.

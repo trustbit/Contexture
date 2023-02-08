@@ -11,6 +11,7 @@
         <Compile Include="Tests.fs" />
         <Compile Include="EnvironmentSimulation.fs" />
         <Compile Include="TestUtils.fs" />
+        <Compile Include="SqlDockerSupport.fs" />
         <Compile Include="EventStore.Tests.fs" />
         <Compile Include="Fixtures.fs" />
         <Compile Include="ApiTests.fs" />
@@ -30,6 +31,8 @@
             <PrivateAssets>all</PrivateAssets>
         </PackageReference>
         <PackageReference Update="FSharp.Core" Version="6.0.5" />
+        <PackageReference Include="NStore.Persistence.MsSql" Version="0.13.1" />
+        <PackageReference Include="Ductus.FluentDocker" Version="2.10.59" />
     </ItemGroup>
 
     <ItemGroup>
