@@ -38,6 +38,7 @@ type StreamKind =
     private
     | SystemType of System.Type
     static member Of<'E>() = SystemType typeof<'E>
+    static member Of(_: 'E) = SystemType typeof<'E>
 type EventMetadata =
     { Source: EventSource
       RecordedAt: System.DateTime }
