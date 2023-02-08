@@ -1,5 +1,6 @@
 module Contexture.Api.Tests.EventStore
 
+open System.Diagnostics.Tracing
 open System.Threading.Tasks
 open Contexture.Api.Infrastructure
 open Contexture.Api.Infrastructure.Storage
@@ -25,6 +26,45 @@ module Fixture =
         createEvent eventSource
 
 let private oneTheoryTestCase (items: obj seq) = items |> Seq.toArray
+
+let private waitForResult (timeout: int) (receivedEvents: TaskCompletionSource<_>) =
+    let cancelTask () : Task =
+        task {
+            do! Task.Delay(timeout)
+
+            if not receivedEvents.Task.IsCompleted then
+                receivedEvents.SetCanceled()
+
+            return ()
+        }
+
+    Task.Run(cancelTask)
+
+let waitForEventsOnSubscription (eventStore: EventStore) action eventCallback =
+    task {
+        let receivedEvents =
+            TaskCompletionSource<EventEnvelope<Fixture.TestStream> list>(
+                TaskCreationOptions.RunContinuationsAsynchronously
+            )
+
+        let subscription events =
+            receivedEvents.SetResult events
+            Async.Sleep(0)
+
+        eventStore.Subscribe(subscription)
+
+        do! Async.StartAsTask(action ())
+
+        let cancelledTask = waitForResult 1000 receivedEvents
+        let! events = receivedEvents.Task
+
+        eventCallback events
+
+        do! cancelledTask
+
+        if not receivedEvents.Task.IsCompletedSuccessfully then
+            failwith "Not completed successfully"
+    }
 
 module Then =
     let assertAll (result: EventEnvelope<Fixture.TestStream> list) (sources: EventSource list) =
@@ -116,34 +156,23 @@ let canWriteIntoEmptyEventStoreAndReceiveEventViaSubscription (eventStore: Event
     task {
         let event = Fixture.generateEvent ()
 
-        let receivedEvents =
-            TaskCompletionSource<EventEnvelope<Fixture.TestStream> list>(
-                TaskCreationOptions.RunContinuationsAsynchronously
-            )
+        do!
+            waitForEventsOnSubscription
+                eventStore
+                (fun () -> eventStore.Append [ event ])
+                (fun events -> Then.assertSingle events event.Metadata.Source)
+    }
 
-        let subscription events =
-            receivedEvents.SetResult events
-            Async.Sleep(0)
+[<Theory>]
+[<MemberData(nameof Given.anEventStoreWithStreamsAndEvents, 1, MemberType = typeof<Given>)>]
+let canAppendToAnExistingStreamAndReceiveOnlyEventViaSubscription (eventStore: EventStore, sources: EventSource list) =
+    task {
+        let event = Fixture.createEvent sources.Head
 
-        eventStore.Subscribe(subscription)
-
-        do! eventStore.Append [ event ]
-
-        let cancelTask () : Task =
-            task {
-                do! Task.Delay(1000)
-
-                if not receivedEvents.Task.IsCompleted then
-                    receivedEvents.SetCanceled()
-
-                return ()
-            }
-
-        let cancelledTask = Task.Run(cancelTask)
-        let! events = receivedEvents.Task
-
-        Then.assertSingle events event.Metadata.Source
-
-        do! cancelledTask
+        do!
+            waitForEventsOnSubscription
+                eventStore
+                (fun () -> eventStore.Append [ event ])
+                (fun events -> Then.assertSingle events event.Metadata.Source)
 
     }

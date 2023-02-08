@@ -67,7 +67,7 @@ module EventEnvelope =
     let unbox (envelope: EventEnvelope) : EventEnvelope<'E> =
         { Metadata = envelope.Metadata
           Event = unbox<'E> envelope.Payload }
-
+    
 type EventResult = Result<EventEnvelope list, string>
 
 module Storage =
