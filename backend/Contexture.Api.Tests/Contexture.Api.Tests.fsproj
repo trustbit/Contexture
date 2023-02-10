@@ -33,6 +33,7 @@
         <PackageReference Update="FSharp.Core" Version="6.0.5" />
         <PackageReference Include="NStore.Persistence.MsSql" Version="0.13.1" />
         <PackageReference Include="Ductus.FluentDocker" Version="2.10.59" />
+        <PackageReference Include="Testcontainers" Version="2.4.0" />
     </ItemGroup>
 
     <ItemGroup>

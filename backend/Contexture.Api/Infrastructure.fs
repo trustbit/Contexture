@@ -4,6 +4,7 @@ open System
 open System.Collections.Concurrent
 open System.Collections.Generic
 open System.Runtime.CompilerServices
+open System.Text.Json
 open System.Threading.Tasks
 
  module Async =
@@ -39,6 +40,16 @@ type StreamKind =
     | SystemType of System.Type
     static member Of<'E>() = SystemType typeof<'E>
     static member Of(_: 'E) = SystemType typeof<'E>
+    static member Of(systemType: Type) =
+        if isNull systemType then
+            nullArg <| nameof systemType
+        SystemType systemType
+module StreamKind =
+    let toString(SystemType systemType) =
+        systemType.AssemblyQualifiedName
+    let ofString(value:string) =
+        value |> Type.GetType |> StreamKind.Of
+
 type EventMetadata =
     { Source: EventSource
       RecordedAt: System.DateTime }
@@ -174,9 +185,228 @@ module Storage =
             
                 member _.All () =
                     agent.PostAndAsyncReply(fun reply -> GetAll(reply)) } 
+    
+    module NStoreBased =
+        open NStore.Core.Persistence
+        open NStore.Persistence.MsSql
+        open NStore.Core.Streams
+        open System.Text.Json
+        open System.Text.Json.Serialization
+        module StreamIdentifier =
+            let name ((eventSource,kind): StreamIdentifier) =
+                $"{StreamKind.toString kind}/{eventSource.ToString()}"
+        
+        type private SerializableEventEnvelope =
+            { Metadata: EventMetadata
+              Payload: JsonElement
+              EventType: string
+              StreamKind: string
+            }
+        type JsonMsSqlSerializer(settings: JsonSerializerOptions)=
+            static member Default: JsonMsSqlSerializer =
+                let options =
+                    JsonSerializerOptions(
+                        PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+                        IgnoreNullValues = true,
+                        WriteIndented = true,
+                        NumberHandling = JsonNumberHandling.AllowReadingFromString
+                    )
 
+                options.Converters.Add(
+                    JsonFSharpConverter(
+                        unionEncoding =
+                            (JsonUnionEncoding.Default
+                             ||| JsonUnionEncoding.Untagged
+                             ||| JsonUnionEncoding.UnwrapRecordCases
+                             ||| JsonUnionEncoding.UnwrapFieldlessTags)
+                    )
+                )
+
+                JsonMsSqlSerializer options
+                
+            interface IMsSqlPayloadSerializer with
+                member _.Deserialize(serialized, serializerInfo) =
+                    if serializerInfo = "byte[]" then
+                        serialized
+                    else if serializerInfo = nameof(EventEnvelope) then
+                        let deserialized = JsonSerializer.Deserialize<SerializableEventEnvelope>(serialized, settings)
+                        let eventType = deserialized.EventType |> Type.GetType
+                        {
+                            EventEnvelope.Payload = JsonSerializer.Deserialize(deserialized.Payload,eventType,settings)
+                            EventType = eventType
+                            StreamKind = deserialized.StreamKind |> StreamKind.ofString
+                            Metadata = deserialized.Metadata
+                        }
+                    else
+                        let returnType = Type.GetType serializerInfo
+                        JsonSerializer.Deserialize(serialized, returnType, settings)
+
+                member _.Serialize(payload, serializerInfo) =
+                    match payload |> tryUnbox<byte[]> with
+                    | Some bytes ->
+                        bytes
+                    | None ->
+                        match payload |> tryUnbox<EventEnvelope> with
+                        | Some envelope ->
+                            let serializable: SerializableEventEnvelope =
+                                {
+                                    Payload = JsonSerializer.SerializeToElement(envelope.Payload, settings)
+                                    EventType = envelope.EventType.AssemblyQualifiedName
+                                    StreamKind = StreamKind.toString envelope.StreamKind
+                                    Metadata = envelope.Metadata
+                                }
+                            serializerInfo <- nameof(EventEnvelope)
+                            JsonSerializer.SerializeToUtf8Bytes(serializable,settings)
+                        | None ->
+                            serializerInfo <- payload.GetType().FullName
+                            JsonSerializer.SerializeToUtf8Bytes(payload,settings)
+                        
+        type Storage(persistence: IPersistence) =
+            
+            let streamsFactory = StreamsFactory(persistence)
+         
+            let fetchAll ()= 
+                task {
+                    let events = TaskCompletionSource<EventEnvelope list>()
+                    let eventList = System.Collections.Generic.List<EventEnvelope>()
+                    let subscription =
+                        { new ISubscription with
+                            member _.OnStartAsync(indexOrPosition: int64) =
+                                Task.CompletedTask
+
+                            member _.OnNextAsync(chunk: IChunk) = task {
+                                match chunk.Payload |> tryUnbox<EventEnvelope> with
+                                | Some envelope ->
+                                    eventList.Add(envelope)
+                                    return true
+                                | None ->
+                                    return false
+                                }
+
+                            member _.CompletedAsync(indexOrPosition: int64) =
+                                events.SetResult(eventList |> Seq.toList)
+                                Task.CompletedTask
+
+                            member _.StoppedAsync(indexOrPosition: int64) =
+                                events.SetCanceled()
+                                Task.CompletedTask
+
+                            member _.OnErrorAsync(indexOrPosition: int64,  ex: Exception) =
+                                events.SetException(ex)
+                                Task.CompletedTask
+                        }
+                        
+                    do! persistence.ReadAllAsync(0,subscription)
+                    try
+                        let! result = events.Task
+                        return Ok result
+                    with e ->
+                        return Error (e.ToString())
+                    }
+                
+            let fetchOf (kind: StreamKind)= 
+                task {
+                    let events = TaskCompletionSource<EventEnvelope list>()
+                    let eventList = System.Collections.Generic.List<EventEnvelope>()
+                    let subscription =
+                        { new ISubscription with
+                            member _.OnStartAsync(indexOrPosition: int64) =
+                                Task.CompletedTask
+
+                            member _.OnNextAsync(chunk: IChunk) = task {
+                                match chunk.Payload |> tryUnbox<EventEnvelope> with
+                                | Some envelope ->
+                                    if envelope.StreamKind = kind then
+                                        eventList.Add(envelope)
+                                    return true
+                                | None ->
+                                    return false
+                                }
+
+                            member _.CompletedAsync(indexOrPosition: int64) =
+                                events.SetResult(eventList |> Seq.toList)
+                                Task.CompletedTask
+
+                            member _.StoppedAsync(indexOrPosition: int64) =
+                                events.SetCanceled()
+                                Task.CompletedTask
+
+                            member _.OnErrorAsync(indexOrPosition: int64,  ex: Exception) =
+                                events.SetException(ex)
+                                Task.CompletedTask
+                        }
+                        
+                    do! persistence.ReadAllAsync(0,subscription)
+                    try
+                        let! result = events.Task
+                        return Ok result
+                    with e ->
+                        return Error (e.ToString())
+                    }
+                
+            let append (envelopes: EventEnvelope list) = task {
+                let streams =
+                    envelopes
+                    |> List.groupBy(fun e -> e.Metadata.Source,e.StreamKind)
+                    
+                for streamIdentifier, events in streams do
+                    let streamName = StreamIdentifier.name streamIdentifier
+                    let stream = streamsFactory.Open(streamName)
+                    for event in events do
+                        let! _ = stream.AppendAsync(event)
+                        ()
+                        
+                return ()
+            }
+            
+            let stream (identifier: StreamIdentifier) = task {
+                let stream = identifier |> StreamIdentifier.name |> streamsFactory.OpenReadOnly
+                let events = TaskCompletionSource<EventEnvelope list>()
+                let eventList = System.Collections.Generic.List<EventEnvelope>()
+                let subscription =
+                    { new ISubscription with
+                        member _.OnStartAsync(indexOrPosition: int64) =
+                            Task.CompletedTask
+
+                        member _.OnNextAsync(chunk: IChunk) = task {
+                            match chunk.Payload |> tryUnbox<EventEnvelope> with
+                            | Some envelope ->
+                                eventList.Add(envelope)
+                                return true
+                            | None ->
+                                return false
+                            }
+
+                        member _.CompletedAsync(indexOrPosition: int64) =
+                            events.SetResult(eventList |> Seq.toList)
+                            Task.CompletedTask
+
+                        member _.StoppedAsync(indexOrPosition: int64) =
+                            events.SetCanceled()
+                            Task.CompletedTask
+
+                        member _.OnErrorAsync(indexOrPosition: int64,  ex: Exception) =
+                            events.SetException(ex)
+                            Task.CompletedTask
+                    }
+                    
+                do! stream.ReadAsync(subscription)
+                try
+                    let! result = events.Task
+                    return Ok result
+                with e ->
+                    return Error (e.ToString())
+            }
+            
+            interface EventStorage with
+                member this.All() : Async<EventResult>=  Async.AwaitTask (fetchAll()) 
+                member this.AllStreamsOf(kind) = Async.AwaitTask (fetchOf kind)
+                member this.Append(envelopes) = Async.AwaitTask (append envelopes)
+                member this.Stream(identifier) = Async.AwaitTask (stream identifier) 
+                
+            
 type EventStore
-    private
+    // private // TODO private?
     (
         storage: Storage.EventStorage,
         // TODO: use an agent for subscriptions?!
