@@ -262,84 +262,33 @@ module Storage =
                             JsonSerializer.SerializeToUtf8Bytes(payload,settings)
                         
         type Storage(persistence: IPersistence) =
-            
             let streamsFactory = StreamsFactory(persistence)
          
             let fetchAll ()= 
                 task {
-                    let events = TaskCompletionSource<EventEnvelope list>()
-                    let eventList = System.Collections.Generic.List<EventEnvelope>()
-                    let subscription =
-                        { new ISubscription with
-                            member _.OnStartAsync(indexOrPosition: int64) =
-                                Task.CompletedTask
-
-                            member _.OnNextAsync(chunk: IChunk) = task {
-                                match chunk.Payload |> tryUnbox<EventEnvelope> with
-                                | Some envelope ->
-                                    eventList.Add(envelope)
-                                    return true
-                                | None ->
-                                    return false
-                                }
-
-                            member _.CompletedAsync(indexOrPosition: int64) =
-                                events.SetResult(eventList |> Seq.toList)
-                                Task.CompletedTask
-
-                            member _.StoppedAsync(indexOrPosition: int64) =
-                                events.SetCanceled()
-                                Task.CompletedTask
-
-                            member _.OnErrorAsync(indexOrPosition: int64,  ex: Exception) =
-                                events.SetException(ex)
-                                Task.CompletedTask
-                        }
-                        
-                    do! persistence.ReadAllAsync(0,subscription)
                     try
-                        let! result = events.Task
-                        return Ok result
+                        let recorder = Recorder()
+                        do! persistence.ReadAllAsync(0,recorder)
+                        let items = recorder.ToArray<EventEnvelope>()
+                        return items |> Array.toList |> Ok
                     with e ->
                         return Error (e.ToString())
                     }
                 
             let fetchOf (kind: StreamKind)= 
                 task {
-                    let events = TaskCompletionSource<EventEnvelope list>()
-                    let eventList = System.Collections.Generic.List<EventEnvelope>()
-                    let subscription =
-                        { new ISubscription with
-                            member _.OnStartAsync(indexOrPosition: int64) =
-                                Task.CompletedTask
-
-                            member _.OnNextAsync(chunk: IChunk) = task {
-                                match chunk.Payload |> tryUnbox<EventEnvelope> with
-                                | Some envelope ->
-                                    if envelope.StreamKind = kind then
-                                        eventList.Add(envelope)
-                                    return true
-                                | None ->
-                                    return false
-                                }
-
-                            member _.CompletedAsync(indexOrPosition: int64) =
-                                events.SetResult(eventList |> Seq.toList)
-                                Task.CompletedTask
-
-                            member _.StoppedAsync(indexOrPosition: int64) =
-                                events.SetCanceled()
-                                Task.CompletedTask
-
-                            member _.OnErrorAsync(indexOrPosition: int64,  ex: Exception) =
-                                events.SetException(ex)
-                                Task.CompletedTask
-                        }
-                        
-                    do! persistence.ReadAllAsync(0,subscription)
-                    try
-                        let! result = events.Task
-                        return Ok result
+                   try
+                        let doesStreamKindMatch (chunk:IChunk) =
+                            chunk.Payload
+                            |> tryUnbox<EventEnvelope>
+                            |> Option.map (fun envelope -> envelope.StreamKind = kind)
+                            |> Option.defaultValue false
+                            
+                        let recorder = Recorder()
+                        let filtered = SubscriptionWrapper(recorder, ChunkFilter = doesStreamKindMatch)
+                        do! persistence.ReadAllAsync(0,filtered)
+                        let items = recorder.ToArray<EventEnvelope>()
+                        return items |> Array.toList |> Ok
                     with e ->
                         return Error (e.ToString())
                     }

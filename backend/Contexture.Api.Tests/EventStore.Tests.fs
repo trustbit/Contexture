@@ -113,7 +113,6 @@ type EventStoreBehavior() =
     abstract member anEventStoreWithStreamsAndEvents: int -> Task<EventStore * EventSource list>
 
     [<Fact>]
-    // [<MemberData(nameof Given.anEmptyEventStore, MemberType = typeof<Given>)>]
     member this.canReadFromAnEmptyStore() =
         task {
             let! eventStore = this.anEmptyEventStore ()
@@ -122,7 +121,6 @@ type EventStoreBehavior() =
         }
 
     [<Fact>]
-    // [<MemberData(nameof Given.anEventStoreWithStreamsAndEvents, 1, MemberType = typeof<Given>)>]
     member this.canReadFromAnStoreWithOneStreamAndOneEvent() =
         task {
             let! eventStore, sources = this.anEventStoreWithStreamsAndEvents (1)
@@ -140,7 +138,6 @@ type EventStoreBehavior() =
         }
 
     [<Fact>]
-    [<MemberData(nameof Given.anEventStoreWithStreamsAndEvents, 3, MemberType = typeof<Given>)>]
     member this.canReadFromAnStoreWithMultipleStreamsAndMultipleEvents() =
         task {
             let! eventStore, sources = this.anEventStoreWithStreamsAndEvents (3)
@@ -157,7 +154,6 @@ type EventStoreBehavior() =
         }
 
     [<Fact>]
-    // [<MemberData(nameof Given.anEmptyEventStore, MemberType = typeof<Given>)>]
     member this.canWriteIntoEmptyEventStoreAndReread() =
         task {
             let! eventStore = this.anEmptyEventStore ()
@@ -173,7 +169,6 @@ type EventStoreBehavior() =
         }
 
     [<Fact>]
-    // [<MemberData(nameof Given.anEmptyEventStore, MemberType = typeof<Given>)>]
     member this.canWriteIntoEmptyEventStoreAndReceiveEventViaSubscription() =
         task {
             let! eventStore = this.anEmptyEventStore ()
@@ -187,7 +182,6 @@ type EventStoreBehavior() =
         }
 
     [<Fact>]
-    // [<MemberData(nameof Given.anEventStoreWithStreamsAndEvents, 1, MemberType = typeof<Given>)>]
     member this.canAppendToAnExistingStreamAndReceiveOnlyEventViaSubscription() =
         task {
             let! eventStore, sources = this.anEventStoreWithStreamsAndEvents 1
@@ -223,26 +217,25 @@ type MsSqlFixture() =
                 .WithName("MS-SQL-Integration-Tests")
                 .WithCleanUp(false)
                 .WithAutoRemove(true)
-        let instance =
-            containerConfiguration
-                .Build()
+
+        let instance = containerConfiguration.Build()
         instance
-        
+
     member _.Container = container
-        
+
     interface IAsyncLifetime with
         member this.DisposeAsync() = container.StopAsync()
         member this.InitializeAsync() = container.StartAsync()
-        
-    interface IAsyncDisposable with
-        member this.DisposeAsync() = container.DisposeAsync()    
 
-type MsSqlBackedEventStore(msSql:MsSqlFixture) =
+    interface IAsyncDisposable with
+        member this.DisposeAsync() = container.DisposeAsync()
+
+type MsSqlBackedEventStore(msSql: MsSqlFixture) =
     inherit EventStoreBehavior()
-    
+
     let counter = ref 0L
 
-    member private this.initializePersistence ()=
+    member private this.initializePersistence() =
         task {
             let config =
                 MsSqlPersistenceOptions(
@@ -256,11 +249,11 @@ type MsSqlBackedEventStore(msSql:MsSqlFixture) =
             do! persistence.DestroyAllAsync(CancellationToken.None)
             do! persistence.InitAsync(CancellationToken.None)
             return persistence
-            }
-    
+        }
+
     override this.anEmptyEventStore() =
         task {
-            let! persistence = this.initializePersistence() 
+            let! persistence = this.initializePersistence ()
             let storage = Storage.NStoreBased.Storage(persistence)
             return EventStore(storage, ConcurrentDictionary())
         }
@@ -269,19 +262,22 @@ type MsSqlBackedEventStore(msSql:MsSqlFixture) =
         task {
             let data = Seq.init count (fun _ -> Fixture.generateEvent ()) |> Seq.toList
 
-            let! persistence = this.initializePersistence()
+            let! persistence = this.initializePersistence ()
             let streamsFactory = StreamsFactory(persistence)
-            for (identifier,events) in data |> List.map EventEnvelope.box |> List.groupBy(fun x ->x.Metadata.Source,x.StreamKind) do
+
+            for (identifier, events) in
+                data
+                |> List.map EventEnvelope.box
+                |> List.groupBy (fun x -> x.Metadata.Source, x.StreamKind) do
                 let stream = streamsFactory.Open(StreamIdentifier.name identifier)
+
                 for event in events do
                     let! _ = stream.AppendAsync(event)
                     ()
 
             let storage = Storage.NStoreBased.Storage(persistence)
-            return
-                EventStore(storage, ConcurrentDictionary()),
-                data |> List.map (fun e -> e.Metadata.Source)
+            return EventStore(storage, ConcurrentDictionary()), data |> List.map (fun e -> e.Metadata.Source)
         }
 
-    
     interface IClassFixture<MsSqlFixture> with
+
