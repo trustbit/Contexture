@@ -83,7 +83,14 @@ type EventResult = Result<EventEnvelope list, string>
 
 module Storage =
 
-    type StreamIdentifier = EventSource * StreamKind
+    type StreamIdentifier =
+        private
+        | StreamIdentifier of StreamKind * EventSource
+    module StreamIdentifier =
+        let name (StreamIdentifier (kind, source)) =
+            $"{StreamKind.toString kind}/{source.ToString()}"
+        let from(eventSource:EventSource) (kind: StreamKind) =
+            StreamIdentifier (kind,eventSource)
 
     type EventStorage =
         abstract member Stream : StreamIdentifier -> Async<EventResult>
@@ -120,7 +127,7 @@ module Storage =
         let private appendToHistory (history: History) (envelope: EventEnvelope) =
             let source = envelope.Metadata.Source
             let streamKind = envelope.StreamKind
-            let key = (source, streamKind)
+            let key = StreamIdentifier.from source streamKind
 
             let fullStream =
                 key |> stream history |> fun s -> s @ [ envelope ]
@@ -192,10 +199,6 @@ module Storage =
         open NStore.Core.Streams
         open System.Text.Json
         open System.Text.Json.Serialization
-        module StreamIdentifier =
-            let name ((eventSource,kind): StreamIdentifier) =
-                $"{StreamKind.toString kind}/{eventSource.ToString()}"
-        
         type private SerializableEventEnvelope =
             { Metadata: EventMetadata
               Payload: JsonElement
@@ -296,7 +299,7 @@ module Storage =
             let append (envelopes: EventEnvelope list) = task {
                 let streams =
                     envelopes
-                    |> List.groupBy(fun e -> e.Metadata.Source,e.StreamKind)
+                    |> List.groupBy(fun e -> StreamIdentifier.from e.Metadata.Source e.StreamKind)
                     
                 for streamIdentifier, events in streams do
                     let streamName = StreamIdentifier.name streamIdentifier
@@ -326,6 +329,8 @@ module Storage =
                 member this.Stream(identifier) = Async.AwaitTask (stream identifier) 
                 
             
+open Storage
+
 type EventStore
     // private // TODO private?
     (
@@ -381,7 +386,7 @@ type EventStore
 
     let stream name : Async<EventEnvelope<'E> list> =
         async {
-            match! storage.Stream(name, StreamKind.Of<'E>()) with
+            match! storage.Stream(StreamIdentifier.from name (StreamKind.Of<'E>())) with
             | Ok events -> return events |> asTyped
             | Error e ->
                 failwithf "Could not get stream %s" e

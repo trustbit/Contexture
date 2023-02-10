@@ -268,7 +268,7 @@ type MsSqlBackedEventStore(msSql: MsSqlFixture) =
             for (identifier, events) in
                 data
                 |> List.map EventEnvelope.box
-                |> List.groupBy (fun x -> x.Metadata.Source, x.StreamKind) do
+                |> List.groupBy (fun x -> StreamIdentifier.from x.Metadata.Source x.StreamKind) do
                 let stream = streamsFactory.Open(StreamIdentifier.name identifier)
 
                 for event in events do
