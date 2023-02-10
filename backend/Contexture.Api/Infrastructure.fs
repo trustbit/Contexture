@@ -310,39 +310,11 @@ module Storage =
             
             let stream (identifier: StreamIdentifier) = task {
                 let stream = identifier |> StreamIdentifier.name |> streamsFactory.OpenReadOnly
-                let events = TaskCompletionSource<EventEnvelope list>()
-                let eventList = System.Collections.Generic.List<EventEnvelope>()
-                let subscription =
-                    { new ISubscription with
-                        member _.OnStartAsync(indexOrPosition: int64) =
-                            Task.CompletedTask
-
-                        member _.OnNextAsync(chunk: IChunk) = task {
-                            match chunk.Payload |> tryUnbox<EventEnvelope> with
-                            | Some envelope ->
-                                eventList.Add(envelope)
-                                return true
-                            | None ->
-                                return false
-                            }
-
-                        member _.CompletedAsync(indexOrPosition: int64) =
-                            events.SetResult(eventList |> Seq.toList)
-                            Task.CompletedTask
-
-                        member _.StoppedAsync(indexOrPosition: int64) =
-                            events.SetCanceled()
-                            Task.CompletedTask
-
-                        member _.OnErrorAsync(indexOrPosition: int64,  ex: Exception) =
-                            events.SetException(ex)
-                            Task.CompletedTask
-                    }
-                    
-                do! stream.ReadAsync(subscription)
                 try
-                    let! result = events.Task
-                    return Ok result
+                    let recorder = Recorder()
+                    do! stream.ReadAsync(recorder)
+                    let items = recorder.ToArray<EventEnvelope>()
+                    return items |> Array.toList |> Ok
                 with e ->
                     return Error (e.ToString())
             }

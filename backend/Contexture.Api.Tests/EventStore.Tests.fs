@@ -8,7 +8,6 @@ open System.Threading.Tasks
 open Contexture.Api.Infrastructure
 open Contexture.Api.Infrastructure.Storage
 open Contexture.Api.Infrastructure.Storage.NStoreBased
-open Contexture.Api.Tests.SqlDockerSupport
 open DotNet.Testcontainers.Builders
 open DotNet.Testcontainers.Configurations
 open DotNet.Testcontainers.Containers
@@ -208,6 +207,7 @@ type InMemoryEventStore() =
             data |> List.map (fun e -> e.Metadata.Source)
         )
 
+#nowarn "44" // ContainerBuilder<MsSqlTestcontainer>() is deprecated but does not provide a clear guidance yet
 type MsSqlFixture() =
     let container =
         let containerConfiguration =
