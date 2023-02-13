@@ -62,8 +62,11 @@ module CommandHandler =
             fun getStreamName aggregate  ->
                 let loadStream identity = async {
                     let streamName = getStreamName identity
-                    let! stream = eventStore.Stream<'Event> streamName
-                    return List.map (fun e -> e.Event) stream
+                    match! eventStore.Stream streamName Version.start with
+                    | Ok (version, stream)->
+                        return List.map (fun e -> e.Event) stream
+                    | Error e ->
+                        return failwithf "Failed to get stream %O with:\n%O" streamName e 
                     }
                 
                 let saveStream identity newEvents = async {
@@ -76,7 +79,9 @@ module CommandHandler =
                                   { Source = name
                                     RecordedAt = clock () } })
                         
-                    do! eventStore.Append mappedEvents
+                    match! eventStore.Append name Unknown newEvents with
+                    | Ok _ -> return ()
+                    | Error e -> return failwithf "Failed to save events for %O with:\n%O" name e
                 }
                 
                 handleWithStream loadStream saveStream aggregate

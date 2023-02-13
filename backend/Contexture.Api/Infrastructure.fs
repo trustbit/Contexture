@@ -6,8 +6,16 @@ open System.Collections.Generic
 open System.Runtime.CompilerServices
 open System.Text.Json
 open System.Threading.Tasks
+open FsToolkit.ErrorHandling
+open Microsoft.Extensions.Internal
+open NStore.Core.Persistence
 
- module Async =
+module Tuple =
+    let mapFsg map (first, second) =
+        (map first, second)
+    let mapSnd map (first, second) =
+        (first, map second)
+module Async =
 
     let map mapper o =
         async {
@@ -50,6 +58,15 @@ module StreamKind =
     let ofString(value:string) =
         value |> Type.GetType |> StreamKind.Of
 
+
+type Version = private Version of int64
+module Version =
+    let start = Version 0
+    let from value =
+        if value < 0 then
+           invalidArg $"Value must not be smaller 0 but is {value}" (nameof value)
+        Version value
+
 type EventMetadata =
     { Source: EventSource
       RecordedAt: System.DateTime }
@@ -66,7 +83,8 @@ type EventEnvelope =
 
 type Subscription<'E> = EventEnvelope<'E> list -> Async<unit>
 
-type private SubscriptionWrapper = EventEnvelope list -> Async<unit>
+
+type private InternalSubscriptionWrapper = EventEnvelope list -> Async<unit>
 
 module EventEnvelope =
     let box (envelope: EventEnvelope<'E>) =
@@ -79,10 +97,22 @@ module EventEnvelope =
         { Metadata = envelope.Metadata
           Event = unbox<'E> envelope.Payload }
     
-type EventResult = Result<EventEnvelope list, string>
+type EventResult = Result<Version * EventEnvelope list, string>
+type EventResult<'e> = Result<Version * EventEnvelope<'e> list, string>
+
+type EventDefinition<'Event> = 'Event
+type AppendError =
+    | LockingConflict of currentVersion: Version * exn
+    | UnknownError of exn
+type ExpectedVersion =
+    | Empty
+    | AtVersion of Version
+    | Unknown
+type EventStream<'Event> =
+    abstract Read: Version -> Async<EventResult<'Event>>
+    abstract Append : ExpectedVersion -> EventDefinition<'Event> list -> Async<Result<Version,AppendError>>
 
 module Storage =
-
     type StreamIdentifier =
         private
         | StreamIdentifier of StreamKind * EventSource
@@ -91,11 +121,13 @@ module Storage =
             $"{StreamKind.toString kind}/{source.ToString()}"
         let from(eventSource:EventSource) (kind: StreamKind) =
             StreamIdentifier (kind,eventSource)
+        let source (StreamIdentifier(_,source)) =source
+        let kind (StreamIdentifier(kind,_)) =kind
 
     type EventStorage =
-        abstract member Stream : StreamIdentifier -> Async<EventResult>
+        abstract member Stream : Version -> StreamIdentifier -> Async<EventResult>
         abstract member AllStreamsOf : StreamKind -> Async<EventResult>
-        abstract member Append : EventEnvelope list -> Async<unit>
+        abstract member Append : StreamIdentifier -> ExpectedVersion ->  EventEnvelope list -> Async<Result<Version,AppendError>>
         abstract member All : unit -> Async<EventResult>
 
     module InMemoryStorage =
@@ -105,12 +137,12 @@ module Storage =
             | Get of StreamKind * AsyncReplyChannel<EventResult>
             | GetStream of StreamIdentifier * AsyncReplyChannel<EventResult>
             | GetAll of AsyncReplyChannel<EventResult>
-            | Append of EventEnvelope list * AsyncReplyChannel<unit>
+            | Append of EventEnvelope list * AsyncReplyChannel<Version>
 
         type private History =
-            { items: EventEnvelope list
-              byIdentifier: Dictionary<StreamIdentifier, EventEnvelope list>
-              byEventType: Dictionary<StreamKind, EventEnvelope list> }
+            { items: (Version * EventEnvelope) list
+              byIdentifier: Dictionary<StreamIdentifier, (Version * EventEnvelope) list>
+              byEventType: Dictionary<StreamKind, (Version * EventEnvelope) list> }
             static member Empty =
                 { items = []
                   byIdentifier = Dictionary()
@@ -120,23 +152,30 @@ module Storage =
             let (success, events) = history.byIdentifier.TryGetValue source
             if success then events else []
 
-        let private getAllStreamsOf history key : EventEnvelope list =
+        let private getAllStreamsOf history key =
             let (success, items) = history.byEventType.TryGetValue key
             if success then items else []
+            
+        let private withMaxVersion (items: (Version * EventEnvelope) list) =
+            if List.isEmpty items then
+                Version.start,[]
+            else
+                items |> List.maxBy (fun (Version version,_) -> version) |> fst,
+                items |> List.map snd
 
         let private appendToHistory (history: History) (envelope: EventEnvelope) =
             let source = envelope.Metadata.Source
             let streamKind = envelope.StreamKind
             let key = StreamIdentifier.from source streamKind
-
+            let version = Version.from (history.items.Length + 1)
             let fullStream =
-                key |> stream history |> fun s -> s @ [ envelope ]
+                key |> stream history |> fun s -> s @ [ version,envelope ]
 
             history.byIdentifier.[key] <- fullStream
             let allEvents = getAllStreamsOf history streamKind
-            history.byEventType.[streamKind] <- allEvents @ [ envelope ]
+            history.byEventType.[streamKind] <- allEvents @ [ version, envelope ]
             
-            { history with items = envelope :: history.items }
+            { history with items = (version, envelope) :: history.items }
 
         let initialize (initialEvents: EventEnvelope list) =
             let proc (inbox: Agent<Msg>) =
@@ -148,26 +187,35 @@ module Storage =
                         | Get (kind, reply) ->
                             kind
                             |> getAllStreamsOf history
+                            |> withMaxVersion
                             |> Ok
                             |> reply.Reply
 
                             return! loop history
 
                         | GetStream (identifier, reply) ->
-                            identifier |> stream history |> Ok |> reply.Reply
+                            identifier
+                            |> stream history
+                            |> withMaxVersion
+                            |> Ok |>
+                            reply.Reply
 
                             return! loop history
                             
                         | GetAll reply ->
-                            history.items |> Ok |> reply.Reply
+                            history.items
+                            |> withMaxVersion
+                            |> Ok
+                            |> reply.Reply
                             
                             return! loop history
 
                         | Append (events, reply) ->
-                            reply.Reply()
-
                             let extendedHistory =
                                 events |> List.fold appendToHistory history
+                                
+                            let version = extendedHistory.items |> List.last |> fst
+                            reply.Reply(version)
 
                             return! loop extendedHistory
                     }
@@ -181,14 +229,16 @@ module Storage =
             let agent = Agent<Msg>.Start (proc)
 
             { new EventStorage with
-                member _.Stream identifier =
+                member _.Stream version identifier =
                     agent.PostAndAsyncReply(fun reply -> GetStream(identifier, reply))
 
                 member _.AllStreamsOf streamType =
                     agent.PostAndAsyncReply(fun reply -> Get(streamType, reply))
 
-                member _.Append events =
-                    agent.PostAndAsyncReply(fun reply -> Append(events, reply)) 
+                member _.Append identifier expectedVersion events = async {
+                    let! result = agent.PostAndAsyncReply(fun reply -> Append(events, reply))
+                    return Ok result
+                    }
             
                 member _.All () =
                     agent.PostAndAsyncReply(fun reply -> GetAll(reply)) } 
@@ -199,13 +249,50 @@ module Storage =
         open NStore.Core.Streams
         open System.Text.Json
         open System.Text.Json.Serialization
-        type private SerializableEventEnvelope =
+        
+        module Version =
+            let ofChunk (chunk: IChunk) =
+                Version chunk.Position
+            let maxVersion (recorder: Recorder) =
+                recorder.Chunks
+                |> Seq.tryLast
+                |> Option.map ofChunk
+                |> Option.defaultValue Version.start
+                
+        module EventEnvelope =
+            let ofChunk (chunk: IChunk) =
+                 chunk.Payload
+                |> tryUnbox<EventEnvelope list>
+                |> Option.defaultValue []
+            let ofRecorder (recorder:Recorder) =
+                recorder.ToArray<EventEnvelope list>()
+                |> Array.toList
+                |> List.collect id
+                
+        type SerializableBatch =
+            { StreamKind: string
+              Events : SerializableEventEnvelope list
+            }
+        and SerializableEventEnvelope =
             { Metadata: EventMetadata
               Payload: JsonElement
               EventType: string
-              StreamKind: string
             }
-        type JsonMsSqlSerializer(settings: JsonSerializerOptions)=
+        type JsonMsSqlSerializer(settings: JsonSerializerOptions) =
+            let deserialize streamKind (item:SerializableEventEnvelope) =
+                let eventType = item.EventType |> Type.GetType
+                {
+                    EventEnvelope.Payload = JsonSerializer.Deserialize(item.Payload,eventType,settings)
+                    EventType = eventType
+                    StreamKind = streamKind
+                    Metadata = item.Metadata
+                }
+            let serialize (envelope:EventEnvelope) =
+                {
+                    Payload = JsonSerializer.SerializeToElement(envelope.Payload, settings)
+                    EventType = envelope.EventType.AssemblyQualifiedName 
+                    Metadata = envelope.Metadata
+                }
             static member Default: JsonMsSqlSerializer =
                 let options =
                     JsonSerializerOptions(
@@ -231,15 +318,12 @@ module Storage =
                 member _.Deserialize(serialized, serializerInfo) =
                     if serializerInfo = "byte[]" then
                         serialized
-                    else if serializerInfo = nameof(EventEnvelope) then
-                        let deserialized = JsonSerializer.Deserialize<SerializableEventEnvelope>(serialized, settings)
-                        let eventType = deserialized.EventType |> Type.GetType
-                        {
-                            EventEnvelope.Payload = JsonSerializer.Deserialize(deserialized.Payload,eventType,settings)
-                            EventType = eventType
-                            StreamKind = deserialized.StreamKind |> StreamKind.ofString
-                            Metadata = deserialized.Metadata
-                        }
+                    else if serializerInfo = nameof(SerializableBatch) then
+                        let deserialized = JsonSerializer.Deserialize<SerializableBatch>(serialized, settings)
+                        let streamKind = deserialized.StreamKind |> StreamKind.ofString
+                        deserialized.Events
+                        |> List.map (deserialize streamKind)
+                        |> box
                     else
                         let returnType = Type.GetType serializerInfo
                         JsonSerializer.Deserialize(serialized, returnType, settings)
@@ -249,22 +333,20 @@ module Storage =
                     | Some bytes ->
                         bytes
                     | None ->
-                        match payload |> tryUnbox<EventEnvelope> with
-                        | Some envelope ->
-                            let serializable: SerializableEventEnvelope =
-                                {
-                                    Payload = JsonSerializer.SerializeToElement(envelope.Payload, settings)
-                                    EventType = envelope.EventType.AssemblyQualifiedName
-                                    StreamKind = StreamKind.toString envelope.StreamKind
-                                    Metadata = envelope.Metadata
+                        match payload |> tryUnbox<EventEnvelope list> with
+                        | Some envelopes ->
+                            let batch =
+                                { StreamKind = StreamKind.toString envelopes.Head.StreamKind
+                                  Events = envelopes |> List.map serialize
                                 }
-                            serializerInfo <- nameof(EventEnvelope)
-                            JsonSerializer.SerializeToUtf8Bytes(serializable,settings)
+                            serializerInfo <- nameof(SerializableBatch)
+                            JsonSerializer.SerializeToUtf8Bytes(batch, settings)
                         | None ->
                             serializerInfo <- payload.GetType().FullName
                             JsonSerializer.SerializeToUtf8Bytes(payload,settings)
                         
         type Storage(persistence: IPersistence) =
+            let streamCache: ConcurrentDictionary<StreamIdentifier,IStream> = ConcurrentDictionary()
             let streamsFactory = StreamsFactory(persistence)
          
             let fetchAll ()= 
@@ -272,8 +354,9 @@ module Storage =
                     try
                         let recorder = Recorder()
                         do! persistence.ReadAllAsync(0,recorder)
-                        let items = recorder.ToArray<EventEnvelope>()
-                        return items |> Array.toList |> Ok
+                        let items = EventEnvelope.ofRecorder recorder
+                        let version = Version.maxVersion recorder
+                        return Ok (version,items)                            
                     with e ->
                         return Error (e.ToString())
                     }
@@ -282,69 +365,119 @@ module Storage =
                 task {
                    try
                         let doesStreamKindMatch (chunk:IChunk) =
-                            chunk.Payload
-                            |> tryUnbox<EventEnvelope>
-                            |> Option.map (fun envelope -> envelope.StreamKind = kind)
-                            |> Option.defaultValue false
+                            chunk
+                            |> EventEnvelope.ofChunk
+                            |> List.exists (fun envelope -> envelope.StreamKind = kind)
                             
                         let recorder = Recorder()
                         let filtered = SubscriptionWrapper(recorder, ChunkFilter = doesStreamKindMatch)
                         do! persistence.ReadAllAsync(0,filtered)
-                        let items = recorder.ToArray<EventEnvelope>()
-                        return items |> Array.toList |> Ok
+                        let items = EventEnvelope.ofRecorder recorder
+                        let version = Version.maxVersion recorder
+                        return Ok (version,items)
                     with e ->
                         return Error (e.ToString())
                     }
                 
-            let append (envelopes: EventEnvelope list) = task {
-                let streams =
-                    envelopes
-                    |> List.groupBy(fun e -> StreamIdentifier.from e.Metadata.Source e.StreamKind)
+            let getOrCreateStream identifier =
+                streamCache.GetOrAdd(
+                    identifier,
+                    fun identifier -> identifier |> StreamIdentifier.name |> streamsFactory.OpenOptimisticConcurrency
+                    )
+                
+            let read identifier (Version version)  =
+                task {
+                    let stream = getOrCreateStream identifier
+                    let recorder = Recorder()
+                    do! stream.ReadAsync(recorder, version)
                     
-                for streamIdentifier, events in streams do
-                    let streamName = StreamIdentifier.name streamIdentifier
-                    let stream = streamsFactory.Open(streamName)
-                    for event in events do
-                        let! _ = stream.AppendAsync(event)
-                        ()
-                        
-                return ()
+                    let items =
+                        recorder
+                        |> EventEnvelope.ofRecorder
+                    
+                    return Ok(Version.maxVersion recorder, items)
+               }
+            let append identifier expectedVersion (envelopes: EventEnvelope list) = task {
+                let stream = getOrCreateStream identifier
+                let doAppend () =
+                    stream.AppendAsync(envelopes)
+                    |> Task.map Version.ofChunk
+                    |> Task.map Ok
+                try
+                    try
+                        let! peek = stream.PeekAsync()
+                        match expectedVersion,peek  with
+                        | Empty, item when isNull item || item.Position = 0 ->
+                            (stream |> unbox<OptimisticConcurrencyStream>).MarkAsNew()
+                            return! doAppend()
+                        | Empty, _ ->
+                            return Error (LockingConflict ((Version.from 0), exn "not empty"))
+                        | AtVersion expected, item when not (isNull item) ->
+                            let currentVersion = Version.ofChunk item
+                            if currentVersion <> expected then
+                                 return Error (LockingConflict (currentVersion, exn $"Expected {expected} version but got {currentVersion}"))
+                            else
+                                return! doAppend()
+                        | AtVersion expected, _ ->
+                            return Error (LockingConflict (Version.from 0, exn $"Expected {expected} version but got unknown"))
+                        | (Unknown, _) ->
+                            return! doAppend()
+                    with
+                        | :? ConcurrencyException as e ->
+                            let! currentVersion = stream.PeekAsync()
+                            return Error (LockingConflict (Version.ofChunk currentVersion, e) )
+                with
+                    | e ->
+                        return Error (UnknownError e)
             }
             
+                        
             let stream (identifier: StreamIdentifier) = task {
                 let stream = identifier |> StreamIdentifier.name |> streamsFactory.OpenReadOnly
                 try
                     let recorder = Recorder()
                     do! stream.ReadAsync(recorder)
-                    let items = recorder.ToArray<EventEnvelope>()
-                    return items |> Array.toList |> Ok
+                    let items = EventEnvelope.ofRecorder recorder
+                    let version = Version.maxVersion recorder
+                    return Ok (version,items)      
                 with e ->
                     return Error (e.ToString())
             }
             
+            let newStream (identifier: StreamIdentifier) = 
+                let stream = identifier |> StreamIdentifier.name |> streamsFactory.OpenOptimisticConcurrency
+                stream
+            
+            member this.NewStream identifier = newStream identifier
+            
             interface EventStorage with
                 member this.All() : Async<EventResult>=  Async.AwaitTask (fetchAll()) 
                 member this.AllStreamsOf(kind) = Async.AwaitTask (fetchOf kind)
-                member this.Append(envelopes) = Async.AwaitTask (append envelopes)
-                member this.Stream(identifier) = Async.AwaitTask (stream identifier) 
+                member this.Append identifier expectedVersion envelopes = Async.AwaitTask (append identifier expectedVersion envelopes)
+                member this.Stream version identifier = Async.AwaitTask (read identifier version)
+                
                 
             
 open Storage
-
+open Storage.NStoreBased
+open NStore.Core.Persistence
+open NStore.Core.Streams
 type EventStore
     // private // TODO private?
     (
         storage: Storage.EventStorage,
+        clock: ISystemClock,
         // TODO: use an agent for subscriptions?!
-        subscriptions: ConcurrentDictionary<System.Type, SubscriptionWrapper list>
+        subscriptions: ConcurrentDictionary<System.Type, InternalSubscriptionWrapper list>
     ) =
 
     let subscriptionsOf key =
         let (success, items) = subscriptions.TryGetValue key
         if success then items else []
 
-    let asTyped items : EventEnvelope<'E> list = items |> List.map EventEnvelope.unbox
-
+    let asTyped items : EventEnvelope<'E> list =
+        items |> List.map EventEnvelope.unbox
+        
     let asUntyped items = items |> List.map EventEnvelope.box
 
     let notifySubscriptions (newItems: EventEnvelope<'E> list) =
@@ -357,16 +490,19 @@ type EventStore
         |> Async.Sequential
         |> Async.Ignore
 
-    let appendAndNotify (newItems: EventEnvelope<'E> list) =
-        async {
-            do! storage.Append(newItems |> asUntyped)
-            do! notifySubscriptions newItems
-        }
+    // let appendAndNotify source (newItems: EventEnvelope<'E> list) =
+    //     async {
+    //         do! storage.Append (StreamIdentifier.from source (StreamKind.Of<'E>())) (newItems |> asUntyped)
+    //         do! notifySubscriptions newItems
+    //     }
 
     let subscribe (subscription: Subscription<'E>) =
         let key = typedefof<'E>
 
-        let upcastSubscription events = events |> asTyped |> subscription
+        let upcastSubscription events =
+            events
+            |> asTyped
+            |> subscription
 
         subscriptions.AddOrUpdate(
             key,
@@ -375,41 +511,69 @@ type EventStore
         )
         |> ignore
 
-    let allStreams () : Async<EventEnvelope<'E> list> =
+    let allStreams () : Async<Version * EventEnvelope<'E> list> =
         async {
             match! StreamKind.Of<'E>() |> storage.AllStreamsOf with
-            | Ok allStreams -> return allStreams |> asTyped
+            | Ok allStreams -> return allStreams |> Tuple.mapSnd asTyped
             | Error e ->
                 failwithf "Could not get all streams: %s" e
-                return List.empty
+                return Version.start,List.empty
         }
 
-    let stream name : Async<EventEnvelope<'E> list> =
+    let stream version name : Async<Version * EventEnvelope<'E> list> =
         async {
-            match! storage.Stream(StreamIdentifier.from name (StreamKind.Of<'E>())) with
-            | Ok events -> return events |> asTyped
+            match! storage.Stream version (StreamIdentifier.from name (StreamKind.Of<'E>())) with
+            | Ok events -> return events |> Tuple.mapSnd asTyped
             | Error e ->
                 failwithf "Could not get stream %s" e
-                return List.empty
+                return Version.start,List.empty
         }
         
-    let all toAllStream : Async<EventEnvelope<'E> list> =
+    let newStream2 name : EventStream<'E> =
+        let identifier = StreamIdentifier.from name (StreamKind.Of<'E>()) 
+        { new EventStream<'E> with
+               member _.Read version =
+                   storage.Stream version identifier
+                   |> AsyncResult.map (Tuple.mapSnd asTyped)
+               member _.Append version definitions =
+                    let envelopes =
+                        definitions
+                        |> List.map (fun payload ->
+                            {
+                                Metadata = {
+                                    Source = identifier |> StreamIdentifier.source
+                                    RecordedAt = clock.UtcNow.DateTime 
+                                }
+                                Event = payload
+                            }
+                        )
+                        |> List.map EventEnvelope.box
+                    storage.Append identifier version envelopes 
+        }
+        
+        
+    let all toAllStream : Async<Version * EventEnvelope<'E> list> =
         async {
             match! storage.All() with
-            | Ok allStreams -> return allStreams |> toAllStream
+            | Ok allStreams ->
+                return allStreams |> Tuple.mapSnd (toAllStream)
             | Error e ->
                 failwithf "Could not get all streams: %s" e
-                return List.empty
+                return Version.start,List.empty
         }
 
     static member Empty =
-        EventStore(Storage.InMemoryStorage.initialize List.empty, ConcurrentDictionary())
+        EventStore(Storage.InMemoryStorage.initialize List.empty,SystemClock(), ConcurrentDictionary())
 
     static member With(history: EventEnvelope list) =
-        EventStore(Storage.InMemoryStorage.initialize history, ConcurrentDictionary())
+        EventStore(Storage.InMemoryStorage.initialize history,SystemClock(), ConcurrentDictionary())
 
-    member _.Stream name = stream name
-    member _.Append items = appendAndNotify items
+    member _.Stream name version =
+        let stream = newStream2 name
+        stream.Read version
+    member _.Append identifier version items =
+        let stream = newStream2 identifier
+        stream.Append version items
     member _.AllStreams() = allStreams ()
     member _.Subscribe(subscription: Subscription<'E>) = subscribe subscription
     member _.All toAllStream = all toAllStream
@@ -451,7 +615,7 @@ module ReadModels =
             interface ReadModelInitialization with
                 member __.ReplayAndConnect() =
                     async {
-                        let! allStreams = eventStore.AllStreams<'Event>()
+                        let! (_,allStreams) = eventStore.AllStreams<'Event>()
                         do! handler allStreams
                         eventStore.Subscribe handler
                     }

@@ -267,7 +267,16 @@ let connectAndReplayReadModels (readModels: ReadModels.ReadModelInitialization s
     |> Async.Parallel
     |> Async.Ignore
 
+
+    
+    
 let importFromDocument clock (store: EventStore) (database: Document) = async {
+    let append (items: EventEnvelope<_> list) =
+        items
+        |> List.groupBy (fun i -> i.Metadata.Source)
+        |> List.map (fun (key, grouping) -> store.Append key Unknown grouping )
+        |> Async.Sequential
+        |> Async.Ignore
     let runAsync (items: Async<Unit> list) =
         items
         |> Async.Sequential
@@ -276,31 +285,31 @@ let importFromDocument clock (store: EventStore) (database: Document) = async {
     do!
         database.Collaborations.All
         |> List.map (Collaboration.asEvents clock)
-        |> List.map store.Append
+        |> List.map append 
         |> runAsync
     
     do!
         database.Domains.All
         |> List.map (Domain.asEvents clock)
-        |> List.map store.Append
+        |> List.map append
         |> runAsync
     
     do!
         database.BoundedContexts.All
         |> List.map (BoundedContext.asEvents clock)
-        |> List.map store.Append
+        |> List.map append
         |> runAsync
     
     do!
         database.BoundedContexts.All
         |> List.map (Namespace.asEvents clock)
-        |> List.map store.Append
+        |> List.map append
         |> runAsync
 
     do!
         database.NamespaceTemplates.All
         |> List.map (NamespaceTemplate.asEvents clock)
-        |> List.map store.Append
+        |> List.map append
         |> runAsync
     }
 let runAsync (host: IHost) =

@@ -158,6 +158,6 @@ module Utils =
             |> EventEnvelope.box
 
     let singleEvent<'e> (eventStore: EventStore) : Async<EventEnvelope<'e>> = async {
-        let! events = eventStore.AllStreams<'e>()
+        let! _,events = eventStore.AllStreams<'e>()
         return Then.Single events
     }
