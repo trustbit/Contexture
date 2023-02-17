@@ -21,11 +21,11 @@ open Xunit
 
 module Fixture =
     let environment = EnvironmentSimulation.FixedTimeEnvironment.FromSystemClock()
-    type TestStream = | TestEvent
+    type TestStream = | TestEvent of int
     let streamKind = StreamKind.Of<TestStream>()
 
     let createEvent source =
-        let event = TestEvent
+        let event = TestEvent (environment.NextId())
 
         let metadata =
             { Source = source
@@ -65,7 +65,7 @@ let private waitForResult (timeout: int) (receivedEvents: TaskCompletionSource<_
 
     Task.Run(cancelTask)
 
-let waitForEventsOnSubscription (eventStore: EventStore) action eventCallback =
+let waitForEventsOnSubscription start (eventStore: EventStore) action eventCallback =
     task {
         let receivedEvents =
             TaskCompletionSource<EventEnvelope<Fixture.TestStream> list>(
@@ -76,7 +76,7 @@ let waitForEventsOnSubscription (eventStore: EventStore) action eventCallback =
             receivedEvents.SetResult events
             Async.Sleep(0)
 
-        eventStore.Subscribe(subscription)
+        do! eventStore.Subscribe start (subscription)
 
         do! Async.StartAsTask(action ())
 
@@ -103,21 +103,6 @@ module Then =
         let item: EventEnvelope<Fixture.TestStream> = Assert.Single result
         Assert.Equal(Fixture.streamKind, StreamKind.Of(item.Event))
         Assert.Equal(source, item.Metadata.Source)
-
-type Given =
-    static member anEmptyEventStore() =
-        seq { oneTheoryTestCase <| [ EventStore.Empty ] }
-
-    static member anEventStoreWithStreamsAndEvents(count: int) =
-        let data = Seq.init count (fun _ -> Fixture.generateEvent ()) |> Seq.toList
-
-        seq {
-            oneTheoryTestCase
-            <| seq {
-                data |> List.map EventEnvelope.box |> EventStore.With
-                data |> List.map (fun e -> e.Metadata.Source)
-            }
-        }
 
 [<AbstractClass>]
 type EventStoreBehavior() =
@@ -208,35 +193,57 @@ type EventStoreBehavior() =
 
             do!
                 waitForEventsOnSubscription
+                    Position.start
                     eventStore
-                    (fun () -> eventStore.Append event.Metadata.Source Empty [ event ] |> expectOk)
+                    (fun () -> eventStore.Append event.Metadata.Source Empty [ event.Event ] |> expectOk)
                     (fun events -> Then.assertSingle events event.Metadata.Source)
         }
 
     [<Fact>]
-    member this.canAppendToAnExistingStreamAndReceiveOnlyEventViaSubscription() =
+    member this.canAppendToAnExistingStreamAndReceiveOnlyEventViaSubscriptionFromLatest() =
         task {
             let! eventStore, sources = this.anEventStoreWithStreamsAndEvents 1
             let event = Fixture.createEvent sources.Head
 
             do!
                 waitForEventsOnSubscription
+                    (Position.from 1)
                     eventStore
-                    (fun () -> eventStore.Append event.Metadata.Source (AtVersion (Version.from 0)) [ event ] |> expectOk)
-                    (fun events -> Then.assertSingle events event.Metadata.Source)
+                    (fun () -> eventStore.Append event.Metadata.Source (AtVersion (Version.from 0)) [ event.Event ] |> expectOk)
+                    (fun events ->
+                        Then.assertSingle events event.Metadata.Source
+                        let single = events.Head
+                        Assert.Equal(event.Event, single.Event)
+                        )
+        }
+        
+    [<Fact>]
+    member this.canSubscribeFromStartOfExistingStream() =
+        task {
+            let! eventStore, sources = this.anEventStoreWithStreamsAndEvents 1
+            let event = Fixture.createEvent sources.Head
 
+            do!
+                waitForEventsOnSubscription
+                    Position.start
+                    eventStore
+                    (fun () -> async { return () })
+                    (fun events -> Then.assertSingle events event.Metadata.Source)
         }
 
 type InMemoryEventStore() =
     inherit EventStoreBehavior()
 
-    override this.anEmptyEventStore() = Task.FromResult EventStore.Empty
+    override this.anEmptyEventStore() =
+        InMemoryStorage.empty()
+        |> EventStore.With
+        |> Task.FromResult 
 
     override this.anEventStoreWithStreamsAndEvents(count) =
         let data = Seq.init count (fun _ -> Fixture.generateEvent ()) |> Seq.toList
 
         Task.FromResult(
-            data |> List.map EventEnvelope.box |> EventStore.With,
+            data |> List.map EventEnvelope.box |>  InMemoryStorage.initialize |> EventStore.With,
             data |> List.map (fun e -> e.Metadata.Source)
         )
 
@@ -288,7 +295,7 @@ type MsSqlBackedEventStore(msSql: MsSqlFixture) =
         task {
             let! persistence = this.initializePersistence ()
             let storage = Storage.NStoreBased.Storage(persistence)
-            return EventStore(storage, SystemClock(), ConcurrentDictionary())
+            return EventStore(storage, (fun () -> DateTime.Now))
         }
 
     override this.anEventStoreWithStreamsAndEvents(count) =
@@ -307,7 +314,7 @@ type MsSqlBackedEventStore(msSql: MsSqlFixture) =
                 ()
 
             let storage = Storage.NStoreBased.Storage(persistence)
-            return EventStore(storage, SystemClock(),ConcurrentDictionary()), data |> List.map (fun e -> e.Metadata.Source)
+            return EventStore(storage,  (fun () -> DateTime.Now)), data |> List.map (fun e -> e.Metadata.Source)
         }
 
     interface IClassFixture<MsSqlFixture> with

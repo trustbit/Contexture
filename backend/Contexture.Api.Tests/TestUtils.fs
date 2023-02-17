@@ -4,6 +4,7 @@ open System
 open System.IO
 open System.Net
 open System.Net.Http
+open Contexture.Api.Infrastructure.Storage
 open Contexture.Api.Tests.EnvironmentSimulation
 open Microsoft.AspNetCore.Hosting
 open Microsoft.Extensions.Hosting
@@ -77,7 +78,7 @@ module Prepare =
 
     let private registerEvents givens =
         fun (services: IServiceCollection) ->
-            services.AddSingleton<EventStore>(EventStore.With givens)
+            services.AddSingleton<EventStore>(givens |> InMemoryStorage.initialize |> EventStore.With)
             |> ignore
 
     let private buildEvents environment events =

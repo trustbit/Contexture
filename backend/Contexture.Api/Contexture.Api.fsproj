@@ -24,7 +24,13 @@
     <Compile Include="Entities\Namespace.fs" />
     <Compile Include="Entities\NamespaceTemplate.fs" />
     <Compile Include="Database.fs" />
-    <Compile Include="Infrastructure.fs" />
+    <Compile Include="Utils.fs" />
+    <Compile Include="Infrastructure\Types.fs" />
+    <Compile Include="Infrastructure\EventStore.fs" />
+    <Compile Include="Infrastructure\InMemoryStorage.fs" />
+    <Compile Include="Infrastructure\NStoreBased.fs" />
+    <Compile Include="Infrastructure\Projections.fs" />
+    <Compile Include="Infrastructure\ReadModels.fs" />
     <Compile Include="CommandHandlers.fs" />
     <Compile Include="ReadModels\ApplicationReadModels.fs" />
     <Compile Include="ReadModels\Find\Types.fs" />

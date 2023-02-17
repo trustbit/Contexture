@@ -239,7 +239,7 @@ let configureServices (context: HostBuilderContext) (services : IServiceCollecti
         |> ignore
     
     services.AddSingleton<Clock>(utcNowClock) |> ignore
-    services.AddSingleton<EventStore> (EventStore.Empty) |> ignore 
+    services.AddSingleton<EventStore> (EventStore.With (Storage.InMemoryStorage.empty())) |> ignore 
     services |> configureReadModels
     
     services.AddCors() |> ignore
@@ -336,11 +336,11 @@ let runAsync (host: IHost) =
         let subscriptionLogger = loggerFactory.CreateLogger("subscriptions")
 
         // subscriptions for syncing back to the filebased-db are added after initial seeding/loading
-        store.Subscribe(Collaboration.subscription subscriptionLogger database)
-        store.Subscribe(Domain.subscription subscriptionLogger database)
-        store.Subscribe(BoundedContext.subscription subscriptionLogger database)
-        store.Subscribe(Namespace.subscription subscriptionLogger database)
-        store.Subscribe(NamespaceTemplate.subscription subscriptionLogger database)
+        do! store.Subscribe Position.start (Collaboration.subscription subscriptionLogger database)
+        do! store.Subscribe Position.start (Domain.subscription subscriptionLogger database)
+        do! store.Subscribe Position.start (BoundedContext.subscription subscriptionLogger database)
+        do! store.Subscribe Position.start (Namespace.subscription subscriptionLogger database)
+        do! store.Subscribe Position.start (NamespaceTemplate.subscription subscriptionLogger database)
 
         return! host.RunAsync()
     }
