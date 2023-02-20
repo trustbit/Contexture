@@ -25,9 +25,6 @@ import { storeToRefs } from "pinia";
 import ContextureNavbar from "~/components/core/navbar/ContextureNavbar.vue";
 import ContextureConfirmationModal from "~/components/primitives/modal/ContextureConfirmationModal.vue";
 import useConfirmationModalStore from "~/stores/confirmationModal";
-import { HierarchicalEdge } from "~/visualisations/HierarchicalEdge";
-import { Sunburst } from "~/visualisations/Sunburst";
-import { Bubble } from "./visualisations/Bubble";
 
 const modal = useConfirmationModalStore();
 
