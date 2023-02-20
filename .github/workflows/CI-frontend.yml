@@ -10,6 +10,11 @@ on:
       - '.github/workflows/CI-frontend.yml'
       - 'frontend-vue/**'
 
+defaults:
+  run:
+    shell: bash
+    working-directory: frontend-vue
+
 # A workflow run is made up of one or more jobs that can run sequentially or in parallel
 jobs:
   build-frontend:
