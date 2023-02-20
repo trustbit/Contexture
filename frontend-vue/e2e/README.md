@@ -5,7 +5,7 @@
 ```shell
 cd setup
 docker build -t trustbit/contexture_acceptance_tests_setup .
-docker run -e ASPNETCORE_hostBuilder__reloadConfigOnChange=false --rm -p 5000:3000 trustbit/contexture_acceptance_tests_setup
+docker run -e ASPNETCORE_hostBuilder__reloadConfigOnChange=false --rm -p 3000:3000 trustbit/contexture_acceptance_tests_setup
 ```
 
 ## Run
