@@ -1193,7 +1193,7 @@ export class Bubble extends HTMLElement {
     showAllConnections(flag) {
         doShowAllConnections(this.bubbleState, flag);
     }
-
+    
 
     showMain() {
         showMainPage(this.bubbleState);
