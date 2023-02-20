@@ -61,7 +61,7 @@
         </Menu>
       </div>
 
-      <div v-if="boundedContextNamespaces.length === 0" class="mt-4 text-sm italic">
+      <div v-if="boundedContextNamespaces.length === 0" class="mt-4 text-sm italic text-gray-700">
         {{ t("bounded_context_namespace.empty") }}
       </div>
 
@@ -117,6 +117,7 @@
               :options="selectableTemplates"
               v-model="selectedTemplate"
               @selected="onNamespaceTemplateChange"
+              :rules="requiredObjectRule"
             />
 
             <div
@@ -175,6 +176,9 @@ import { useNamespaceTemplatesStore } from "~/stores/namespace-templates";
 import { useNamespaces } from "~/stores/namespaces";
 import { CreateNamespace, CreateNamespaceLabel, Namespace, NamespaceId, NamespaceLabelId } from "~/types/namespace";
 import { NamespaceTemplate, NamespaceTemplateItem } from "~/types/namespace-templates";
+import { useRoute } from "vue-router";
+import { useRouteParams } from "@vueuse/router";
+import { requiredObjectRule, requiredStringRule } from "~/core/validationRules";
 
 const { loading, activeBoundedContext } = storeToRefs(useBoundedContextsStore());
 const { createNamespace, deleteNamespace, createNamespaceLabel, deleteNamespaceLabel } = useNamespaces();
@@ -189,6 +193,7 @@ const isCreateNamespaceFromTemplateOpen = ref(false);
 const selectedTemplate = ref<NamespaceTemplate>();
 const boundedContextNamespaces = computed(() => activeBoundedContext.value?.namespaces || []);
 const submitError = ref<HelpfulErrorProps>();
+const boundedContextId = useRouteParams("id")
 const namespaceNameRule = toFieldValidator(
   zod
     .string()

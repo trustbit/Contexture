@@ -29,7 +29,7 @@
         @update:collapsed="(collapsed) => updateCollapsed('commandsHandled', collapsed)"
       >
         <Form @submit="(name) => onAddMessage('commandsHandled', name)">
-          <ContextureInputText :label="t('common.name')" name="name" :required="true" :rules="requiredRule" />
+          <ContextureInputText :label="t('common.name')" name="name" :required="true" :rules="requiredStringRule" />
           <ContexturePrimaryButton type="submit" size="sm" :label="t('bounded_context_canvas.messages.commands.add')">
             <template #left>
               <Icon:material-symbols:add class="mr-2" />
@@ -67,7 +67,7 @@
         @update:collapsed="(collapsed) => updateCollapsed('eventsHandled', collapsed)"
       >
         <Form @submit="(name) => onAddMessage('eventsHandled', name)">
-          <ContextureInputText :label="t('common.name')" name="name" :required="true" :rules="requiredRule" />
+          <ContextureInputText :label="t('common.name')" name="name" :required="true" :rules="requiredStringRule" />
           <ContexturePrimaryButton type="submit" size="sm" :label="t('bounded_context_canvas.messages.events.add')">
             <template #left>
               <Icon:material-symbols:add class="mr-2" />
@@ -105,7 +105,7 @@
         @update:collapsed="(collapsed) => updateCollapsed('queriesHandled', collapsed)"
       >
         <Form @submit="(name) => onAddMessage('queriesHandled', name)">
-          <ContextureInputText :label="t('common.name')" name="name" :required="true" :rules="requiredRule" />
+          <ContextureInputText :label="t('common.name')" name="name" :required="true" :rules="requiredStringRule" />
           <ContexturePrimaryButton type="submit" size="sm" :label="t('bounded_context_canvas.messages.queries.add')">
             <template #left>
               <Icon:material-symbols:add class="mr-2" />
@@ -137,7 +137,7 @@ import ContexturePrimaryButton from "~/components/primitives/button/ContexturePr
 import ContextureCollapsable from "~/components/primitives/collapsable/ContextureCollapsable.vue";
 import ContextureInputText from "~/components/primitives/input/ContextureInputText.vue";
 import ContextureListItem from "~/components/primitives/list/ContextureListItem.vue";
-import { requiredRule } from "~/core/validationRules";
+import { requiredStringRule } from "~/core/validationRules";
 import { useBoundedContextsStore } from "~/stores/boundedContexts";
 import useConfirmationModalStore from "~/stores/confirmationModal";
 import { CreateMessage, Messages, MessagesConsumedKeys } from "~/types/boundedContext";

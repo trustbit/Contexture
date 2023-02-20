@@ -29,7 +29,7 @@
         @update:collapsed="(collapsed) => updateCollapsed('commandsSent', collapsed)"
       >
         <Form @submit="(name) => onAddMessage('commandsSent', name)">
-          <ContextureInputText :label="t('common.name')" name="name" :required="true" :rules="requiredRule" />
+          <ContextureInputText :label="t('common.name')" name="name" :required="true" :rules="requiredStringRule" />
           <ContexturePrimaryButton type="submit" size="sm" :label="t('bounded_context_canvas.messages.commands.add')">
             <template #left>
               <Icon:material-symbols:add class="mr-2" />
@@ -69,7 +69,7 @@
         @update:collapsed="(collapsed) => updateCollapsed('eventsPublished', collapsed)"
       >
         <Form @submit="(name) => onAddMessage('eventsPublished', name)">
-          <ContextureInputText :label="t('common.name')" name="name" :required="true" :rules="requiredRule" />
+          <ContextureInputText :label="t('common.name')" name="name" :required="true" :rules="requiredStringRule" />
           <ContexturePrimaryButton type="submit" size="sm" :label="t('bounded_context_canvas.messages.events.add')">
             <template #left>
               <Icon:material-symbols:add class="mr-2" />
@@ -109,7 +109,7 @@
         @update:collapsed="(collapsed) => updateCollapsed('queriesInvoked', collapsed)"
       >
         <Form @submit="(name) => onAddMessage('queriesInvoked', name)">
-          <ContextureInputText :label="t('common.name')" name="name" :required="true" :rules="requiredRule" />
+          <ContextureInputText :label="t('common.name')" name="name" :required="true" :rules="requiredStringRule" />
           <ContexturePrimaryButton type="submit" size="sm" :label="t('bounded_context_canvas.messages.queries.add')">
             <template #left>
               <Icon:material-symbols:add class="mr-2" />
@@ -140,7 +140,7 @@ import { HelpfulErrorProps } from "~/components/primitives/alert/ContextureHelpf
 import ContextureHelpfulErrorAlert from "~/components/primitives/alert/ContextureHelpfulErrorAlert.vue";
 import ContextureInputText from "~/components/primitives/input/ContextureInputText.vue";
 import ContextureListItem from "~/components/primitives/list/ContextureListItem.vue";
-import { requiredRule } from "~/core/validationRules";
+import { requiredStringRule } from "~/core/validationRules";
 import { useBoundedContextsStore } from "~/stores/boundedContexts";
 import useConfirmationModalStore from "~/stores/confirmationModal";
 import { CreateMessage, MessageProduceKeys, Messages } from "~/types/boundedContext";

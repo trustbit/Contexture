@@ -32,8 +32,4 @@ import { Bubble } from "./visualisations/Bubble";
 const modal = useConfirmationModalStore();
 
 const { isOpen, body, title, confirmButtonText, component, componentProps } = storeToRefs(modal);
-
-customElements.define("bubble-visualization", Bubble);
-customElements.define("hierarchical-edge", HierarchicalEdge);
-customElements.define("visualization-sunburst", Sunburst);
 </script>

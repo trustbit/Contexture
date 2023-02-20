@@ -1,18 +1,21 @@
 import { createPinia } from "pinia";
 import { createApp } from "vue";
-import { createI18n } from "vue-i18n";
+import { createI18n, I18nOptions } from "vue-i18n";
 import { createRouter, createWebHistory } from "vue-router";
 import App from "./App.vue";
 import routes from "./routes";
 import "./styles/main.css";
+import { Bubble } from "~/visualisations/Bubble";
+import { HierarchicalEdge } from "~/visualisations/HierarchicalEdge";
+import { Sunburst } from "~/visualisations/Sunburst";
 
 const messages = Object.fromEntries(
   Object.entries(import.meta.glob<{ default: any }>("../locales/*.json", { eager: true })).map(([key, value]) => {
     return [key.slice(11, -5), value.default];
   })
-);
+)  as I18nOptions['messages'];
 
-const i18n = createI18n({
+export const i18n = createI18n({
   legacy: false,
   locale: "en",
   messages,
@@ -28,6 +31,11 @@ const router = createRouter({
     return { top: 0 };
   },
 });
+
+customElements.define("bubble-visualization", Bubble);
+customElements.define("hierarchical-edge", HierarchicalEdge);
+customElements.define("visualization-sunburst", Sunburst);
+
 app.use(router);
 app.use(i18n);
 app.use(pinia);
