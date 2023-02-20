@@ -47,7 +47,6 @@ const { focused } = useFocusWithin(tabs);
 onKeyDown("ArrowRight", () => {
   if (focused?.value) {
     if (props.modelValue != null && props.modelValue + 1 < props.options.length) {
-      console.log("is less");
       select(props.modelValue + 1);
     }
   }

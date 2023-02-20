@@ -12,7 +12,7 @@
                   size="sm"
                   :color="namespaceSearchTerm ? 'orange' : 'teal'"
                   variant="filled"
-                  >{{ uniqueNamespaceNames.size }}
+                >{{ uniqueNamespaceNames.size }}
                 </ContextureBadge>
               </div>
             </template>
@@ -104,35 +104,41 @@
         />
 
         <div v-if="options.selectedTextPresentationMode >= 0" class="h-full overflow-y-scroll p-1 sm:p-4">
-          <div class="mb-4">
-            <span class="font-bold">{{ domainCount }}&nbsp;</span>
-            <span>{{ t("common.domain", domainCount) }}&nbsp;</span>
-            <span>{{ t("common.with") }}&nbsp;</span>
-            <span class="font-bold">{{ data?.length }}&nbsp;</span>
-            <span>{{ t("common.bounded_context", domainCount) }}&nbsp;</span>
-          </div>
 
-          <div class="space-y-4">
-            <div v-for="item in domainsWithBoundedContexts" :key="item.domainId">
-              <div class="rounded bg-white p-1 sm:p-4">
-                <h2 class="text-lg font-bold">
-                  {{ domainIdToDomainName[item.domainId] }}
-                </h2>
-                <div
-                  class="mt-4 flex flex-col gap-y-2 sm:grid sm:gap-2"
-                  :class="[
+          <ContextureHelpfulErrorAlert v-if="error" :error="error" :response="data" :friendly-message="t('search.loading_error')" />
+          <div v-else>
+            <div v-if="!isFetching">
+              <div class="mb-4">
+                <span class="font-bold">{{ domainCount }}&nbsp;</span>
+                <span>{{ t("common.domain", domainCount) }}&nbsp;</span>
+                <span>{{ t("common.with") }}&nbsp;</span>
+                <span class="font-bold">{{ data?.length }}&nbsp;</span>
+                <span>{{ t("common.bounded_context", domainCount) }}&nbsp;</span>
+              </div>
+
+              <div class="space-y-4">
+                <div v-for="item in domainsWithBoundedContexts" :key="item.domainId">
+                  <div class="rounded bg-white p-1 sm:p-4">
+                    <h2 class="text-lg font-bold">
+                      {{ domainIdToDomainName[item.domainId] }}
+                    </h2>
+                    <div
+                      class="mt-4 flex flex-col gap-y-2 sm:grid sm:gap-2"
+                      :class="[
                     {
                       'sm:grid-cols-2': options.selectedTextPresentationMode === 0,
                     },
                   ]"
-                >
-                  <div v-for="boundedContext of item.contexts" :key="boundedContext.id">
-                    <ContextureBoundedContextCard
-                      :bounded-context="boundedContext"
-                      :show-namespaces="true"
-                      :show-actions="false"
-                      :condensed="options.selectedTextPresentationMode === 1"
-                    />
+                    >
+                      <div v-for="boundedContext of item.contexts" :key="boundedContext.id">
+                        <ContextureBoundedContextCard
+                          :bounded-context="boundedContext"
+                          :show-namespaces="true"
+                          :show-actions="false"
+                          :condensed="options.selectedTextPresentationMode === 1"
+                        />
+                      </div>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -166,6 +172,7 @@ import { useNamespaces } from "~/stores/namespaces";
 import { BoundedContext } from "~/types/boundedContext";
 import { Domain } from "~/types/domain";
 import { Namespace } from "~/types/namespace";
+import ContextureHelpfulErrorAlert from "~/components/primitives/alert/ContextureHelpfulErrorAlert.vue";
 
 interface SearchSettings {
   selectedTextPresentationMode: number;
@@ -180,7 +187,7 @@ const route = useRoute();
 
 const options: Ref<SearchSettings> = useLocalStorage<SearchSettings>("settings.search.presentation", {
   selectedTextPresentationMode: 0,
-  selectedVisualization: -1,
+  selectedVisualization: -1
 });
 
 const namespaceSearchTerm = ref<string>("");
@@ -206,8 +213,8 @@ onMounted(() => {
           ...activeFilters.value,
           {
             key: key,
-            value: v as string,
-          },
+            value: v as string
+          }
         ];
       });
     } else {
@@ -215,8 +222,8 @@ onMounted(() => {
         ...activeFilters.value,
         {
           key: key,
-          value: route.query[key] as string,
-        },
+          value: route.query[key] as string
+        }
       ];
     }
   }
@@ -228,8 +235,8 @@ function addFilter(index: number, event: { key?: string; value?: string }): void
       ...activeFilters.value,
       {
         key: "Label.Name",
-        value: event.key,
-      },
+        value: event.key
+      }
     ];
   }
   if (event.value) {
@@ -237,8 +244,8 @@ function addFilter(index: number, event: { key?: string; value?: string }): void
       ...activeFilters.value,
       {
         key: "Label.Value",
-        value: event.value,
-      },
+        value: event.value
+      }
     ];
   }
 
@@ -250,7 +257,6 @@ function onDeleteFilter(index: number): void {
 }
 
 watch(activeFilters, (value) => {
-  console.log("change");
   const queryParams = value.reduce((acc, { key, value }) => {
     if (!acc[key]) {
       acc[key] = [];
@@ -299,13 +305,16 @@ const queryParams = computed(() => {
 
 const url = computed(() => "/api/boundedContexts?" + queryParams.value);
 
-const { data } = useFetch<BoundedContext[]>(url, {
-  refetch: true,
+const { data, error, isFetching } = useFetch<BoundedContext[]>(url, {
+  refetch: true
 }).get();
 
 const boundedContextDomain = computed<{
   [domainId: string]: BoundedContext[];
 }>(() => {
+  if (error.value) {
+    return {};
+  }
   return (
     data.value?.reduce((acc: { [domainId: string]: BoundedContext[] }, curr: BoundedContext) => {
       if (!acc[curr.domain.id]) {
@@ -320,7 +329,7 @@ const boundedContextDomain = computed<{
 const domainsWithBoundedContexts = computed(() => {
   return Object.entries(boundedContextDomain.value).map(([domainId, contexts]) => ({
     domainId,
-    contexts,
+    contexts
   }));
 });
 

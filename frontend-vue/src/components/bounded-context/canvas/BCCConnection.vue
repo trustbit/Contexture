@@ -248,9 +248,7 @@ function searchSuggestions(query: string): void {
   }
 }
 
-// todo types
 async function onCreateCollaborator(collaborator: any): Promise<void> {
-  console.log("test");
   let ref: string;
   if (selectedCollaborator.value === "frontend" || selectedCollaborator.value === "externalSystem") {
     ref = collaborator.collaboratorRef;

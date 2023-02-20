@@ -269,6 +269,7 @@
   "search.add_filter": "add filter",
   "search.field": "Field",
   "search.hierarchical_edge": "Hierarchical Edge",
+  "search.loading_error": "Could not load search results",
   "search.namespaces.search.aria_label": "Search namespaces",
   "search.namespaces.search.placeholder": "Search namespaces",
   "search.namespaces.search.title": "Namespaces",

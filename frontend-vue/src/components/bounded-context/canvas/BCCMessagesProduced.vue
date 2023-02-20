@@ -166,7 +166,6 @@ const submitError = ref<HelpfulErrorProps>();
 const messages = computed(() => activeBoundedContext.value.messages);
 
 async function onAddMessage(key: MessageProduceKeys, message: CreateMessage) {
-  console.log(message);
   const res = await store.addMessage(activeBoundedContext.value.id, key, message.name);
 
   if (res.error.value) {

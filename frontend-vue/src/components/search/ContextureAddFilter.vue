@@ -34,6 +34,7 @@ import { Ref, ref } from "vue";
 import ContextureAutocomplete from "~/components/primitives/autocomplete/ContextureAutocomplete.vue";
 import ContexturePrimaryButton from "~/components/primitives/button/ContexturePrimaryButton.vue";
 import ContextureInputText from "~/components/primitives/input/ContextureInputText.vue";
+import { useI18n } from "vue-i18n";
 
 interface Props {
   namespaceName: string;
@@ -44,7 +45,7 @@ const props = defineProps<Props>();
 const emit = defineEmits<{
   (e: "add", event: any): void;
 }>();
-
+const {t} = useI18n();
 const keyTerm = ref<string>("");
 
 const keySuggestions = ref<string[]>(
