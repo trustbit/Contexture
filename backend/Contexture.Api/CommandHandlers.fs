@@ -40,7 +40,7 @@ module CommandHandler =
         
     let handleWithStream loadStream saveStream (aggregate: Aggregate<'State,'Cmd,'Event,'Error>) : HandleIdentityAndCommand<'Identity,'Cmd,'Error> =
         fun identity (command : 'Cmd) -> async {
-            let! stream = loadStream identity
+            let! version,stream = loadStream identity
             
             let state =
                 stream
@@ -48,7 +48,7 @@ module CommandHandler =
                 
             match aggregate.Decider command state with
             | Ok newEvents ->
-                do! saveStream identity newEvents
+                do! saveStream identity version newEvents
                 return Ok identity
             | Error e ->
                 return e |> DomainError |> Error
@@ -64,12 +64,12 @@ module CommandHandler =
                     let streamName = getStreamName identity
                     match! eventStore.Stream streamName Version.start with
                     | Ok (version, stream)->
-                        return List.map (fun e -> e.Event) stream
+                        return version, List.map (fun e -> e.Event) stream
                     | Error e ->
                         return failwithf "Failed to get stream %O with:\n%O" streamName e 
                     }
                 
-                let saveStream identity newEvents = async {
+                let saveStream identity version newEvents = async {
                     let name = getStreamName identity
                     let mappedEvents =
                         newEvents
@@ -79,7 +79,7 @@ module CommandHandler =
                                   { Source = name
                                     RecordedAt = clock () } })
                         
-                    match! eventStore.Append name Unknown newEvents with
+                    match! eventStore.Append name (AtVersion version) newEvents with
                     | Ok _ -> return ()
                     | Error e -> return failwithf "Failed to save events for %O with:\n%O" name e
                 }

@@ -11,7 +11,7 @@ open FsToolkit.ErrorHandling
 type Msg =
     private
     | Get of StreamKind * AsyncReplyChannel<EventResult>
-    | GetStream of StreamIdentifier * AsyncReplyChannel<EventResult>
+    | GetStream of StreamIdentifier * AsyncReplyChannel<StreamResult>
     | GetAll of AsyncReplyChannel<EventResult>
     | Append of EventEnvelope list * AsyncReplyChannel<Version>
     | Notify of Position * EventEnvelope list * (Position -> EventEnvelope list -> Async<unit>)
@@ -78,7 +78,7 @@ let initialize (initialEvents: EventEnvelope list) =
 
                     return! loop state
                 | GetStream(identifier, reply) ->
-                    identifier |> stream history |> withMaxPosition |> Ok |> reply.Reply
+                    identifier |> stream history |> withMaxVersion |> Ok |> reply.Reply
 
                     return! loop state
                 | GetAll reply ->

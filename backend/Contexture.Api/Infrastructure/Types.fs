@@ -87,6 +87,8 @@ module EventEnvelope =
 
 type EventResult = Result<Position * EventEnvelope list, string>
 type EventResult<'e> = Result<Position * EventEnvelope<'e> list, string>
+type StreamResult = Result<Version * EventEnvelope list, string>
+type StreamResult<'e> = Result<Version * EventEnvelope<'e> list, string>
 
 type EventDefinition<'Event> = 'Event
 
@@ -100,5 +102,5 @@ type ExpectedVersion =
     | Unknown
 
 type EventStream<'Event> =
-    abstract Read: Version -> Async<EventResult<'Event>>
+    abstract Read: Version -> Async<StreamResult<'Event>>
     abstract Append: ExpectedVersion -> EventDefinition<'Event> list -> Async<Result<Version, AppendError>>

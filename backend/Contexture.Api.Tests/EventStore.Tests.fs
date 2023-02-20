@@ -126,24 +126,25 @@ type EventStoreBehavior() =
     member this.canReadFromAnStoreWithOneStreamAndOneEvent() =
         task {
             let! eventStore, sources = this.anEventStoreWithStreamsAndEvents (1)
-            let! version,result = eventStore.AllStreams()
+            let! position,result = eventStore.AllStreams()
 
+            let expectedVersion = Version.from 1
             let expectedPosition = Position.from 1
             Then.assertAll result sources
-            Assert.Equal (expectedPosition, version)
+            Assert.Equal (expectedPosition, position)
 
             let source = sources.Head
-            let! streamPosition,stream =
-                eventStore.Stream source  Version.start
+            let! streamVersion,stream =
+                eventStore.Stream source Version.start
                 |> resultOrFail
                 
             Then.assertSingle stream source
-            Assert.Equal (expectedPosition, streamPosition)
+            Assert.Equal (expectedVersion, streamVersion)
 
-            let! allVersion,allStreams = eventStore.All(List.map EventEnvelope.unbox)
+            let! allPosition,allStreams = eventStore.All(List.map EventEnvelope.unbox)
             Then.assertAll allStreams [ source ]
             Assert.NotEmpty allStreams
-            Assert.Equal (allVersion, streamPosition)
+            Assert.Equal (allPosition |> Position.value, streamVersion |> Version.value)
         }
 
     [<Fact>]
@@ -175,16 +176,18 @@ type EventStoreBehavior() =
                 |> expectOk
 
             let expectedPosition = Position.from 1
-            let! version,result = eventStore.AllStreams()
+            let expectedVersion = Version.from 1
+            
+            let! position,result = eventStore.AllStreams()
             Then.assertAll result [ event.Metadata.Source ]
-            Assert.Equal (expectedPosition, version)
+            Assert.Equal (expectedPosition, position)
 
             let! (version, stream: EventEnvelope<Fixture.TestStream> list) =
                 eventStore.Stream event.Metadata.Source Version.start
                 |> resultOrFail
 
             Then.assertSingle stream event.Metadata.Source
-            Assert.Equal (expectedPosition, version)
+            Assert.Equal (expectedVersion, version)
         }
 
     [<Fact>]

@@ -30,7 +30,7 @@ and SubscriptionStatus =
 
 
 type EventStorage =
-    abstract member Stream: Version -> StreamIdentifier -> Async<EventResult>
+    abstract member Stream: Version -> StreamIdentifier -> Async<StreamResult>
     abstract member AllStreamsOf: StreamKind -> Async<EventResult>
 
     abstract member Append:

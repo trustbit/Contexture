@@ -162,7 +162,7 @@ type Storage(persistence: IPersistence, logger: INStoreLoggerFactory) =
 
             let items = recorder |> EventEnvelope.ofRecorder
 
-            return Ok(Position.maxPosition recorder, items)
+            return Ok(Version.maxVersion recorder, items)
         }
 
     let append identifier expectedVersion (envelopes: EventEnvelope list) =
