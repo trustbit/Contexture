@@ -5,7 +5,7 @@ on:
     branches:
       - master
   workflow_dispatch:
-    
+
 
 # CONFIGURATION
 # For help, go to https://github.com/Azure/Actions
@@ -32,17 +32,19 @@ jobs:
       name: Build
     - run: make test-backend
       name: Test
-    - name: Setup Elm
-      uses: jorelali/setup-elm@v2
+    - name: Setup Node.js
+      uses: actions/setup-node@v1
+      with:
+        node-version: '16.x'
     - run: make prepare-image
     - name: prepare scenario
       run: cp ./example/restaurant-db.json ./artifacts/image/db.json
     - name: 'Deploy to Azure WebApp'
       uses: azure/webapps-deploy@v2
-      with: 
+      with:
         app-name: ${{ env.AZURE_WEBAPP_NAME }}
         publish-profile: ${{ secrets.AZURE_WEBAPP_PUBLISH_PROFILE }}
         package: ${{ env.AZURE_WEBAPP_PACKAGE_PATH }}
-        
+
   # For more information on GitHub Actions for Azure, refer to https://github.com/Azure/Actions
   # For more samples to get started with GitHub Action workflows to deploy to Azure, refer to https://github.com/Azure/actions-workflow-samples
