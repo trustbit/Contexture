@@ -33,9 +33,9 @@ jobs:
     - run: make test-backend
       name: Test
     - name: Setup Node.js
-      uses: actions/setup-node@v1
+      uses: actions/setup-node@v3
       with:
-        node-version: '16.x'
+        node-version: '18.x'
     - run: make prepare-image
     - name: prepare scenario
       run: cp ./example/restaurant-db.json ./artifacts/image/db.json
