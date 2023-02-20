@@ -51,7 +51,7 @@ module Position =
     let value (Position value) = value
 
     let from value =
-        if value < 0 then
+        if value < 0L then
             invalidArg $"Value must not be smaller 0 but is {value}" (nameof value)
 
         Position value
@@ -70,9 +70,9 @@ type EventEnvelope =
       EventType: System.Type
       StreamKind: StreamKind }
 
-type Subscription = EventEnvelope list -> Async<unit>
+type SubscriptionHandler = EventEnvelope list -> Async<unit>
 
-type Subscription<'E> = EventEnvelope<'E> list -> Async<unit>
+type SubscriptionHandler<'E> = EventEnvelope<'E> list -> Async<unit>
 
 module EventEnvelope =
     let box (envelope: EventEnvelope<'E>) =
@@ -85,8 +85,8 @@ module EventEnvelope =
         { Metadata = envelope.Metadata
           Event = unbox<'E> envelope.Payload }
 
-type EventResult = Result<Version * EventEnvelope list, string>
-type EventResult<'e> = Result<Version * EventEnvelope<'e> list, string>
+type EventResult = Result<Position * EventEnvelope list, string>
+type EventResult<'e> = Result<Position * EventEnvelope<'e> list, string>
 
 type EventDefinition<'Event> = 'Event
 

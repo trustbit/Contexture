@@ -2,8 +2,10 @@ module Contexture.Api.Infrastructure.Storage.NStoreBased
 
 open System
 open System.Collections.Concurrent
+open System.Threading
 open System.Threading.Tasks
 open FsToolkit.ErrorHandling
+open NStore.Core.Logging
 open NStore.Persistence.MsSql
 open NStore.Core.Streams
 open System.Text.Json
@@ -13,6 +15,13 @@ open NStore.Core.Persistence
 open Contexture.Api.Infrastructure
 open Contexture.Api.Infrastructure.Storage
 
+module Position =
+    let ofChunk (chunk: IChunk) = Position chunk.Position
+    let maxPosition (recorder: Recorder) =
+        recorder.Chunks
+        |> Seq.tryLast
+        |> Option.map ofChunk
+        |> Option.defaultValue Position.start
 module Version =
     let ofChunk (chunk: IChunk) = Version chunk.Position
 
@@ -103,7 +112,7 @@ type JsonMsSqlSerializer(settings: JsonSerializerOptions) =
                     serializerInfo <- payload.GetType().FullName
                     JsonSerializer.SerializeToUtf8Bytes(payload, settings)
 
-type Storage(persistence: IPersistence) =
+type Storage(persistence: IPersistence, logger: INStoreLoggerFactory) =
     let streamCache: ConcurrentDictionary<StreamIdentifier, IStream> =
         ConcurrentDictionary()
 
@@ -115,7 +124,7 @@ type Storage(persistence: IPersistence) =
                 let recorder = Recorder()
                 do! persistence.ReadAllAsync(0, recorder)
                 let items = EventEnvelope.ofRecorder recorder
-                let version = Version.maxVersion recorder
+                let version = Position.maxPosition recorder
                 return Ok(version, items)
             with e ->
                 return Error(e.ToString())
@@ -133,8 +142,8 @@ type Storage(persistence: IPersistence) =
                 let filtered = SubscriptionWrapper(recorder, ChunkFilter = doesStreamKindMatch)
                 do! persistence.ReadAllAsync(0, filtered)
                 let items = EventEnvelope.ofRecorder recorder
-                let version = Version.maxVersion recorder
-                return Ok(version, items)
+                let position = Position.maxPosition recorder
+                return Ok(position, items)
             with e ->
                 return Error(e.ToString())
         }
@@ -153,7 +162,7 @@ type Storage(persistence: IPersistence) =
 
             let items = recorder |> EventEnvelope.ofRecorder
 
-            return Ok(Version.maxVersion recorder, items)
+            return Ok(Position.maxPosition recorder, items)
         }
 
     let append identifier expectedVersion (envelopes: EventEnvelope list) =
@@ -211,63 +220,94 @@ type Storage(persistence: IPersistence) =
                 return Error(e.ToString())
         }
 
-    let newStream (identifier: StreamIdentifier) =
-        let stream =
-            identifier |> StreamIdentifier.name |> streamsFactory.OpenOptimisticConcurrency
+    let unfilteredSubscription (subscription: SubscriptionHandler) =
+        fun chunk ->
+            task {
+                let envelopes = EventEnvelope.ofChunk chunk
+                do! subscription envelopes
+                return true
+            }
+        
+    let filteredSubscription streamKind (subscription: SubscriptionHandler)  =
+        fun chunk ->
+            task {
+                let envelopes = EventEnvelope.ofChunk chunk
+                let filtered = envelopes |> List.filter (fun e -> e.StreamKind = streamKind)
 
-        stream
+                if not (List.isEmpty filtered) then
+                    do! subscription filtered
 
-    let subscribe definition (subscription: Subscription) =
-        let unfilteredSubscription =
-            { new ISubscription with
-                member _.OnStartAsync(indexOrPosition) = Task.CompletedTask
-
-                member _.OnNextAsync(chunk: IChunk) =
-                    task {
-                        let envelopes = EventEnvelope.ofChunk chunk
-                        do! subscription envelopes
-                        return true
-                    }
-
-                member _.CompletedAsync(indexOrPosition) = Task.CompletedTask
-
-                member _.StoppedAsync(indexOrPosition) = Task.CompletedTask
-
-                member _.OnErrorAsync(indexOrPosition, ex) = Task.CompletedTask }
-
+                return true
+        }
+        
+    let captureStatus (processor:ChunkProcessor) =
+        let mutable subscriptionStatus = NotRunning
+        LambdaSubscription(
+            fun chunk ->
+                task {
+                    let! result = processor.Invoke chunk
+                    subscriptionStatus <- Processing (Position.ofChunk chunk)
+                    return result
+                }
+            ,
+            OnComplete = fun pos ->
+                subscriptionStatus <- CaughtUp (Position.from pos)
+                Task.CompletedTask
+            ,
+            OnError = fun (pos:int64) (ex:Exception)->
+                subscriptionStatus <- Failed (ex, pos |> Position.from |> Some)
+                Task.CompletedTask
+            ,
+            OnStart = fun pos ->
+                subscriptionStatus <- Processing (Position.from pos)
+                Task.CompletedTask
+            ,
+            OnStop = fun pos ->
+                subscriptionStatus <- Stopped(Position.from pos)
+                Task.CompletedTask
+        ),
+        fun () -> subscriptionStatus
+    
+    let startAsPolling position (subscription:ChunkProcessor) =
+        let wrappedSubscription,status = captureStatus subscription
+        let pollingClient = PollingClient(persistence,Position.value position, wrappedSubscription,logger)
+        pollingClient.Start()
+        { new Subscription with
+            member _.Status = status()
+            member _.DisposeAsync () = 
+                ValueTask (pollingClient.Stop())
+        }
+        
+    let subscribe definition (subscription: SubscriptionHandler) =
         match definition with
         | FromStream(streamIdentifier, version) ->
             let stream =
                 streamIdentifier |> StreamIdentifier.name |> streamsFactory.OpenReadOnly
-
-            stream.ReadAsync(unfilteredSubscription, version |> Option.defaultValue Version.start |> Version.value)
-        | FromAll position -> persistence.ReadAllAsync(Position.value position, unfilteredSubscription)
+            let token = new CancellationTokenSource()
+            let wrappedSubscription, status =
+                captureStatus (unfilteredSubscription subscription)
+                
+            // TODO: this is not polling - it just reads data once!
+            let readTask = stream.ReadAsync(wrappedSubscription, version |> Option.defaultValue Version.start |> Version.value, token.Token)
+            { new Subscription with
+                member _.Status = status()
+                member _.DisposeAsync () =
+                    ValueTask <| task {
+                    if (not token.IsCancellationRequested) then
+                        token.Cancel()
+                        token.Dispose()
+                        
+                    while not readTask.IsCompleted do    
+                        do! Task.Delay(100)
+                    
+                    readTask.Dispose()
+                    return ()
+                }                
+            }
+        | FromAll position ->
+            startAsPolling position (unfilteredSubscription subscription)
         | FromKind(streamKind, position) ->
-            let filteredSubscription =
-                { new ISubscription with
-                    member _.OnStartAsync(indexOrPosition) = Task.CompletedTask
-
-                    member _.OnNextAsync(chunk: IChunk) =
-                        task {
-                            let envelopes = EventEnvelope.ofChunk chunk
-                            let filtered = envelopes |> List.filter (fun e -> e.StreamKind = streamKind)
-
-                            if not (List.isEmpty filtered) then
-                                do! subscription filtered
-
-                            return true
-                        }
-
-                    member _.CompletedAsync(indexOrPosition) = Task.CompletedTask
-
-                    member _.StoppedAsync(indexOrPosition) = Task.CompletedTask
-
-                    member _.OnErrorAsync(indexOrPosition, ex) = Task.CompletedTask }
-
-            persistence.ReadAllAsync(Position.value position, filteredSubscription)
-
-
-    member this.NewStream identifier = newStream identifier
+            startAsPolling position (filteredSubscription streamKind  subscription)
 
     interface EventStorage with
         member this.All() : Async<EventResult> = Async.AwaitTask(fetchAll ())
@@ -280,4 +320,4 @@ type Storage(persistence: IPersistence) =
             Async.AwaitTask(read identifier version)
 
         member this.Subscribe definition subscription =
-            Async.AwaitTask(subscribe definition subscription)
+            subscribe definition subscription

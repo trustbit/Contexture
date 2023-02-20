@@ -2,10 +2,12 @@ module Contexture.Api.App
 
 open System
 open System.IO
+open System.Threading.Tasks
 open Contexture.Api.Aggregates
 open Contexture.Api.Database
 open Contexture.Api.Infrastructure
 open Contexture.Api.FileBasedCommandHandlers
+open Contexture.Api.Infrastructure.Storage
 open Giraffe
 open Microsoft.AspNetCore.Builder
 open Microsoft.AspNetCore.Http
@@ -263,11 +265,31 @@ let buildHost args =
 
 let connectAndReplayReadModels (readModels: ReadModels.ReadModelInitialization seq) =
     readModels
-    |> Seq.map (fun r -> r.ReplayAndConnect())
-    |> Async.Parallel
-    |> Async.Ignore
-
-
+    |> Seq.map (fun r -> r.ReplayAndConnect (Some Position.start))
+    |> Seq.toList
+    
+let waitUntilCaughtUp (subscriptions: Subscription List) =
+    task {
+        let getCurrentStatus () =
+            subscriptions
+            |> List.fold (fun (c,e) item ->
+                match item.Status with
+                | CaughtUp p ->  (p,item) :: c, e
+                | Failed (ex,pos) -> c, (ex,pos,item) :: e
+                | _ -> c,e
+            ) (List.empty,List.empty)
+            
+        let initialStatus = getCurrentStatus()
+        let mutable lastStatus = initialStatus
+        let mutable counter = 0
+        while not(lastStatus |> fst |> List.length = (subscriptions |> List.length )) do
+            do! Task.Delay(100)
+            let calculatedStatus = getCurrentStatus()
+            lastStatus <- calculatedStatus
+            counter <- counter + 1
+            if counter > 10 then
+                failwithf "No result after %i iterations. Last Status %A" counter lastStatus
+    }
     
     
 let importFromDocument clock (store: EventStore) (database: Document) = async {
@@ -327,7 +349,8 @@ let runAsync (host: IHost) =
         let readModels =
             host.Services.GetServices<ReadModels.ReadModelInitialization>()
 
-        do! connectAndReplayReadModels readModels
+        let readModelSubscriptions = connectAndReplayReadModels readModels
+        do! waitUntilCaughtUp readModelSubscriptions
 
         let! document = database.Read()
         do! importFromDocument clock store document
@@ -336,11 +359,16 @@ let runAsync (host: IHost) =
         let subscriptionLogger = loggerFactory.CreateLogger("subscriptions")
 
         // subscriptions for syncing back to the filebased-db are added after initial seeding/loading
-        do! store.Subscribe Position.start (Collaboration.subscription subscriptionLogger database)
-        do! store.Subscribe Position.start (Domain.subscription subscriptionLogger database)
-        do! store.Subscribe Position.start (BoundedContext.subscription subscriptionLogger database)
-        do! store.Subscribe Position.start (Namespace.subscription subscriptionLogger database)
-        do! store.Subscribe Position.start (NamespaceTemplate.subscription subscriptionLogger database)
+        let fileSyncSubscriptions  =
+            [
+                store.Subscribe Position.start (Collaboration.subscription subscriptionLogger database)
+                store.Subscribe Position.start (Domain.subscription subscriptionLogger database)
+                store.Subscribe Position.start (BoundedContext.subscription subscriptionLogger database)
+                store.Subscribe Position.start (Namespace.subscription subscriptionLogger database)
+                store.Subscribe Position.start (NamespaceTemplate.subscription subscriptionLogger database)
+            ]
+            
+        do! waitUntilCaughtUp (readModelSubscriptions @ fileSyncSubscriptions)
 
         return! host.RunAsync()
     }

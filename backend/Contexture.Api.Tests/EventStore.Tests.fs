@@ -72,11 +72,13 @@ let waitForEventsOnSubscription start (eventStore: EventStore) action eventCallb
                 TaskCreationOptions.RunContinuationsAsynchronously
             )
 
-        let subscription events =
-            receivedEvents.SetResult events
+        let subscriptionHandler events =
+            if not(List.isEmpty events) then
+                receivedEvents.SetResult events
             Async.Sleep(0)
 
-        do! eventStore.Subscribe start (subscription)
+        let subscription = eventStore.Subscribe start subscriptionHandler
+        do! Contexture.Api.App.waitUntilCaughtUp [subscription]
 
         do! Async.StartAsTask(action ())
 
@@ -117,7 +119,7 @@ type EventStoreBehavior() =
             let! eventStore = this.anEmptyEventStore ()
             let! version,result = eventStore.AllStreams()
             Assert.Empty result
-            Assert.Equal(Version.start, version)
+            Assert.Equal(Position.start, version)
         }
 
     [<Fact>]
@@ -126,22 +128,22 @@ type EventStoreBehavior() =
             let! eventStore, sources = this.anEventStoreWithStreamsAndEvents (1)
             let! version,result = eventStore.AllStreams()
 
-            let expectedVersion = Version.from 1
+            let expectedPosition = Position.from 1
             Then.assertAll result sources
-            Assert.Equal (expectedVersion, version)
+            Assert.Equal (expectedPosition, version)
 
             let source = sources.Head
-            let! streamVersion,stream =
+            let! streamPosition,stream =
                 eventStore.Stream source  Version.start
                 |> resultOrFail
                 
             Then.assertSingle stream source
-            Assert.Equal (expectedVersion, streamVersion)
+            Assert.Equal (expectedPosition, streamPosition)
 
             let! allVersion,allStreams = eventStore.All(List.map EventEnvelope.unbox)
             Then.assertAll allStreams [ source ]
             Assert.NotEmpty allStreams
-            Assert.Equal (allVersion, streamVersion)
+            Assert.Equal (allVersion, streamPosition)
         }
 
     [<Fact>]
@@ -149,9 +151,9 @@ type EventStoreBehavior() =
         task {
             let! eventStore, sources = this.anEventStoreWithStreamsAndEvents (3)
             let! (version,result: EventEnvelope<Fixture.TestStream> list) = eventStore.AllStreams()
-            let expectedVersion = Version.from 3
+            let expectedPosition = Position.from 3
             Then.assertAll result sources
-            Assert.Equal(expectedVersion, version)
+            Assert.Equal(expectedPosition, version)
 
             for source in sources do
                 let! _,stream =
@@ -161,7 +163,7 @@ type EventStoreBehavior() =
 
             let! (version,allStreams: EventEnvelope<Fixture.TestStream> list) = eventStore.All(List.map EventEnvelope.unbox)
             Then.assertAll allStreams sources
-            Assert.Equal(expectedVersion, version)
+            Assert.Equal(expectedPosition, version)
         }
 
     [<Fact>]
@@ -172,17 +174,17 @@ type EventStoreBehavior() =
             do! eventStore.Append event.Metadata.Source Empty [ event.Event ]
                 |> expectOk
 
-            let expectedVersion = Version.from 1
+            let expectedPosition = Position.from 1
             let! version,result = eventStore.AllStreams()
             Then.assertAll result [ event.Metadata.Source ]
-            Assert.Equal (expectedVersion, version)
+            Assert.Equal (expectedPosition, version)
 
             let! (version, stream: EventEnvelope<Fixture.TestStream> list) =
                 eventStore.Stream event.Metadata.Source Version.start
                 |> resultOrFail
 
             Then.assertSingle stream event.Metadata.Source
-            Assert.Equal (expectedVersion, version)
+            Assert.Equal (expectedPosition, version)
         }
 
     [<Fact>]
@@ -209,7 +211,7 @@ type EventStoreBehavior() =
                 waitForEventsOnSubscription
                     (Position.from 1)
                     eventStore
-                    (fun () -> eventStore.Append event.Metadata.Source (AtVersion (Version.from 0)) [ event.Event ] |> expectOk)
+                    (fun () -> eventStore.Append event.Metadata.Source (AtVersion (Version.from 1)) [ event.Event ] |> expectOk)
                     (fun events ->
                         Then.assertSingle events event.Metadata.Source
                         let single = events.Head
@@ -273,13 +275,14 @@ type MsSqlFixture() =
 type MsSqlBackedEventStore(msSql: MsSqlFixture) =
     inherit EventStoreBehavior()
 
+    let loggerFactory = NStoreNullLoggerFactory.Instance
     let counter = ref 0L
 
     member private this.initializePersistence() =
         task {
             let config =
                 MsSqlPersistenceOptions(
-                    NStoreNullLoggerFactory.Instance,
+                    loggerFactory,
                     ConnectionString = msSql.Container.ConnectionString,
                     StreamsTableName = $"streams_{Interlocked.Increment(counter)}_{this.GetType().Name}",
                     Serializer = Storage.NStoreBased.JsonMsSqlSerializer.Default
@@ -294,7 +297,7 @@ type MsSqlBackedEventStore(msSql: MsSqlFixture) =
     override this.anEmptyEventStore() =
         task {
             let! persistence = this.initializePersistence ()
-            let storage = Storage.NStoreBased.Storage(persistence)
+            let storage = Storage.NStoreBased.Storage(persistence,loggerFactory)
             return EventStore(storage, (fun () -> DateTime.Now))
         }
 
@@ -313,7 +316,7 @@ type MsSqlBackedEventStore(msSql: MsSqlFixture) =
                 let! _ = stream.AppendAsync(events)
                 ()
 
-            let storage = Storage.NStoreBased.Storage(persistence)
+            let storage = Storage.NStoreBased.Storage(persistence,loggerFactory)
             return EventStore(storage,  (fun () -> DateTime.Now)), data |> List.map (fun e -> e.Metadata.Source)
         }
 

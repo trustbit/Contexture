@@ -1,5 +1,6 @@
 namespace Contexture.Api.Infrastructure.Storage
 
+open System
 open Contexture.Api.Infrastructure
 
 type StreamIdentifier = private StreamIdentifier of StreamKind * EventSource
@@ -16,6 +17,17 @@ type SubscriptionDefinition =
     | FromAll of Position
     | FromKind of StreamKind * Position
     | FromStream of StreamIdentifier * Version option
+    
+type Subscription =
+    inherit IAsyncDisposable
+    abstract Status: SubscriptionStatus
+and SubscriptionStatus =
+    | NotRunning
+    | Processing of current: Position
+    | CaughtUp of at: Position
+    | Failed of exn * at: Position option
+    | Stopped of at: Position
+
 
 type EventStorage =
     abstract member Stream: Version -> StreamIdentifier -> Async<EventResult>
@@ -25,7 +37,7 @@ type EventStorage =
         StreamIdentifier -> ExpectedVersion -> EventEnvelope list -> Async<Result<Version, AppendError>>
 
     abstract member All: unit -> Async<EventResult>
-    abstract member Subscribe: SubscriptionDefinition -> Subscription -> Async<unit>
+    abstract member Subscribe: SubscriptionDefinition -> SubscriptionHandler -> Subscription
 
 namespace Contexture.Api.Infrastructure
 
@@ -42,27 +54,21 @@ type EventStore(storage: Storage.EventStorage, clock: Clock)
 
     let asUntyped items = items |> List.map EventEnvelope.box
 
-    let subscribeStreamKind position (subscription: Subscription<'E>) =
-        async {
-            let upcastSubscription events = events |> asTyped |> subscription
+    let subscribeStreamKind position (subscription: SubscriptionHandler<'E>) =
+        let upcastSubscription events = events |> asTyped |> subscription
+        storage.Subscribe (FromKind(StreamKind.Of<'E>(), position)) upcastSubscription
+    
+    let subscribeAll position (subscription: SubscriptionHandler<'E>) =
+        let upcastSubscription events = events |> asTyped |> subscription
+        storage.Subscribe (FromAll position) upcastSubscription        
 
-            do! storage.Subscribe (FromKind(StreamKind.Of<'E>(), position)) upcastSubscription
-        }
-
-    let subscribeAll position (subscription: Subscription<'E>) =
-        async {
-            let upcastSubscription events = events |> asTyped |> subscription
-
-            do! storage.Subscribe (FromAll position) upcastSubscription
-        }
-
-    let allStreams () : Async<Version * EventEnvelope<'E> list> =
+    let allStreams () : Async<Position * EventEnvelope<'E> list> =
         async {
             match! StreamKind.Of<'E>() |> storage.AllStreamsOf with
             | Ok allStreams -> return allStreams |> Tuple.mapSnd asTyped
             | Error e ->
                 failwithf "Could not get all streams: %s" e
-                return Version.start, List.empty
+                return Position.start, List.empty
         }
 
     let stream name : EventStream<'E> =
@@ -85,13 +91,13 @@ type EventStore(storage: Storage.EventStorage, clock: Clock)
                 storage.Append identifier version envelopes }
 
 
-    let all toAllStream : Async<Version * EventEnvelope<'E> list> =
+    let all toAllStream : Async<Position * EventEnvelope<'E> list> =
         async {
             match! storage.All() with
             | Ok allStreams -> return allStreams |> Tuple.mapSnd (toAllStream)
             | Error e ->
                 failwithf "Could not get all streams: %s" e
-                return Version.start, List.empty
+                return Position.start, List.empty
         }
 
     static member With(storage: Storage.EventStorage) =
@@ -107,8 +113,8 @@ type EventStore(storage: Storage.EventStorage, clock: Clock)
 
     member _.AllStreams() = allStreams ()
 
-    member _.Subscribe position (subscription: Subscription<'E>) =
+    member _.Subscribe position (subscription: SubscriptionHandler<'E>) =
         subscribeStreamKind position subscription
 
-    member _.SubscribeAll position (subscription: Subscription<'E>) = subscribeAll position subscription
+    member _.SubscribeAll position (subscription: SubscriptionHandler<'E>) = subscribeAll position subscription
     member _.All toAllStream = all toAllStream

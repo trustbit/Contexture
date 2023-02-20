@@ -187,7 +187,7 @@ module FileBasedCommandHandlers =
                 State.evolve Initial event
             |> convertToOption 
                 
-        let subscription logger (database: SingleFileBasedDatastore): Subscription<Domain.Event> =
+        let subscription logger (database: SingleFileBasedDatastore): SubscriptionHandler<Domain.Event> =
             fun (events: EventEnvelope<Domain.Event> list) ->
                 database.Change(fun document ->
                     events
@@ -270,7 +270,7 @@ module FileBasedCommandHandlers =
                 |> Option.map (convertToSerialization [])
             
 
-        let subscription logger (database: SingleFileBasedDatastore): Subscription<Event> =
+        let subscription logger (database: SingleFileBasedDatastore): SubscriptionHandler<Event> =
             fun (events: EventEnvelope<Event> list) ->
                 database.Change(fun document ->
                     events
@@ -339,7 +339,7 @@ module FileBasedCommandHandlers =
                 Collaboration.State.evolve Collaboration.Initial event
             |> convertToOption 
 
-        let subscription logger (database: SingleFileBasedDatastore): Subscription<Collaboration.Event> =
+        let subscription logger (database: SingleFileBasedDatastore): SubscriptionHandler<Collaboration.Event> =
             fun (events: EventEnvelope<Collaboration.Event> list) -> 
                 database.Change(fun document ->
                     events
@@ -395,7 +395,7 @@ module FileBasedCommandHandlers =
                 { boundedContext with Namespaces = Projections.asNamespaces boundedContext.Namespaces event })
 
 
-        let subscription logger (database: SingleFileBasedDatastore): Subscription<Event> =
+        let subscription logger (database: SingleFileBasedDatastore): SubscriptionHandler<Event> =
             fun (events: EventEnvelope<Event> list) ->
                 database.Change(fun document ->
                     events
@@ -439,7 +439,7 @@ module FileBasedCommandHandlers =
             }
             |> List.singleton
 
-        let subscription logger (database: SingleFileBasedDatastore): Subscription<Event> =
+        let subscription logger (database: SingleFileBasedDatastore): SubscriptionHandler<Event> =
             fun (events: EventEnvelope<Event> list) ->
                 database.Change(fun document ->
                     events
