@@ -404,6 +404,8 @@ test.describe("Domain Role", () => {
     await page.getByRole("button", { name: "add domain role" }).click();
     await page.getByTestId("deleteDomainRole").click();
     await page.getByRole("button", { name: "Delete" }).click();
+
+    await expect(page.getByText("Test domain role")).toHaveCount(0);
   });
 
   test("should be able to add and delete a domain role from a pre-defined list", async ({ page }) => {
@@ -422,5 +424,7 @@ test.describe("Domain Role", () => {
     ).toBeVisible();
     await page.getByTestId("deleteDomainRole").click();
     await page.getByRole("button", { name: "Delete" }).click();
+
+    await expect(page.getByText("Specification Model")).toHaveCount(0);
   });
 });
