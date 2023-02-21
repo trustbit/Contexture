@@ -13,7 +13,7 @@ const messages = Object.fromEntries(
   Object.entries(import.meta.glob<{ default: any }>("../locales/*.json", { eager: true })).map(([key, value]) => {
     return [key.slice(11, -5), value.default];
   })
-)  as I18nOptions['messages'];
+) as I18nOptions["messages"];
 
 export const i18n = createI18n({
   legacy: false,

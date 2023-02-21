@@ -193,7 +193,7 @@ const isCreateNamespaceFromTemplateOpen = ref(false);
 const selectedTemplate = ref<NamespaceTemplate>();
 const boundedContextNamespaces = computed(() => activeBoundedContext.value?.namespaces || []);
 const submitError = ref<HelpfulErrorProps>();
-const boundedContextId = useRouteParams("id")
+const boundedContextId = useRouteParams("id");
 const namespaceNameRule = toFieldValidator(
   zod
     .string()

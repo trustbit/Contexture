@@ -45,7 +45,7 @@ const props = defineProps<Props>();
 const emit = defineEmits<{
   (e: "add", event: any): void;
 }>();
-const {t} = useI18n();
+const { t } = useI18n();
 const keyTerm = ref<string>("");
 
 const keySuggestions = ref<string[]>(

@@ -1,15 +1,15 @@
 <template>
-  <div class="grid auto-cols-max sm:auto-cols-auto grid-cols-2 gap-x-4">
+  <div class="grid auto-cols-max grid-cols-2 gap-x-4 sm:auto-cols-auto">
     <div class="space-y-4">
-      <BCCDescription class="bg-gray-100 h-fit" />
+      <BCCDescription class="h-fit bg-gray-100" />
 
-      <BCCKey class="bg-gray-100 h-fit" />
+      <BCCKey class="h-fit bg-gray-100" />
 
-      <BCCStrategicClassification class="bg-gray-100 h-fit" />
+      <BCCStrategicClassification class="h-fit bg-gray-100" />
 
-      <BCCBusinessDecisions class="bg-gray-100 h-fit" />
+      <BCCBusinessDecisions class="h-fit bg-gray-100" />
 
-      <BCCUbiquitousLanguage class="bg-gray-100 h-fit" />
+      <BCCUbiquitousLanguage class="h-fit bg-gray-100" />
     </div>
 
     <div class="space-y-4">

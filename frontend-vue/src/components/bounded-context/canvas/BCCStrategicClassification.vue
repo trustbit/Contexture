@@ -9,7 +9,7 @@
   >
     <ContextureHelpfulErrorAlert v-if="submitError" v-bind="submitError" class="mb-4" />
     <div class="mt-2 flex gap-x-8">
-      <div class="flex flex-col min-w-fit">
+      <div class="flex min-w-fit flex-col">
         <div class="mb-4 flex capitalize">
           {{ t("common.domain") }}
           <ContextureTooltip
@@ -29,7 +29,7 @@
           :disabled="!editMode"
         />
       </div>
-      <div class="flex flex-col min-w-fit">
+      <div class="flex min-w-fit flex-col">
         <div class="mb-4 flex">
           {{ t("bounded_context_canvas.strategic_classification.business_model") }}
           <ContextureTooltip content="What role does the context play in your business model?" placement="top">
@@ -46,7 +46,7 @@
           :disabled="!editMode"
         />
       </div>
-      <div class="flex flex-col min-w-fit">
+      <div class="flex min-w-fit flex-col">
         <div class="mb-4 flex">
           {{ t("bounded_context_canvas.strategic_classification.evolution") }}
           <ContextureTooltip content="How evolved is the concept (see Wardley Maps)" placement="top">

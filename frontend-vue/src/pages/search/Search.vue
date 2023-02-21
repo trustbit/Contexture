@@ -12,7 +12,7 @@
                   size="sm"
                   :color="namespaceSearchTerm ? 'orange' : 'teal'"
                   variant="filled"
-                >{{ uniqueNamespaceNames.size }}
+                  >{{ uniqueNamespaceNames.size }}
                 </ContextureBadge>
               </div>
             </template>
@@ -104,8 +104,12 @@
         />
 
         <div v-if="options.selectedTextPresentationMode >= 0" class="h-full overflow-y-scroll p-1 sm:p-4">
-
-          <ContextureHelpfulErrorAlert v-if="error" :error="error" :response="data" :friendly-message="t('search.loading_error')" />
+          <ContextureHelpfulErrorAlert
+            v-if="error"
+            :error="error"
+            :response="data"
+            :friendly-message="t('search.loading_error')"
+          />
           <div v-else>
             <div v-if="!isFetching">
               <div class="mb-4">
@@ -125,10 +129,10 @@
                     <div
                       class="mt-4 flex flex-col gap-y-2 sm:grid sm:gap-2"
                       :class="[
-                    {
-                      'sm:grid-cols-2': options.selectedTextPresentationMode === 0,
-                    },
-                  ]"
+                        {
+                          'sm:grid-cols-2': options.selectedTextPresentationMode === 0,
+                        },
+                      ]"
                     >
                       <div v-for="boundedContext of item.contexts" :key="boundedContext.id">
                         <ContextureBoundedContextCard
@@ -187,7 +191,7 @@ const route = useRoute();
 
 const options: Ref<SearchSettings> = useLocalStorage<SearchSettings>("settings.search.presentation", {
   selectedTextPresentationMode: 0,
-  selectedVisualization: -1
+  selectedVisualization: -1,
 });
 
 const namespaceSearchTerm = ref<string>("");
@@ -213,8 +217,8 @@ onMounted(() => {
           ...activeFilters.value,
           {
             key: key,
-            value: v as string
-          }
+            value: v as string,
+          },
         ];
       });
     } else {
@@ -222,8 +226,8 @@ onMounted(() => {
         ...activeFilters.value,
         {
           key: key,
-          value: route.query[key] as string
-        }
+          value: route.query[key] as string,
+        },
       ];
     }
   }
@@ -235,8 +239,8 @@ function addFilter(index: number, event: { key?: string; value?: string }): void
       ...activeFilters.value,
       {
         key: "Label.Name",
-        value: event.key
-      }
+        value: event.key,
+      },
     ];
   }
   if (event.value) {
@@ -244,8 +248,8 @@ function addFilter(index: number, event: { key?: string; value?: string }): void
       ...activeFilters.value,
       {
         key: "Label.Value",
-        value: event.value
-      }
+        value: event.value,
+      },
     ];
   }
 
@@ -306,7 +310,7 @@ const queryParams = computed(() => {
 const url = computed(() => "/api/boundedContexts?" + queryParams.value);
 
 const { data, error, isFetching } = useFetch<BoundedContext[]>(url, {
-  refetch: true
+  refetch: true,
 }).get();
 
 const boundedContextDomain = computed<{
@@ -329,7 +333,7 @@ const boundedContextDomain = computed<{
 const domainsWithBoundedContexts = computed(() => {
   return Object.entries(boundedContextDomain.value).map(([domainId, contexts]) => ({
     domainId,
-    contexts
+    contexts,
   }));
 });
 

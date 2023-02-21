@@ -1,13 +1,13 @@
 <template>
-  <div class="grid auto-cols-max sm:auto-cols-auto overflow-x-scroll gap-y-4">
+  <div class="grid auto-cols-max gap-y-4 overflow-x-scroll sm:auto-cols-auto">
     <div class="grid grid-cols-3 gap-x-4">
       <div class="space-y-4">
         <BCCDescription class="bg-gray-100" />
         <BCCKey class="bg-gray-100" />
       </div>
-      <BCCStrategicClassification class="bg-gray-100 h-fit" />
+      <BCCStrategicClassification class="h-fit bg-gray-100" />
 
-      <BCCDomainRoles class="bg-gray-100 h-fit" />
+      <BCCDomainRoles class="h-fit bg-gray-100" />
     </div>
     <div class="grid grid-cols-3 gap-x-4 rounded bg-gray-100 p-4">
       <div class="space-y-4 rounded bg-white p-4">

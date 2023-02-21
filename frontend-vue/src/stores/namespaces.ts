@@ -50,9 +50,7 @@ export const useNamespaces = defineStore("namespaces", () => {
       activeBoundedContext.value!.namespaces = activeBoundedContext.value!.namespaces.filter(
         (n) => n.id !== namespaceId
       );
-      namespaces.value = namespaces.value.filter(
-        (n) => n.id !== namespaceId
-      );
+      namespaces.value = namespaces.value.filter((n) => n.id !== namespaceId);
     }
 
     return {
