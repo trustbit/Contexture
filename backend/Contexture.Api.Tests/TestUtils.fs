@@ -80,7 +80,10 @@ module Prepare =
 
     let private registerEvents givens =
         fun (services: IServiceCollection) ->
-            services.AddSingleton<EventStore>(givens |> InMemoryStorage.initialize |> EventStore.With)
+            services.AddSingleton<EventStore>(fun p ->
+                let clock = p.GetRequiredService<Clock>()
+                EventStore.With (givens |> InMemoryStorage.initialize) clock
+            )
             |> ignore
 
     let private buildEvents environment events =

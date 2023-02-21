@@ -5,6 +5,9 @@ open Contexture.Api.Infrastructure
 
 type StreamIdentifier = private StreamIdentifier of StreamKind * EventSource
 
+module StreamKind =
+    let asIdentifier source kind = StreamIdentifier(kind, source)
+
 module StreamIdentifier =
     let name (StreamIdentifier(kind, source)) =
         $"{StreamKind.toString kind}/{source.ToString()}"
@@ -51,13 +54,9 @@ open Contexture.Api.Infrastructure.Storage
 open Contexture.Api.Infrastructure
 open FsToolkit.ErrorHandling
 
-type EventStore(storage: Storage.EventStorage, clock: Clock)
-// private // TODO private?
- =
+type EventStore(storage: Storage.EventStorage, clock: Clock) =
 
     let asTyped items : EventEnvelope<'E> list = items |> List.map EventEnvelope.unbox
-
-    let asUntyped items = items |> List.map EventEnvelope.box
 
     let subscribeStreamKind position (subscription: SubscriptionHandler<'E>) =
         let upcastSubscription events = events |> asTyped |> subscription
@@ -105,8 +104,8 @@ type EventStore(storage: Storage.EventStorage, clock: Clock)
                 return Position.start, List.empty
         }
 
-    static member With(storage: Storage.EventStorage) =
-        EventStore(storage, (fun () -> DateTime.Now))
+    static member With(storage: Storage.EventStorage) clock =
+        EventStore(storage, clock)
 
     member _.Stream name version =
         let stream = stream name

@@ -3,11 +3,11 @@ namespace Contexture.Api.Tests.EnvironmentSimulation
 open System
 open System.Threading
 
-type Clock = unit -> DateTime
+type Clock = unit -> DateTimeOffset
 
 module Clock =
 
-    let systemClock = fun () -> DateTime.UtcNow
+    let systemClock = fun () -> DateTimeOffset.UtcNow
 
     let currentInstant (clock: Clock) = clock ()
 
@@ -17,15 +17,15 @@ module Clock =
         |> fun t -> t.ToUniversalTime()
 
 type ISimulateEnvironment =
-    abstract Time : unit -> System.DateTime
+    abstract Time : unit -> System.DateTimeOffset
     abstract NextId : unit -> int
 
-type FixedTimeEnvironment(now: DateTime, seed: int) =
+type FixedTimeEnvironment(now: DateTimeOffset, seed: int) =
     let ids = ref seed
 
     let nextId () = Interlocked.Increment(ids)
 
-    static member FromInstance(now: DateTime) =
+    static member FromInstance(now: DateTimeOffset) =
         FixedTimeEnvironment(now, 0) :> ISimulateEnvironment
 
     static member FromClock(clock: Clock) =

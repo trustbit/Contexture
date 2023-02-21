@@ -31,4 +31,4 @@ module Async =
 
 type Agent<'T> = MailboxProcessor<'T>
 
-type Clock = unit -> System.DateTime
+type Clock = unit -> System.DateTimeOffset

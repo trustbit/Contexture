@@ -179,7 +179,7 @@ let errorHandler (ex : Exception) (logger : ILogger) =
     clearResponse >=> setStatusCode 500 >=> text ex.Message
 
 let utcNowClock =
-    fun () ->  System.DateTime.UtcNow
+    fun () ->  System.DateTimeOffset.UtcNow
         
 let configureCors (builder : CorsPolicyBuilder) =
     builder
@@ -241,7 +241,11 @@ let configureServices (context: HostBuilderContext) (services : IServiceCollecti
         |> ignore
     
     services.AddSingleton<Clock>(utcNowClock) |> ignore
-    services.AddSingleton<EventStore> (EventStore.With (Storage.InMemoryStorage.empty())) |> ignore 
+    services.AddSingleton<EventStore> (fun (p:IServiceProvider) ->
+        let storage = Storage.InMemoryStorage.empty()
+        let clock = p.GetRequiredService<Clock>()
+        EventStore.With storage clock
+    ) |> ignore 
     services |> configureReadModels
     
     services.AddCors() |> ignore

@@ -1,9 +1,6 @@
 namespace Contexture.Api.Infrastructure
 
 open System
-open System.Collections.Concurrent
-open FsToolkit.ErrorHandling
-
 
 type EventSource = Guid
 
@@ -15,7 +12,7 @@ type StreamKind =
         if isNull systemType then
             nullArg <| nameof systemType
 
-        SystemType systemType.AssemblyQualifiedName
+        SystemType systemType.FullName
 
     static member Of<'E>() = StreamKind.Of typeof<'E>
     static member Of(_: 'E) = StreamKind.Of typeof<'E>
@@ -58,7 +55,7 @@ module Position =
 
 type EventMetadata =
     { Source: EventSource
-      RecordedAt: System.DateTime }
+      RecordedAt: System.DateTimeOffset }
 
 type EventEnvelope<'Event> =
     { Metadata: EventMetadata

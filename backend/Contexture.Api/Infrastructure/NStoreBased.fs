@@ -40,11 +40,11 @@ module EventEnvelope =
     let ofRecorder (recorder: Recorder) =
         recorder.ToArray<EventEnvelope list>() |> Array.toList |> List.collect id
 
-type SerializableBatch =
+type private SerializableBatch =
     { StreamKind: string
       Events: SerializableEventEnvelope list }
 
-and SerializableEventEnvelope =
+and private SerializableEventEnvelope =
     { Metadata: EventMetadata
       Payload: JsonElement
       EventType: string }

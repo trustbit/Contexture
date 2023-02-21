@@ -235,16 +235,19 @@ type InMemoryEventStore() =
     inherit EventStoreBehavior()
 
     override this.anEmptyEventStore() =
-        InMemoryStorage.empty () |> EventStore.With |> Task.FromResult
+        EventStore.With (InMemoryStorage.empty ()) Fixture.environment.Time
+        |> Task.FromResult
 
     override this.anEventStoreWithStreamsAndEvents(count) =
         let data = Seq.init count (fun _ -> Fixture.generateEvent ()) |> Seq.toList
 
-        Task.FromResult(
+        let storage =
             data
             |> List.map EventEnvelope.box
             |> InMemoryStorage.initialize
-            |> EventStore.With,
+            
+        Task.FromResult(
+            EventStore.With storage Fixture.environment.Time,
             data |> List.map (fun e -> e.Metadata.Source)
         )
 
@@ -298,7 +301,7 @@ type MsSqlBackedEventStore(msSql: MsSqlFixture) =
         task {
             let! persistence = this.initializePersistence ()
             let storage = Storage.NStoreBased.Storage(persistence, loggerFactory)
-            return EventStore(storage, (fun () -> DateTime.Now))
+            return EventStore(storage, (fun () -> DateTimeOffset.Now))
         }
 
     override this.anEventStoreWithStreamsAndEvents(count) =
@@ -317,7 +320,7 @@ type MsSqlBackedEventStore(msSql: MsSqlFixture) =
                 ()
 
             let storage = Storage.NStoreBased.Storage(persistence, loggerFactory)
-            return EventStore(storage, (fun () -> DateTime.Now)), data |> List.map (fun e -> e.Metadata.Source)
+            return EventStore(storage, (fun () -> DateTimeOffset.Now)), data |> List.map (fun e -> e.Metadata.Source)
         }
 
     interface IClassFixture<MsSqlFixture> with
