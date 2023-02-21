@@ -51,7 +51,7 @@ test.describe("Edit Bounded Context", () => {
     await expect(page.getByTestId("boundedContextName")).toBeVisible();
   });
 
-  test("should close edit and not change anything", async ({ page }) => {
+  test("should close edit mode and not change anything", async ({ page }) => {
     const boundedContextCanvas = new BoundedContextCanvasPage(page);
 
     const closeButton = page.getByRole("button", {
@@ -87,11 +87,8 @@ test.describe("Edit Bounded Context", () => {
   });
 
   test("should validate name", async ({ page }) => {
-    const editButton = await page.getByRole("button", {
-      name: "Edit bounded context",
-    });
-
-    await editButton.click();
+    const boundedContextCanvas = new BoundedContextCanvasPage(page);
+    await boundedContextCanvas.editBoundedContextButton.click();
 
     await page.getByLabel("Name (Required)").fill("");
     await expect(page.getByText("is required")).toBeVisible();

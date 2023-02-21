@@ -51,19 +51,43 @@ test.describe("Edit domain", () => {
     await expect(page.getByText("This is an updated domain vision")).toBeVisible();
   });
 
-  test("should not edit a domain if edit mode is closed", async ({ page }) => {
+  test("should close edit mode and not change anything", async ({ page }) => {
     const domainDetails = new DomainDetailsPage(page);
 
     await domainDetails.editDomainButton.click();
-    await page.getByLabel("Short Key").fill("SUB");
-    await page.getByLabel("Name (Required)").fill("domain new");
-    await page.getByLabel("Vision").fill("This is an updated domain vision");
+    await page.getByLabel("Short Key").fill("DontSave");
+    await page.getByLabel("Name (Required)").fill("Do Not Save");
+    await page.getByLabel("Vision").fill("Vision which should not be saved");
     await domainDetails.closeEditDomainButton.click();
 
     await expect(domainDetails.editDomainButton).toBeVisible();
-    await expect(page.getByText("SUB", { exact: true })).not.toBeVisible();
-    await expect(page.getByRole("heading", { name: "domain new" })).not.toBeVisible();
-    await expect(page.getByText("This is an updated domain vision", { exact: true })).not.toBeVisible();
+    await expect(page.getByText("DontSave", { exact: true })).not.toBeVisible();
+    await expect(page.getByRole("heading", { name: "Name not saved" })).not.toBeVisible();
+    await expect(page.getByText("Vision which should not be saved", { exact: true })).not.toBeVisible();
+  });
+
+  test("should validate short key", async ({ page }) => {
+    const domainDetailsPage = new DomainDetailsPage(page);
+    await domainDetailsPage.editDomainButton.click();
+
+    const shortKey = await page.getByLabel("Short Key");
+
+    await shortKey.fill("0");
+    await expect(page.getByText("Must not start with a number")).toBeVisible();
+    await shortKey.fill("-");
+    await expect(page.getByText("Must not start with hyphen")).toBeVisible();
+    await shortKey.fill("TestTestTestTestTestTest");
+    await expect(page.getByText("String must contain at most 16 character(s)")).toBeVisible();
+    await shortKey.fill("?");
+    await expect(page.getByText("Must be valid alphabetic character")).toBeVisible();
+  });
+
+  test("should validate name", async ({ page }) => {
+    const domainDetailsPage = new DomainDetailsPage(page);
+    await domainDetailsPage.editDomainButton.click();
+
+    await page.getByLabel("Name (Required)").fill("");
+    await expect(page.getByText("is required")).toBeVisible();
   });
 });
 
