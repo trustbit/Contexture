@@ -25,7 +25,13 @@
               </div>
               <div v-else>
                 <ContextureBadge color="blue" mode="light" size="sm" variant="filled">
-                  <b>{{ label.name }}</b> {{ label.value }}
+                  <b>{{ label.name }}&nbsp;</b>
+                  <RouterLink
+                    :to="`/search?Label.Name=${label.name}&Label.Value=${label.value}`"
+                    class="hover:underline"
+                  >
+                    {{ label.value }}
+                  </RouterLink>
                 </ContextureBadge>
               </div>
             </template>
@@ -118,7 +124,13 @@
                 </div>
                 <div v-else>
                   <ContextureBadge color="blue" mode="light" size="sm" variant="filled">
-                    <b>{{ label.name }}</b> {{ label.value }}
+                    <b>{{ label.name }}&nbsp;</b>
+                    <RouterLink
+                      :to="`/search?Label.Name=${label.name}&Label.Value=${label.value}`"
+                      class="hover:underline"
+                    >
+                      {{ label.value }}
+                    </RouterLink>
                   </ContextureBadge>
                 </div>
               </template>

@@ -176,9 +176,8 @@ import { useNamespaceTemplatesStore } from "~/stores/namespace-templates";
 import { useNamespaces } from "~/stores/namespaces";
 import { CreateNamespace, CreateNamespaceLabel, Namespace, NamespaceId, NamespaceLabelId } from "~/types/namespace";
 import { NamespaceTemplate, NamespaceTemplateItem } from "~/types/namespace-templates";
-import { useRoute } from "vue-router";
 import { useRouteParams } from "@vueuse/router";
-import { requiredObjectRule, requiredStringRule } from "~/core/validationRules";
+import { requiredObjectRule } from "~/core/validationRules";
 
 const { loading, activeBoundedContext } = storeToRefs(useBoundedContextsStore());
 const { createNamespace, deleteNamespace, createNamespaceLabel, deleteNamespaceLabel } = useNamespaces();

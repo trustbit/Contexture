@@ -28,7 +28,7 @@
                 <ul v-for="(namespace, index) of uniqueNamespaceNames" :key="namespace">
                   <ContextureListItem>
                     <template #title>
-                      <ContexturePopover placement="bottom-end" v-model:open="popoverShow[index]">
+                      <ContexturePopover placement="bottom-end" v-model:open="addFilterPopoverOpen[index]">
                         <template #button>
                           <button
                             class="mr-2 flex items-center hover:text-gray-800"
@@ -157,9 +157,9 @@
 <script setup lang="ts">
 import { useLocalStorage } from "@vueuse/core";
 import { storeToRefs } from "pinia";
-import { computed, onMounted, Ref, ref, watch } from "vue";
+import { computed, Ref, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
-import { useRoute, useRouter } from "vue-router";
+import { LocationQueryValue, useRoute, useRouter } from "vue-router";
 import ContextureBoundedContextCard from "~/components/bounded-context/ContextureBoundedContextCard.vue";
 import ContextureAccordionItem from "~/components/primitives/accordion/ContextureAccordionItem.vue";
 import ContextureBadge from "~/components/primitives/badge/ContextureBadge.vue";
@@ -177,6 +177,7 @@ import { BoundedContext } from "~/types/boundedContext";
 import { Domain } from "~/types/domain";
 import { Namespace } from "~/types/namespace";
 import ContextureHelpfulErrorAlert from "~/components/primitives/alert/ContextureHelpfulErrorAlert.vue";
+import { arrayContentEqual } from "~/core/arrayContentEqual";
 
 interface SearchSettings {
   selectedTextPresentationMode: number;
@@ -206,32 +207,40 @@ const uniqueNamespaceNames = computed(
     )
 );
 
-const activeFilters = ref<ActiveFilter[]>([]);
-
-onMounted(() => {
-  for (const key in route.query) {
-    const value = route.query[key];
-    if (Array.isArray(value)) {
-      value.forEach((v) => {
-        activeFilters.value = [
-          ...activeFilters.value,
-          {
-            key: key,
-            value: v as string,
-          },
-        ];
-      });
-    } else {
-      activeFilters.value = [
-        ...activeFilters.value,
-        {
+function convertFilter(): ActiveFilter[] {
+  return Object.keys(route.query)
+    .map((key) => {
+      const value: LocationQueryValue | LocationQueryValue[] = route.query[key];
+      if (Array.isArray(value)) {
+        return value
+          .map((v) => {
+            return {
+              key: key,
+              value: (v || "").toString(),
+            };
+          })
+          .flat();
+      } else {
+        return {
           key: key,
-          value: route.query[key] as string,
-        },
-      ];
+          value: (value || "").toString(),
+        };
+      }
+    })
+    .flat();
+}
+
+const activeFilters = ref<ActiveFilter[]>(convertFilter());
+
+watch(
+  () => route.query,
+  () => {
+    const routeFilters = convertFilter();
+    if (!arrayContentEqual(activeFilters.value, routeFilters)) {
+      activeFilters.value = routeFilters;
     }
   }
-});
+);
 
 function addFilter(index: number, event: { key?: string; value?: string }): void {
   if (event.key) {
@@ -253,7 +262,7 @@ function addFilter(index: number, event: { key?: string; value?: string }): void
     ];
   }
 
-  popoverShow.value[index] = false;
+  addFilterPopoverOpen.value[index] = false;
 }
 
 function onDeleteFilter(index: number): void {
@@ -349,7 +358,7 @@ const domainIdToDomainName = computed<{ [domainId: string]: string }>(() => {
   );
 });
 
-const popoverShow = ref<boolean[]>([]);
+const addFilterPopoverOpen = ref<boolean[]>([]);
 
 const domainCount = computed(() => {
   return Object.keys(boundedContextDomain.value).length;
