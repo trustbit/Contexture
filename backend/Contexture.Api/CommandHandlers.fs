@@ -92,6 +92,7 @@ module FileBasedCommandHandlers =
                     Domain.decide
                     Domain.State.evolve
                     Domain.State.Initial
+                    
         
         let useHandler stateBasedHandler =
             aggregate

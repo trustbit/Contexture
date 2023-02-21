@@ -92,7 +92,7 @@ let private singleWriterPipeline (initialEvents: EventEnvelope list) (inbox: Age
                 let extendedHistory = events |> List.fold appendToHistory history
 
                 let position, version =
-                    extendedHistory.items |> List.last |> (fun (p, v, _) -> p, v)
+                    extendedHistory.items |> List.head |> (fun (p, v, _) -> p, v)
 
                 reply.Reply(version)
 
@@ -103,20 +103,25 @@ let private singleWriterPipeline (initialEvents: EventEnvelope list) (inbox: Age
 
                 let byKind = events |> List.groupBy (fun e -> e.StreamKind) |> Map.ofList
 
-                let subscriptionsToNotify =
+                let subscriptionsToNotifyWithEvents,remainingSubscriptions =
                     subscriptions
-                    |> List.choose (fun (definition, s) ->
+                    |> List.fold (fun (toNotify,other) (definition, s) ->
                         match definition with
                         | FromStream(streamIdentifier, _) when byIdentifier |> Map.containsKey streamIdentifier ->
-                            Some(s, byIdentifier |> Map.find streamIdentifier)
-                        | FromAll _ -> Some(s, events)
+                            toNotify @ [ (s, byIdentifier |> Map.find streamIdentifier)],other
+                        | FromAll _ -> toNotify @ [ s, events],other
                         | FromKind(streamKind, _) when byKind |> Map.containsKey streamKind ->
-                            Some(s, byKind |> Map.find streamKind)
-                        | _ -> None)
+                            toNotify @ [ s, byKind |> Map.find streamKind],other
+                        | _ ->
+                            toNotify, s :: other
+                        ) (List.empty,List.empty)
 
-                subscriptionsToNotify
+                subscriptionsToNotifyWithEvents
                 |> List.iter (fun (s, events) -> inbox.Post(Notify(position, events, s)))
-
+                
+                remainingSubscriptions
+                |> List.iter (fun s -> inbox.Post(Notify(position,List.empty,s)))
+               
                 return! loop (subscriptions, extendedHistory)
             | Subscribe(definition, subscription, reply) ->
                 let skipUntil position items =
