@@ -26,7 +26,7 @@ test.afterAll(async ({ request }) => {
 });
 
 test.beforeEach(async ({ page }) => {
-  await page.goto(`http://localhost:4200/domain/${parentDomainId}`);
+  await page.goto(`/domain/${parentDomainId}`);
 });
 
 test.describe("Edit domain", () => {
@@ -69,7 +69,7 @@ test.describe("Edit domain", () => {
 
 test.describe("Not found", () => {
   test("should show error if domain does not exists", async ({ page }) => {
-    await page.goto(`http://localhost:4200/domain/not-existing`);
+    await page.goto(`/domain/not-existing`);
 
     await expect(page.getByText("No such domain 'not-existing'")).toBeVisible();
     await expect(page.getByText("View all domains")).toBeVisible();

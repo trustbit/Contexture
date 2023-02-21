@@ -29,7 +29,7 @@ test.afterAll(async ({ request }) => {
 });
 
 test.beforeEach(async ({ page }) => {
-  await page.goto(`http://localhost:4200/boundedContext/${boundedContextId}/canvas`);
+  await page.goto(`/boundedContext/${boundedContextId}/canvas`);
 });
 
 test.describe("Edit Bounded Context", () => {

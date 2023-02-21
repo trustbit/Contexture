@@ -1,0 +1,35 @@
+name: Frontend E2E Tests
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/CI-frontend-e2e.yml'
+      - 'frontend-vue/**'
+
+defaults:
+  run:
+    shell: bash
+    working-directory: frontend-vue
+
+jobs:
+  frontend-e2e:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions/setup-node@v3
+        with:
+          node-version: '18.x'
+      - run: npm ci
+      - name: Prepare backend
+        run: docker run -d --rm -p 3000:3000 -e ASPNETCORE_hostBuilder__reloadConfigOnChange=false -it $(docker build -q .)
+        working-directory: frontend-vue/e2e/setup
+      - name: Install Playwright Browsers
+        run: npx playwright install --with-deps
+      - name: Run Playwright tests
+        run: npx playwright test
+      - uses: actions/upload-artifact@v3
+        if: always()
+        with:
+          name: playwright-report
+          path: playwright-report/
+          retention-days: 3

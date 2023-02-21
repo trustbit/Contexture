@@ -4,13 +4,11 @@
 
 ```shell
 cd setup
-docker build -t trustbit/contexture_acceptance_tests_setup .
-docker run -e ASPNETCORE_hostBuilder__reloadConfigOnChange=false --rm -p 3000:3000 trustbit/contexture_acceptance_tests_setup
+docker run -d --rm -p 3000:3000 -e ASPNETCORE_hostBuilder__reloadConfigOnChange=false -it $(docker build -q .)
 ```
 
 ## Run
 
 ```shell
-npm run dev
 npm run test:e2e
 ```
