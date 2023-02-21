@@ -402,7 +402,7 @@ test.describe("Domain Role", () => {
     await page.getByLabel("Domain role name (Required)").fill("Test domain role");
     await page.getByLabel("Description").fill("This is a new domain role");
     await page.getByRole("button", { name: "add domain role" }).click();
-    await page.getByRole("button", { name: "test" }).getByRole("button").click();
+    await page.getByTestId("deleteDomainRole").click();
     await page.getByRole("button", { name: "Delete" }).click();
   });
 
@@ -420,7 +420,7 @@ test.describe("Domain Role", () => {
     await expect(
       page.getByText("Produces a document describing a job/request that needs to be performed.")
     ).toBeVisible();
-    await page.getByRole("button", { name: "Specification Model" }).getByRole("button").click();
+    await page.getByTestId("deleteDomainRole").click();
     await page.getByRole("button", { name: "Delete" }).click();
   });
 });

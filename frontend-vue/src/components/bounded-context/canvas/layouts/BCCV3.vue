@@ -1,18 +1,18 @@
 <template>
-  <div class="flex flex-row gap-x-4">
-    <div class="flex min-w-fit w-1/2 flex-col gap-y-4">
-      <BCCDescription class="bg-gray-100" />
+  <div class="grid auto-cols-max sm:auto-cols-auto grid-cols-2 gap-x-4">
+    <div class="space-y-4">
+      <BCCDescription class="bg-gray-100 h-fit" />
 
-      <BCCKey class="bg-gray-100" />
+      <BCCKey class="bg-gray-100 h-fit" />
 
-      <BCCStrategicClassification class="bg-gray-100" />
+      <BCCStrategicClassification class="bg-gray-100 h-fit" />
 
-      <BCCBusinessDecisions class="bg-gray-100" />
+      <BCCBusinessDecisions class="bg-gray-100 h-fit" />
 
-      <BCCUbiquitousLanguage class="bg-gray-100" />
+      <BCCUbiquitousLanguage class="bg-gray-100 h-fit" />
     </div>
 
-    <div class="flex min-w-fit w-1/2 flex-col gap-y-4">
+    <div class="space-y-4">
       <BCCDomainRoles class="bg-gray-100" />
 
       <ContextureBoundedContextCanvasElement :title="t('bounded_context_canvas.messages.title')" class="bg-gray-100">

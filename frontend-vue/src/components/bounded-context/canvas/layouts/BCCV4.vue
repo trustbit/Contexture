@@ -1,16 +1,16 @@
 <template>
-  <div class="flex min-w-max w-full flex-col gap-y-4">
-    <div class="flex min-w-min gap-x-4">
-      <div class="flex min-w-fit w-1/3 flex-col gap-y-4">
+  <div class="grid auto-cols-max sm:auto-cols-auto overflow-x-scroll gap-y-4">
+    <div class="grid grid-cols-3 gap-x-4">
+      <div class="space-y-4">
         <BCCDescription class="bg-gray-100" />
         <BCCKey class="bg-gray-100" />
       </div>
-      <BCCStrategicClassification class="min-w-fit w-1/3 bg-gray-100" />
+      <BCCStrategicClassification class="bg-gray-100 h-fit" />
 
-      <BCCDomainRoles class="min-w-fit w-1/3 bg-gray-100" />
+      <BCCDomainRoles class="bg-gray-100 h-fit" />
     </div>
-    <div class="flex gap-x-4 rounded bg-gray-100 p-4">
-      <div class="flex min-w-fit w-1/3 flex-col gap-y-4 rounded bg-white p-4">
+    <div class="grid grid-cols-3 gap-x-4 rounded bg-gray-100 p-4">
+      <div class="space-y-4 rounded bg-white p-4">
         <h3 class="text-lg font-bold">{{ t("bounded_context_canvas.collaborators.inbound_communication") }}</h3>
         <div class="flex flex-col gap-y-2 rounded bg-gray-100 p-4">
           <div class="flex items-center gap-x-1.5">
@@ -41,11 +41,11 @@
           <BCCMessagesConsumed />
         </div>
       </div>
-      <div class="flex min-w-fit w-1/3 flex-col gap-y-2">
+      <div class="space-y-2">
         <BCCUbiquitousLanguage class="bg-white" />
         <BCCBusinessDecisions class="bg-white" />
       </div>
-      <div class="flex min-w-fit w-1/3 flex-col gap-y-4 rounded bg-white p-4">
+      <div class="space-y-4 rounded bg-white p-4">
         <h3 class="text-lg font-bold">{{ t("bounded_context_canvas.collaborators.outbound_communication") }}</h3>
         <div class="flex flex-col gap-y-2 rounded bg-gray-100 p-4">
           <div class="flex items-center gap-x-1.5">

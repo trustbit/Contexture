@@ -16,7 +16,7 @@
           <template #title>
             <div class="flex w-full justify-between">
               {{ domainRole.name }}
-              <button @click.prevent="() => onDeleteDomainRole(domainRole)">
+              <button @click.prevent="() => onDeleteDomainRole(domainRole)" data-testId="deleteDomainRole">
                 <Icon:material-symbols:delete-outline class="h-5 w-5 text-blue-500 hover:text-blue-600" />
               </button>
             </div>
