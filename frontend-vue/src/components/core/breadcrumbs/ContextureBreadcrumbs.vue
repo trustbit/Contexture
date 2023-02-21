@@ -1,6 +1,6 @@
 <template>
   <nav :aria-label="t('breadcrumbs.accessibility.aria_label')">
-    <ol class="space-x-2">
+    <ol class="flex flex-wrap sm:gap-x-2">
       <li class="inline-flex items-center text-xs text-gray-800">
         <RouterLink to="/" class="inline-flex items-center hover:text-gray-600 hover:underline">
           <Icon:material-symbols:home-outline aria-hidden="true" class="mr-1.5 text-gray-800" />

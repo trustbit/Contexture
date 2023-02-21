@@ -1,6 +1,6 @@
 <template>
-  <div class="flex w-fit flex-row gap-y-4 gap-x-4 overflow-x-auto sm:w-full">
-    <div class="flex w-1/2 flex-col gap-y-4">
+  <div class="flex flex-row gap-x-4">
+    <div class="flex min-w-fit w-1/2 flex-col gap-y-4">
       <BCCDescription class="bg-gray-100" />
 
       <BCCKey class="bg-gray-100" />
@@ -12,7 +12,7 @@
       <BCCUbiquitousLanguage class="bg-gray-100" />
     </div>
 
-    <div class="flex w-1/2 flex-col gap-y-4">
+    <div class="flex min-w-fit w-1/2 flex-col gap-y-4">
       <BCCDomainRoles class="bg-gray-100" />
 
       <ContextureBoundedContextCanvasElement :title="t('bounded_context_canvas.messages.title')" class="bg-gray-100">

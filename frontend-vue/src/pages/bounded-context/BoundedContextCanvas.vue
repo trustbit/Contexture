@@ -5,7 +5,7 @@
 
   <div v-else-if="activeBoundedContext">
     <ContextureHeroHeader>
-      <div class="flex flex-col gap-4 px-3 lg:px-20">
+      <div class="flex flex-col gap-4 px-4 lg:px-20">
         <div v-if="editMode" class="flex justify-between">
           <div class="w-full">
             <ContextureHelpfulErrorAlert v-if="submitError" v-bind="submitError" class="mb-4" />
@@ -46,7 +46,7 @@
       </div>
     </ContextureHeroHeader>
 
-    <div class="mx-auto mt-5 px-3 pb-8 text-gray-900 sm:px-0 lg:px-20">
+    <div class="mx-auto mt-5 px-3 pb-8 text-gray-900 px-4 lg:px-20">
       <div class="mt-8">
         <TabGroup :default-index="1">
           <div class="flex items-center justify-between">
@@ -61,7 +61,7 @@
                   v-for="version in BoundedContextVersion"
                   class="inline-flex flex-grow items-center justify-center px-3 py-1.5 hover:bg-blue-100 ui-selected:bg-blue-500 ui-selected:text-white"
                   :key="version"
-                  >{{ version }}
+                >{{ version }}
                 </Tab>
               </TabList>
             </div>
@@ -120,13 +120,13 @@ async function onSave(values: { name: string; key?: string }) {
     submitError.value = {
       friendlyMessage: t("bounded_context_canvas.error.update"),
       error: updateNameRes.error.value,
-      response: updateNameRes.data.value,
+      response: updateNameRes.data.value
     };
   } else if (updateKeyRes.error.value) {
     submitError.value = {
       friendlyMessage: t("bounded_context_canvas.error.update"),
       error: updateKeyRes.error.value,
-      response: updateKeyRes.data.value,
+      response: updateKeyRes.data.value
     };
   } else {
     editMode.value = false;
