@@ -17,14 +17,16 @@ type SubscriptionDefinition =
     | FromAll of SubscriptionStartingPosition
     | FromKind of StreamKind * SubscriptionStartingPosition
     | FromStream of StreamIdentifier * Version option
+
 and SubscriptionStartingPosition =
     | Start
     | From of Position
-    | End 
-    
+    | End
+
 type Subscription =
     inherit IAsyncDisposable
     abstract Status: SubscriptionStatus
+
 and SubscriptionStatus =
     | NotRunning
     | Processing of current: Position
@@ -60,10 +62,10 @@ type EventStore(storage: Storage.EventStorage, clock: Clock)
     let subscribeStreamKind position (subscription: SubscriptionHandler<'E>) =
         let upcastSubscription events = events |> asTyped |> subscription
         storage.Subscribe (FromKind(StreamKind.Of<'E>(), position)) upcastSubscription
-    
+
     let subscribeAll position (subscription: SubscriptionHandler<'E>) =
         let upcastSubscription events = events |> asTyped |> subscription
-        storage.Subscribe (FromAll position) upcastSubscription        
+        storage.Subscribe (FromAll position) upcastSubscription
 
     let allStreams () : Async<Position * EventEnvelope<'E> list> =
         async {

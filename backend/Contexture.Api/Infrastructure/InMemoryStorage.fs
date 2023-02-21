@@ -39,15 +39,17 @@ let private withMaxPosition (items: (Position * Version * EventEnvelope) list) =
     if List.isEmpty items then
         Position.start, []
     else
-        items |> List.maxBy (fun (Position pos,_, _) -> pos) |> fun (pos,_,_) -> pos,
-        items |> List.map (fun (_,_,item) -> item)
-        
+        items
+        |> List.maxBy (fun (Position pos, _, _) -> pos)
+        |> fun (pos, _, _) -> pos, items |> List.map (fun (_, _, item) -> item)
+
 let private withMaxVersion (items: (Position * Version * EventEnvelope) list) =
     if List.isEmpty items then
         Version.start, []
     else
-        items |> List.maxBy (fun (_, Version version, _) -> version) |> fun (_,version,_) -> version,
-        items |> List.map (fun (_,_,item) -> item)
+        items
+        |> List.maxBy (fun (_, Version version, _) -> version)
+        |> fun (_, version, _) -> version, items |> List.map (fun (_, _, item) -> item)
 
 let private appendToHistory (history: History) (envelope: EventEnvelope) =
     let source = envelope.Metadata.Source
@@ -56,13 +58,15 @@ let private appendToHistory (history: History) (envelope: EventEnvelope) =
     let position = Position.from (int64 history.items.Length + 1L)
     let existingStream = key |> stream history
     let eventVersion = Version.from (existingStream.Length + 1)
-    let fullStream = existingStream |> (fun s -> s @ [ position, eventVersion, envelope ])
+
+    let fullStream =
+        existingStream |> (fun s -> s @ [ position, eventVersion, envelope ])
 
     history.byIdentifier.[key] <- fullStream
     let allEvents = getAllStreamsOf history streamKind
     history.byEventType.[streamKind] <- allEvents @ [ position, eventVersion, envelope ]
 
-    { history with items = (position,eventVersion, envelope) :: history.items }
+    { history with items = (position, eventVersion, envelope) :: history.items }
 
 let initialize (initialEvents: EventEnvelope list) =
     let proc (inbox: Agent<Msg>) =
@@ -88,7 +92,9 @@ let initialize (initialEvents: EventEnvelope list) =
                 | Append(events, reply) ->
                     let extendedHistory = events |> List.fold appendToHistory history
 
-                    let (position,version) = extendedHistory.items |> List.last |> fun (p,v,_) -> p,v
+                    let (position, version) =
+                        extendedHistory.items |> List.last |> (fun (p, v, _) -> p, v)
+
                     reply.Reply(version)
 
                     let byIdentifier =
@@ -118,43 +124,28 @@ let initialize (initialEvents: EventEnvelope list) =
                 | Subscribe(definition, subscription, reply) ->
                     let skipUntil position items =
                         items
-                        |> List.skipWhile (fun (p,_, _) ->
+                        |> List.skipWhile (fun (p, _, _) ->
                             match position with
                             | Start -> false
                             | End -> true
                             | From pos when pos = Position.start -> false
-                            | From pos -> p <= pos
-                        )
+                            | From pos -> p <= pos)
+
                     let events =
                         match definition with
-                        | FromAll position ->
-                            history.items |> skipUntil position
-                        | FromKind(kind, position) ->
-                            kind
-                            |> getAllStreamsOf history
-                             |> skipUntil position
+                        | FromAll position -> history.items |> skipUntil position
+                        | FromKind(kind, position) -> kind |> getAllStreamsOf history |> skipUntil position
                         | FromStream(identifier, version) ->
                             identifier
                             |> stream history
-                            |> List.skipWhile (fun (_,v, _) -> if version.IsNone then false else v < version.Value)
+                            |> List.skipWhile (fun (_, v, _) -> if version.IsNone then false else v < version.Value)
 
                     let lastPosition = history.items |> withMaxPosition |> fst
+
                     if not events.IsEmpty then
-                        inbox.Post(
-                            Notify(
-                                lastPosition,
-                                events |> List.map (fun (_,_,i) -> i),
-                                subscription
-                            )
-                        )
+                        inbox.Post(Notify(lastPosition, events |> List.map (fun (_, _, i) -> i), subscription))
                     else
-                        inbox.Post(
-                            Notify(
-                                lastPosition,
-                                List.empty,
-                                subscription
-                            )
-                        )
+                        inbox.Post(Notify(lastPosition, List.empty, subscription))
 
                     reply.Reply()
                     return! loop ((definition, subscription) :: subscriptions, history)
@@ -187,35 +178,37 @@ let initialize (initialEvents: EventEnvelope list) =
         member _.All() =
             agent.PostAndAsyncReply(fun reply -> GetAll(reply))
 
-        member _.Subscribe definition subscription = async {
-            let cancel = new CancellationTokenSource()
-            let mutable lastVersion = None
-            let recordingSubscription version events = async {
-                do! subscription events
-                lastVersion <- Some version
-                }
-                
-            let resultTask =
-                Async.StartAsTask(
-                    agent.PostAndAsyncReply(fun reply -> Subscribe(definition, recordingSubscription, reply)),
-                    cancellationToken = cancel.Token
-                )
-                 
-            return {
-                new Subscription with
-                    member _.Status =
-                        match lastVersion with
-                        | None -> NotRunning
-                        | Some v -> CaughtUp v
-                    member _.DisposeAsync() =
-                        if not cancel.IsCancellationRequested then
-                            cancel.Cancel()
-                            cancel.Dispose()
-                            
-                        resultTask.Dispose()
-                        ValueTask.CompletedTask
-                }
-            }
-    }
+        member _.Subscribe definition subscription =
+            async {
+                let cancel = new CancellationTokenSource()
+                let mutable lastVersion = None
+
+                let recordingSubscription version events =
+                    async {
+                        do! subscription events
+                        lastVersion <- Some version
+                    }
+
+                let resultTask =
+                    Async.StartAsTask(
+                        agent.PostAndAsyncReply(fun reply -> Subscribe(definition, recordingSubscription, reply)),
+                        cancellationToken = cancel.Token
+                    )
+
+                return
+                    { new Subscription with
+                        member _.Status =
+                            match lastVersion with
+                            | None -> NotRunning
+                            | Some v -> CaughtUp v
+
+                        member _.DisposeAsync() =
+                            if not cancel.IsCancellationRequested then
+                                cancel.Cancel()
+                                cancel.Dispose()
+
+                            resultTask.Dispose()
+                            ValueTask.CompletedTask }
+            } }
 
 let empty () = initialize []

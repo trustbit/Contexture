@@ -1,18 +1,14 @@
 module Contexture.Api.Tests.EventStore
 
 open System
-open System.Collections.Concurrent
-open System.Diagnostics.Tracing
 open System.Threading
 open System.Threading.Tasks
 open Contexture.Api.Infrastructure
 open Contexture.Api.Infrastructure.Storage
-open Contexture.Api.Infrastructure.Storage.NStoreBased
 open DotNet.Testcontainers.Builders
 open DotNet.Testcontainers.Configurations
 open DotNet.Testcontainers.Containers
 open FsToolkit.ErrorHandling
-open Microsoft.Extensions.Internal
 open Microsoft.FSharp.Control
 open NStore.Core.Logging
 open NStore.Core.Streams
@@ -21,11 +17,11 @@ open Xunit
 
 module Fixture =
     let environment = EnvironmentSimulation.FixedTimeEnvironment.FromSystemClock()
-    type TestStream = | TestEvent of int
+    type TestStream = TestEvent of int
     let streamKind = StreamKind.Of<TestStream>()
 
     let createEvent source =
-        let event = TestEvent (environment.NextId())
+        let event = TestEvent(environment.NextId())
 
         let metadata =
             { Source = source
@@ -39,13 +35,14 @@ module Fixture =
 
 let private oneTheoryTestCase (items: obj seq) = items |> Seq.toArray
 
-let private expectOk (result: Async<Result<'r,_>>) : Async<unit> =
+let private expectOk (result: Async<Result<'r, _>>) : Async<unit> =
     async {
         match! result with
         | Ok _ -> return ()
         | Error e -> return failwithf "Expected an Ok result but got Error:\n%O" e
     }
-let private resultOrFail (result: Async<Result<'r,_>>) : Async<'r> =
+
+let private resultOrFail (result: Async<Result<'r, _>>) : Async<'r> =
     async {
         match! result with
         | Ok r -> return r
@@ -73,12 +70,13 @@ let waitForEventsOnSubscription start (eventStore: EventStore) action eventCallb
             )
 
         let subscriptionHandler events =
-            if not(List.isEmpty events) then
+            if not (List.isEmpty events) then
                 receivedEvents.SetResult events
+
             Async.Sleep(0)
 
         let! subscription = eventStore.Subscribe start subscriptionHandler
-        do! Contexture.Api.App.waitUntilCaughtUp [subscription]
+        do! Contexture.Api.App.waitUntilCaughtUp [ subscription ]
 
         do! Async.StartAsTask(action ())
 
@@ -117,7 +115,7 @@ type EventStoreBehavior() =
     member this.canReadFromAnEmptyStore() =
         task {
             let! eventStore = this.anEmptyEventStore ()
-            let! version,result = eventStore.AllStreams()
+            let! version, result = eventStore.AllStreams()
             Assert.Empty result
             Assert.Equal(Position.start, version)
         }
@@ -126,43 +124,41 @@ type EventStoreBehavior() =
     member this.canReadFromAnStoreWithOneStreamAndOneEvent() =
         task {
             let! eventStore, sources = this.anEventStoreWithStreamsAndEvents (1)
-            let! position,result = eventStore.AllStreams()
+            let! position, result = eventStore.AllStreams()
 
             let expectedVersion = Version.from 1
             let expectedPosition = Position.from 1
             Then.assertAll result sources
-            Assert.Equal (expectedPosition, position)
+            Assert.Equal(expectedPosition, position)
 
             let source = sources.Head
-            let! streamVersion,stream =
-                eventStore.Stream source Version.start
-                |> resultOrFail
-                
-            Then.assertSingle stream source
-            Assert.Equal (expectedVersion, streamVersion)
+            let! streamVersion, stream = eventStore.Stream source Version.start |> resultOrFail
 
-            let! allPosition,allStreams = eventStore.All(List.map EventEnvelope.unbox)
+            Then.assertSingle stream source
+            Assert.Equal(expectedVersion, streamVersion)
+
+            let! allPosition, allStreams = eventStore.All(List.map EventEnvelope.unbox)
             Then.assertAll allStreams [ source ]
             Assert.NotEmpty allStreams
-            Assert.Equal (allPosition |> Position.value, streamVersion |> Version.value)
+            Assert.Equal(allPosition |> Position.value, streamVersion |> Version.value)
         }
 
     [<Fact>]
     member this.canReadFromAnStoreWithMultipleStreamsAndMultipleEvents() =
         task {
             let! eventStore, sources = this.anEventStoreWithStreamsAndEvents (3)
-            let! (version,result: EventEnvelope<Fixture.TestStream> list) = eventStore.AllStreams()
+            let! (version, result: EventEnvelope<Fixture.TestStream> list) = eventStore.AllStreams()
             let expectedPosition = Position.from 3
             Then.assertAll result sources
             Assert.Equal(expectedPosition, version)
 
             for source in sources do
-                let! _,stream =
-                    eventStore.Stream source Version.start
-                    |> resultOrFail
+                let! _, stream = eventStore.Stream source Version.start |> resultOrFail
                 Then.assertSingle stream source
 
-            let! (version,allStreams: EventEnvelope<Fixture.TestStream> list) = eventStore.All(List.map EventEnvelope.unbox)
+            let! (version, allStreams: EventEnvelope<Fixture.TestStream> list) =
+                eventStore.All(List.map EventEnvelope.unbox)
+
             Then.assertAll allStreams sources
             Assert.Equal(expectedPosition, version)
         }
@@ -172,22 +168,20 @@ type EventStoreBehavior() =
         task {
             let! eventStore = this.anEmptyEventStore ()
             let event = Fixture.generateEvent ()
-            do! eventStore.Append event.Metadata.Source Empty [ event.Event ]
-                |> expectOk
+            do! eventStore.Append event.Metadata.Source Empty [ event.Event ] |> expectOk
 
             let expectedPosition = Position.from 1
             let expectedVersion = Version.from 1
-            
-            let! position,result = eventStore.AllStreams()
+
+            let! position, result = eventStore.AllStreams()
             Then.assertAll result [ event.Metadata.Source ]
-            Assert.Equal (expectedPosition, position)
+            Assert.Equal(expectedPosition, position)
 
             let! (version, stream: EventEnvelope<Fixture.TestStream> list) =
-                eventStore.Stream event.Metadata.Source Version.start
-                |> resultOrFail
+                eventStore.Stream event.Metadata.Source Version.start |> resultOrFail
 
             Then.assertSingle stream event.Metadata.Source
-            Assert.Equal (expectedVersion, version)
+            Assert.Equal(expectedVersion, version)
         }
 
     [<Fact>]
@@ -212,16 +206,17 @@ type EventStoreBehavior() =
 
             do!
                 waitForEventsOnSubscription
-                    (From (Position.from 1))
+                    (From(Position.from 1))
                     eventStore
-                    (fun () -> eventStore.Append event.Metadata.Source (AtVersion (Version.from 1)) [ event.Event ] |> expectOk)
+                    (fun () ->
+                        eventStore.Append event.Metadata.Source (AtVersion(Version.from 1)) [ event.Event ]
+                        |> expectOk)
                     (fun events ->
                         Then.assertSingle events event.Metadata.Source
                         let single = events.Head
-                        Assert.Equal(event.Event, single.Event)
-                        )
+                        Assert.Equal(event.Event, single.Event))
         }
-        
+
     [<Fact>]
     member this.canSubscribeFromStartOfExistingStream() =
         task {
@@ -240,19 +235,21 @@ type InMemoryEventStore() =
     inherit EventStoreBehavior()
 
     override this.anEmptyEventStore() =
-        InMemoryStorage.empty()
-        |> EventStore.With
-        |> Task.FromResult 
+        InMemoryStorage.empty () |> EventStore.With |> Task.FromResult
 
     override this.anEventStoreWithStreamsAndEvents(count) =
         let data = Seq.init count (fun _ -> Fixture.generateEvent ()) |> Seq.toList
 
         Task.FromResult(
-            data |> List.map EventEnvelope.box |>  InMemoryStorage.initialize |> EventStore.With,
+            data
+            |> List.map EventEnvelope.box
+            |> InMemoryStorage.initialize
+            |> EventStore.With,
             data |> List.map (fun e -> e.Metadata.Source)
         )
 
 #nowarn "44" // ContainerBuilder<MsSqlTestcontainer>() is deprecated but does not provide a clear guidance yet
+
 type MsSqlFixture() =
     let container =
         let containerConfiguration =
@@ -288,7 +285,7 @@ type MsSqlBackedEventStore(msSql: MsSqlFixture) =
                     loggerFactory,
                     ConnectionString = msSql.Container.ConnectionString,
                     StreamsTableName = $"streams_{Interlocked.Increment(counter)}_{this.GetType().Name}",
-                    Serializer = Storage.NStoreBased.JsonMsSqlSerializer.Default
+                    Serializer = NStoreBased.JsonMsSqlSerializer.Default
                 )
 
             let persistence = NStore.Persistence.MsSql.MsSqlPersistence(config)
@@ -300,7 +297,7 @@ type MsSqlBackedEventStore(msSql: MsSqlFixture) =
     override this.anEmptyEventStore() =
         task {
             let! persistence = this.initializePersistence ()
-            let storage = Storage.NStoreBased.Storage(persistence,loggerFactory)
+            let storage = Storage.NStoreBased.Storage(persistence, loggerFactory)
             return EventStore(storage, (fun () -> DateTime.Now))
         }
 
@@ -319,8 +316,8 @@ type MsSqlBackedEventStore(msSql: MsSqlFixture) =
                 let! _ = stream.AppendAsync(events)
                 ()
 
-            let storage = Storage.NStoreBased.Storage(persistence,loggerFactory)
-            return EventStore(storage,  (fun () -> DateTime.Now)), data |> List.map (fun e -> e.Metadata.Source)
+            let storage = Storage.NStoreBased.Storage(persistence, loggerFactory)
+            return EventStore(storage, (fun () -> DateTime.Now)), data |> List.map (fun e -> e.Metadata.Source)
         }
 
     interface IClassFixture<MsSqlFixture> with

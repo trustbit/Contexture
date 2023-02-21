@@ -17,11 +17,13 @@ open Contexture.Api.Infrastructure.Storage
 
 module Position =
     let ofChunk (chunk: IChunk) = Position chunk.Position
+
     let maxPosition (recorder: Recorder) =
         recorder.Chunks
         |> Seq.tryLast
         |> Option.map ofChunk
         |> Option.defaultValue Position.start
+
 module Version =
     let ofChunk (chunk: IChunk) = Version chunk.Position
 
@@ -227,8 +229,8 @@ type Storage(persistence: IPersistence, logger: INStoreLoggerFactory) =
                 do! subscription envelopes
                 return true
             }
-        
-    let filteredSubscription streamKind (subscription: SubscriptionHandler)  =
+
+    let filteredSubscription streamKind (subscription: SubscriptionHandler) =
         fun chunk ->
             task {
                 let envelopes = EventEnvelope.ofChunk chunk
@@ -238,93 +240,107 @@ type Storage(persistence: IPersistence, logger: INStoreLoggerFactory) =
                     do! subscription filtered
 
                 return true
-        }
-        
-    let captureStatus (processor:ChunkProcessor) =
+            }
+
+    let captureStatus (processor: ChunkProcessor) =
         let mutable subscriptionStatus = NotRunning
+
         LambdaSubscription(
             fun chunk ->
                 task {
                     let! result = processor.Invoke chunk
-                    subscriptionStatus <- Processing (Position.ofChunk chunk)
+                    subscriptionStatus <- Processing(Position.ofChunk chunk)
                     return result
                 }
-            ,
-            OnComplete = fun pos ->
-                subscriptionStatus <- CaughtUp (Position.from pos)
-                Task.CompletedTask
-            ,
-            OnError = fun (pos:int64) (ex:Exception)->
-                subscriptionStatus <- Failed (ex, pos |> Position.from |> Some)
-                Task.CompletedTask
-            ,
-            OnStart = fun pos ->
-                subscriptionStatus <- Processing (Position.from pos)
-                Task.CompletedTask
-            ,
-            OnStop = fun pos ->
-                subscriptionStatus <- Stopped(Position.from pos)
-                Task.CompletedTask
+            , OnComplete =
+                fun pos ->
+                    subscriptionStatus <- CaughtUp(Position.from pos)
+                    Task.CompletedTask
+            , OnError =
+                fun (pos: int64) (ex: Exception) ->
+                    subscriptionStatus <- Failed(ex, pos |> Position.from |> Some)
+                    Task.CompletedTask
+            , OnStart =
+                fun pos ->
+                    subscriptionStatus <- Processing(Position.from pos)
+                    Task.CompletedTask
+            , OnStop =
+                fun pos ->
+                    subscriptionStatus <- Stopped(Position.from pos)
+                    Task.CompletedTask
         ),
         fun () -> subscriptionStatus
-    
+
     let valueFromPosition position =
         match position with
-        | Start ->  Position.start |> Position.value |> Task.FromResult
-        | From position -> position |> Position.value |> Task.FromResult 
+        | Start -> Position.start |> Position.value |> Task.FromResult
+        | From position -> position |> Position.value |> Task.FromResult
         | End -> persistence.ReadLastPositionAsync()
-        
-    let startAsPolling position (subscription:ChunkProcessor) = task {
-        let wrappedSubscription,status = captureStatus subscription
-        let! positionValue = valueFromPosition position
-        let pollingClient = PollingClient(persistence, positionValue, wrappedSubscription,logger)
-        pollingClient.Start()
-        return {
-            new Subscription with
-                member _.Status = status()
-                member _.DisposeAsync () = 
-                    ValueTask (pollingClient.Stop())
-            }
+
+    let startAsPolling position (subscription: ChunkProcessor) =
+        task {
+            let wrappedSubscription, status = captureStatus subscription
+            let! positionValue = valueFromPosition position
+
+            let pollingClient =
+                PollingClient(persistence, positionValue, wrappedSubscription, logger)
+
+            pollingClient.Start()
+
+            return
+                { new Subscription with
+                    member _.Status = status ()
+                    member _.DisposeAsync() = ValueTask(pollingClient.Stop()) }
         }
-        
+
     let subscribe definition (subscription: SubscriptionHandler) =
         match definition with
         | FromStream(streamIdentifier, version) ->
             let stream =
                 streamIdentifier |> StreamIdentifier.name |> streamsFactory.OpenReadOnly
+
             let token = new CancellationTokenSource()
+
             let wrappedSubscription, status =
                 captureStatus (unfilteredSubscription subscription)
-                
+
             // TODO: this is not polling - it just reads data once!
-            let readTask = stream.ReadAsync(wrappedSubscription, version |> Option.defaultValue Version.start |> Version.value, token.Token)
-            Task.FromResult {
-                new Subscription with
-                    member _.Status = status()
-                    member _.DisposeAsync () =
-                        ValueTask <| task {
-                        if (not token.IsCancellationRequested) then
-                            token.Cancel()
-                            token.Dispose()
-                            
-                        while not readTask.IsCompleted do    
-                            do! Task.Delay(100)
-                        
-                        readTask.Dispose()
-                        return ()
-                    }                
-            }
-        | FromAll position ->
-            startAsPolling position (unfilteredSubscription subscription)
-        | FromKind(streamKind, position) ->
-            startAsPolling position (filteredSubscription streamKind  subscription)
+            let readTask =
+                stream.ReadAsync(
+                    wrappedSubscription,
+                    version |> Option.defaultValue Version.start |> Version.value,
+                    token.Token
+                )
+
+            Task.FromResult
+                { new Subscription with
+                    member _.Status = status ()
+
+                    member _.DisposeAsync() =
+                        ValueTask
+                        <| task {
+                            if (not token.IsCancellationRequested) then
+                                token.Cancel()
+                                token.Dispose()
+
+                            while not readTask.IsCompleted do
+                                do! Task.Delay(100)
+
+                            readTask.Dispose()
+                            return ()
+                        } }
+        | FromAll position -> startAsPolling position (unfilteredSubscription subscription)
+        | FromKind(streamKind, position) -> startAsPolling position (filteredSubscription streamKind subscription)
 
     interface EventStorage with
         member this.All() : Async<EventResult> = Async.AwaitTask(fetchAll ())
         member this.AllStreamsOf(kind) = Async.AwaitTask(fetchOf kind)
+
         member this.Append identifier expectedVersion envelopes =
             Async.AwaitTask(append identifier expectedVersion envelopes)
+
         member this.Stream version identifier =
             Async.AwaitTask(read identifier version)
+
         member this.Subscribe definition subscription =
             Async.AwaitTask(subscribe definition subscription)

@@ -11,9 +11,8 @@ type ReadModelInitialization =
 module ReadModelInitialization =
     type private RMI<'Event>(eventStore: EventStore, handler: EventHandler<'Event>) =
         interface ReadModelInitialization with
-            member _.ReplayAndConnect position =
-                eventStore.Subscribe position  handler
-                
+            member _.ReplayAndConnect position = eventStore.Subscribe position handler
+
 
     let initializeWith (eventStore: EventStore) (handler: EventHandler<'Event>) : ReadModelInitialization =
         RMI(eventStore, handler) :> ReadModelInitialization
