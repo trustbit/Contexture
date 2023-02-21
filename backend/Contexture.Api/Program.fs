@@ -4,7 +4,7 @@ open System
 open System.IO
 open System.Threading.Tasks
 open Contexture.Api.Aggregates
-open Contexture.Api.Database
+open Contexture.Api.FileBased.Database
 open Contexture.Api.Infrastructure
 open Contexture.Api.FileBasedCommandHandlers
 open Contexture.Api.Infrastructure.Storage
@@ -200,7 +200,7 @@ let configureApp (app : IApplicationBuilder) =
         .UseGiraffe(webApp (frontendHostRoutes env))
         
 let configureJsonSerializer (services: IServiceCollection) =
-    Database.Serialization.serializerOptions
+    FileBased.Database.Serialization.serializerOptions
     |> SystemTextJson.Serializer
     |> services.AddSingleton<Json.ISerializer>
     |> ignore
@@ -299,7 +299,7 @@ let waitUntilCaughtUp (subscriptions: Subscription List) =
     }
     
     
-let importFromDocument clock (store: EventStore) (database: Document) = async {
+let importFromDocument clock (store: EventStore) (database: FileBased.Database.Document) = async {
     let append (items: EventEnvelope<_> list) =
         items
         |> List.groupBy (fun i -> i.Metadata.Source)
@@ -313,31 +313,31 @@ let importFromDocument clock (store: EventStore) (database: Document) = async {
 
     do!
         database.Collaborations.All
-        |> List.map (Collaboration.asEvents clock)
+        |> List.map (FileBased.Convert.Collaboration.asEvents clock)
         |> List.map append 
         |> runAsync
     
     do!
         database.Domains.All
-        |> List.map (Domain.asEvents clock)
+        |> List.map (FileBased.Convert.Domain.asEvents clock)
         |> List.map append
         |> runAsync
     
     do!
         database.BoundedContexts.All
-        |> List.map (BoundedContext.asEvents clock)
+        |> List.map (FileBased.Convert.BoundedContext.asEvents clock)
         |> List.map append
         |> runAsync
     
     do!
         database.BoundedContexts.All
-        |> List.map (Namespace.asEvents clock)
+        |> List.map (FileBased.Convert.Namespace.asEvents clock)
         |> List.map append
         |> runAsync
 
     do!
         database.NamespaceTemplates.All
-        |> List.map (NamespaceTemplate.asEvents clock)
+        |> List.map (FileBased.Convert.NamespaceTemplate.asEvents clock)
         |> List.map append
         |> runAsync
     }
@@ -345,7 +345,7 @@ let runAsync (host: IHost) =
     task {
         // make sure the database is loaded
         let database =
-            host.Services.GetRequiredService<SingleFileBasedDatastore>()
+            host.Services.GetRequiredService<FileBased.Database.SingleFileBasedDatastore>()
 
         let store =
             host.Services.GetRequiredService<EventStore>()
@@ -368,11 +368,11 @@ let runAsync (host: IHost) =
         // subscriptions for syncing back to the filebased-db are added after initial seeding/loading
         let! fileSyncSubscriptions  =
             Async.Parallel [
-                store.Subscribe End (Collaboration.subscription subscriptionLogger database)
-                store.Subscribe End (Domain.subscription subscriptionLogger database)
-                store.Subscribe End (BoundedContext.subscription subscriptionLogger database)
-                store.Subscribe End (Namespace.subscription subscriptionLogger database)
-                store.Subscribe End (NamespaceTemplate.subscription subscriptionLogger database)
+                store.Subscribe End (FileBased.Convert.Collaboration.subscription subscriptionLogger database)
+                store.Subscribe End (FileBased.Convert.Domain.subscription subscriptionLogger database)
+                store.Subscribe End (FileBased.Convert.BoundedContext.subscription subscriptionLogger database)
+                store.Subscribe End (FileBased.Convert.Namespace.subscription subscriptionLogger database)
+                store.Subscribe End (FileBased.Convert.NamespaceTemplate.subscription subscriptionLogger database)
             ]
             |> Async.map Array.toList
             

@@ -23,7 +23,6 @@
     <Compile Include="Entities\Collaboration.fs" />
     <Compile Include="Entities\Namespace.fs" />
     <Compile Include="Entities\NamespaceTemplate.fs" />
-    <Compile Include="Database.fs" />
     <Compile Include="Utils.fs" />
     <Compile Include="Infrastructure\Types.fs" />
     <Compile Include="Infrastructure\EventStore.fs" />
@@ -43,6 +42,8 @@
     <Compile Include="Views\Views.fs" />
     <Compile Include="Views\Namespaces.fs" />
     <Compile Include="Views\Search.fs" />
+    <Compile Include="Filebased\Database.fs" />
+    <Compile Include="Filebased\Convert.fs" />
     <Compile Include="Program.fs" />
   </ItemGroup>
   <ItemGroup>

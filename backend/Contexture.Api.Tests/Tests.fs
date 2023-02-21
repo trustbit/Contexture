@@ -2,7 +2,7 @@ module Tests
 
 open Contexture.Api
 open Xunit
-open Database
+open FileBased.Database
 open FSharp.Control.Tasks
 
 [<Fact>]
