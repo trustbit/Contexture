@@ -116,32 +116,33 @@ let initialize (initialEvents: EventEnvelope list) =
 
                     return! loop (subscriptions, extendedHistory)
                 | Subscribe(definition, subscription, reply) ->
+                    let skipUntil position items =
+                        items
+                        |> List.skipWhile (fun (p,_, _) ->
+                            match position with
+                            | Start -> false
+                            | End -> true
+                            | From pos when pos = Position.start -> false
+                            | From pos -> p <= pos
+                        )
                     let events =
                         match definition with
                         | FromAll position ->
-                            history.items
-                            |> List.skipWhile (fun (p,_, _) ->
-                                if position = Position.start then
-                                    false
-                                else
-                                    p <= position)
+                            history.items |> skipUntil position
                         | FromKind(kind, position) ->
                             kind
                             |> getAllStreamsOf history
-                            |> List.skipWhile (fun (p,_, _) ->
-                                if position = Position.start then
-                                    false
-                                else
-                                    p <= position)
+                             |> skipUntil position
                         | FromStream(identifier, version) ->
                             identifier
                             |> stream history
                             |> List.skipWhile (fun (_,v, _) -> if version.IsNone then false else v < version.Value)
 
+                    let lastPosition = history.items |> withMaxPosition |> fst
                     if not events.IsEmpty then
                         inbox.Post(
                             Notify(
-                                events |> List.map (fun (p,_,_) -> p) |> List.max,
+                                lastPosition,
                                 events |> List.map (fun (_,_,i) -> i),
                                 subscription
                             )
@@ -149,7 +150,7 @@ let initialize (initialEvents: EventEnvelope list) =
                     else
                         inbox.Post(
                             Notify(
-                                Position.start,
+                                lastPosition,
                                 List.empty,
                                 subscription
                             )
@@ -159,7 +160,7 @@ let initialize (initialEvents: EventEnvelope list) =
                     return! loop ((definition, subscription) :: subscriptions, history)
 
                 | Notify(version, events, subscription) ->
-                    do! subscription version events
+                    Async.Start <| subscription version events
 
                     return! loop state
             }
@@ -186,7 +187,7 @@ let initialize (initialEvents: EventEnvelope list) =
         member _.All() =
             agent.PostAndAsyncReply(fun reply -> GetAll(reply))
 
-        member _.Subscribe definition subscription =
+        member _.Subscribe definition subscription = async {
             let cancel = new CancellationTokenSource()
             let mutable lastVersion = None
             let recordingSubscription version events = async {
@@ -200,18 +201,20 @@ let initialize (initialEvents: EventEnvelope list) =
                     cancellationToken = cancel.Token
                 )
                  
-            { new Subscription with
-                member _.Status =
-                    match lastVersion with
-                    | None -> NotRunning
-                    | Some v -> CaughtUp v
-                member _.DisposeAsync() =
-                    if not cancel.IsCancellationRequested then
-                        cancel.Cancel()
-                        cancel.Dispose()
-                        
-                    resultTask.Dispose()
-                    ValueTask.CompletedTask
+            return {
+                new Subscription with
+                    member _.Status =
+                        match lastVersion with
+                        | None -> NotRunning
+                        | Some v -> CaughtUp v
+                    member _.DisposeAsync() =
+                        if not cancel.IsCancellationRequested then
+                            cancel.Cancel()
+                            cancel.Dispose()
+                            
+                        resultTask.Dispose()
+                        ValueTask.CompletedTask
+                }
             }
     }
 

@@ -6,6 +6,7 @@ open System.Net
 open System.Net.Http
 open Contexture.Api.Infrastructure.Storage
 open Contexture.Api.Tests.EnvironmentSimulation
+open FsToolkit.ErrorHandling
 open Microsoft.AspNetCore.Hosting
 open Microsoft.Extensions.Hosting
 open Microsoft.Extensions.Http
@@ -50,8 +51,7 @@ module TestHost =
         
         host.Services.GetServices<ReadModels.ReadModelInitialization>()
         |> Contexture.Api.App.connectAndReplayReadModels
-        |> Contexture.Api.App.waitUntilCaughtUp
-        |> Async.AwaitTask
+        |> Async.bind (Contexture.Api.App.waitUntilCaughtUp >> Async.AwaitTask)
         |> Async.RunSynchronously
         
         host.Start()

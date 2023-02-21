@@ -265,8 +265,9 @@ let buildHost args =
 
 let connectAndReplayReadModels (readModels: ReadModels.ReadModelInitialization seq) =
     readModels
-    |> Seq.map (fun r -> r.ReplayAndConnect (Some Position.start))
-    |> Seq.toList
+    |> Seq.map (fun r -> r.ReplayAndConnect Start)
+    |> Async.Parallel
+    |> Async.map Array.toList
     
 let waitUntilCaughtUp (subscriptions: Subscription List) =
     task {
@@ -279,10 +280,12 @@ let waitUntilCaughtUp (subscriptions: Subscription List) =
                 | _ -> c,e
             ) (List.empty,List.empty)
             
+        let selectPositions status =
+            status |> fst |> List.map fst |> List.distinct 
         let initialStatus = getCurrentStatus()
         let mutable lastStatus = initialStatus
         let mutable counter = 0
-        while not(lastStatus |> fst |> List.length = (subscriptions |> List.length )) do
+        while not(lastStatus |> fst |> List.length = (subscriptions |> List.length ) && (lastStatus |> selectPositions |> List.length = 1)) do
             do! Task.Delay(100)
             let calculatedStatus = getCurrentStatus()
             lastStatus <- calculatedStatus
@@ -296,7 +299,7 @@ let importFromDocument clock (store: EventStore) (database: Document) = async {
     let append (items: EventEnvelope<_> list) =
         items
         |> List.groupBy (fun i -> i.Metadata.Source)
-        |> List.map (fun (key, grouping) -> store.Append key Unknown grouping )
+        |> List.map (fun (key, grouping) -> store.Append key Unknown (grouping |> List.map (fun g -> g.Event)) )
         |> Async.Sequential
         |> Async.Ignore
     let runAsync (items: Async<Unit> list) =
@@ -349,7 +352,7 @@ let runAsync (host: IHost) =
         let readModels =
             host.Services.GetServices<ReadModels.ReadModelInitialization>()
 
-        let readModelSubscriptions = connectAndReplayReadModels readModels
+        let! readModelSubscriptions = connectAndReplayReadModels readModels
         do! waitUntilCaughtUp readModelSubscriptions
 
         let! document = database.Read()
@@ -359,14 +362,15 @@ let runAsync (host: IHost) =
         let subscriptionLogger = loggerFactory.CreateLogger("subscriptions")
 
         // subscriptions for syncing back to the filebased-db are added after initial seeding/loading
-        let fileSyncSubscriptions  =
-            [
-                store.Subscribe Position.start (Collaboration.subscription subscriptionLogger database)
-                store.Subscribe Position.start (Domain.subscription subscriptionLogger database)
-                store.Subscribe Position.start (BoundedContext.subscription subscriptionLogger database)
-                store.Subscribe Position.start (Namespace.subscription subscriptionLogger database)
-                store.Subscribe Position.start (NamespaceTemplate.subscription subscriptionLogger database)
+        let! fileSyncSubscriptions  =
+            Async.Parallel [
+                store.Subscribe End (Collaboration.subscription subscriptionLogger database)
+                store.Subscribe End (Domain.subscription subscriptionLogger database)
+                store.Subscribe End (BoundedContext.subscription subscriptionLogger database)
+                store.Subscribe End (Namespace.subscription subscriptionLogger database)
+                store.Subscribe End (NamespaceTemplate.subscription subscriptionLogger database)
             ]
+            |> Async.map Array.toList
             
         do! waitUntilCaughtUp (readModelSubscriptions @ fileSyncSubscriptions)
 

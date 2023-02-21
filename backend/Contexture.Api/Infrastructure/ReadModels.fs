@@ -6,13 +6,13 @@ open Contexture.Api.Infrastructure.Storage
 type EventHandler<'Event> = EventEnvelope<'Event> list -> Async<unit>
 
 type ReadModelInitialization =
-    abstract member ReplayAndConnect: Position option -> Subscription
+    abstract member ReplayAndConnect: SubscriptionStartingPosition -> Async<Subscription>
 
 module ReadModelInitialization =
     type private RMI<'Event>(eventStore: EventStore, handler: EventHandler<'Event>) =
         interface ReadModelInitialization with
             member _.ReplayAndConnect position =
-                eventStore.Subscribe (position |> Option.defaultValue Position.start) handler
+                eventStore.Subscribe position  handler
                 
 
     let initializeWith (eventStore: EventStore) (handler: EventHandler<'Event>) : ReadModelInitialization =

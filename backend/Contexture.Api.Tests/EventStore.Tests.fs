@@ -77,7 +77,7 @@ let waitForEventsOnSubscription start (eventStore: EventStore) action eventCallb
                 receivedEvents.SetResult events
             Async.Sleep(0)
 
-        let subscription = eventStore.Subscribe start subscriptionHandler
+        let! subscription = eventStore.Subscribe start subscriptionHandler
         do! Contexture.Api.App.waitUntilCaughtUp [subscription]
 
         do! Async.StartAsTask(action ())
@@ -198,7 +198,7 @@ type EventStoreBehavior() =
 
             do!
                 waitForEventsOnSubscription
-                    Position.start
+                    Start
                     eventStore
                     (fun () -> eventStore.Append event.Metadata.Source Empty [ event.Event ] |> expectOk)
                     (fun events -> Then.assertSingle events event.Metadata.Source)
@@ -212,7 +212,7 @@ type EventStoreBehavior() =
 
             do!
                 waitForEventsOnSubscription
-                    (Position.from 1)
+                    (From (Position.from 1))
                     eventStore
                     (fun () -> eventStore.Append event.Metadata.Source (AtVersion (Version.from 1)) [ event.Event ] |> expectOk)
                     (fun events ->
@@ -230,7 +230,7 @@ type EventStoreBehavior() =
 
             do!
                 waitForEventsOnSubscription
-                    Position.start
+                    Start
                     eventStore
                     (fun () -> async { return () })
                     (fun events -> Then.assertSingle events event.Metadata.Source)

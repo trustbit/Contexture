@@ -268,14 +268,23 @@ type Storage(persistence: IPersistence, logger: INStoreLoggerFactory) =
         ),
         fun () -> subscriptionStatus
     
-    let startAsPolling position (subscription:ChunkProcessor) =
+    let valueFromPosition position =
+        match position with
+        | Start ->  Position.start |> Position.value |> Task.FromResult
+        | From position -> position |> Position.value |> Task.FromResult 
+        | End -> persistence.ReadLastPositionAsync()
+        
+    let startAsPolling position (subscription:ChunkProcessor) = task {
         let wrappedSubscription,status = captureStatus subscription
-        let pollingClient = PollingClient(persistence,Position.value position, wrappedSubscription,logger)
+        let! positionValue = valueFromPosition position
+        let pollingClient = PollingClient(persistence, positionValue, wrappedSubscription,logger)
         pollingClient.Start()
-        { new Subscription with
-            member _.Status = status()
-            member _.DisposeAsync () = 
-                ValueTask (pollingClient.Stop())
+        return {
+            new Subscription with
+                member _.Status = status()
+                member _.DisposeAsync () = 
+                    ValueTask (pollingClient.Stop())
+            }
         }
         
     let subscribe definition (subscription: SubscriptionHandler) =
@@ -289,20 +298,21 @@ type Storage(persistence: IPersistence, logger: INStoreLoggerFactory) =
                 
             // TODO: this is not polling - it just reads data once!
             let readTask = stream.ReadAsync(wrappedSubscription, version |> Option.defaultValue Version.start |> Version.value, token.Token)
-            { new Subscription with
-                member _.Status = status()
-                member _.DisposeAsync () =
-                    ValueTask <| task {
-                    if (not token.IsCancellationRequested) then
-                        token.Cancel()
-                        token.Dispose()
+            Task.FromResult {
+                new Subscription with
+                    member _.Status = status()
+                    member _.DisposeAsync () =
+                        ValueTask <| task {
+                        if (not token.IsCancellationRequested) then
+                            token.Cancel()
+                            token.Dispose()
+                            
+                        while not readTask.IsCompleted do    
+                            do! Task.Delay(100)
                         
-                    while not readTask.IsCompleted do    
-                        do! Task.Delay(100)
-                    
-                    readTask.Dispose()
-                    return ()
-                }                
+                        readTask.Dispose()
+                        return ()
+                    }                
             }
         | FromAll position ->
             startAsPolling position (unfilteredSubscription subscription)
@@ -312,12 +322,9 @@ type Storage(persistence: IPersistence, logger: INStoreLoggerFactory) =
     interface EventStorage with
         member this.All() : Async<EventResult> = Async.AwaitTask(fetchAll ())
         member this.AllStreamsOf(kind) = Async.AwaitTask(fetchOf kind)
-
         member this.Append identifier expectedVersion envelopes =
             Async.AwaitTask(append identifier expectedVersion envelopes)
-
         member this.Stream version identifier =
             Async.AwaitTask(read identifier version)
-
         member this.Subscribe definition subscription =
-            subscribe definition subscription
+            Async.AwaitTask(subscribe definition subscription)

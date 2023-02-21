@@ -14,9 +14,13 @@ module StreamIdentifier =
     let kind (StreamIdentifier(kind, _)) = kind
 
 type SubscriptionDefinition =
-    | FromAll of Position
-    | FromKind of StreamKind * Position
+    | FromAll of SubscriptionStartingPosition
+    | FromKind of StreamKind * SubscriptionStartingPosition
     | FromStream of StreamIdentifier * Version option
+and SubscriptionStartingPosition =
+    | Start
+    | From of Position
+    | End 
     
 type Subscription =
     inherit IAsyncDisposable
@@ -28,7 +32,6 @@ and SubscriptionStatus =
     | Failed of exn * at: Position option
     | Stopped of at: Position
 
-
 type EventStorage =
     abstract member Stream: Version -> StreamIdentifier -> Async<StreamResult>
     abstract member AllStreamsOf: StreamKind -> Async<EventResult>
@@ -37,7 +40,7 @@ type EventStorage =
         StreamIdentifier -> ExpectedVersion -> EventEnvelope list -> Async<Result<Version, AppendError>>
 
     abstract member All: unit -> Async<EventResult>
-    abstract member Subscribe: SubscriptionDefinition -> SubscriptionHandler -> Subscription
+    abstract member Subscribe: SubscriptionDefinition -> SubscriptionHandler -> Async<Subscription>
 
 namespace Contexture.Api.Infrastructure
 
