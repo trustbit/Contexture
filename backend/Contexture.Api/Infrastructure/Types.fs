@@ -55,7 +55,9 @@ module Position =
 
 type EventMetadata =
     { Source: EventSource
-      RecordedAt: System.DateTimeOffset }
+      RecordedAt: System.DateTimeOffset
+      Position: Position
+      Version: Version }
 
 type EventEnvelope<'Event> =
     { Metadata: EventMetadata

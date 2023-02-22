@@ -63,15 +63,7 @@ module CommandHandler =
                     }
                 
                 let saveStream identity version newEvents = async {
-                    let name = getStreamName identity
-                    let mappedEvents =
-                        newEvents
-                        |> List.map (fun e ->
-                            { Event = e
-                              Metadata =
-                                  { Source = name
-                                    RecordedAt = clock () } })
-                        
+                    let name = getStreamName identity                        
                     match! eventStore.Append name (AtVersion version) newEvents with
                     | Ok appendedVersion -> return appendedVersion
                     | Error e -> return failwithf "Failed to save events for %O with:\n%O" name e

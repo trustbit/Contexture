@@ -36,13 +36,26 @@ and SubscriptionStatus =
     | CaughtUp of at: Position
     | Failed of exn * at: Position option
     | Stopped of at: Position
+type EventDefinition =
+    { Source: EventSource
+      Event: obj
+      EventType: System.Type
+      StreamKind: StreamKind }
+    
+module EventDefinition =
+    let from source (item: 'E) =
+        { Source = source
+          Event = item
+          EventType = typeof<'E>
+          StreamKind = StreamKind.Of<'E>()
+        }
 
 type EventStorage =
     abstract member Stream: Version -> StreamIdentifier -> Async<StreamResult>
     abstract member AllStreamsOf: StreamKind -> Async<EventResult>
 
     abstract member Append:
-        StreamIdentifier -> ExpectedVersion -> EventEnvelope list -> Async<Result<Version, AppendError>>
+        StreamIdentifier -> ExpectedVersion -> EventDefinition list -> Async<Result<Version, AppendError>>
 
     abstract member All: unit -> Async<EventResult>
     abstract member Subscribe: SubscriptionDefinition -> SubscriptionHandler -> Async<Subscription>
@@ -54,7 +67,7 @@ open Contexture.Api.Infrastructure.Storage
 open Contexture.Api.Infrastructure
 open FsToolkit.ErrorHandling
 
-type EventStore(storage: Storage.EventStorage, clock: Clock) =
+type EventStore(storage: Storage.EventStorage) =
 
     let asTyped items : EventEnvelope<'E> list = items |> List.map EventEnvelope.unbox
 
@@ -83,17 +96,16 @@ type EventStore(storage: Storage.EventStorage, clock: Clock) =
                 storage.Stream version identifier |> AsyncResult.map (Tuple.mapSnd asTyped)
 
             member _.Append version definitions =
-                let envelopes =
+                let eventDefinitions =
                     definitions
                     |> List.map (fun payload ->
-                        { Metadata =
-                            { Source = identifier |> StreamIdentifier.source
-                              RecordedAt = clock () }
-                          Event = payload })
-                    |> List.map EventEnvelope.box
+                        { Source = identifier |> StreamIdentifier.source
+                          Event = box payload
+                          EventType = typeof<'E>
+                          StreamKind = StreamKind.Of<'E>() }
+                    )
 
-                storage.Append identifier version envelopes }
-
+                storage.Append identifier version eventDefinitions }
 
     let all toAllStream : Async<Position * EventEnvelope<'E> list> =
         async {
@@ -104,8 +116,8 @@ type EventStore(storage: Storage.EventStorage, clock: Clock) =
                 return Position.start, List.empty
         }
 
-    static member With(storage: Storage.EventStorage) clock =
-        EventStore(storage, clock)
+    static member With(storage: Storage.EventStorage)=
+        EventStore(storage)
 
     member _.Stream name version =
         let stream = stream name

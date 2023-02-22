@@ -242,9 +242,10 @@ let configureServices (context: HostBuilderContext) (services : IServiceCollecti
     
     services.AddSingleton<Clock>(utcNowClock) |> ignore
     services.AddSingleton<EventStore> (fun (p:IServiceProvider) ->
-        let storage = Storage.InMemoryStorage.empty()
         let clock = p.GetRequiredService<Clock>()
-        EventStore.With storage clock
+        let storage = Storage.InMemoryStorage.empty clock
+        
+        EventStore.With storage
     ) |> ignore 
     services |> configureReadModels
     
@@ -300,9 +301,9 @@ let waitUntilCaughtUp (subscriptions: Subscription List) =
     
     
 let importFromDocument clock (store: EventStore) (database: FileBased.Database.Document) = async {
-    let append (items: EventEnvelope<_> list) =
+    let append (items: EventDefinition list) =
         items
-        |> List.groupBy (fun i -> i.Metadata.Source)
+        |> List.groupBy (fun i -> i.Source)
         |> List.map (fun (key, grouping) -> store.Append key Unknown (grouping |> List.map (fun g -> g.Event)) )
         |> Async.Sequential
         |> Async.Ignore

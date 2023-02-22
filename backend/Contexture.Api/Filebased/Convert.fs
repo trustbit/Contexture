@@ -5,6 +5,7 @@ open Contexture.Api.Aggregates.Namespace
 open Contexture.Api.Aggregates.NamespaceTemplate.Projections
 open Contexture.Api.FileBased.Database
 open Contexture.Api.Infrastructure
+open Contexture.Api.Infrastructure.Storage
 open Microsoft.Extensions.Logging
 
 module BridgeEventSourcingWithFilebasedDatabase =
@@ -53,16 +54,15 @@ module Domain =
     open BridgeEventSourcingWithFilebasedDatabase
 
     let asEvents clock (domain: Serialization.Domain) =
-        { Metadata =
-            { Source = domain.Id
-              RecordedAt = clock () }
-          Event =
-            DomainImported
+        EventDefinition.from
+            domain.Id
+            (DomainImported
                 { DomainId = domain.Id
                   Name = domain.Name
                   ParentDomainId = domain.ParentDomainId
                   Vision = domain.Vision
-                  ShortName = domain.ShortName } }
+                  ShortName = domain.ShortName }
+            )
         |> List.singleton
 
     let mapDomainToSerialization (state: Serialization.Domain option) event : Serialization.Domain option =
@@ -109,11 +109,9 @@ module BoundedContext =
     open BoundedContext
 
     let asEvents clock (collaboration: Serialization.BoundedContext) =
-        { Metadata =
-            { Source = collaboration.Id
-              RecordedAt = clock () }
-          Event =
-            BoundedContextImported
+        EventDefinition.from
+            collaboration.Id
+            (BoundedContextImported
                 { BoundedContextId = collaboration.Id
                   DomainId = collaboration.DomainId
                   Description = collaboration.Description
@@ -123,7 +121,8 @@ module BoundedContext =
                   UbiquitousLanguage = collaboration.UbiquitousLanguage
                   BusinessDecisions = collaboration.BusinessDecisions
                   ShortName = collaboration.ShortName
-                  Name = collaboration.Name } }
+                  Name = collaboration.Name }
+            )
         |> List.singleton
 
 
@@ -178,16 +177,14 @@ module Collaboration =
     open BridgeEventSourcingWithFilebasedDatabase
 
     let asEvents clock (collaboration: Serialization.Collaboration) =
-        { Metadata =
-            { Source = collaboration.Id
-              RecordedAt = clock () }
-          Event =
-            Collaboration.CollaborationImported
+        EventDefinition.from
+            collaboration.Id
+            (Collaboration.CollaborationImported
                 { CollaborationId = collaboration.Id
                   Description = collaboration.Description
                   RelationshipType = collaboration.RelationshipType
                   Initiator = collaboration.Initiator
-                  Recipient = collaboration.Recipient } }
+                  Recipient = collaboration.Recipient })
         |> List.singleton
 
     let mapToSerialization (state: Serialization.Collaboration option) event : Serialization.Collaboration option =
@@ -235,11 +232,9 @@ module Namespace =
     let asEvents clock (boundedContext: Serialization.BoundedContext) =
         boundedContext.Namespaces
         |> List.map (fun n ->
-            { Metadata =
-                { Source = boundedContext.Id
-                  RecordedAt = clock () }
-              Event =
-                NamespaceImported
+            EventDefinition.from
+                boundedContext.Id
+                (NamespaceImported
                     { NamespaceId = n.Id
                       BoundedContextId = boundedContext.Id
                       NamespaceTemplateId = n.Template
@@ -250,7 +245,8 @@ module Namespace =
                             { LabelId = l.Id
                               Name = l.Name
                               Value = Option.ofObj l.Value
-                              Template = l.Template }) } })
+                              Template = l.Template }) } )
+            )
 
     let asNamespaceWithBoundedContext (boundedContextOption: Serialization.BoundedContext option) event =
         boundedContextOption
@@ -272,11 +268,9 @@ module NamespaceTemplate =
     open NamespaceTemplate
 
     let asEvents clock (template: NamespaceTemplate) =
-        { Metadata =
-            { Source = template.Id
-              RecordedAt = clock () }
-          Event =
-            NamespaceTemplateImported
+        EventDefinition.from
+            template.Id
+            (NamespaceTemplateImported
                 { NamespaceTemplateId = template.Id
                   Name = template.Name
                   Description = Option.ofObj template.Description
@@ -286,7 +280,8 @@ module NamespaceTemplate =
                         { TemplateLabelId = l.Id
                           Name = l.Name
                           Description = Option.ofObj l.Description
-                          Placeholder = Option.ofObj l.Placeholder }) } }
+                          Placeholder = Option.ofObj l.Placeholder }) }
+            )
         |> List.singleton
 
     let subscription logger (database: SingleFileBasedDatastore) : SubscriptionHandler<Event> =

@@ -2,6 +2,7 @@ module Contexture.Api.Infrastructure.Storage.InMemoryStorage
 
 open System
 open System.Collections.Generic
+open System.Reflection.Metadata
 open System.Threading
 open System.Threading.Tasks
 open Contexture.Api.Infrastructure
@@ -13,7 +14,7 @@ type Msg =
     | Get of StreamKind * AsyncReplyChannel<EventResult>
     | GetStream of StreamIdentifier * AsyncReplyChannel<StreamResult>
     | GetAll of AsyncReplyChannel<EventResult>
-    | Append of EventEnvelope list * AsyncReplyChannel<Version>
+    | Append of EventDefinition list * AsyncReplyChannel<Version>
     | Notify of Position * EventEnvelope list * (Position -> EventEnvelope list -> Async<unit>)
     | Subscribe of SubscriptionDefinition * (Position -> EventEnvelope list -> Async<unit>) * AsyncReplyChannel<unit>
 
@@ -51,14 +52,25 @@ let private withMaxVersion (items: (Position * Version * EventEnvelope) list) =
     else
         items |> List.maxBy selectVersion |> selectVersion, items |> List.map selectItem
 
-let private appendToHistory (history: History) (envelope: EventEnvelope) =
-    let source = envelope.Metadata.Source
-    let streamKind = envelope.StreamKind
+let private appendToHistory clock (history: History, envelopes) (definition: EventDefinition) =
+    let source = definition.Source
+    let streamKind = definition.StreamKind
     let key = StreamIdentifier.from source streamKind
     let position = Position.from (int64 history.items.Length + 1L)
     let existingStream = key |> stream history
     let eventVersion = Version.from (existingStream.Length + 1)
 
+    let envelope = {
+        Metadata =
+            { Source = definition.Source
+              RecordedAt = clock ()
+              Position = position
+              Version = eventVersion
+            }
+        Payload = definition.Event
+        EventType = definition.EventType
+        StreamKind = definition.StreamKind
+        }
     let fullStream =
         existingStream |> (fun s -> s @ [ position, eventVersion, envelope ])
 
@@ -66,9 +78,9 @@ let private appendToHistory (history: History) (envelope: EventEnvelope) =
     let allEvents = getAllStreamsOf history streamKind
     history.byEventType.[streamKind] <- allEvents @ [ position, eventVersion, envelope ]
 
-    { history with items = (position, eventVersion, envelope) :: history.items }
+    { history with items = (position, eventVersion, envelope) :: history.items },envelopes @ [ envelope ]
 
-let private singleWriterPipeline (initialEvents: EventEnvelope list) (inbox: Agent<Msg>) =
+let private singleWriterPipeline clock (initialEvents: EventDefinition list) (inbox: Agent<Msg>) =
     let rec loop state =
         let (subscriptions, history) = state
 
@@ -88,8 +100,8 @@ let private singleWriterPipeline (initialEvents: EventEnvelope list) (inbox: Age
                 history.items |> withMaxPosition |> Ok |> reply.Reply
 
                 return! loop state
-            | Append(events, reply) ->
-                let extendedHistory = events |> List.fold appendToHistory history
+            | Append(eventDefinitions, reply) ->
+                let extendedHistory,envelopes = eventDefinitions |> List.fold (appendToHistory clock) (history, List.empty)
 
                 let position, version =
                     extendedHistory.items |> List.head |> (fun (p, v, _) -> p, v)
@@ -97,11 +109,11 @@ let private singleWriterPipeline (initialEvents: EventEnvelope list) (inbox: Age
                 reply.Reply(version)
 
                 let byIdentifier =
-                    events
+                    envelopes
                     |> List.groupBy (fun e -> StreamIdentifier.from e.Metadata.Source e.StreamKind)
                     |> Map.ofList
 
-                let byKind = events |> List.groupBy (fun e -> e.StreamKind) |> Map.ofList
+                let byKind = envelopes |> List.groupBy (fun e -> e.StreamKind) |> Map.ofList
 
                 let subscriptionsToNotifyWithEvents,remainingSubscriptions =
                     subscriptions
@@ -109,7 +121,7 @@ let private singleWriterPipeline (initialEvents: EventEnvelope list) (inbox: Age
                         match definition with
                         | FromStream(streamIdentifier, _) when byIdentifier |> Map.containsKey streamIdentifier ->
                             toNotify @ [ (s, byIdentifier |> Map.find streamIdentifier)],other
-                        | FromAll _ -> toNotify @ [ s, events],other
+                        | FromAll _ -> toNotify @ [ s, envelopes],other
                         | FromKind(streamKind, _) when byKind |> Map.containsKey streamKind ->
                             toNotify @ [ s, byKind |> Map.find streamKind],other
                         | _ ->
@@ -158,12 +170,12 @@ let private singleWriterPipeline (initialEvents: EventEnvelope list) (inbox: Age
                 return! loop state
         }
 
-    let initialHistory = initialEvents |> List.fold appendToHistory History.Empty
+    let initialHistory,_ = initialEvents |> List.fold (appendToHistory clock) (History.Empty,[])
 
     loop ([], initialHistory)
 
-let initialize (initialEvents: EventEnvelope list) =
-    let agent = Agent<Msg>.Start (singleWriterPipeline initialEvents)
+let initialize clock (initialEvents: EventDefinition list) =
+    let agent = Agent<Msg>.Start (singleWriterPipeline clock initialEvents)
 
     { new EventStorage with
         member _.Stream version identifier =
@@ -215,4 +227,4 @@ let initialize (initialEvents: EventEnvelope list) =
                             ValueTask.CompletedTask }
             } }
 
-let empty () = initialize []
+let empty clock = initialize clock [ ]

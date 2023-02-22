@@ -82,20 +82,13 @@ module Prepare =
         fun (services: IServiceCollection) ->
             services.AddSingleton<EventStore>(fun p ->
                 let clock = p.GetRequiredService<Clock>()
-                EventStore.With (givens |> InMemoryStorage.initialize) clock
+                EventStore.With (givens |> InMemoryStorage.initialize clock)
             )
             |> ignore
 
-    let private buildEvents environment events =
-        events |> List.map (fun e -> e environment)
-
     let buildServerWithEvents events = events |> registerEvents
 
-    let withGiven environment eventBuilders =
-        let givenEvents =
-            eventBuilders
-            |> buildEvents environment
-            
+    let withGiven environment (givenEvents: EventDefinition list) =           
         let testConfiguration =
            buildServerWithEvents givenEvents
         let testHost =
@@ -156,12 +149,7 @@ module Utils =
     open Xunit
 
     let asEvent id event =
-        fun (environment: ISimulateEnvironment) ->
-            { Event = event
-              Metadata =
-                  { Source = id
-                    RecordedAt = environment.Time() } }
-            |> EventEnvelope.box
+        EventDefinition.from id event
 
     let singleEvent<'e> (eventStore: EventStore) : Async<EventEnvelope<'e>> = async {
         let! _,events = eventStore.AllStreams<'e>()
