@@ -231,7 +231,9 @@ type Storage(persistence: IPersistence, clock: Clock, logger: INStoreLoggerFacto
             let stream = getOrCreateStream identifier
 
             let doAppend () =
-                stream.AppendAsync(envelopes) |> Task.map Version.ofChunk |> Task.map Ok
+                stream.AppendAsync(envelopes)
+                |> Task.map (fun chunk -> Version.ofChunk chunk, Position.ofChunk chunk)
+                |> Task.map Ok
 
             try
                 try

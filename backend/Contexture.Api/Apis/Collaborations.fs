@@ -23,7 +23,7 @@ module Collaborations =
                     let clock = ctx.GetService<Clock>()
                     let eventBasedCommandHandler = CommandHandler.EventBased.eventStoreBasedCommandHandler clock database
                     match! command |> Collaboration.useHandler eventBasedCommandHandler with
-                    | Ok (collaborationId,version) ->
+                    | Ok (collaborationId,version,_) ->
                         return! redirectTo false (sprintf "/api/collaborations/%O" collaborationId) next ctx
                     | Error (DomainError error) ->
                         return! RequestErrors.BAD_REQUEST (sprintf "Domain Error %A" error) next ctx
@@ -45,7 +45,7 @@ module Collaborations =
                     let database = ctx.GetService<EventStore>()
                     let clock = ctx.GetService<Clock>()
                     match! Collaboration.useHandler (EventBased.eventStoreBasedCommandHandler clock database) (RemoveConnection collaborationId) with
-                    | Ok (collaborationId,version) -> return! json collaborationId next ctx
+                    | Ok (collaborationId,version,_) -> return! json collaborationId next ctx
                     | Error e -> return! ServerErrors.INTERNAL_ERROR e next ctx
                 }
                 

@@ -55,7 +55,7 @@ type EventStorage =
     abstract member AllStreamsOf: StreamKind -> Async<EventResult>
 
     abstract member Append:
-        StreamIdentifier -> ExpectedVersion -> EventDefinition list -> Async<Result<Version, AppendError>>
+        StreamIdentifier -> ExpectedVersion -> EventDefinition list -> Async<Result<Version * Position, AppendError>>
 
     abstract member All: unit -> Async<EventResult>
     abstract member Subscribe: SubscriptionDefinition -> SubscriptionHandler -> Async<Subscription>

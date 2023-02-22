@@ -53,16 +53,16 @@ module Domain =
     open Domain
     open BridgeEventSourcingWithFilebasedDatabase
 
-    let asEvents clock (domain: Serialization.Domain) =
-        EventDefinition.from
-            domain.Id
-            (DomainImported
+    let asEvents (domain: Serialization.Domain) =
+        (
+            domain.Id,
+            DomainImported
                 { DomainId = domain.Id
                   Name = domain.Name
                   ParentDomainId = domain.ParentDomainId
                   Vision = domain.Vision
                   ShortName = domain.ShortName }
-            )
+        )
         |> List.singleton
 
     let mapDomainToSerialization (state: Serialization.Domain option) event : Serialization.Domain option =
@@ -108,10 +108,10 @@ module BoundedContext =
     open BridgeEventSourcingWithFilebasedDatabase
     open BoundedContext
 
-    let asEvents clock (collaboration: Serialization.BoundedContext) =
-        EventDefinition.from
-            collaboration.Id
-            (BoundedContextImported
+    let asEvents (collaboration: Serialization.BoundedContext) =
+        (
+            collaboration.Id,
+            BoundedContextImported
                 { BoundedContextId = collaboration.Id
                   DomainId = collaboration.DomainId
                   Description = collaboration.Description
@@ -122,7 +122,7 @@ module BoundedContext =
                   BusinessDecisions = collaboration.BusinessDecisions
                   ShortName = collaboration.ShortName
                   Name = collaboration.Name }
-            )
+        )
         |> List.singleton
 
 
@@ -176,15 +176,16 @@ module BoundedContext =
 module Collaboration =
     open BridgeEventSourcingWithFilebasedDatabase
 
-    let asEvents clock (collaboration: Serialization.Collaboration) =
-        EventDefinition.from
-            collaboration.Id
-            (Collaboration.CollaborationImported
+    let asEvents (collaboration: Serialization.Collaboration) =
+        (
+            collaboration.Id,
+            Collaboration.CollaborationImported
                 { CollaborationId = collaboration.Id
                   Description = collaboration.Description
                   RelationshipType = collaboration.RelationshipType
                   Initiator = collaboration.Initiator
-                  Recipient = collaboration.Recipient })
+                  Recipient = collaboration.Recipient }
+        )
         |> List.singleton
 
     let mapToSerialization (state: Serialization.Collaboration option) event : Serialization.Collaboration option =
@@ -229,12 +230,12 @@ module Namespace =
     open BridgeEventSourcingWithFilebasedDatabase
     open Namespace
 
-    let asEvents clock (boundedContext: Serialization.BoundedContext) =
+    let asEvents (boundedContext: Serialization.BoundedContext) =
         boundedContext.Namespaces
         |> List.map (fun n ->
-            EventDefinition.from
-                boundedContext.Id
-                (NamespaceImported
+            (
+                boundedContext.Id,
+                NamespaceImported
                     { NamespaceId = n.Id
                       BoundedContextId = boundedContext.Id
                       NamespaceTemplateId = n.Template
@@ -267,10 +268,10 @@ module NamespaceTemplate =
     open BridgeEventSourcingWithFilebasedDatabase
     open NamespaceTemplate
 
-    let asEvents clock (template: NamespaceTemplate) =
-        EventDefinition.from
-            template.Id
-            (NamespaceTemplateImported
+    let asEvents (template: NamespaceTemplate) =
+        (
+            template.Id,
+            NamespaceTemplateImported
                 { NamespaceTemplateId = template.Id
                   Name = template.Name
                   Description = Option.ofObj template.Description

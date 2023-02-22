@@ -63,7 +63,7 @@ module BoundedContexts =
                     let clock = ctx.GetService<Clock>()
                     let eventStoreBased = EventBased.eventStoreBasedCommandHandler clock database
                     match! BoundedContext.useHandler eventStoreBased command with
-                    | Ok (updatedContext,version) ->
+                    | Ok (updatedContext,version,_) ->
                         return! redirectTo false (sprintf "/api/boundedcontexts/%O" updatedContext) next ctx
                     | Error (DomainError EmptyName) ->
                         return! RequestErrors.BAD_REQUEST "Name must not be empty" next ctx
@@ -104,7 +104,7 @@ module BoundedContexts =
                     let clock = ctx.GetService<Clock>()
                     let eventStoreBased = EventBased.eventStoreBasedCommandHandler clock database
                     match! BoundedContext.useHandler eventStoreBased (RemoveBoundedContext contextId) with
-                    | Ok (id,version) -> return! json id next ctx
+                    | Ok (id,version,_) -> return! json id next ctx
                     | Error e -> return! ServerErrors.INTERNAL_ERROR e next ctx
                 }
 

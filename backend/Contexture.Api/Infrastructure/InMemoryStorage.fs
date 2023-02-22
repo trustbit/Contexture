@@ -14,7 +14,7 @@ type Msg =
     | Get of StreamKind * AsyncReplyChannel<EventResult>
     | GetStream of StreamIdentifier * AsyncReplyChannel<StreamResult>
     | GetAll of AsyncReplyChannel<EventResult>
-    | Append of EventDefinition list * AsyncReplyChannel<Version>
+    | Append of EventDefinition list * AsyncReplyChannel<Version * Position>
     | Notify of Position * EventEnvelope list * (Position -> EventEnvelope list -> Async<unit>)
     | Subscribe of SubscriptionDefinition * (Position -> EventEnvelope list -> Async<unit>) * AsyncReplyChannel<unit>
 
@@ -106,7 +106,7 @@ let private singleWriterPipeline clock (initialEvents: EventDefinition list) (in
                 let position, version =
                     extendedHistory.items |> List.head |> (fun (p, v, _) -> p, v)
 
-                reply.Reply(version)
+                reply.Reply(version,position)
 
                 let byIdentifier =
                     envelopes

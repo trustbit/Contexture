@@ -102,4 +102,4 @@ type ExpectedVersion =
 
 type EventStream<'Event> =
     abstract Read: Version -> Async<StreamResult<'Event>>
-    abstract Append: ExpectedVersion -> EventDefinition<'Event> list -> Async<Result<Version, AppendError>>
+    abstract Append: ExpectedVersion -> EventDefinition<'Event> list -> Async<Result<Version * Position, AppendError>>

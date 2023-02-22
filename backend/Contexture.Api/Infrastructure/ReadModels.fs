@@ -20,10 +20,13 @@ module ReadModelInitialization =
 type ReadModel<'Event, 'State> =
     abstract member EventHandler: EventEnvelope<'Event> list -> Async<unit>
     abstract member State: unit -> Task<'State>
+    abstract member State: Position -> Task<'State>
 
 type Msg<'Event, 'Result> =
+    private
     | Notify of EventEnvelope<'Event> list * AsyncReplyChannel<unit>
     | State of AsyncReplyChannel<'Result>
+    | StateAfter of Position * AsyncReplyChannel<'Result>
 
 let readModel
     (updateState: 'State -> EventEnvelope<'Event> list -> 'State)
@@ -31,21 +34,33 @@ let readModel
     : ReadModel<'Event, 'State> =
     let agent =
         let eventSubscriber (inbox: Agent<Msg<_, _>>) =
-            let rec loop state =
+            let rec loop (processedPosition,state) =
                 async {
                     let! msg = inbox.Receive()
 
                     match msg with
                     | Notify(eventEnvelopes, reply) ->
                         reply.Reply()
-                        return! loop (eventEnvelopes |> updateState state)
+                        
+                        let highestPosition =
+                            eventEnvelopes
+                            |> List.map(fun e -> e.Metadata.Position)
+                            |> List.maxOr processedPosition
+                        return! loop (highestPosition, eventEnvelopes |> updateState state)
 
                     | State reply ->
                         reply.Reply state
-                        return! loop state
+                        return! loop (processedPosition,state)
+                    | StateAfter(position, reply) ->
+                        if position > processedPosition then
+                            inbox.Post(StateAfter(position,reply))
+                        else
+                            reply.Reply state
+                        return! loop (processedPosition,state)
+                        
                 }
 
-            loop initState
+            loop (Position.start,initState)
 
         Agent<Msg<_, _>>.Start (eventSubscriber)
 
@@ -54,4 +69,8 @@ let readModel
             agent.PostAndAsyncReply(fun reply -> Notify(eventEnvelopes, reply))
 
         member _.State() =
-            agent.PostAndAsyncReply State |> Async.StartAsTask }
+            agent.PostAndAsyncReply State |> Async.StartAsTask
+        
+        member _.State position =
+            agent.PostAndAsyncReply (fun reply -> StateAfter(position,reply)) |> Async.StartAsTask
+    }

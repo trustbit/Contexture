@@ -32,3 +32,10 @@ module Async =
 type Agent<'T> = MailboxProcessor<'T>
 
 type Clock = unit -> System.DateTimeOffset
+
+module List =
+    let maxOr defaultValue items =
+        if List.isEmpty items then
+            defaultValue
+        else
+            List.max items

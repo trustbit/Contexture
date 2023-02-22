@@ -28,8 +28,8 @@ module Namespaces =
                     let clock = ctx.GetService<Clock>()
                     let eventBasedHandler = EventBased.eventStoreBasedCommandHandler clock database
                     match! Namespace.useHandler eventBasedHandler command with
-                    | Ok (updatedContext,version) ->
-                        let! namespaceState = ctx.GetService<ReadModels.Namespace.AllNamespacesReadModel>().State()
+                    | Ok (updatedContext,version,position) ->
+                        let! namespaceState = ctx.GetService<ReadModels.Namespace.AllNamespacesReadModel>().State(position)
                         // for namespaces we don't use redirects ATM
                         let boundedContext =
                             updatedContext

@@ -301,10 +301,10 @@ let waitUntilCaughtUp (subscriptions: Subscription List) =
     
     
 let importFromDocument clock (store: EventStore) (database: FileBased.Database.Document) = async {
-    let append (items: EventDefinition list) =
+    let append items =
         items
-        |> List.groupBy (fun i -> i.Source)
-        |> List.map (fun (key, grouping) -> store.Append key Unknown (grouping |> List.map (fun g -> g.Event)) )
+        |> List.groupBy (fun (source,_) -> source)
+        |> List.map (fun (source, grouping) -> store.Append source Unknown (grouping |> List.map (fun (_,event) -> event)) )
         |> Async.Sequential
         |> Async.Ignore
     let runAsync (items: Async<Unit> list) =
@@ -314,31 +314,31 @@ let importFromDocument clock (store: EventStore) (database: FileBased.Database.D
 
     do!
         database.Collaborations.All
-        |> List.map (FileBased.Convert.Collaboration.asEvents clock)
+        |> List.map FileBased.Convert.Collaboration.asEvents
         |> List.map append 
         |> runAsync
     
     do!
         database.Domains.All
-        |> List.map (FileBased.Convert.Domain.asEvents clock)
+        |> List.map FileBased.Convert.Domain.asEvents
         |> List.map append
         |> runAsync
     
     do!
         database.BoundedContexts.All
-        |> List.map (FileBased.Convert.BoundedContext.asEvents clock)
+        |> List.map FileBased.Convert.BoundedContext.asEvents
         |> List.map append
         |> runAsync
     
     do!
         database.BoundedContexts.All
-        |> List.map (FileBased.Convert.Namespace.asEvents clock)
+        |> List.map FileBased.Convert.Namespace.asEvents
         |> List.map append
         |> runAsync
 
     do!
         database.NamespaceTemplates.All
-        |> List.map (FileBased.Convert.NamespaceTemplate.asEvents clock)
+        |> List.map FileBased.Convert.NamespaceTemplate.asEvents
         |> List.map append
         |> runAsync
     }
