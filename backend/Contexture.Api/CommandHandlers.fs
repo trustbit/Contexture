@@ -11,8 +11,8 @@ module CommandHandler =
         | Exception of exn
         | EntityNotFound of 'Id
 
-    type HandleIdentityAndCommand<'Identity,'Command,'Error> = 'Identity -> 'Command -> Async<Result<'Identity,CommandHandlerError<'Error,'Identity>>>
-    type HandleCommand<'Identity,'Command,'Error> = 'Command -> Async<Result<'Identity,CommandHandlerError<'Error,'Identity>>>
+    type HandleIdentityAndCommand<'Identity,'Command,'Error> = 'Identity -> 'Command -> Async<Result<'Identity * Version,CommandHandlerError<'Error,'Identity>>>
+    type HandleCommand<'Identity,'Command,'Error> = 'Command -> Async<Result<'Identity * Version,CommandHandlerError<'Error,'Identity>>>
     
     let getIdentityFromCommand identifyCommand (handler: HandleIdentityAndCommand<_,_,_>) : HandleCommand<_,_,_> =
         fun command -> async {
@@ -41,8 +41,8 @@ module CommandHandler =
                 
             match aggregate.Decider command state with
             | Ok newEvents ->
-                do! saveStream identity version newEvents
-                return Ok identity
+                let! version = saveStream identity version newEvents
+                return Ok (identity,version)
             | Error e ->
                 return e |> DomainError |> Error
         }
@@ -73,7 +73,7 @@ module CommandHandler =
                                     RecordedAt = clock () } })
                         
                     match! eventStore.Append name (AtVersion version) newEvents with
-                    | Ok _ -> return ()
+                    | Ok appendedVersion -> return appendedVersion
                     | Error e -> return failwithf "Failed to save events for %O with:\n%O" name e
                 }
                 

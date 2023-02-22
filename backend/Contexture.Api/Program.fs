@@ -294,7 +294,7 @@ let waitUntilCaughtUp (subscriptions: Subscription List) =
             let calculatedStatus = getCurrentStatus()
             lastStatus <- calculatedStatus
             counter <- counter + 1
-            if counter > 10 then
+            if counter > 100 then
                 failwithf "No result after %i iterations. Last Status %A" counter lastStatus
     }
     

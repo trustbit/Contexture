@@ -91,7 +91,7 @@ module Domains =
                     let clock = ctx.GetService<Clock>()
                     let eventStoreBased = EventBased.eventStoreBasedCommandHandler clock database
                     match! Domain.useHandler eventStoreBased (RemoveDomain domainId) with
-                    | Ok domainId -> return! json domainId next ctx
+                    | Ok (domainId,version) -> return! json domainId next ctx
                     | Error e -> return! ServerErrors.INTERNAL_ERROR e next ctx
                 }
 
@@ -102,7 +102,7 @@ module Domains =
                     let clock = ctx.GetService<Clock>()
                     let eventStoreBased = EventBased.eventStoreBasedCommandHandler clock database
                     match! Domain.useHandler eventStoreBased command with
-                    | Ok updatedDomain -> return! redirectTo false (sprintf "/api/domains/%O" updatedDomain) next ctx
+                    | Ok (updatedDomain,version) -> return! redirectTo false (sprintf "/api/domains/%O" updatedDomain) next ctx
                     | Error (DomainError EmptyName) ->
                         return! RequestErrors.BAD_REQUEST "Name must not be empty" next ctx
                     | Error e -> return! ServerErrors.INTERNAL_ERROR e next ctx
@@ -133,7 +133,7 @@ module Domains =
                     let clock = ctx.GetService<Clock>()
                     let eventStoreBased = EventBased.eventStoreBasedCommandHandler clock database
                     match! BoundedContext.useHandler eventStoreBased (CreateBoundedContext(Guid.NewGuid(), domainId, command)) with
-                    | Ok addedContext ->
+                    | Ok (addedContext,version) ->
                         return! redirectTo false (sprintf "/api/boundedcontexts/%O" addedContext) next ctx
                     | Error (DomainError Aggregates.BoundedContext.EmptyName) ->
                         return! RequestErrors.BAD_REQUEST "Name must not be empty" next ctx
