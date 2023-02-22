@@ -293,3 +293,46 @@ module NamespaceTemplate =
                 |> Result.map (fun c -> { document with NamespaceTemplates = c })
                 |> Result.mapError (fun e -> $"%O{e}"))
             |> waitForDbChange logger
+
+let importFromDocument (store: EventStore) (database: Document) = async {
+    let append items =
+        items
+        |> List.groupBy (fun (source,_) -> source)
+        |> List.map (fun (source, grouping) -> store.Append source Unknown (grouping |> List.map (fun (_,event) -> event)) )
+        |> Async.Sequential
+        |> Async.Ignore
+    let runAsync (items: Async<Unit> list) =
+        items
+        |> Async.Sequential
+        |> Async.Ignore
+
+    do!
+        database.Collaborations.All
+        |> List.map Collaboration.asEvents
+        |> List.map append 
+        |> runAsync
+    
+    do!
+        database.Domains.All
+        |> List.map Domain.asEvents
+        |> List.map append
+        |> runAsync
+    
+    do!
+        database.BoundedContexts.All
+        |> List.map BoundedContext.asEvents
+        |> List.map append
+        |> runAsync
+    
+    do!
+        database.BoundedContexts.All
+        |> List.map Namespace.asEvents
+        |> List.map append
+        |> runAsync
+
+    do!
+        database.NamespaceTemplates.All
+        |> List.map NamespaceTemplate.asEvents
+        |> List.map append
+        |> runAsync
+    }

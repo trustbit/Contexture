@@ -300,48 +300,7 @@ let waitUntilCaughtUp (subscriptions: Subscription List) =
     }
     
     
-let importFromDocument clock (store: EventStore) (database: FileBased.Database.Document) = async {
-    let append items =
-        items
-        |> List.groupBy (fun (source,_) -> source)
-        |> List.map (fun (source, grouping) -> store.Append source Unknown (grouping |> List.map (fun (_,event) -> event)) )
-        |> Async.Sequential
-        |> Async.Ignore
-    let runAsync (items: Async<Unit> list) =
-        items
-        |> Async.Sequential
-        |> Async.Ignore
 
-    do!
-        database.Collaborations.All
-        |> List.map FileBased.Convert.Collaboration.asEvents
-        |> List.map append 
-        |> runAsync
-    
-    do!
-        database.Domains.All
-        |> List.map FileBased.Convert.Domain.asEvents
-        |> List.map append
-        |> runAsync
-    
-    do!
-        database.BoundedContexts.All
-        |> List.map FileBased.Convert.BoundedContext.asEvents
-        |> List.map append
-        |> runAsync
-    
-    do!
-        database.BoundedContexts.All
-        |> List.map FileBased.Convert.Namespace.asEvents
-        |> List.map append
-        |> runAsync
-
-    do!
-        database.NamespaceTemplates.All
-        |> List.map FileBased.Convert.NamespaceTemplate.asEvents
-        |> List.map append
-        |> runAsync
-    }
 let runAsync (host: IHost) =
     task {
         // make sure the database is loaded
@@ -361,7 +320,7 @@ let runAsync (host: IHost) =
         do! waitUntilCaughtUp readModelSubscriptions
 
         let! document = database.Read()
-        do! importFromDocument clock store document
+        do! FileBased.Convert.importFromDocument store document
         
         let loggerFactory = host.Services.GetRequiredService<ILoggerFactory>()
         let subscriptionLogger = loggerFactory.CreateLogger("subscriptions")
