@@ -6,6 +6,7 @@ open System.Reflection
 open System.Threading
 open System.Threading.Tasks
 open FsToolkit.ErrorHandling
+open Microsoft.Extensions.Logging
 open NStore.Core.Logging
 open NStore.Persistence.MsSql
 open NStore.Core.Streams
@@ -405,3 +406,19 @@ type Storage(persistence: IPersistence, clock: Clock, logger: INStoreLoggerFacto
 
         member this.Subscribe definition subscription =
             Async.AwaitTask(subscribe definition subscription)
+
+type private MicrosoftLoggingLogger(logger:ILogger) =
+    interface INStoreLogger with
+        member this.BeginScope(state) = logger.BeginScope state
+        member this.LogDebug(message, args) = logger.LogDebug(message,args)
+        member this.LogError(message, args) = logger.LogError(message,args)
+        member this.LogInformation(message, args) = logger.LogInformation(message,args)
+        member this.LogWarning(message, args) = logger.LogWarning(message,args)
+        member this.IsDebugEnabled = logger.IsEnabled(LogLevel.Debug)
+        member this.IsInformationEnabled = logger.IsEnabled(LogLevel.Information)
+        member this.IsWarningEnabled = logger.IsEnabled(LogLevel.Warning)
+    
+type MicrosoftLoggingLoggerFactory(loggerFactory: ILoggerFactory) =
+    interface INStoreLoggerFactory with
+        member this.CreateLogger(categoryName) = MicrosoftLoggingLogger(loggerFactory.CreateLogger(categoryName))
+    

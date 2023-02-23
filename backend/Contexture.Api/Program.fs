@@ -2,6 +2,7 @@ module Contexture.Api.App
 
 open System
 open System.IO
+open System.Threading
 open System.Threading.Tasks
 open Contexture.Api.Aggregates
 open Contexture.Api.FileBased.Database
@@ -22,24 +23,100 @@ open FSharp.Control.Tasks
 
 [<CLIMutable>]
 type ContextureOptions = 
-    { DatabasePath: string 
+    { ConnectionString: string
+      DatabasePath: string 
       GitHash: string
     }
 
+type ContextureConfiguration =
+    { GitHash: string
+      Engine : ContextureStorageEngine }
+and ContextureStorageEngine =
+    | FileBased of path: string
+    | SqlServerBased of connectionString:string
+
 module AllRoute =
+    open ReadModels
 
     let getAllData =
         fun (next: HttpFunc) (ctx: HttpContext) -> task {
-            let database = ctx.GetService<SingleFileBasedDatastore>()
-            let! document = database.Read()
-
-            let result =
-                {| BoundedContexts = document.BoundedContexts.All
-                   Domains = document.Domains.All
-                   Collaborations = document.Collaborations.All
-                   NamespaceTemplates = document.NamespaceTemplates.All |}
-
-            return! json result next ctx
+            let config = ctx.GetService<ContextureConfiguration>()
+            let! result =
+                match config.Engine with
+                | FileBased _ -> task {
+                    let database = ctx.GetService<SingleFileBasedDatastore>()
+                    let! document = database.Read()
+                    return document
+                    }
+                | SqlServerBased _ -> task {
+                    let! domainState = ctx.GetService<ReadModels.Domain.AllDomainReadModel>().State()
+                    let! boundedContextState = ctx.GetService<ReadModels.BoundedContext.AllBoundedContextsReadModel>().State()
+                    let! namespaceState = ctx.GetService<ReadModels.Namespace.AllNamespacesReadModel>().State()
+                    let! collaborationState = ctx.GetService<ReadModels.Collaboration.AllCollaborationsReadModel>().State()
+                    let! namespaceTemplatesState = ctx.GetService<ReadModels.Templates.AllTemplatesReadModel>().State()
+                    let domains = domainState |> Domain.allDomains
+                    let boundedContexts = boundedContextState |> BoundedContext.allBoundedContexts
+                    let namespacesOf = namespaceState |> Namespace.namespacesOf
+                    let collaborations = collaborationState |> Collaboration.activeCollaborations
+                    let templates = namespaceTemplatesState |> Templates.allTemplates
+                    let document : Document =
+                        { BoundedContexts =
+                            collectionOfGuid (
+                                boundedContexts
+                                |> List.map (fun b ->
+                                    {
+                                        Serialization.BoundedContext.Id = b.Id
+                                        Serialization.BoundedContext.DomainId = b.DomainId
+                                        Serialization.BoundedContext.ShortName= b.ShortName
+                                        Serialization.BoundedContext.Name = b.Name
+                                        Serialization.BoundedContext.Description = b.Description
+                                        Serialization.BoundedContext.Classification = b.Classification
+                                        Serialization.BoundedContext.BusinessDecisions = b.BusinessDecisions
+                                        Serialization.BoundedContext.Messages = b.Messages
+                                        Serialization.BoundedContext.DomainRoles= b.DomainRoles
+                                        Serialization.BoundedContext.UbiquitousLanguage= b.UbiquitousLanguage
+                                        Serialization.BoundedContext.Namespaces= namespacesOf b.Id
+                                    })
+                                )
+                                (fun b -> b.Id)
+                            
+                          Domains =
+                              collectionOfGuid (
+                                  domains
+                                  |> List.map (fun d ->
+                                      {
+                                        Serialization.Domain.Id = d.Id
+                                        Serialization.Domain.Name = d.Name
+                                        Serialization.Domain.Vision = d.Vision
+                                        Serialization.Domain.ShortName = d.ShortName
+                                        Serialization.Domain.ParentDomainId = d.ParentDomainId
+                                      })
+                                  )
+                                (fun d -> d.Id)
+                          Collaborations =
+                              collectionOfGuid (
+                                  collaborations
+                                  |> List.map (fun c ->
+                                      {
+                                          Serialization.Collaboration.Id = c.Id
+                                          Serialization.Collaboration.Description = c.Description
+                                          Serialization.Collaboration.Initiator = c.Initiator
+                                          Serialization.Collaboration.Recipient = c.Recipient
+                                          Serialization.Collaboration.RelationshipType = c.RelationshipType
+                                      }))
+                                  (fun c -> c.Id)
+                          NamespaceTemplates = collectionOfGuid templates (fun t -> t.Id)
+                        }
+                    return document
+                    }
+                
+            let returnValue =
+                    {| BoundedContexts = result.BoundedContexts.All
+                       Domains = result.Domains.All
+                       Collaborations = result.Collaborations.All
+                       NamespaceTemplates = result.NamespaceTemplates.All |}
+                       
+            return! json returnValue next ctx
         }
 
     [<CLIMutable>]
@@ -52,9 +129,7 @@ module AllRoute =
     let putReplaceAllData =
         fun (next: HttpFunc) (ctx: HttpContext) ->
             task {
-                let database =
-                    ctx.GetService<SingleFileBasedDatastore>()
-
+                let config = ctx.GetService<ContextureConfiguration>()
                 let logger = ctx.GetLogger()
                 let notEmpty items = not (List.isEmpty items)
                 let! data = ctx.BindJsonAsync<UpdateAllData>()
@@ -75,21 +150,31 @@ module AllRoute =
                         data.NamespaceTemplates.Length
                     )
 
-                    let! oldDocument = database.Read()
-
+                    let newDocument : Document =
+                        { Domains = collectionOfGuid data.Domains (fun d -> d.Id)
+                          BoundedContexts = collectionOfGuid data.BoundedContexts (fun d -> d.Id)
+                          Collaborations = collectionOfGuid data.Collaborations (fun d -> d.Id)
+                          NamespaceTemplates = collectionOfGuid data.NamespaceTemplates (fun d -> d.Id) }
                     let! result =
-                        database.Change
-                            (fun _ ->
-                                let newDocument : Document =
-                                    { Domains = collectionOfGuid data.Domains (fun d -> d.Id)
-                                      BoundedContexts = collectionOfGuid data.BoundedContexts (fun d -> d.Id)
-                                      Collaborations = collectionOfGuid data.Collaborations (fun d -> d.Id)
-                                      NamespaceTemplates = collectionOfGuid data.NamespaceTemplates (fun d -> d.Id) }
+                        match config.Engine with
+                        | FileBased _ -> task {
+                            let database = ctx.GetService<SingleFileBasedDatastore>()
+                            let! oldDocument = database.Read()
 
-                                Ok newDocument)
-
+                            let! result = database.Change (fun _ -> Ok newDocument)
+                            return result |> Result.map (fun _ -> Some oldDocument)
+                            }
+                        | SqlServerBased _ -> task {
+                            let store = ctx.GetService<EventStore>()
+                            let persistence = ctx.GetService<NStore.Persistence.MsSql.MsSqlPersistence>()
+                            do! persistence.DestroyAllAsync(ctx.RequestAborted)
+                            do! persistence.InitAsync(ctx.RequestAborted)
+                            do! FileBased.Convert.importFromDocument store newDocument
+                            return Ok None
+                        }
+                            
                     match result with
-                    | Ok _ ->
+                    | Ok oldDocument ->
                         let lifetime =
                             ctx.GetService<IHostApplicationLifetime>()
 
@@ -224,29 +309,75 @@ let configureReadModels (services: IServiceCollection) =
     |> registerReadModel (ReadModels.Find.Namespaces.readModel())
     |> ignore
 
+let buildContextureConfiguration (options:ContextureOptions) =
+    if not (String.IsNullOrEmpty options.ConnectionString) then
+        { GitHash = options.GitHash
+          Engine = SqlServerBased options.ConnectionString
+        }
+    else if not (String.IsNullOrEmpty options.DatabasePath) then
+        { GitHash = options.GitHash
+          Engine = FileBased options.DatabasePath
+        }
+    else
+        failwith "Unable to initialize Contexture configuration"
+
 let configureServices (context: HostBuilderContext) (services : IServiceCollection) =
     services
         .AddOptions<ContextureOptions>()
         .Bind(context.Configuration)
-        .Validate((fun options -> not (String.IsNullOrEmpty options.DatabasePath)), "A non-empty DatabasePath configuration is required")
-        |> ignore
-    services.AddSingleton<SingleFileBasedDatastore>(fun services ->
-        let options = services.GetRequiredService<IOptions<ContextureOptions>>()
-        // TODO: danger zone - loading should not be done as part of the initialization
-        AgentBased.initializeDatabase(options.Value.DatabasePath)
-        |> Async.AwaitTask
-        |> Async.RunSynchronously
-        )
-        
+        .Validate((fun options -> not (String.IsNullOrEmpty options.DatabasePath) || not(String.IsNullOrEmpty options.ConnectionString)), "A non-empty Database configuration is required: Configure either a file based DatabasePath or a SQL based ConnectionString")
         |> ignore
     
-    services.AddSingleton<Clock>(utcNowClock) |> ignore
-    services.AddSingleton<EventStore> (fun (p:IServiceProvider) ->
-        let clock = p.GetRequiredService<Clock>()
-        let storage = Storage.InMemoryStorage.empty clock
-        
-        EventStore.With storage
+    services.AddSingleton<ContextureConfiguration>(fun p ->
+        let options = p.GetRequiredService<IOptions<ContextureOptions>>().Value
+        buildContextureConfiguration options
     ) |> ignore 
+
+    let configuration = context.Configuration.Get<ContextureOptions>() |> buildContextureConfiguration
+    
+    match configuration.Engine with
+    | FileBased path ->
+        services
+            .AddSingleton<SingleFileBasedDatastore>(fun services ->
+                let options = services.GetRequiredService<IOptions<ContextureOptions>>()
+                // TODO: danger zone - loading should not be done as part of the initialization
+                AgentBased.initializeDatabase(path)
+                |> Async.AwaitTask
+                |> Async.RunSynchronously
+                )
+            .AddSingleton<EventStore> (fun (p:IServiceProvider) ->
+                let clock = p.GetRequiredService<Clock>()
+                let storage = Storage.InMemoryStorage.empty clock
+                
+                EventStore.With storage
+            )
+        |> ignore
+    | SqlServerBased connectionString ->
+        services
+            .AddSingleton<NStore.Core.Logging.INStoreLoggerFactory,NStoreBased.MicrosoftLoggingLoggerFactory>()
+            .AddSingleton<NStore.Persistence.MsSql.MsSqlPersistence>(fun p ->
+                let logger = p.GetRequiredService<NStore.Core.Logging.INStoreLoggerFactory>()
+                let config =
+                    NStore.Persistence.MsSql.MsSqlPersistenceOptions(
+                        logger,
+                        ConnectionString = connectionString,
+                        Serializer = NStoreBased.JsonMsSqlSerializer.Default
+                    )
+
+                NStore.Persistence.MsSql.MsSqlPersistence(config)
+                )
+            .AddSingleton<EventStore> (fun (p:IServiceProvider) ->
+                let clock = p.GetRequiredService<Clock>()
+                let logger = NStoreBased.MicrosoftLoggingLoggerFactory(p.GetRequiredService<ILoggerFactory>())
+                let persistence = p.GetRequiredService<NStore.Persistence.MsSql.MsSqlPersistence>()
+                let storage = NStoreBased.Storage(persistence,clock, logger)
+                EventStore.With storage
+            )
+            |> ignore
+        
+    
+    services.AddSingleton<Clock>(utcNowClock) |> ignore
+     
     services |> configureReadModels
     
     services.AddCors() |> ignore
@@ -299,44 +430,53 @@ let waitUntilCaughtUp (subscriptions: Subscription List) =
                 failwithf "No result after %i iterations. Last Status %A" counter lastStatus
     }
     
-    
-
 let runAsync (host: IHost) =
     task {
-        // make sure the database is loaded
-        let database =
-            host.Services.GetRequiredService<FileBased.Database.SingleFileBasedDatastore>()
-
-        let store =
-            host.Services.GetRequiredService<EventStore>()
-            
-        let clock = host.Services.GetRequiredService<Clock>()
-
-        // connect and replay before we start import the document
-        let readModels =
-            host.Services.GetServices<ReadModels.ReadModelInitialization>()
-
-        let! readModelSubscriptions = connectAndReplayReadModels readModels
-        do! waitUntilCaughtUp readModelSubscriptions
-
-        let! document = database.Read()
-        do! FileBased.Convert.importFromDocument store document
+        let config = host.Services.GetRequiredService<ContextureConfiguration>()
         
-        let loggerFactory = host.Services.GetRequiredService<ILoggerFactory>()
-        let subscriptionLogger = loggerFactory.CreateLogger("subscriptions")
+        match config.Engine with
+        | FileBased _ ->
+            // make sure the database is loaded
+            let database =
+                host.Services.GetRequiredService<FileBased.Database.SingleFileBasedDatastore>()
+                
+            // connect and replay before we start import the document
+            let readModels =
+                host.Services.GetServices<ReadModels.ReadModelInitialization>()
 
-        // subscriptions for syncing back to the filebased-db are added after initial seeding/loading
-        let! fileSyncSubscriptions  =
-            Async.Parallel [
-                store.Subscribe End (FileBased.Convert.Collaboration.subscription subscriptionLogger database)
-                store.Subscribe End (FileBased.Convert.Domain.subscription subscriptionLogger database)
-                store.Subscribe End (FileBased.Convert.BoundedContext.subscription subscriptionLogger database)
-                store.Subscribe End (FileBased.Convert.Namespace.subscription subscriptionLogger database)
-                store.Subscribe End (FileBased.Convert.NamespaceTemplate.subscription subscriptionLogger database)
-            ]
-            |> Async.map Array.toList
+            let! readModelSubscriptions = connectAndReplayReadModels readModels
+            do! waitUntilCaughtUp readModelSubscriptions
+
+            let store = host.Services.GetRequiredService<EventStore>()
+        
+            let! document = database.Read()
+            do! FileBased.Convert.importFromDocument store document
+        
+            let loggerFactory = host.Services.GetRequiredService<ILoggerFactory>()
+            let subscriptionLogger = loggerFactory.CreateLogger("subscriptions")
+
+            // subscriptions for syncing back to the filebased-db are added after initial seeding/loading
+            let! fileSyncSubscriptions  =
+                Async.Parallel [
+                    store.Subscribe End (FileBased.Convert.Collaboration.subscription subscriptionLogger database)
+                    store.Subscribe End (FileBased.Convert.Domain.subscription subscriptionLogger database)
+                    store.Subscribe End (FileBased.Convert.BoundedContext.subscription subscriptionLogger database)
+                    store.Subscribe End (FileBased.Convert.Namespace.subscription subscriptionLogger database)
+                    store.Subscribe End (FileBased.Convert.NamespaceTemplate.subscription subscriptionLogger database)
+                ]
+                |> Async.map Array.toList
+                
+            do! waitUntilCaughtUp (readModelSubscriptions @ fileSyncSubscriptions)
+        | SqlServerBased _ ->
+            // TODO: properly provision database table?
+            let persistence = host.Services.GetRequiredService<NStore.Persistence.MsSql.MsSqlPersistence>()
+            do! persistence.InitAsync(CancellationToken.None)
+
+            let readModels = host.Services.GetServices<ReadModels.ReadModelInitialization>()
+
+            let! readModelSubscriptions = connectAndReplayReadModels readModels
             
-        do! waitUntilCaughtUp (readModelSubscriptions @ fileSyncSubscriptions)
+            do! waitUntilCaughtUp readModelSubscriptions
 
         return! host.RunAsync()
     }
