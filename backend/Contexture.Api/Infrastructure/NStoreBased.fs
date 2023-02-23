@@ -125,7 +125,7 @@ type JsonMsSqlSerializer(settings: JsonSerializerOptions) =
             JsonFSharpConverter(
                 unionEncoding =
                     (JsonUnionEncoding.Default
-                     ||| JsonUnionEncoding.Untagged
+                     ||| JsonUnionEncoding.InternalTag
                      ||| JsonUnionEncoding.UnwrapRecordCases
                      ||| JsonUnionEncoding.UnwrapFieldlessTags)
             )
