@@ -8,7 +8,6 @@ open Contexture.Api.FileBasedCommandHandlers
 open Contexture.Api.Infrastructure
 
 open Microsoft.AspNetCore.Http
-open FSharp.Control.Tasks
 
 open Giraffe
 

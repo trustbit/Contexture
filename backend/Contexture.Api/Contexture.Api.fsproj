@@ -44,6 +44,8 @@
     <Compile Include="Views\Search.fs" />
     <Compile Include="Filebased\Database.fs" />
     <Compile Include="Filebased\Convert.fs" />
+    <Compile Include="Configuration.fs" />
+    <Compile Include="AllRoutes.fs" />
     <Compile Include="Program.fs" />
   </ItemGroup>
   <ItemGroup>

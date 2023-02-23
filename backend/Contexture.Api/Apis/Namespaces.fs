@@ -8,7 +8,6 @@ open Contexture.Api
 open Contexture.Api.Infrastructure
 open Contexture.Api.ReadModels
 open Microsoft.AspNetCore.Http
-open FSharp.Control.Tasks
 
 open Giraffe
 
@@ -16,7 +15,6 @@ module Namespaces =
     open ValueObjects
 
     module CommandEndpoints =
-        open System
         open Namespace
         open FileBasedCommandHandlers
         open CommandHandler

@@ -3,9 +3,7 @@
 open System
 open Contexture.Api
 open Contexture.Api.Infrastructure
-open Contexture.Api.Infrastructure.Projections
 open Microsoft.AspNetCore.Http
-open FSharp.Control.Tasks
 
 open Giraffe
 

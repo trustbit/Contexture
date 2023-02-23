@@ -7,8 +7,6 @@ open Contexture.Api.Infrastructure
 open Contexture.Api.Views
 open Microsoft.AspNetCore.Http
 
-open FSharp.Control.Tasks
-
 open Giraffe
 open Microsoft.Extensions.Hosting
 

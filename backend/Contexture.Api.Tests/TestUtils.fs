@@ -13,7 +13,6 @@ open Microsoft.Extensions.Http
 open Microsoft.Extensions.DependencyInjection
 open Microsoft.AspNetCore.TestHost
 open Microsoft.Extensions.Logging
-open FSharp.Control.Tasks
 
 open Contexture.Api.Infrastructure
 
