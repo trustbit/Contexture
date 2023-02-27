@@ -12,13 +12,12 @@ publish-backend:
         -o artifacts/backend
 
 build-app:
-	cd frontend && npm install
-	cd frontend && npm run build
+	cd frontend-vue && npm ci && npm run build
 
 publish-app: build-app
 	mkdir -p artifacts/frontend
-	cd frontend && npm pack
-	mv frontend/*.tgz artifacts/frontend
+	cd frontend-vue && npm pack
+	mv frontend-vue/*.tgz artifacts/frontend
 	cd artifacts/frontend && tar xf *.tgz --strip=1 package/
 	rm artifacts/frontend/*.tgz
 
