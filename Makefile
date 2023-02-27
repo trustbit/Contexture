@@ -16,10 +16,7 @@ build-app:
 
 publish-app: build-app
 	mkdir -p artifacts/frontend
-	cd frontend-vue && npm pack
-	mv frontend-vue/*.tgz artifacts/frontend
-	cd artifacts/frontend && tar xf *.tgz --strip=1 package/
-	rm artifacts/frontend/*.tgz
+	cp -r frontend-vue/dist/** artifacts/frontend
 
 prepare-image: publish-backend publish-app
 	mkdir -p artifacts/image/wwwroot
