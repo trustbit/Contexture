@@ -88,7 +88,7 @@ function packageMatrix(collaborations, domains, existIds) {
 
         const domain = domains.find((domain) => domain.id == domainId);
 
-        return [...resolveDomainNames(domain.parentDomainId), domain.key || domain.name]
+        return [...resolveDomainNames(domain.parentDomainId), domain.shortName || domain.name]
             .filter((domainName) => domainName)
             .map(niceName);
     }
@@ -113,7 +113,7 @@ function packageMatrix(collaborations, domains, existIds) {
                 boundedContext.parentDomainId
             ).join(".");
 
-            return `${domainNames}.${boundedContext.key || boundedContext.name}`;
+            return `${domainNames}.${boundedContext.shortName || boundedContext.name}`;
         }
 
         if (collaborator.domain) {
@@ -131,7 +131,7 @@ function packageMatrix(collaborations, domains, existIds) {
                 "."
             );
 
-            return `${domainNames}.${domain.key || domain.name}`;
+            return `${domainNames}.${domain.shortName || domain.name}`;
         }
 
         if (collaborator.externalSystem) {

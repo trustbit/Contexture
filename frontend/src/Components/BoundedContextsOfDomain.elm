@@ -35,7 +35,7 @@ import Html.Events exposing (onClick)
 import Http
 import Json.Decode as Decode
 import Json.Decode.Pipeline as JP
-import Key
+import ShortName
 import List
 import List.Split exposing (chunksOfLeft)
 import RemoteData
@@ -99,7 +99,7 @@ condensedWithActions model =
             [ Html.h5 [ class "card-title", Spacing.mb1 ]
                 [ text (context |> BoundedContext.name) ]
             , Html.small [ class "text-muted" ]
-                [ text (context |> BoundedContext.key |> Maybe.map Key.toString |> Maybe.withDefault "") ]
+                [ text (context |> BoundedContext.shortName |> Maybe.map ShortName.toString |> Maybe.withDefault "") ]
             ]
         , Grid.col [ Col.md7 ]
             [ ListGroup.ul (BoundedContextCard.namespaceItems model.contextItem.namespaces) ]

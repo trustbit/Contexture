@@ -4,18 +4,24 @@ on:
   push:
     paths:
       - '.github/workflows/ci-frontend.yml'
-      - 'frontend/**'
+      - 'frontend-vue/**'
+
+defaults:
+  run:
+    shell: bash
+    working-directory: frontend-vue
 
 jobs:
   build-frontend:
     runs-on: ubuntu-latest
 
     steps:
-    - uses: actions/checkout@v3
-    - name: Use Node.js
-      uses: actions/setup-node@v1
-      with:
-        node-version: '15.x'
-    - run: npm install
-      working-directory: frontend
-    - run: make build-app
+      - uses: actions/checkout@v3
+      - uses: actions/setup-node@v3
+        with:
+          node-version: '18.x'
+      - run: npm ci
+      - run: npm run lint
+      - run: npm run test:unit
+      - run: make build-app
+        working-directory: ./

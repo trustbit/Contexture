@@ -146,7 +146,7 @@ module Database =
         type Domain =
             { Id: DomainId
               ParentDomainId: DomainId option
-              Key: string option
+              ShortName: string option
               Name: string
               Vision: string option }
 
@@ -160,7 +160,7 @@ module Database =
         type BoundedContext =
             { Id: BoundedContextId
               DomainId: DomainId
-              Key: string option
+              ShortName: string option
               Name: string
               Description: string option
               Classification: StrategicClassification
@@ -281,6 +281,22 @@ module Database =
                         idValue.Value.ToString()
                         |> IdentityHash.generate identityNamespace
                     obj.Property(propertyName).Value <- JValue(newId)
+                | None -> ()
+            
+            let renameProperty oldPropertyName newPropertyName (obj: JObject) =
+                let property =
+                    obj.Property(oldPropertyName)
+                    |> Option.ofObj
+                    |> Option.bind
+                        (fun p ->
+                            p.Value
+                            |> Option.ofObj
+                            |> Option.bind (tryUnbox<JValue>))
+
+                match property with
+                | Some propertyValue ->
+                    obj.Remove(oldPropertyName) |> ignore
+                    obj.Add(newPropertyName, propertyValue)
                 | None -> ()
 
             let toVersion1 (json: string) =
@@ -436,13 +452,32 @@ module Database =
                     root.Add(JProperty("namespaceTemplates", JArray()))
                 root.Property("version").Value <- JValue(2)
                 root.ToString()
+                
+            let toVersion3 (json: string) =
+                let root = JObject.Parse json
+
+                let processDomains (token: JToken) =
+                    let obj = token :?> JObject
+                    obj |> renameProperty "key" "shortName"
+
+                let processBoundedContexts (token: JToken) =
+                    let obj = token :?> JObject
+                    obj |> renameProperty "key" "shortName"
+
+                root.["domains"] |> Seq.iter processDomains
+
+                root.["boundedContexts"] |> Seq.iter processBoundedContexts
+
+                root.Property("version").Value <- JValue(3)
+                root.ToString()
 
         type HasVersion = { Version: int option }
 
         let applyMigrations version json =
             let versions =
                 [ 0, Migrations.toVersion1
-                  1, Migrations.toVersion2 ]
+                  1, Migrations.toVersion2
+                  2, Migrations.toVersion3 ]
 
             versions
             |> List.skipWhile (fun (v, _) -> version > v)

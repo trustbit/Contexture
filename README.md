@@ -92,16 +92,16 @@ ASPNETCORE_URLS=http://*:8080 DATABASEPATH=data/mydb.json dotnet Contexture.Api.
 
 ## Contexture frontend application
 
-The application is developed with [Elm](https://elm-lang.org/) and connects to the backend via the API.
+The application is developed with [Vue.js](https://vuejs.org/) and connects to the backend via the API.
 
 Make sure [Node](https://nodejs.org/en/) is installed and NPM is in your path.
 
 ### Run the frontend
 
 ```bash
-cd frontend
+cd frontend-vue
 npm install
-npm start
+npm run dev
 ```
 
 Make sure the backend part is reachable with its default url <http://localhost:3000>

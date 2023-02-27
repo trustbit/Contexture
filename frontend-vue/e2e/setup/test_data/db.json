@@ -1,0 +1,821 @@
+{
+  "version": 2,
+  "domains": [
+    {
+      "id": "0ea5eba8-a6de-5ef0-922c-ccb6e7a49d30",
+      "key": "RES",
+      "name": "Restaurant Experience",
+      "vision": "Serving guests with the best meals in our restaurants"
+    },
+    {
+      "id": "37827e03-9d35-5532-89e3-bd490c050e92",
+      "name": "Inventory",
+      "vision": "Manage inventory of our restaurants"
+    }
+  ],
+  "boundedContexts": [
+    {
+      "id": "1016ef47-00ae-50c9-a20e-9d0839408cf6",
+      "domainId": "0ea5eba8-a6de-5ef0-922c-ccb6e7a49d30",
+      "key": "DEL",
+      "name": "Delivery",
+      "description": "In charge of delivering cooked food & drinks to the guests table",
+      "classification": {
+        "domainType": "Generic",
+        "businessModel": [
+          "CostReduction"
+        ],
+        "evolution": "Commodity"
+      },
+      "businessDecisions": [],
+      "ubiquitousLanguage": {},
+      "messages": {
+        "commandsHandled": [],
+        "commandsSent": [],
+        "eventsHandled": [],
+        "eventsPublished": [],
+        "queriesHandled": [],
+        "queriesInvoked": []
+      },
+      "domainRoles": [],
+      "namespaces": [
+        {
+          "id": "81403c1e-f41d-44e9-8759-cc87ef204854",
+          "template": "fecc6764-6528-5345-92e2-41cc50fb1512",
+          "name": "Team",
+          "labels": [
+            {
+              "id": "fb7192ca-d008-45ed-ba4d-6ac4d1465a82",
+              "name": "Architect",
+              "value": "Karen Flynn",
+              "template": "fecc6764-6528-5345-92e2-41cc50fb1513"
+            },
+            {
+              "id": "4614fa66-3a1c-4d3f-b1a2-e6b184689925",
+              "name": "Tester",
+              "value": "Patricia Vaughan",
+              "template": "fecc6764-6528-5345-92e2-41cc50fb1514"
+            },
+            {
+              "id": "098ed068-b193-40ce-841f-8623839d2e71",
+              "name": "Coder",
+              "value": "Cynthia Dickerson",
+              "template": "fecc6764-6528-5345-92e2-41cc50fb1515"
+            },
+            {
+              "id": "d03469c4-d666-47d5-975d-b6e36e5cc095",
+              "name": "Product Owner",
+              "value": "Deborah Levy",
+              "template": "fecc6764-6528-5345-92e2-41cc50fb1516"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "351eae25-8e62-59c5-a4f9-23500c0a1644",
+      "domainId": "37827e03-9d35-5532-89e3-bd490c050e92",
+      "key": "IDEL",
+      "name": "Delivery",
+      "description": "Delivers inventory to our restaurants",
+      "classification": {
+        "domainType": "Core",
+        "businessModel": [
+          "CostReduction"
+        ],
+        "evolution": "Genesis"
+      },
+      "businessDecisions": [
+        {
+          "name": "Routing",
+          "description": "Best routes to deliver inventory to restaurants"
+        }
+      ],
+      "ubiquitousLanguage": {
+        "demand": {
+          "term": "Demand"
+        },
+        "route": {
+          "term": "Route"
+        }
+      },
+      "messages": {
+        "commandsHandled": [],
+        "commandsSent": [],
+        "eventsHandled": [],
+        "eventsPublished": [],
+        "queriesHandled": [],
+        "queriesInvoked": []
+      },
+      "domainRoles": [],
+      "namespaces": [
+        {
+          "id": "8c5fd737-da62-40d4-8465-6dc2fc9f0e8b",
+          "template": "fecc6764-6528-5345-92e2-41cc50fb1517",
+          "name": "Lifecycle Tools",
+          "labels": [
+            {
+              "id": "c2496643-d1d0-4061-a605-eeafebe841ac",
+              "name": "Issue Tracker",
+              "value": "http://github.com/contexture/inventory",
+              "template": "fecc6764-6528-5345-92e2-41cc50fb1518"
+            }
+          ]
+        },
+        {
+          "id": "2a3a380e-04b2-470e-ba2f-6321990a692e",
+          "template": "fecc6764-6528-5345-92e2-41cc50fb1512",
+          "name": "Team",
+          "labels": [
+            {
+              "id": "032081b8-5b71-472a-a870-c25886724c65",
+              "name": "Architect",
+              "value": "Hugh Marks",
+              "template": "fecc6764-6528-5345-92e2-41cc50fb1513"
+            },
+            {
+              "id": "56739d4f-89cf-472e-8408-a5bc67edd0a6",
+              "name": "Tester",
+              "value": "Harvey Davenport",
+              "template": "fecc6764-6528-5345-92e2-41cc50fb1514"
+            },
+            {
+              "id": "7a3b43b0-b7fd-4707-8d2c-a62c911e6b85",
+              "name": "Coder",
+              "value": "Arthur Cooke",
+              "template": "fecc6764-6528-5345-92e2-41cc50fb1515"
+            },
+            {
+              "id": "88f98332-89ff-4459-90c2-7576842263c3",
+              "name": "Product Owner",
+              "value": "Matthew Berry",
+              "template": "fecc6764-6528-5345-92e2-41cc50fb1516"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "35767714-1190-5ff8-a998-1d750f2813a4",
+      "domainId": "0ea5eba8-a6de-5ef0-922c-ccb6e7a49d30",
+      "key": "TS",
+      "name": "Table Service",
+      "description": "Make sure our guest is serviced in a good way and orders can be placed.",
+      "classification": {
+        "domainType": "Supporting",
+        "businessModel": [
+          "Engagement"
+        ],
+        "evolution": "Product"
+      },
+      "businessDecisions": [
+        {
+          "name": "Preparation Estimation",
+          "description": "How long will the oder take to be delivered?"
+        }
+      ],
+      "ubiquitousLanguage": {
+        "order": {
+          "term": "Order"
+        }
+      },
+      "messages": {
+        "commandsHandled": [],
+        "commandsSent": [
+          "Order Meal"
+        ],
+        "eventsHandled": [],
+        "eventsPublished": [],
+        "queriesHandled": [],
+        "queriesInvoked": []
+      },
+      "domainRoles": [],
+      "namespaces": []
+    },
+    {
+      "id": "44145752-9e6b-5fda-92cc-c86f7958b5d4",
+      "domainId": "0ea5eba8-a6de-5ef0-922c-ccb6e7a49d30",
+      "key": "SET",
+      "name": "Seating",
+      "description": "Offers seating for guests in our restaurant",
+      "classification": {
+        "domainType": "Supporting",
+        "businessModel": [
+          "Engagement"
+        ],
+        "evolution": "CustomBuilt"
+      },
+      "businessDecisions": [],
+      "ubiquitousLanguage": {},
+      "messages": {
+        "commandsHandled": [],
+        "commandsSent": [],
+        "eventsHandled": [],
+        "eventsPublished": [],
+        "queriesHandled": [],
+        "queriesInvoked": []
+      },
+      "domainRoles": [
+        {
+          "name": "Engagement Context",
+          "description": "Provides key features which attract users to keep using the product. Example: Free Financial Advice Context"
+        }
+      ],
+      "namespaces": [
+        {
+          "id": "5614e9a2-19d5-4f7c-961a-9333d28aeae4",
+          "template": "fecc6764-6528-5345-92e2-41cc50fb1512",
+          "name": "Team",
+          "labels": [
+            {
+              "id": "8a97286d-fa8a-4188-95cd-b988b1aa8b24",
+              "name": "Architect",
+              "value": "Deborah Levy",
+              "template": "fecc6764-6528-5345-92e2-41cc50fb1513"
+            },
+            {
+              "id": "b992536b-f864-4690-b547-49fe5976b5b1",
+              "name": "Tester",
+              "value": "Donna Stephens",
+              "template": "fecc6764-6528-5345-92e2-41cc50fb1514"
+            },
+            {
+              "id": "3c450875-e20a-4bfd-b044-c60e6f6f946a",
+              "name": "Coder",
+              "value": "Patricia Vaughan",
+              "template": "fecc6764-6528-5345-92e2-41cc50fb1515"
+            },
+            {
+              "id": "223ccaa6-74c5-477d-92c6-366aecb3e6d2",
+              "name": "Product Owner",
+              "value": "Susan Knox",
+              "template": "fecc6764-6528-5345-92e2-41cc50fb1516"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "52b74862-0a37-5a74-98cb-561b5321d1d6",
+      "domainId": "37827e03-9d35-5532-89e3-bd490c050e92",
+      "key": "WAR",
+      "name": "Warehousing",
+      "description": "Store our Inventory in the right places, so delivery to restaurants is quick",
+      "classification": {
+        "domainType": "Generic",
+        "businessModel": [
+          "CostReduction"
+        ],
+        "evolution": "Commodity"
+      },
+      "businessDecisions": [],
+      "ubiquitousLanguage": {},
+      "messages": {
+        "commandsHandled": [],
+        "commandsSent": [],
+        "eventsHandled": [],
+        "eventsPublished": [],
+        "queriesHandled": [],
+        "queriesInvoked": []
+      },
+      "domainRoles": [],
+      "namespaces": [
+        {
+          "id": "98651c41-161f-4a2d-a391-5592672ce048",
+          "template": "fecc6764-6528-5345-92e2-41cc50fb1512",
+          "name": "Team",
+          "labels": [
+            {
+              "id": "e63ca19c-b82c-4a4a-b4e6-9ed1bd77667c",
+              "name": "Architect",
+              "value": "Euan Barker",
+              "template": "fecc6764-6528-5345-92e2-41cc50fb1513"
+            },
+            {
+              "id": "a522ebda-af85-4a8a-bdc8-6d4edad43efd",
+              "name": "Tester",
+              "value": "Mae Vazquez",
+              "template": "fecc6764-6528-5345-92e2-41cc50fb1514"
+            },
+            {
+              "id": "ad52f02d-313e-4bbb-a1c7-0918092fc7ee",
+              "name": "Coder",
+              "value": "Maya Patel",
+              "template": "fecc6764-6528-5345-92e2-41cc50fb1515"
+            },
+            {
+              "id": "a085b2dc-ad64-480e-ac52-b5cf9798347e",
+              "name": "Product Owner",
+              "value": "Stephen Ramos",
+              "template": "fecc6764-6528-5345-92e2-41cc50fb1516"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "6ef3fdc5-845a-5a42-ac46-434887c8d6ec",
+      "domainId": "0ea5eba8-a6de-5ef0-922c-ccb6e7a49d30",
+      "key": "FOP",
+      "name": "Food Preparation",
+      "description": "Preparing delicious meals from ingredients",
+      "classification": {
+        "domainType": "Core",
+        "businessModel": [
+          "Compliance"
+        ],
+        "evolution": "CustomBuilt"
+      },
+      "businessDecisions": [
+        {
+          "name": "Derive Nutrition Information from ingredients"
+        }
+      ],
+      "ubiquitousLanguage": {
+        "ingredient": {
+          "term": "Ingredient"
+        },
+        "meal": {
+          "term": "Meal"
+        }
+      },
+      "messages": {
+        "commandsHandled": [
+          "Cook Meal"
+        ],
+        "commandsSent": [],
+        "eventsHandled": [],
+        "eventsPublished": [
+          "Meal prepared"
+        ],
+        "queriesHandled": [
+          "Nutrition information"
+        ],
+        "queriesInvoked": []
+      },
+      "domainRoles": [],
+      "namespaces": [
+        {
+          "id": "f757f0b7-933e-452b-985c-288a5afdb872",
+          "template": "fecc6764-6528-5345-92e2-41cc50fb1512",
+          "name": "Team",
+          "labels": [
+            {
+              "id": "1fb3a30c-baf3-46d7-8c6d-5bc9a6cdbde1",
+              "name": "Architect",
+              "value": "Karen Flynn",
+              "template": "fecc6764-6528-5345-92e2-41cc50fb1513"
+            },
+            {
+              "id": "4672b2ae-e6bb-4097-84f7-8a53f24d8784",
+              "name": "Tester",
+              "value": "Donna Stephens",
+              "template": "fecc6764-6528-5345-92e2-41cc50fb1514"
+            },
+            {
+              "id": "3797d8ba-75ba-4c60-9f5e-63e9e3b10264",
+              "name": "Coder",
+              "value": "Nancy Li",
+              "template": "fecc6764-6528-5345-92e2-41cc50fb1515"
+            },
+            {
+              "id": "0b1e76d6-4085-4d5a-9f24-720293537e65",
+              "name": "Product Owner",
+              "value": "Deborah Levy",
+              "template": "fecc6764-6528-5345-92e2-41cc50fb1516"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "e2fee2e6-f8a4-54da-9607-95fbd31b9b8c",
+      "domainId": "0ea5eba8-a6de-5ef0-922c-ccb6e7a49d30",
+      "key": "BIL",
+      "name": "Billing",
+      "description": "Prepares bills for customers order and offers payment possibilities",
+      "classification": {
+        "domainType": "Supporting",
+        "businessModel": [
+          "Compliance",
+          "CostReduction"
+        ],
+        "evolution": "Product"
+      },
+      "businessDecisions": [
+        {
+          "name": "Payment method",
+          "description": "Depending on the bills amount a different payment method is selected (e.g. Cash, Debit or Credit Card)"
+        },
+        {
+          "name": "Tax calculation"
+        }
+      ],
+      "ubiquitousLanguage": {
+        "bill": {
+          "term": "Bill"
+        },
+        "payment method": {
+          "term": "Payment Method"
+        },
+        "tax": {
+          "term": "Tax"
+        }
+      },
+      "messages": {
+        "commandsHandled": [
+          "Request Bill"
+        ],
+        "commandsSent": [],
+        "eventsHandled": [
+          "Order Delivered"
+        ],
+        "eventsPublished": [],
+        "queriesHandled": [],
+        "queriesInvoked": []
+      },
+      "domainRoles": [
+        {
+          "name": "Audit Model",
+          "description": "Monitors the execution. Example: Advertising Campaign Analyser"
+        }
+      ],
+      "namespaces": [
+        {
+          "id": "f0bc7e71-0626-48fe-b1d5-3c9a3d0cd271",
+          "template": "fecc6764-6528-5345-92e2-41cc50fb1512",
+          "name": "Team",
+          "labels": [
+            {
+              "id": "2f0bbcde-9445-465a-8bfe-5ed8a799303e",
+              "name": "Architect",
+              "value": "Karen Flynn",
+              "template": "fecc6764-6528-5345-92e2-41cc50fb1513"
+            },
+            {
+              "id": "bcac563d-0e05-48f7-a2cd-9c5a41152a1b",
+              "name": "Tester",
+              "value": "Donna Stephens",
+              "template": "fecc6764-6528-5345-92e2-41cc50fb1514"
+            },
+            {
+              "id": "9e9415fc-afc7-4b86-8987-9a706cae31de",
+              "name": "Coder",
+              "value": "Cynthia Dickerson",
+              "template": "fecc6764-6528-5345-92e2-41cc50fb1515"
+            },
+            {
+              "id": "d08886f7-bfc1-4c57-a239-65be0f8b8497",
+              "name": "Product Owner",
+              "value": "Linda Mcneil",
+              "template": "fecc6764-6528-5345-92e2-41cc50fb1516"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "e6598848-32dd-5b66-9f6d-70a2c9f858ce",
+      "domainId": "0ea5eba8-a6de-5ef0-922c-ccb6e7a49d30",
+      "key": "GUE",
+      "name": "Guest Experience",
+      "description": "Ensures that guests feel welcome in the restaurant and keeps an eye on the financial situation.",
+      "classification": {
+        "domainType": "Core",
+        "businessModel": [
+          "Revenue",
+          "Engagement"
+        ],
+        "evolution": "Genesis"
+      },
+      "businessDecisions": [
+        {
+          "name": "Price calculation",
+          "description": "Calculates prices for produces sold in the restaurant"
+        }
+      ],
+      "ubiquitousLanguage": {
+        "price": {
+          "term": "Price"
+        },
+        "product": {
+          "term": "Product"
+        }
+      },
+      "messages": {
+        "commandsHandled": [],
+        "commandsSent": [],
+        "eventsHandled": [],
+        "eventsPublished": [],
+        "queriesHandled": [
+          "Product Price"
+        ],
+        "queriesInvoked": [
+          "Retrieve ingredients"
+        ]
+      },
+      "domainRoles": [
+        {
+          "name": "Engagement Context",
+          "description": "Provides key features which attract users to keep using the product. Example: Free Financial Advice Context"
+        }
+      ],
+      "namespaces": [
+        {
+          "id": "3e74f641-6602-46dd-a685-bdb76d1e66db",
+          "template": "fecc6764-6528-5345-92e2-41cc50fb1512",
+          "name": "Team",
+          "labels": [
+            {
+              "id": "bb0272e2-07a0-4cfc-b0fd-0397d09ea691",
+              "name": "Architect",
+              "value": "Debra Dalton",
+              "template": "fecc6764-6528-5345-92e2-41cc50fb1513"
+            },
+            {
+              "id": "17974501-ddd5-431b-82cd-cd917558aa1a",
+              "name": "Tester",
+              "value": "Donna Stephens",
+              "template": "fecc6764-6528-5345-92e2-41cc50fb1514"
+            },
+            {
+              "id": "61746602-f613-4cef-b8ff-00e48981ae64",
+              "name": "Coder",
+              "value": "Cynthia Dickerson",
+              "template": "fecc6764-6528-5345-92e2-41cc50fb1515"
+            },
+            {
+              "id": "2848343c-bf63-419c-9396-f9d2bb0ad950",
+              "name": "Product Owner",
+              "value": "Linda Mcneil",
+              "template": "fecc6764-6528-5345-92e2-41cc50fb1516"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "f51b00e7-ad48-5c8d-8e1c-ad80d4f508c2",
+      "domainId": "37827e03-9d35-5532-89e3-bd490c050e92",
+      "key": "PRO",
+      "name": "Procurement",
+      "description": "Make sure we buy the right amount of inventory",
+      "classification": {
+        "domainType": "Generic",
+        "businessModel": [
+          "CostReduction"
+        ],
+        "evolution": "Product"
+      },
+      "businessDecisions": [],
+      "ubiquitousLanguage": {},
+      "messages": {
+        "commandsHandled": [],
+        "commandsSent": [],
+        "eventsHandled": [],
+        "eventsPublished": [],
+        "queriesHandled": [],
+        "queriesInvoked": []
+      },
+      "domainRoles": [],
+      "namespaces": [
+        {
+          "id": "d53885e2-7266-4edf-8b00-5542dc2bb095",
+          "template": "fecc6764-6528-5345-92e2-41cc50fb1517",
+          "name": "Lifecycle Tools",
+          "labels": [
+            {
+              "id": "b6c45dba-83ee-4eb6-b46a-3ba586416e08",
+              "name": "Issue Tracker",
+              "value": "http://github.com/contexture/procurement",
+              "template": "fecc6764-6528-5345-92e2-41cc50fb1518"
+            },
+            {
+              "id": "47bf2d0c-2a1a-4946-91ea-8cfab047e6d2",
+              "name": "Wiki",
+              "value": "http://github.com/contexture/wiki",
+              "template": "fecc6764-6528-5345-92e2-41cc50fb1519"
+            }
+          ]
+        },
+        {
+          "id": "9b048a44-e069-4324-919a-43f892b75f68",
+          "template": "fecc6764-6528-5345-92e2-41cc50fb1512",
+          "name": "Team",
+          "labels": [
+            {
+              "id": "9fc660b7-8bcb-4ffe-b01f-e52265ee6b11",
+              "name": "Architect",
+              "value": "Hugh Marks",
+              "template": "fecc6764-6528-5345-92e2-41cc50fb1513"
+            },
+            {
+              "id": "326d33f2-050a-411a-b7f4-c28da7e07bc7",
+              "name": "Tester",
+              "value": "Mae Vazquez",
+              "template": "fecc6764-6528-5345-92e2-41cc50fb1514"
+            },
+            {
+              "id": "86d53583-0d8e-4604-8276-a58ef700e78e",
+              "name": "Coder",
+              "value": "Maya Patel",
+              "template": "fecc6764-6528-5345-92e2-41cc50fb1515"
+            },
+            {
+              "id": "3775696d-4f13-4a02-ac84-9396e3a20a83",
+              "name": "Product Owner",
+              "value": "Courtney Salas",
+              "template": "fecc6764-6528-5345-92e2-41cc50fb1516"
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "collaborations": [
+    {
+      "id": "10ba7cce-bcba-55f9-b8fe-b5ffc5aff6a6",
+      "initiator": {
+        "boundedContext": "351eae25-8e62-59c5-a4f9-23500c0a1644"
+      },
+      "recipient": {
+        "boundedContext": "6ef3fdc5-845a-5a42-ac46-434887c8d6ec"
+      }
+    },
+    {
+      "id": "4989eefc-d40b-5333-9636-66c5d1a61e2b",
+      "initiator": {
+        "boundedContext": "1016ef47-00ae-50c9-a20e-9d0839408cf6"
+      },
+      "recipient": {
+        "boundedContext": "e2fee2e6-f8a4-54da-9607-95fbd31b9b8c"
+      }
+    },
+    {
+      "id": "7127fc82-6b31-5d78-826a-d67e004cd090",
+      "description": "Notify about empty inventory",
+      "initiator": {
+        "boundedContext": "52b74862-0a37-5a74-98cb-561b5321d1d6"
+      },
+      "recipient": {
+        "boundedContext": "f51b00e7-ad48-5c8d-8e1c-ad80d4f508c2"
+      }
+    },
+    {
+      "id": "8223f6d5-4496-573c-baf3-4e36decf51cd",
+      "initiator": {
+        "boundedContext": "e2fee2e6-f8a4-54da-9607-95fbd31b9b8c"
+      },
+      "recipient": {
+        "boundedContext": "e6598848-32dd-5b66-9f6d-70a2c9f858ce"
+      },
+      "relationshipType": {
+        "upstreamDownstream": {
+          "initiatorRole": "Downstream",
+          "upstreamType": "OpenHost",
+          "downstreamType": "AntiCorruptionLayer"
+        }
+      }
+    },
+    {
+      "id": "884e6d7e-c3f5-5743-bcb9-17050385c7cc",
+      "initiator": {
+        "boundedContext": "35767714-1190-5ff8-a998-1d750f2813a4"
+      },
+      "recipient": {
+        "boundedContext": "1016ef47-00ae-50c9-a20e-9d0839408cf6"
+      }
+    },
+    {
+      "id": "97eaad3f-a1b4-5703-82c3-fb5977910766",
+      "initiator": {
+        "boundedContext": "44145752-9e6b-5fda-92cc-c86f7958b5d4"
+      },
+      "recipient": {
+        "boundedContext": "e2fee2e6-f8a4-54da-9607-95fbd31b9b8c"
+      }
+    },
+    {
+      "id": "99407a75-311c-5d01-9ba2-767d06cad879",
+      "initiator": {
+        "boundedContext": "e6598848-32dd-5b66-9f6d-70a2c9f858ce"
+      },
+      "recipient": {
+        "boundedContext": "6ef3fdc5-845a-5a42-ac46-434887c8d6ec"
+      },
+      "relationshipType": {
+        "symmetric": "Partnership"
+      }
+    },
+    {
+      "id": "a04f2e43-893c-53d9-bb11-8340bc3fbd7f",
+      "initiator": {
+        "boundedContext": "1016ef47-00ae-50c9-a20e-9d0839408cf6"
+      },
+      "recipient": {
+        "boundedContext": "44145752-9e6b-5fda-92cc-c86f7958b5d4"
+      }
+    },
+    {
+      "id": "aba2e113-b7fa-5f21-a022-332eb0b01037",
+      "initiator": {
+        "boundedContext": "52b74862-0a37-5a74-98cb-561b5321d1d6"
+      },
+      "recipient": {
+        "boundedContext": "351eae25-8e62-59c5-a4f9-23500c0a1644"
+      }
+    },
+    {
+      "id": "b6554749-221a-5a53-9e99-98d4da5c24b1",
+      "initiator": {
+        "boundedContext": "35767714-1190-5ff8-a998-1d750f2813a4"
+      },
+      "recipient": {
+        "boundedContext": "6ef3fdc5-845a-5a42-ac46-434887c8d6ec"
+      },
+      "relationshipType": {
+        "upstreamDownstream": {
+          "initiatorRole": "Upstream",
+          "upstreamType": "OpenHost",
+          "downstreamType": "Downstream"
+        }
+      }
+    },
+    {
+      "id": "d626e7b5-d44c-58c5-bbc0-daa49a39f680",
+      "initiator": {
+        "boundedContext": "44145752-9e6b-5fda-92cc-c86f7958b5d4"
+      },
+      "recipient": {
+        "boundedContext": "35767714-1190-5ff8-a998-1d750f2813a4"
+      }
+    },
+    {
+      "id": "ef1d7604-fc1d-5a11-8781-4828fa25e2fb",
+      "initiator": {
+        "boundedContext": "6ef3fdc5-845a-5a42-ac46-434887c8d6ec"
+      },
+      "recipient": {
+        "boundedContext": "1016ef47-00ae-50c9-a20e-9d0839408cf6"
+      }
+    }
+  ],
+  "namespaceTemplates": [
+    {
+      "id": "fecc6764-6528-5345-92e2-41cc50fb1512",
+      "name": "Team",
+      "description": "Name the members of your team in different roles",
+      "template": [
+        {
+          "name": "Architect",
+          "description": "Responsible for designing solutions",
+          "placeholder": "A name like 'Karl Gustaf Maier'",
+          "id": "fecc6764-6528-5345-92e2-41cc50fb1513"
+        },
+        {
+          "name": "Tester",
+          "description": "The person who is assuring the quality of the solution",
+          "placeholder": "A name like 'Karl Friedrich Sattman'",
+          "id": "fecc6764-6528-5345-92e2-41cc50fb1514"
+        },
+        {
+          "name": "Coder",
+          "description": "Developing the solution",
+          "placeholder": "A name like 'Karl der Grosse'",
+          "id": "fecc6764-6528-5345-92e2-41cc50fb1515"
+        },
+        {
+          "name": "Product Owner",
+          "description": "Driving the direction of the solution",
+          "placeholder": "A name like 'Karoline Huber'",
+          "id": "fecc6764-6528-5345-92e2-41cc50fb1516"
+        }
+      ]
+    },
+    {
+      "id": "fecc6764-6528-5345-92e2-41cc50fb1517",
+      "name": "Lifecycle Tools",
+      "description": "List links to tools which manage the development effort and lifecycle",
+      "template": [
+        {
+          "name": "Issue Tracker",
+          "description": "A link to the issue tracker",
+          "placeholder": "http://issuetracker.mycompany.com",
+          "id": "fecc6764-6528-5345-92e2-41cc50fb1518"
+        },
+        {
+          "name": "Wiki",
+          "description": "A link to the wiki or documentation",
+          "placeholder": "http://wiki.mycompany.com",
+          "id": "fecc6764-6528-5345-92e2-41cc50fb1519"
+        },
+        {
+          "name": "Repository",
+          "description": "A link to the source code repository",
+          "placeholder": "http://code.mycompany.com",
+          "id": "fecc6764-6528-5345-92e2-41cc50fb1520"
+        }
+      ]
+    }
+  ]
+}

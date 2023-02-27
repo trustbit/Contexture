@@ -19,12 +19,12 @@ module Utils =
                 values
                 |> Set.filter (fun n -> findValue n <> value))
 
-    let findByKey keyPhrase items =
+    let findByPhrase phrase items =
         let matchesKey (key: string) =
             let term = key |> SearchTerm.fromInput
 
             term
-            |> Option.map (SearchPhrase.matches keyPhrase)
+            |> Option.map (SearchPhrase.matches phrase)
             |> Option.defaultValue false
 
         items
@@ -71,7 +71,7 @@ module Utils =
 
     let byName (namespaces: NamespaceFinder) (name: SearchPhrase) =
         namespaces
-        |> findByKey name
+        |> findByPhrase name
         |> SearchPhraseResult.fromManyResults
 
     let byTemplate (namespaces: NamespaceFinder) (templateId: NamespaceTemplateId) =
@@ -206,13 +206,13 @@ module Labels =
 
     let byLabelName (namespaces: NamespacesByLabel) (phrase: SearchPhrase) =
         namespaces.ByLabelName
-        |> findByKey phrase
+        |> findByPhrase phrase
         |> selectResults fst
         |> SearchPhraseResult.fromManyResults
 
     let byLabelValue (namespaces: NamespacesByLabel) (phrase: SearchPhrase) =
         namespaces.ByLabelValue
-        |> findByKey phrase
+        |> findByPhrase phrase
         |> selectResults fst
         |> SearchPhraseResult.fromManyResults
 
@@ -234,18 +234,18 @@ module Domains =
     open ValueObjects
     open Utils
 
-    type DomainByKeyAndNameModel =
-        { ByKey: Map<string, DomainId>
+    type DomainByShortNameAndNameModel =
+        { ByShortName: Map<string, DomainId>
           ByName: Map<string, Set<DomainId>> }
         static member Empty =
-            { ByKey = Map.empty
+            { ByShortName = Map.empty
               ByName = Map.empty }
 
     let private projectToDomain state eventEnvelope =
-        let addKey canBeKey domain byKey =
-            match canBeKey with
-            | Some key -> byKey |> Map.add key domain
-            | None -> byKey
+        let addShortName canBeShortName domain byShortName =
+            match canBeShortName with
+            | Some shortName -> byShortName |> Map.add shortName domain
+            | None -> byShortName
 
         let append key value items = appendToSet items (key, value)
 
@@ -256,16 +256,16 @@ module Domains =
         | DomainCreated n ->
             { state with
                   ByName = state.ByName |> append n.Name n.DomainId }
-        | KeyAssigned k ->
+        | ShortNameAssigned k ->
             { state with
-                  ByKey =
-                      state.ByKey
+                  ByShortName =
+                      state.ByShortName
                       |> Map.filter (fun _ v -> v <> k.DomainId)
-                      |> addKey k.Key k.DomainId }
+                      |> addShortName k.ShortName k.DomainId }
         | DomainImported n ->
             { state with
                   ByName = appendToSet state.ByName (n.Name, n.DomainId)
-                  ByKey = state.ByKey |> addKey n.Key n.DomainId }
+                  ByShortName = state.ByShortName |> addShortName n.ShortName n.DomainId }
         | DomainRenamed l ->
             { state with
                   ByName =
@@ -275,25 +275,25 @@ module Domains =
         | DomainRemoved l ->
             { state with
                   ByName = state.ByName |> removeFromSet id l.DomainId
-                  ByKey =
-                      state.ByKey
+                  ByShortName =
+                      state.ByShortName
                       |> Map.filter (fun _ v -> v <> l.DomainId) }
         | CategorizedAsSubdomain _
         | PromotedToDomain _
         | VisionRefined _ -> state
 
-    let byName (model: DomainByKeyAndNameModel) (phrase: SearchPhrase) =
+    let byName (model: DomainByShortNameAndNameModel) (phrase: SearchPhrase) =
         model.ByName
-        |> findByKey phrase
+        |> findByPhrase phrase
         |> SearchPhraseResult.fromManyResults
 
-    let byKey (model: DomainByKeyAndNameModel) (phrase: SearchPhrase) =
-        model.ByKey
-        |> findByKey phrase
+    let byShortName (model: DomainByShortNameAndNameModel) (phrase: SearchPhrase) =
+        model.ByShortName
+        |> findByPhrase phrase
         |> SearchPhraseResult.fromResults
 
     type ReadModel =
-        ReadModels.ReadModel<Aggregates.Domain.Event, DomainByKeyAndNameModel>
+        ReadModels.ReadModel<Aggregates.Domain.Event, DomainByShortNameAndNameModel>
 
     let readModel () =
         let updateState state eventEnvelopes =
@@ -303,25 +303,25 @@ module Domains =
 
             newState
 
-        ReadModels.readModel updateState DomainByKeyAndNameModel.Empty
+        ReadModels.readModel updateState DomainByShortNameAndNameModel.Empty
 
 module BoundedContexts =
     open Contexture.Api.Aggregates.BoundedContext
     open ValueObjects
     open Utils
     
-    type BoundedContextByKeyAndNameModel =
-        { ByKey: Map<string, BoundedContextId>
+    type BoundedContextByShortNameAndNameModel =
+        { ByShortName: Map<string, BoundedContextId>
           ByName: Map<string, Set<BoundedContextId>> }
         static member Empty =
-            { ByKey = Map.empty
+            { ByShortName = Map.empty
               ByName = Map.empty }
 
     let private projectToBoundedContext state eventEnvelope =
-        let addKey canBeKey domain byKey =
-            match canBeKey with
-            | Some key -> byKey |> Map.add key domain
-            | None -> byKey
+        let addShortName canBeShortName domain byShortName =
+            match canBeShortName with
+            | Some shortName -> byShortName |> Map.add shortName domain
+            | None -> byShortName
 
         let append key value items = appendToSet items (key, value)
 
@@ -329,16 +329,16 @@ module BoundedContexts =
         | BoundedContextCreated n ->
             { state with
                   ByName = state.ByName |> append n.Name n.BoundedContextId }
-        | KeyAssigned k ->
+        | ShortNameAssigned k ->
             { state with
-                  ByKey =
-                      state.ByKey
+                  ByShortName =
+                      state.ByShortName
                       |> Map.filter (fun _ v -> v <> k.BoundedContextId)
-                      |> addKey k.Key k.BoundedContextId }
+                      |> addShortName k.ShortName k.BoundedContextId }
         | BoundedContextImported n ->
             { state with
                   ByName = appendToSet state.ByName (n.Name, n.BoundedContextId)
-                  ByKey = state.ByKey |> addKey n.Key n.BoundedContextId }
+                  ByShortName = state.ByShortName |> addShortName n.ShortName n.BoundedContextId }
         | BoundedContextRenamed l ->
             { state with
                   ByName =
@@ -350,23 +350,23 @@ module BoundedContexts =
                   ByName =
                       state.ByName
                       |> removeFromSet id l.BoundedContextId
-                  ByKey =
-                      state.ByKey
+                  ByShortName =
+                      state.ByShortName
                       |> Map.filter (fun _ v -> v <> l.BoundedContextId) }
         | _ -> state
 
-    let byName (model: BoundedContextByKeyAndNameModel) (phrase: SearchPhrase) =
+    let byName (model: BoundedContextByShortNameAndNameModel) (phrase: SearchPhrase) =
         model.ByName
-        |> findByKey phrase
+        |> findByPhrase phrase
         |> SearchPhraseResult.fromManyResults
 
-    let byKey (model: BoundedContextByKeyAndNameModel) (phrase: SearchPhrase) =
-        model.ByKey
-        |> findByKey phrase
+    let byShortName (model: BoundedContextByShortNameAndNameModel) (phrase: SearchPhrase) =
+        model.ByShortName
+        |> findByPhrase phrase
         |> SearchPhraseResult.fromResults
 
     type ReadModel =
-        ReadModels.ReadModel<Aggregates.BoundedContext.Event, BoundedContextByKeyAndNameModel>
+        ReadModels.ReadModel<Aggregates.BoundedContext.Event, BoundedContextByShortNameAndNameModel>
 
     let readModel () =
         let updateState state eventEnvelopes =
@@ -376,4 +376,4 @@ module BoundedContexts =
 
             newState
 
-        ReadModels.readModel updateState BoundedContextByKeyAndNameModel.Empty
+        ReadModels.readModel updateState BoundedContextByShortNameAndNameModel.Empty

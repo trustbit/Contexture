@@ -31,14 +31,17 @@ jobs:
       name: Build
     - run: make test-backend
       name: Test
-    - name: Setup Elm
-      uses: jorelali/setup-elm@v2
+    - name: Setup Node.js
+      uses: actions/setup-node@v3
+      with:
+        node-version: '18.x'
     - run: make prepare-image
     - name: prepare scenario
       run: cp ./example/restaurant-db.json ./artifacts/image/db.json
     - name: 'Deploy to Azure WebApp'
       uses: azure/webapps-deploy@v2
-      with: 
+      with:
         app-name: ${{ env.AZURE_WEBAPP_NAME }}
         publish-profile: ${{ secrets.AZURE_WEBAPP_PUBLISH_PROFILE }}
         package: ${{ env.AZURE_WEBAPP_PACKAGE_PATH }}
+

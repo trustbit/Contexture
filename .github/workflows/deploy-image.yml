@@ -20,8 +20,10 @@ jobs:
       name: Build
     - run: make test-backend
       name: Test
-    - name: Setup Elm
-      uses: jorelali/setup-elm@v2
+    - name: Setup Node.js
+      uses: actions/setup-node@v3
+      with:
+        node-version: '18.x'
     - run: make prepare-image
       name: Prepares backend & frontend into an image
     - name: Publish to Registry

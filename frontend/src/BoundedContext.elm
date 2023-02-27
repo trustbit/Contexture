@@ -1,8 +1,8 @@
 module BoundedContext exposing (
   BoundedContext, Problem, Name,
   changeName, name, isName,
-  domain, id, key, changeKey,
-  move, remove, assignKey,
+  domain, id, shortName, changeShortName,
+  move, remove, assignShortName,
   newBoundedContext,
   idFieldDecoder, nameFieldDecoder, modelDecoder)
 
@@ -14,7 +14,7 @@ import Http
 import Url
 import Api exposing (ApiResult)
 
-import Key exposing (Key)
+import ShortName exposing (ShortName)
 import Domain
 import Domain.DomainId as Domain exposing (DomainId, idEncoder)
 import BoundedContext.BoundedContextId exposing (BoundedContextId, idDecoder)
@@ -34,7 +34,7 @@ type alias Internals =
   { id : BoundedContextId
   , domain : DomainId
   , name : String
-  , key : Maybe Key
+  , shortName : Maybe ShortName
   }
 
 isName : String -> Result Problem Name
@@ -44,9 +44,9 @@ isName couldBeName =
   else Err NameInvalid
 
 
-changeKey : Maybe Key -> BoundedContext -> BoundedContext
-changeKey aKey (BoundedContext context) =
-  BoundedContext { context | key = aKey }
+changeShortName : Maybe ShortName -> BoundedContext -> BoundedContext
+changeShortName aShortName (BoundedContext context) =
+  BoundedContext { context | shortName = aShortName }
 
 id : BoundedContext -> BoundedContextId
 id (BoundedContext context) =
@@ -63,9 +63,9 @@ domain (BoundedContext context) =
   context.domain
 
 
-key : BoundedContext -> Maybe Key
-key (BoundedContext context) =
-  context.key
+shortName : BoundedContext -> Maybe ShortName
+shortName (BoundedContext context) =
+  context.shortName
 
 idFieldDecoder : Decoder BoundedContextId
 idFieldDecoder =
@@ -93,7 +93,7 @@ modelDecoder =
     |> JP.custom idFieldDecoder
     |> JP.custom parentDomainIdFieldDecoder
     |> JP.custom nameFieldDecoder
-    |> JP.optional "key" (Decode.maybe Key.keyDecoder) Nothing
+    |> JP.optional "shortName" (Decode.maybe ShortName.shortNameDecoder) Nothing
   ) |> Decode.map BoundedContext
 
 
@@ -129,19 +129,19 @@ move base contextId targetDomain =
   in
     request
 
-assignKey : Api.Configuration -> BoundedContextId -> Maybe Key -> ApiResult BoundedContext msg
-assignKey base contextId contextKey =
+assignShortName : Api.Configuration -> BoundedContextId -> Maybe ShortName -> ApiResult BoundedContext msg
+assignShortName base contextId contextShortName =
   let
-    encodedKey =
-      case contextKey of
-        Just v -> Key.keyEncoder v
+    encodedShortName =
+      case contextShortName of
+        Just v -> ShortName.shortNameEncoder v
         Nothing -> Encode.null
     request toMsg =
       Http.request
       { method = "POST"
       , headers = []
-      , url = contextId |> Api.boundedContext |> Api.url base  |> (\c -> c ++ "/key")
-      , body = Http.jsonBody <| Encode.object[ ("key", encodedKey) ]
+      , url = contextId |> Api.boundedContext |> Api.url base  |> (\c -> c ++ "/shortName")
+      , body = Http.jsonBody <| Encode.object[ ("shortName", encodedShortName) ]
       , expect = Http.expectJson toMsg modelDecoder
       , timeout = Nothing
       , tracker = Nothing

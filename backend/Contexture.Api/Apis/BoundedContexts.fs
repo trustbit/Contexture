@@ -19,7 +19,7 @@ module BoundedContexts =
         type BoundedContextResult =
             { Id: BoundedContextId
               ParentDomainId: DomainId
-              Key: string option
+              ShortName: string option
               Name: string
               Description: string option
               Classification: StrategicClassification
@@ -37,7 +37,7 @@ module BoundedContexts =
             =
             { Id = boundedContext.Id
               ParentDomainId = boundedContext.DomainId
-              Key = boundedContext.Key
+              ShortName = boundedContext.ShortName
               Name = boundedContext.Name
               Description = boundedContext.Description
               Classification = boundedContext.Classification
@@ -73,8 +73,8 @@ module BoundedContexts =
         let rename contextId (command: RenameBoundedContext) =
             updateAndReturnBoundedContext (RenameBoundedContext(contextId, command))
 
-        let key contextId (command: AssignKey) =
-            updateAndReturnBoundedContext (AssignKey(contextId, command))
+        let shortName contextId (command: AssignShortName) =
+            updateAndReturnBoundedContext (AssignShortName(contextId, command))
 
         let move contextId (command: MoveBoundedContextToDomain) =
             updateAndReturnBoundedContext (MoveBoundedContextToDomain(contextId, command))
@@ -272,8 +272,8 @@ module BoundedContexts =
                                         >=> route "/rename"
                                         >=> bindJson (CommandEndpoints.rename contextId)
                                         POST
-                                        >=> route "/key"
-                                        >=> bindJson (CommandEndpoints.key contextId)
+                                        >=> route "/shortName"
+                                        >=> bindJson (CommandEndpoints.shortName contextId)
                                         POST
                                         >=> route "/move"
                                         >=> bindJson (CommandEndpoints.move contextId)
