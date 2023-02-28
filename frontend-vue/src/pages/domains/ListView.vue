@@ -12,7 +12,7 @@
     />
 
     <div v-else class="w-full">
-      <div class="text-sm text-gray-700" v-if="parentDomains.length === 0">{{ $t("domains.empty") }}</div>
+      <div class="text-sm text-gray-700" v-if="parentDomains.length === 0">{{ t('domains.empty') }}</div>
       <div v-else>
         <ContextureSearch v-model="searchQuery" :placeholder="t('domains.list.search.bounded_contexts')" />
 
@@ -26,7 +26,8 @@
             <div class="grid-cols-3 gap-4 bg-gray-100 p-2 sm:grid sm:p-6" v-if="showParentDomain(parentDomain.id)">
               <!-- parent domains -->
               <!-- first column -->
-              <div class="top-[40px] order-1 col-start-1 flex self-start rounded bg-white p-4 sm:sticky">
+              <RouterLink :to="`/domain/${parentDomain.id}`"
+                          class="top-[40px] order-1 col-start-1 flex self-start rounded bg-white p-4 sm:sticky hover:bg-blue-50">
                 <div>
                   <div class="flex">
                     <Icon:material-symbols:flip-to-back aria-hidden="true" class="h-6 w-6 text-blue-500" />
@@ -52,10 +53,10 @@
                       >
                         <Icon:material-symbols:flip-to-back aria-hidden="true" class="mr-1.5 text-purple-500" />
                         <span class="font-bold text-blue-900">{{
-                          t("domains.list.subdomains", {
-                            count: parentDomain.subdomains.length,
-                          })
-                        }}</span>
+                            t("domains.list.subdomains", {
+                              count: parentDomain.subdomains.length
+                            })
+                          }}</span>
                       </ContextureBadge>
                       <ContextureBadge
                         v-if="parentDomain.boundedContexts.length > 0"
@@ -67,10 +68,10 @@
                       >
                         <Icon:material-symbols:select-all aria-hidden="true" class="mr-1.5 text-yellow-500" />
                         <span class="font-bold text-blue-900">{{
-                          t("domains.list.bounded_contexts", {
-                            count: parentDomain.boundedContexts.length,
-                          })
-                        }}</span>
+                            t("domains.list.bounded_contexts", {
+                              count: parentDomain.boundedContexts.length
+                            })
+                          }}</span>
                       </ContextureBadge>
                     </div>
                   </div>
@@ -82,7 +83,7 @@
                     </p>
                   </div>
                 </div>
-              </div>
+              </RouterLink>
 
               <!-- second & third column -->
               <!-- Subdomains & bounded contexts -->
@@ -90,7 +91,8 @@
                 <div v-for="subdomain of filteredSubdomains[parentDomain.id]" :key="subdomain.id" class="mb-8">
                   <div class="grid-cols-2 gap-x-4 sm:grid">
                     <!-- second column -->
-                    <div class="top-[40px] flex flex-col self-start rounded bg-white p-4 sm:sticky">
+                    <RouterLink :to="`/domain/${subdomain.id}`"
+                                class="top-[40px] flex flex-col self-start rounded bg-white p-4 sm:sticky hover:bg-blue-50">
                       <div class="text-gray-800">
                         <div class="mb-2 flex flex-wrap items-center gap-x-1 text-xs font-bold">
                           {{ parentDomain.name }}
@@ -124,7 +126,7 @@
                           <span class="font-bold text-blue-900">
                             {{
                               t("domains.list.subdomains", {
-                                count: subdomainsByDomainId[subdomain.id].length,
+                                count: subdomainsByDomainId[subdomain.id].length
                               })
                             }}
                           </span>
@@ -141,7 +143,7 @@
                           <span class="font-bold text-blue-900">
                             {{
                               t("domains.list.bounded_contexts", {
-                                count: boundedContextsByDomainId[subdomain.id]?.length,
+                                count: boundedContextsByDomainId[subdomain.id]?.length
                               })
                             }}
                           </span>
@@ -154,14 +156,15 @@
                           {{ subdomain.vision }}
                         </p>
                       </div>
-                    </div>
+                    </RouterLink>
 
                     <!-- third column -->
                     <div class="flex flex-col gap-y-4">
-                      <div
+                      <RouterLink
                         v-for="boundedContext of filteredBoundedContexts[subdomain.id]"
-                        class="rounded bg-white p-4"
+                        class="rounded bg-white p-4 hover:bg-blue-50"
                         :key="boundedContext.id"
+                        :to="`/boundedContext/${boundedContext.id}/canvas`"
                       >
                         <div class="text-gray-800">
                           <div class="mb-2 flex flex-wrap items-center gap-x-1 text-xs font-bold">
@@ -220,7 +223,7 @@
                             </div>
                           </div>
                         </div>
-                      </div>
+                      </RouterLink>
                     </div>
                   </div>
                 </div>
@@ -228,11 +231,12 @@
 
               <!-- third column -->
               <!-- Bounded Context belonging to a parent domain -->
-              <div class="order-2 col-start-3 col-end-3">
-                <div
+              <div class="order-2 col-start-3 col-end-3 flex flex-col gap-y-4">
+                <RouterLink
                   v-for="boundedContext of filteredBoundedContexts[parentDomain.id]"
-                  class="mt-2 rounded bg-white p-4"
+                  class="rounded bg-white p-4 hover:bg-blue-50"
                   :key="boundedContext.id"
+                  :to="`/boundedContext/${boundedContext.id}/canvas`"
                 >
                   <div class="text-gray-800">
                     <div class="mb-2 flex flex-wrap items-center gap-x-1 text-xs font-bold">
@@ -290,7 +294,7 @@
                       </div>
                     </div>
                   </div>
-                </div>
+                </RouterLink>
               </div>
             </div>
           </template>
@@ -311,7 +315,7 @@ import ContextureHelpfulErrorAlert from "~/components/primitives/alert/Contextur
 import ContextureBadge from "~/components/primitives/badge/ContextureBadge.vue";
 import ContextureSearch from "~/components/primitives/input/ContextureSearch.vue";
 import ContextureSwitch from "~/components/primitives/switch/ContextureSwitch.vue";
-import { isLink } from "~/core";
+import { filter, isLink } from "~/core";
 import { useBoundedContextsStore } from "~/stores/boundedContexts";
 import { useDomainsStore } from "~/stores/domains";
 import { BoundedContext } from "~/types/boundedContext";
@@ -328,9 +332,9 @@ const { subdomainsByDomainId, parentDomains, loading, loadingError } = storeToRe
 
 const options: Ref<DomainListViewSettings> = useLocalStorage<DomainListViewSettings>("settings.domains.listView", {
   showDescription: false,
-  showNamespaces: false,
+  showNamespaces: false
 });
-const searchQuery = useRouteQuery("query");
+const searchQuery = useRouteQuery<string>("query");
 const searchQueryDebounced = refDebounced(searchQuery, 500);
 
 const filteredBoundedContexts = computed<{ [domainId: string]: BoundedContext[] }>(() => {
@@ -363,42 +367,14 @@ const filteredSubdomains = computed(() => {
   }
 });
 
-function filter(obj: any, query: string, key: string | undefined) {
-  for (const prop in obj) {
-    if (key && prop !== key) {
-      continue;
-    }
-    if (Array.isArray(obj[prop])) {
-      if (obj[prop].includes(query)) {
-        return true;
-      }
-      const nestedResults = searchInArray(obj[prop] as any[], query);
-      if (nestedResults.length) {
-        return true;
-      }
-    } else {
-      if (typeof obj[prop] === "string") {
-        if (obj[prop].toLowerCase().includes(query?.toLowerCase())) {
-          return true;
-        }
-      }
-    }
-  }
-  return false;
-}
-
-const searchInArray = (array: any[], query: string, key?: string): any[] => {
-  return array.filter((o) => filter(o, query, key));
-};
-
 const searchInBoundedContext = (
   objectToSearchIn: { [id: DomainId]: BoundedContext[] },
   query: string,
-  keys?: string
-): {} => {
-  return Object.keys(objectToSearchIn).reduce((curr: any, key: any) => {
-    const arr = objectToSearchIn[key];
-    const filtered = arr.filter((a) => filter(a, query, keys));
+  keyToInclude?: string
+): { [id: DomainId]: BoundedContext[] } => {
+  return Object.keys(objectToSearchIn).reduce((curr: { [id: DomainId]: BoundedContext[] }, key: DomainId) => {
+    const boundedContexts = objectToSearchIn[key];
+    const filtered = boundedContexts.filter((boundedContext) => filter(boundedContext, query, keyToInclude));
 
     if (filtered.length === 0) {
       return curr;

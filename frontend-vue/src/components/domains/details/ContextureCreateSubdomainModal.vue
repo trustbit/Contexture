@@ -1,7 +1,7 @@
 <template>
   <ContextureModal :title="t('domains.modal.create_subdomain.title')" :is-open="isOpen" @cancel="onCancel">
     <ContextureHelpfulErrorAlert v-bind="submitError" />
-    <div class="w-96 pt-8">
+    <div class="sm:w-96 pt-8">
       <ContextureDynamicForm
         @submit="onAddNewSubdomain"
         :schema="form"
