@@ -26,8 +26,8 @@ Domains of the example
 An overview on the Bounded Contexts of the "Restaurant Experience" domain
 ![An overview on the Bounded Contexts of a domain](example/DomainOverview.png)
 
-A detailed view of the "Billing" Bounded Context with the help of the Bounded-Context-Canvas-v3
-![A detailed view on the Bounded-Context-Canvas, v3](example/CanvasV3Overview.png)
+A detailed view of the "Billing" Bounded Context with the help of the Bounded-Context-Canvas-v4
+![A detailed view on the Bounded-Context-Canvas, v4](example/CanvasV4Overview.png)
 
 ## Contexture backend
 
