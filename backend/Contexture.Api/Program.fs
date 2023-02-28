@@ -139,8 +139,6 @@ let webApp hostFrontend =
                    AllRoute.routes
             ])
          route "/meta" >=> GET >=> status
-         Views.Search.routes
-         Views.Namespaces.routes
          hostFrontend
          RequestErrors.NOT_FOUND "Not found"
     ]
