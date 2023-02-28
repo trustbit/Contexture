@@ -12,7 +12,7 @@
     />
 
     <div v-else class="w-full">
-      <div class="text-sm text-gray-700" v-if="parentDomains.length === 0">{{ t('domains.empty') }}</div>
+      <div class="text-sm text-gray-700" v-if="parentDomains.length === 0">{{ t("domains.empty") }}</div>
       <div v-else>
         <ContextureSearch v-model="searchQuery" :placeholder="t('domains.list.search.bounded_contexts')" />
 
@@ -26,8 +26,10 @@
             <div class="grid-cols-3 gap-4 bg-gray-100 p-2 sm:grid sm:p-6" v-if="showParentDomain(parentDomain.id)">
               <!-- parent domains -->
               <!-- first column -->
-              <RouterLink :to="`/domain/${parentDomain.id}`"
-                          class="top-[40px] order-1 col-start-1 flex self-start rounded bg-white p-4 sm:sticky hover:bg-blue-50">
+              <RouterLink
+                :to="`/domain/${parentDomain.id}`"
+                class="top-[40px] order-1 col-start-1 flex self-start rounded bg-white p-4 hover:bg-blue-50 sm:sticky"
+              >
                 <div>
                   <div class="flex">
                     <Icon:material-symbols:flip-to-back aria-hidden="true" class="h-6 w-6 text-blue-500" />
@@ -53,10 +55,10 @@
                       >
                         <Icon:material-symbols:flip-to-back aria-hidden="true" class="mr-1.5 text-purple-500" />
                         <span class="font-bold text-blue-900">{{
-                            t("domains.list.subdomains", {
-                              count: parentDomain.subdomains.length
-                            })
-                          }}</span>
+                          t("domains.list.subdomains", {
+                            count: parentDomain.subdomains.length,
+                          })
+                        }}</span>
                       </ContextureBadge>
                       <ContextureBadge
                         v-if="parentDomain.boundedContexts.length > 0"
@@ -68,10 +70,10 @@
                       >
                         <Icon:material-symbols:select-all aria-hidden="true" class="mr-1.5 text-yellow-500" />
                         <span class="font-bold text-blue-900">{{
-                            t("domains.list.bounded_contexts", {
-                              count: parentDomain.boundedContexts.length
-                            })
-                          }}</span>
+                          t("domains.list.bounded_contexts", {
+                            count: parentDomain.boundedContexts.length,
+                          })
+                        }}</span>
                       </ContextureBadge>
                     </div>
                   </div>
@@ -91,8 +93,10 @@
                 <div v-for="subdomain of filteredSubdomains[parentDomain.id]" :key="subdomain.id" class="mb-8">
                   <div class="grid-cols-2 gap-x-4 sm:grid">
                     <!-- second column -->
-                    <RouterLink :to="`/domain/${subdomain.id}`"
-                                class="top-[40px] flex flex-col self-start rounded bg-white p-4 sm:sticky hover:bg-blue-50">
+                    <RouterLink
+                      :to="`/domain/${subdomain.id}`"
+                      class="top-[40px] flex flex-col self-start rounded bg-white p-4 hover:bg-blue-50 sm:sticky"
+                    >
                       <div class="text-gray-800">
                         <div class="mb-2 flex flex-wrap items-center gap-x-1 text-xs font-bold">
                           {{ parentDomain.name }}
@@ -126,7 +130,7 @@
                           <span class="font-bold text-blue-900">
                             {{
                               t("domains.list.subdomains", {
-                                count: subdomainsByDomainId[subdomain.id].length
+                                count: subdomainsByDomainId[subdomain.id].length,
                               })
                             }}
                           </span>
@@ -143,7 +147,7 @@
                           <span class="font-bold text-blue-900">
                             {{
                               t("domains.list.bounded_contexts", {
-                                count: boundedContextsByDomainId[subdomain.id]?.length
+                                count: boundedContextsByDomainId[subdomain.id]?.length,
                               })
                             }}
                           </span>
@@ -332,7 +336,7 @@ const { subdomainsByDomainId, parentDomains, loading, loadingError } = storeToRe
 
 const options: Ref<DomainListViewSettings> = useLocalStorage<DomainListViewSettings>("settings.domains.listView", {
   showDescription: false,
-  showNamespaces: false
+  showNamespaces: false,
 });
 const searchQuery = useRouteQuery<string>("query");
 const searchQueryDebounced = refDebounced(searchQuery, 500);

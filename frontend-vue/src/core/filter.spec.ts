@@ -37,5 +37,4 @@ describe("filter", () => {
 
     expect(actualFound).toBeFalsy();
   });
-
 });
