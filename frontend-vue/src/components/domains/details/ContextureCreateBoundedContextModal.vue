@@ -1,7 +1,7 @@
 <template>
   <ContextureModal :title="t('domains.modal.create_bounded_context.title')" :is-open="isOpen" @cancel="onCancel">
     <ContextureHelpfulErrorAlert v-bind="submitError" />
-    <div class="w-96 pt-8">
+    <div class="pt-8 sm:w-96">
       <ContextureDynamicForm
         @submit="onAddNewBoundedContext"
         :schema="form"
