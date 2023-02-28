@@ -19,8 +19,8 @@ open Microsoft.Extensions.Options
 open FSharp.Control.Tasks
 
 [<CLIMutable>]
-type ContextureOptions =
-    { DatabasePath: string
+type ContextureOptions = 
+    { DatabasePath: string 
       GitHash: string
     }
 
@@ -155,8 +155,8 @@ let frontendHostRoutes (env: IWebHostEnvironment) : HttpHandler =
     if env.IsDevelopment() then
         detectRedirectLoop >=>
             choose [
-                GET >=>
-                    fun (next : HttpFunc) (ctx : HttpContext) ->
+                GET >=> 
+                    fun (next : HttpFunc) (ctx : HttpContext) -> 
                         let urlBuilder =
                             ctx.GetRequestUrl()
                             |> UriBuilder
@@ -164,7 +164,7 @@ let frontendHostRoutes (env: IWebHostEnvironment) : HttpHandler =
                         urlBuilder.Scheme <- "http"
                         redirectTo false (urlBuilder.ToString()) next ctx
             ]
-
+     
     else
         detectRedirectLoop >=>
             choose [
@@ -178,7 +178,7 @@ let errorHandler (ex : Exception) (logger : ILogger) =
 
 let utcNowClock =
     fun () ->  System.DateTime.UtcNow
-
+        
 let configureCors (builder : CorsPolicyBuilder) =
     builder
         .AllowAnyOrigin()
@@ -186,7 +186,7 @@ let configureCors (builder : CorsPolicyBuilder) =
         .AllowAnyHeader()
         |> ignore
 
-let configureApp (app : IApplicationBuilder) =
+let configureApp (app : IApplicationBuilder) =    
     let env = app.ApplicationServices.GetService<IWebHostEnvironment>()
     (match env.IsDevelopment() with
     | true  ->
@@ -196,19 +196,19 @@ let configureApp (app : IApplicationBuilder) =
         .UseCors(configureCors)
         .UseStaticFiles()
         .UseGiraffe(webApp (frontendHostRoutes env))
-
+        
 let configureJsonSerializer (services: IServiceCollection) =
     Database.Serialization.serializerOptions
     |> SystemTextJson.Serializer
     |> services.AddSingleton<Json.ISerializer>
     |> ignore
-
+    
 let registerReadModel<'R, 'E, 'S when 'R :> ReadModels.ReadModel<'E,'S> and 'R : not struct> (readModel: 'R) (services: IServiceCollection) =
     services.AddSingleton<'R>(readModel) |> ignore
     let initializeReadModel (s: IServiceProvider) =
         ReadModels.ReadModelInitialization.initializeWith (s.GetRequiredService<EventStore>()) readModel.EventHandler
     services.AddSingleton<ReadModels.ReadModelInitialization> initializeReadModel
-
+    
 let configureReadModels (services: IServiceCollection) =
     services
     |> registerReadModel (ReadModels.Domain.domainsReadModel())
@@ -235,13 +235,13 @@ let configureServices (context: HostBuilderContext) (services : IServiceCollecti
         |> Async.AwaitTask
         |> Async.RunSynchronously
         )
-
+        
         |> ignore
-
+    
     services.AddSingleton<Clock>(utcNowClock) |> ignore
-    services.AddSingleton<EventStore> (EventStore.Empty) |> ignore
+    services.AddSingleton<EventStore> (EventStore.Empty) |> ignore 
     services |> configureReadModels
-
+    
     services.AddCors() |> ignore
     services.AddGiraffe() |> ignore
     services |> configureJsonSerializer
@@ -278,19 +278,19 @@ let importFromDocument clock (store: EventStore) (database: Document) = async {
         |> List.map (Collaboration.asEvents clock)
         |> List.map store.Append
         |> runAsync
-
+    
     do!
         database.Domains.All
         |> List.map (Domain.asEvents clock)
         |> List.map store.Append
         |> runAsync
-
+    
     do!
         database.BoundedContexts.All
         |> List.map (BoundedContext.asEvents clock)
         |> List.map store.Append
         |> runAsync
-
+    
     do!
         database.BoundedContexts.All
         |> List.map (Namespace.asEvents clock)
@@ -311,7 +311,7 @@ let runAsync (host: IHost) =
 
         let store =
             host.Services.GetRequiredService<EventStore>()
-
+            
         let clock = host.Services.GetRequiredService<Clock>()
 
         // connect and replay before we start import the document
@@ -322,7 +322,7 @@ let runAsync (host: IHost) =
 
         let! document = database.Read()
         do! importFromDocument clock store document
-
+        
         let loggerFactory = host.Services.GetRequiredService<ILoggerFactory>()
         let subscriptionLogger = loggerFactory.CreateLogger("subscriptions")
 
