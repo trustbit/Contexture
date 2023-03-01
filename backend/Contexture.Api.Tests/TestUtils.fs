@@ -29,7 +29,7 @@ module TestHost =
             .ConfigureServices(Action<_, _> configureServices)
             .ConfigureWebHostDefaults(fun (webHost: IWebHostBuilder) ->
                 webHost
-                    .UseSetting("DatabasePath", "unit-tests.json")
+                    .UseSetting("FileBased:Path", "unit-tests.json")
                     .Configure(Action<_> configure)
                     .UseTestServer()
                     .ConfigureTestServices(Action<_> configureTest)

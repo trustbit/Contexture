@@ -7,6 +7,7 @@ open System.Threading.Tasks
 open Contexture.Api.FileBased.Database
 open Contexture.Api.Infrastructure
 open Contexture.Api.Infrastructure.Storage
+open FsToolkit.ErrorHandling
 open Giraffe
 open Microsoft.AspNetCore.Builder
 open Microsoft.AspNetCore.Http
@@ -17,13 +18,9 @@ open Microsoft.Extensions.Hosting
 open Microsoft.Extensions.Logging
 open Microsoft.Extensions.DependencyInjection
 open Microsoft.Extensions.Options
+open System.Text.Json
+open System.Text.Json.Serialization
 
-[<CLIMutable>]
-type ContextureOptions = 
-    { ConnectionString: string
-      DatabasePath: string 
-      GitHash: string
-    }
 
 module SystemRoutes =
     let errorHandler (ex : Exception) (logger : ILogger) =
@@ -107,7 +104,24 @@ let configureApp (app : IApplicationBuilder) =
         .UseGiraffe(Routes.webApp (Routes.frontendHostRoutes env))
         
 let configureJsonSerializer (services: IServiceCollection) =
-    FileBased.Database.Serialization.serializerOptions
+    let options =
+        System.Text.Json.JsonSerializerOptions(
+            Encoder = System.Text.Encodings.Web.JavaScriptEncoder.UnsafeRelaxedJsonEscaping,
+            PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.CamelCase,
+            IgnoreNullValues = true,
+            WriteIndented = true,
+            NumberHandling = System.Text.Json.Serialization.JsonNumberHandling.AllowReadingFromString
+        )
+        
+    let fSharpOptions =
+        JsonFSharpOptions.Default()
+            .WithUnionUntagged()
+            .WithUnionUnwrapRecordCases()
+            .WithUnionUnwrapFieldlessTags()
+            
+    fSharpOptions.AddToJsonSerializerOptions(options)
+    
+    options
     |> SystemTextJson.Serializer
     |> services.AddSingleton<Json.ISerializer>
     |> ignore
@@ -131,31 +145,19 @@ let configureReadModels (services: IServiceCollection) =
     |> registerReadModel (ReadModels.Find.Namespaces.readModel())
     |> ignore
 
-let buildContextureConfiguration (options:ContextureOptions) =
-    if not (String.IsNullOrEmpty options.ConnectionString) then
-        { GitHash = options.GitHash
-          Engine = SqlServerBased options.ConnectionString
-        }
-    else if not (String.IsNullOrEmpty options.DatabasePath) then
-        { GitHash = options.GitHash
-          Engine = FileBased options.DatabasePath
-        }
-    else
-        failwith "Unable to initialize Contexture configuration"
 
 let configureServices (context: HostBuilderContext) (services : IServiceCollection) =
     services
-        .AddOptions<ContextureOptions>()
+        .AddOptions<Options.ContextureOptions>()
         .Bind(context.Configuration)
-        .Validate((fun options -> not (String.IsNullOrEmpty options.DatabasePath) || not(String.IsNullOrEmpty options.ConnectionString)), "A non-empty Database configuration is required: Configure either a file based DatabasePath or a SQL based ConnectionString")
         |> ignore
     
     services.AddSingleton<ContextureConfiguration>(fun p ->
-        let options = p.GetRequiredService<IOptions<ContextureOptions>>().Value
-        buildContextureConfiguration options
+        let options = p.GetRequiredService<IOptions<Options.ContextureOptions>>().Value
+        Options.buildConfiguration options
     ) |> ignore 
 
-    let configuration = context.Configuration.Get<ContextureOptions>() |> buildContextureConfiguration
+    let configuration = context.Configuration.Get<Options.ContextureOptions>() |> Options.buildConfiguration
     
     match configuration.Engine with
     | FileBased path ->

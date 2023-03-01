@@ -31,19 +31,25 @@ A detailed view of the "Billing" Bounded Context with the help of the Bounded-Co
 
 ## Contexture backend
 
-The Contexture server implements a simple storage backend that exposes a file system backed API and serves static assets through a Giraffe F# application.
+The Contexture server provides the API to store data and serves static assets through a Giraffe F# application.
+Currently two storage engines are supported:
+- a simple, file based engine that persists data in a single specified file with a JSON-based format. 
+  With this engine no versions or change dates are supported at the moment  
+- a SQL-Server based engine that uses an event-sourced storage with support of database base version information and change dates.
 
-### Run the backend
+### Run and configure the backend
 
-Contexture server will listen on port `5000` per default and use `data/db.json` as default database file.
+With the default settings the Contexture server will listen on port `5000` and use the file based engine with  `data/db.json` as database file.
 If you want to have the server listening on any other port, set the environment variable `ASPNETCORE_URLS=http://*:8080` to the desired port.
-To choose a different database file configure the `DatabasePath` configuration via an environment variable.
-Note: you might need to exclude launch-profiles on start via `--no-launch-profile`.
+To choose and configure a different database engine use the following configurations (explained via environment variables but default ASP.NET Core patterns for configurations apply):
+- `FileBased__Path=/data/db.json` to use the file based engine with the file `db.json` located in the `/data` directory or volume.
+- `SqlBased__ConnectionString=Server=localhost;User Id=sa;Password=development(!)Password` to use the Sql Server engine with the database on `localhost` accessed by the `sa` user and it's (unsafe!) password
 
 ```bash
 cd backend
 dotnet run --project Contexture.Api
 ```
+Note: when running Contexture you might need to exclude current launch-profiles via `--no-launch-profile`.
 
 ### Publish and running the backend manually
 
@@ -55,13 +61,13 @@ dotnet run --configuration Release Contexture.Api/Contexture.Api.fsproj --output
 Run the published version of the backend:
 ```
 cd artifacts
-ASPNETCORE_URLS=http://*:8080 DATABASEPATH=data/mydb.json dotnet Contexture.Api.App.dll
+ASPNETCORE_URLS=http://*:8080 FileBased__Path=data/mydb.json dotnet Contexture.Api.App.dll
 ```
 
 ### Caveats
 
 - `cors` is configured to allow all origins
-- no logging built in
+- no authentication and authorization built in
 - no UI for Namespace-template administration.
   Use the following `curl` commands to manage templates:
     - get templates
@@ -92,7 +98,8 @@ ASPNETCORE_URLS=http://*:8080 DATABASEPATH=data/mydb.json dotnet Contexture.Api.
 
 ### Testing the backend
 
-Integration tests supported by a Docker based on MS-SQL image exist. On an ARM-based Mac (M1/M2) [this Docker-Feature](https://github.com/microsoft/mssql-docker/issues/668#issuecomment-1412206521) must be enabled
+The integration tests for the SQL-Server based engine are supported by a MS-SQL Docker image.
+On an ARM-based Mac (M1/M2) [this Docker-Feature](https://github.com/microsoft/mssql-docker/issues/668#issuecomment-1412206521) must be enabled for now.
 
 ## Contexture frontend application
 
@@ -117,6 +124,27 @@ To build the Docker image use the `Makefile` via `make build-image` or execute t
 To run the `softwarepark/contexture` image use `make run-app` and browse to <http://localhost:3000>.
 
 Your data will be stored in the `/data/db.json` file on the volume `/data`.
+
+## Importing and Exporting data
+
+The following endpoints to export and import snapshots of data exist:
+
+```bash
+# gets a snapshot of the data from a Contexture instance at $BASE_URL and saves content to $FILENAME.json
+# Note: the result does not contain historic / versioned data at the moment
+curl -X GET $BASE_URL/api/all -o $FILENAME.json
+```
+
+```bash
+# Replaces all data in Contexture with the content of the file - this DELETES all existing data!
+# Returns the content previous the the restore and stores it in $OLD_FILENAME.json
+# Note: after the request the application is terminated and needs to be restarted (by Kubernetes)
+curl -X PUT \
+   -o $OLD_FILENAME.JSON \
+   -H "Content-Type: application/json" \
+   -d @$FILENAME.json \
+   $BASE_URL/api/all
+```
 
 ## Contributors
 
