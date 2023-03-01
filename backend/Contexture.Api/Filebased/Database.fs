@@ -180,7 +180,7 @@ module Serialization =
               Collaborations = []
               NamespaceTemplates = [] }
 
-    let serializerOptions =
+    let private serializerOptions =
         let options =
             JsonSerializerOptions(
                 Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping,

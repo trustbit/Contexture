@@ -11,6 +11,71 @@ open Contexture.Api.Infrastructure
 open Contexture.Api.Aggregates
 open ReadModels
 
+let private projectAllData (ctx: HttpContext) =
+    task {
+        let! domainState = ctx.GetService<ReadModels.Domain.AllDomainReadModel>().State()
+
+        let! boundedContextState =
+            ctx.GetService<ReadModels.BoundedContext.AllBoundedContextsReadModel>().State()
+
+        let! namespaceState = ctx.GetService<ReadModels.Namespace.AllNamespacesReadModel>().State()
+
+        let! collaborationState =
+            ctx.GetService<ReadModels.Collaboration.AllCollaborationsReadModel>().State()
+
+        let! namespaceTemplatesState =
+            ctx.GetService<ReadModels.Templates.AllTemplatesReadModel>().State()
+
+        let domains = domainState |> Domain.allDomains
+        let boundedContexts = boundedContextState |> BoundedContext.allBoundedContexts
+        let namespacesOf = namespaceState |> Namespace.namespacesOf
+        let collaborations = collaborationState |> Collaboration.activeCollaborations
+        let templates = namespaceTemplatesState |> Templates.allTemplates
+
+        // for now we use the file format as our canonical import/export model
+        let document: Document =
+            { BoundedContexts =
+                collectionOfGuid
+                    (boundedContexts
+                     |> List.map (fun b ->
+                         { Serialization.BoundedContext.Id = b.Id
+                           Serialization.BoundedContext.DomainId = b.DomainId
+                           Serialization.BoundedContext.ShortName = b.ShortName
+                           Serialization.BoundedContext.Name = b.Name
+                           Serialization.BoundedContext.Description = b.Description
+                           Serialization.BoundedContext.Classification = b.Classification
+                           Serialization.BoundedContext.BusinessDecisions = b.BusinessDecisions
+                           Serialization.BoundedContext.Messages = b.Messages
+                           Serialization.BoundedContext.DomainRoles = b.DomainRoles
+                           Serialization.BoundedContext.UbiquitousLanguage = b.UbiquitousLanguage
+                           Serialization.BoundedContext.Namespaces = namespacesOf b.Id }))
+                    (fun b -> b.Id)
+
+              Domains =
+                  collectionOfGuid
+                      (domains
+                       |> List.map (fun d ->
+                           { Serialization.Domain.Id = d.Id
+                             Serialization.Domain.Name = d.Name
+                             Serialization.Domain.Vision = d.Vision
+                             Serialization.Domain.ShortName = d.ShortName
+                             Serialization.Domain.ParentDomainId = d.ParentDomainId }))
+                      (fun d -> d.Id)
+              Collaborations =
+                collectionOfGuid
+                    (collaborations
+                     |> List.map (fun c ->
+                         { Serialization.Collaboration.Id = c.Id
+                           Serialization.Collaboration.Description = c.Description
+                           Serialization.Collaboration.Initiator = c.Initiator
+                           Serialization.Collaboration.Recipient = c.Recipient
+                           Serialization.Collaboration.RelationshipType = c.RelationshipType }))
+                    (fun c -> c.Id)
+              NamespaceTemplates = collectionOfGuid templates (fun t -> t.Id) }
+
+        return document
+    }
+
 let getAllData =
     fun (next: HttpFunc) (ctx: HttpContext) ->
         task {
@@ -25,68 +90,7 @@ let getAllData =
                         return document
                     }
                 | SqlServerBased _ ->
-                    task {
-                        let! domainState = ctx.GetService<ReadModels.Domain.AllDomainReadModel>().State()
-
-                        let! boundedContextState =
-                            ctx.GetService<ReadModels.BoundedContext.AllBoundedContextsReadModel>().State()
-
-                        let! namespaceState = ctx.GetService<ReadModels.Namespace.AllNamespacesReadModel>().State()
-
-                        let! collaborationState =
-                            ctx.GetService<ReadModels.Collaboration.AllCollaborationsReadModel>().State()
-
-                        let! namespaceTemplatesState =
-                            ctx.GetService<ReadModels.Templates.AllTemplatesReadModel>().State()
-
-                        let domains = domainState |> Domain.allDomains
-                        let boundedContexts = boundedContextState |> BoundedContext.allBoundedContexts
-                        let namespacesOf = namespaceState |> Namespace.namespacesOf
-                        let collaborations = collaborationState |> Collaboration.activeCollaborations
-                        let templates = namespaceTemplatesState |> Templates.allTemplates
-
-                        let document: Document =
-                            { BoundedContexts =
-                                collectionOfGuid
-                                    (boundedContexts
-                                     |> List.map (fun b ->
-                                         { Serialization.BoundedContext.Id = b.Id
-                                           Serialization.BoundedContext.DomainId = b.DomainId
-                                           Serialization.BoundedContext.ShortName = b.ShortName
-                                           Serialization.BoundedContext.Name = b.Name
-                                           Serialization.BoundedContext.Description = b.Description
-                                           Serialization.BoundedContext.Classification = b.Classification
-                                           Serialization.BoundedContext.BusinessDecisions = b.BusinessDecisions
-                                           Serialization.BoundedContext.Messages = b.Messages
-                                           Serialization.BoundedContext.DomainRoles = b.DomainRoles
-                                           Serialization.BoundedContext.UbiquitousLanguage = b.UbiquitousLanguage
-                                           Serialization.BoundedContext.Namespaces = namespacesOf b.Id }))
-                                    (fun b -> b.Id)
-
-                              Domains =
-                                  collectionOfGuid
-                                      (domains
-                                       |> List.map (fun d ->
-                                           { Serialization.Domain.Id = d.Id
-                                             Serialization.Domain.Name = d.Name
-                                             Serialization.Domain.Vision = d.Vision
-                                             Serialization.Domain.ShortName = d.ShortName
-                                             Serialization.Domain.ParentDomainId = d.ParentDomainId }))
-                                      (fun d -> d.Id)
-                              Collaborations =
-                                collectionOfGuid
-                                    (collaborations
-                                     |> List.map (fun c ->
-                                         { Serialization.Collaboration.Id = c.Id
-                                           Serialization.Collaboration.Description = c.Description
-                                           Serialization.Collaboration.Initiator = c.Initiator
-                                           Serialization.Collaboration.Recipient = c.Recipient
-                                           Serialization.Collaboration.RelationshipType = c.RelationshipType }))
-                                    (fun c -> c.Id)
-                              NamespaceTemplates = collectionOfGuid templates (fun t -> t.Id) }
-
-                        return document
-                    }
+                    projectAllData ctx
 
             let returnValue =
                 {| BoundedContexts = result.BoundedContexts.All
@@ -144,16 +148,17 @@ let putReplaceAllData =
                             let! oldDocument = database.Read()
 
                             let! result = database.Change(fun _ -> Ok newDocument)
-                            return result |> Result.map (fun _ -> Some oldDocument)
+                            return result |> Result.map (fun _ -> oldDocument)
                         }
                     | SqlServerBased _ ->
                         task {
+                            let! document = projectAllData ctx
                             let store = ctx.GetService<EventStore>()
                             let persistence = ctx.GetService<NStore.Persistence.MsSql.MsSqlPersistence>()
                             do! persistence.DestroyAllAsync(ctx.RequestAborted)
                             do! persistence.InitAsync(ctx.RequestAborted)
                             do! FileBased.Convert.importFromDocument store newDocument
-                            return Ok None
+                            return Ok document
                         }
 
                 match result with
