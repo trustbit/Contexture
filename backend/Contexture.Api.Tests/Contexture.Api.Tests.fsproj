@@ -8,12 +8,14 @@
     </PropertyGroup>
 
     <ItemGroup>
-        <Compile Include="Tests.fs" />
+        <Compile Include="SqlServerFixture.fs" />
         <Compile Include="EnvironmentSimulation.fs" />
-        <Compile Include="TestUtils.fs" />
+        <Compile Include="TestSetup.fs" />
+        <Compile Include="Scenario.fs" />
         <Compile Include="EventStore.Tests.fs" />
         <Compile Include="Fixtures.fs" />
         <Compile Include="ApiTests.fs" />
+        <Compile Include="Tests.fs" />
     </ItemGroup>
 
     <ItemGroup>

@@ -52,6 +52,7 @@ module Position =
             invalidArg $"Value must not be smaller 0 but is {value}" (nameof value)
 
         Position value
+    let nextPosition (Position value) = Position (value + 1L)
 
 type EventMetadata =
     { Source: EventSource

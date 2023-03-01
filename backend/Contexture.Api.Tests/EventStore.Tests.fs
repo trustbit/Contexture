@@ -29,21 +29,6 @@ module Fixture =
         let eventSource = environment |> EnvironmentSimulation.PseudoRandom.guid
         createEvent eventSource
 
-let private oneTheoryTestCase (items: obj seq) = items |> Seq.toArray
-
-let private expectOk (result: Async<Result<'r, _>>) : Async<unit> =
-    async {
-        match! result with
-        | Ok _ -> return ()
-        | Error e -> return failwithf "Expected an Ok result but got Error:\n%O" e
-    }
-
-let private resultOrFail (result: Async<Result<'r, _>>) : Async<'r> =
-    async {
-        match! result with
-        | Ok r -> return r
-        | Error e -> return failwithf "Expected an Ok result but got Error:\n%O" e
-    }
 
 let private waitForResult (timeout: int) (receivedEvents: TaskCompletionSource<_>) =
     let cancelTask () : Task =
@@ -128,7 +113,7 @@ type EventStoreBehavior() =
             Assert.Equal(expectedPosition, position)
 
             let source = sources.Head
-            let! streamVersion, stream = eventStore.Stream source Version.start |> resultOrFail
+            let! streamVersion, stream = eventStore.Stream source Version.start |> Then.resultOrFail
 
             Then.assertSingle stream source
             Assert.Equal(expectedVersion, streamVersion)
@@ -142,14 +127,14 @@ type EventStoreBehavior() =
     [<Fact>]
     member this.canReadFromAnStoreWithMultipleStreamsAndMultipleEvents() =
         task {
-            let! eventStore, sources = this.anEventStoreWithStreamsAndEvents (3)
+            let! eventStore, sources = this.anEventStoreWithStreamsAndEvents 3
             let! (version, result: EventEnvelope<Fixture.TestStream> list) = eventStore.AllStreams()
             let expectedPosition = Position.from 3
             Then.assertAll result sources
             Assert.Equal(expectedPosition, version)
 
             for source in sources do
-                let! _, stream = eventStore.Stream source Version.start |> resultOrFail
+                let! _, stream = eventStore.Stream source Version.start |> Then.resultOrFail
                 Then.assertSingle stream source
 
             let! (version, allStreams: EventEnvelope<Fixture.TestStream> list) =
@@ -160,11 +145,11 @@ type EventStoreBehavior() =
         }
 
     [<Fact>]
-    member this.canWriteIntoEmptyEventStoreAndReread() =
+    member this.Stream_WriteIntoEmptyEventStore_RereadWrittenEvent() =
         task {
             let! eventStore = this.anEmptyEventStore ()
             let source,event = Fixture.generateEvent ()
-            do! eventStore.Append source Empty [ event ] |> expectOk
+            do! eventStore.Append source Empty [ event ] |> Then.expectOk
 
             let expectedPosition = Position.from 1
             let expectedVersion = Version.from 1
@@ -174,14 +159,14 @@ type EventStoreBehavior() =
             Assert.Equal(expectedPosition, position)
 
             let! (version, stream: EventEnvelope<Fixture.TestStream> list) =
-                eventStore.Stream source Version.start |> resultOrFail
+                eventStore.Stream source Version.start |> Then.resultOrFail
 
             Then.assertSingle stream source
             Assert.Equal(expectedVersion, version)
         }
 
     [<Fact>]
-    member this.canWriteIntoEmptyEventStoreAndReceiveEventViaSubscription() =
+    member this.Subscribe_WriteIntoEmptyEventStore_ReceiveEventViaSubscription() =
         task {
             let! eventStore = this.anEmptyEventStore ()
             let source, event = Fixture.generateEvent ()
@@ -190,12 +175,12 @@ type EventStoreBehavior() =
                 waitForEventsOnSubscription
                     Start
                     eventStore
-                    (fun () -> eventStore.Append source Empty [ event ] |> expectOk)
+                    (fun () -> eventStore.Append source Empty [ event ] |> Then.expectOk)
                     (fun events -> Then.assertSingle events source)
         }
 
     [<Fact>]
-    member this.canAppendToAnExistingStreamAndReceiveOnlyEventViaSubscriptionFromLatest() =
+    member this.Subscribe_AppendToAnExistingStream_ReceiveOnlyLatestEventViaSubscription() =
         task {
             let! eventStore, sources = this.anEventStoreWithStreamsAndEvents 1
             let source,event = Fixture.createEvent sources.Head
@@ -206,7 +191,7 @@ type EventStoreBehavior() =
                     eventStore
                     (fun () ->
                         eventStore.Append source (AtVersion(Version.from 1)) [ event ]
-                        |> expectOk)
+                        |> Then.expectOk)
                     (fun events ->
                         Then.assertSingle events source
                         let single = events.Head
@@ -214,10 +199,10 @@ type EventStoreBehavior() =
         }
 
     [<Fact>]
-    member this.canSubscribeFromStartOfExistingStream() =
+    member this.Subscribe_FromStartOfExistingStream_ReturnsAllEvents() =
         task {
             let! eventStore, sources = this.anEventStoreWithStreamsAndEvents 1
-            let source,event = Fixture.createEvent sources.Head
+            let source,_ = Fixture.createEvent sources.Head
 
             do!
                 waitForEventsOnSubscription
@@ -225,6 +210,27 @@ type EventStoreBehavior() =
                     eventStore
                     (fun () -> async { return () })
                     (fun events -> Then.assertSingle events source)
+        }
+        
+    [<Fact>]
+    member this.Subscribe_FromSpecificPositionOfExistingStream_ReturnsOnlyEventsAfterTheStartPosition() =
+        task {
+            let! eventStore, _ = this.anEventStoreWithStreamsAndEvents 3
+            let startingPosition = Position.from 2
+            do!
+                waitForEventsOnSubscription
+                    (From startingPosition)
+                    eventStore
+                    (fun () -> async { return () })
+                    (fun events ->
+                        Then.NotEmpty (List.toSeq events)
+                        let minimumPosition =
+                            events
+                            |> List.minBy(fun e -> e.Metadata.Position)
+                            
+                        Assert.Equal(Position.nextPosition startingPosition , minimumPosition.Metadata.Position)
+                        ignore <| Assert.Single events 
+                    )
         }
 
 type InMemoryEventStore() =
@@ -246,30 +252,6 @@ type InMemoryEventStore() =
             EventStore.With storage,
             data |> List.map (fun (source,_) -> source)
         )
-
-#nowarn "44" // ContainerBuilder<MsSqlTestcontainer>() is deprecated but does not provide a clear guidance yet
-
-type MsSqlFixture() =
-    let container =
-        let containerConfiguration =
-            ContainerBuilder<MsSqlTestcontainer>()
-                .WithDatabase(new MsSqlTestcontainerConfiguration(Password = "localdevpassword#123"))
-                .WithImage("mcr.microsoft.com/mssql/server:2019-latest")
-                .WithName("MS-SQL-Integration-Tests")
-                .WithCleanUp(false)
-                .WithAutoRemove(true)
-
-        let instance = containerConfiguration.Build()
-        instance
-
-    member _.Container = container
-
-    interface IAsyncLifetime with
-        member this.DisposeAsync() = container.StopAsync()
-        member this.InitializeAsync() = container.StartAsync()
-
-    interface IAsyncDisposable with
-        member this.DisposeAsync() = container.DisposeAsync()
 
 type MsSqlBackedEventStore(msSql: MsSqlFixture) =
     inherit EventStoreBehavior()
