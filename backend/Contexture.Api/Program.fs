@@ -161,7 +161,6 @@ let configureServices (context: HostBuilderContext) (services : IServiceCollecti
     | FileBased path ->
         services
             .AddSingleton<SingleFileBasedDatastore>(fun services ->
-                let options = services.GetRequiredService<IOptions<ContextureOptions>>()
                 // TODO: danger zone - loading should not be done as part of the initialization
                 AgentBased.initializeDatabase(path)
                 |> Async.AwaitTask

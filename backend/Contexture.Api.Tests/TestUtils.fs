@@ -15,6 +15,7 @@ open Microsoft.AspNetCore.TestHost
 open Microsoft.Extensions.Logging
 
 open Contexture.Api.Infrastructure
+open Microsoft.Extensions.Options
 
 module TestHost =
     let configureLogging (builder: ILoggingBuilder) =
@@ -28,6 +29,7 @@ module TestHost =
             .ConfigureServices(Action<_, _> configureServices)
             .ConfigureWebHostDefaults(fun (webHost: IWebHostBuilder) ->
                 webHost
+                    .UseSetting("DatabasePath", "unit-tests.json")
                     .Configure(Action<_> configure)
                     .UseTestServer()
                     .ConfigureTestServices(Action<_> configureTest)
