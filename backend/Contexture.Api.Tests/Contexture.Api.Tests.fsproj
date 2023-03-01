@@ -1,10 +1,10 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
     <PropertyGroup>
-        <TargetFramework>net6.0</TargetFramework>
+        <TargetFramework>net7.0</TargetFramework>
 
         <IsPackable>false</IsPackable>
-        <GenerateProgramFile>false</GenerateProgramFile>
+        <GenerateProgramFile>true</GenerateProgramFile>
     </PropertyGroup>
 
     <ItemGroup>
@@ -18,19 +18,19 @@
 
     <ItemGroup>
         <PackageReference Include="JsonDiffPatch.Net" Version="2.3.0" />
-        <PackageReference Include="Microsoft.AspNetCore.TestHost" Version="6.0.6" />
-        <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.2.0" />
-        <PackageReference Include="xunit" Version="2.4.1" />
+        <PackageReference Include="Microsoft.AspNetCore.TestHost" Version="7.0.3" />
+        <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.5.0" />
+        <PackageReference Include="xunit" Version="2.4.2" />
         <PackageReference Include="xunit.runner.visualstudio" Version="2.4.5">
             <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
             <PrivateAssets>all</PrivateAssets>
         </PackageReference>
-        <PackageReference Include="coverlet.collector" Version="3.1.2">
+        <PackageReference Include="coverlet.collector" Version="3.2.0">
             <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
             <PrivateAssets>all</PrivateAssets>
         </PackageReference>
-        <PackageReference Update="FSharp.Core" Version="6.0.5" />
-        <PackageReference Include="NStore.Persistence.MsSql" Version="0.13.1" />
+        <PackageReference Update="FSharp.Core" Version="7.0.200" />
+        <PackageReference Include="NStore.Persistence.MsSql" Version="0.14.0" />
         <PackageReference Include="Testcontainers" Version="2.4.0" />
     </ItemGroup>
 
