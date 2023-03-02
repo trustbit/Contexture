@@ -91,7 +91,7 @@ module Domains =
                     let clock = ctx.GetService<Clock>()
                     let eventStoreBased = EventBased.eventStoreBasedCommandHandler clock database
                     match! Domain.useHandler eventStoreBased (RemoveDomain domainId) with
-                    | Ok (domainId,version,_) -> return! json domainId next ctx
+                    | Ok (domainId,_,_) -> return! json domainId next ctx
                     | Error e -> return! ServerErrors.INTERNAL_ERROR e next ctx
                 }
 
@@ -102,7 +102,8 @@ module Domains =
                     let clock = ctx.GetService<Clock>()
                     let eventStoreBased = EventBased.eventStoreBasedCommandHandler clock database
                     match! Domain.useHandler eventStoreBased command with
-                    | Ok (updatedDomain,version,_) -> return! redirectTo false (sprintf "/api/domains/%O" updatedDomain) next ctx
+                    | Ok (updatedDomain,_,position) ->
+                        return! redirectTo false (State.appendProcessedPosition (sprintf "/api/domains/%O" updatedDomain) position) next ctx
                     | Error (DomainError EmptyName) ->
                         return! RequestErrors.BAD_REQUEST "Name must not be empty" next ctx
                     | Error e -> return! ServerErrors.INTERNAL_ERROR e next ctx
@@ -133,8 +134,8 @@ module Domains =
                     let clock = ctx.GetService<Clock>()
                     let eventStoreBased = EventBased.eventStoreBasedCommandHandler clock database
                     match! BoundedContext.useHandler eventStoreBased (CreateBoundedContext(Guid.NewGuid(), domainId, command)) with
-                    | Ok (addedContext,version,_) ->
-                        return! redirectTo false (sprintf "/api/boundedcontexts/%O" addedContext) next ctx
+                    | Ok (addedContext,_,position) ->
+                        return! redirectTo false (State.appendProcessedPosition (sprintf "/api/boundedcontexts/%O" addedContext) position) next ctx
                     | Error (DomainError Aggregates.BoundedContext.EmptyName) ->
                         return! RequestErrors.BAD_REQUEST "Name must not be empty" next ctx
                     | Error e -> return! ServerErrors.INTERNAL_ERROR e next ctx

@@ -15,6 +15,7 @@ module Collaborations =
     module CommandEndpoints =
         open System
         open CommandHandler
+        open ReadModels
         let private updateAndReturnCollaboration command =
             fun (next: HttpFunc) (ctx: HttpContext) ->
                 task {
@@ -22,8 +23,8 @@ module Collaborations =
                     let clock = ctx.GetService<Clock>()
                     let eventBasedCommandHandler = CommandHandler.EventBased.eventStoreBasedCommandHandler clock database
                     match! command |> Collaboration.useHandler eventBasedCommandHandler with
-                    | Ok (collaborationId,version,_) ->
-                        return! redirectTo false (sprintf "/api/collaborations/%O" collaborationId) next ctx
+                    | Ok (collaborationId,_,position) ->
+                        return! redirectTo false (State.appendProcessedPosition (sprintf "/api/collaborations/%O" collaborationId) position) next ctx
                     | Error (DomainError error) ->
                         return! RequestErrors.BAD_REQUEST (sprintf "Domain Error %A" error) next ctx
                     | Error e -> return! ServerErrors.INTERNAL_ERROR e next ctx

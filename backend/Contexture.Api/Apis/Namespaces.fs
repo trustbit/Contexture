@@ -82,6 +82,7 @@ module Namespaces =
             open NamespaceTemplate
             open FileBasedCommandHandlers
             open CommandHandler
+            open ReadModels
 
             let private updateAndReturnTemplate command =
                 fun (next: HttpFunc) (ctx: HttpContext) ->
@@ -90,8 +91,8 @@ module Namespaces =
                         let clock = ctx.GetService<Clock>()
                         let eventBasedCommandHandler = EventBased.eventStoreBasedCommandHandler clock database 
                         match! NamespaceTemplate.useHandler eventBasedCommandHandler command with
-                        | Ok updatedTemplate ->
-                            return! redirectTo false (sprintf "/api/namespaces/templates/%O" updatedTemplate) next ctx
+                        | Ok (updatedTemplate,_,position) ->
+                            return! redirectTo false (State.appendProcessedPosition (sprintf "/api/namespaces/templates/%O" updatedTemplate) position) next ctx
                         | Error (DomainError error) ->
                             return! RequestErrors.BAD_REQUEST(sprintf "Template Error %A" error) next ctx
                         | Error e -> return! ServerErrors.INTERNAL_ERROR e next ctx

@@ -2,6 +2,7 @@ module Contexture.Api.Infrastructure.ReadModels
 
 open System.Threading.Tasks
 open Contexture.Api.Infrastructure.Storage
+open Microsoft.AspNetCore.Http
 
 type EventHandler<'Event> = EventEnvelope<'Event> list -> Async<unit>
 
@@ -28,12 +29,27 @@ type ReadModel<'Event, 'State> =
 module State =
     open Microsoft.AspNetCore.Http
     open Giraffe
+    open System
+    
+    [<Literal>]
+    let private processedPosition = "processedPosition"
+    
+    let appendProcessedPosition (url: string) (position:Position) =
+        let parts = url.Split("?")
+        let queryString =
+            if parts.Length = 2 then
+                QueryString("?" + parts[1])
+            else
+                QueryString()
+                
+        PathString(parts[0]).Add(queryString.Add(processedPosition, position |> Position.value |> string))
+
     let fromReadModel<'R when 'R :> ReadModel> (ctx: HttpContext) =
         ctx.GetService<'R>()
     let fetch findReadModel (ctx: HttpContext) : Task<'S> =
         let readModel = findReadModel ctx
         let stateRetriever = unbox<IRetrieveState<'S>> readModel
-        match ctx.TryGetQueryStringValue "processedPosition" |> Option.bind (Position.parse) with
+        match ctx.TryGetQueryStringValue processedPosition |> Option.bind (Position.parse) with
         | Some position ->
             stateRetriever.State position
         | None ->

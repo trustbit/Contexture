@@ -54,7 +54,7 @@ module BoundedContexts =
         open System
         open FileBasedCommandHandlers
         open CommandHandler
-
+        open ReadModels
         let private updateAndReturnBoundedContext command =
             fun (next: HttpFunc) (ctx: HttpContext) ->
                 task {
@@ -62,8 +62,8 @@ module BoundedContexts =
                     let clock = ctx.GetService<Clock>()
                     let eventStoreBased = EventBased.eventStoreBasedCommandHandler clock database
                     match! BoundedContext.useHandler eventStoreBased command with
-                    | Ok (updatedContext,version,_) ->
-                        return! redirectTo false (sprintf "/api/boundedcontexts/%O" updatedContext) next ctx
+                    | Ok (updatedContext,_,position) ->
+                        return! redirectTo false (State.appendProcessedPosition (sprintf "/api/boundedcontexts/%O" updatedContext) position) next ctx
                     | Error (DomainError EmptyName) ->
                         return! RequestErrors.BAD_REQUEST "Name must not be empty" next ctx
                     | Error e -> return! ServerErrors.INTERNAL_ERROR e next ctx
