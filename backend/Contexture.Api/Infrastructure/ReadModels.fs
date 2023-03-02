@@ -16,11 +16,29 @@ module ReadModelInitialization =
 
     let initializeWith (eventStore: EventStore) (handler: EventHandler<'Event>) : ReadModelInitialization =
         RMI(eventStore, handler) :> ReadModelInitialization
-
+type IRetrieveState<'State> =
+    abstract State : unit -> Task<'State>
+    abstract State : Position -> Task<'State>
+type ReadModel = interface end
 type ReadModel<'Event, 'State> =
+    inherit IRetrieveState<'State>
+    inherit ReadModel
     abstract member EventHandler: EventEnvelope<'Event> list -> Async<unit>
-    abstract member State: unit -> Task<'State>
-    abstract member State: Position -> Task<'State>
+    
+module State =
+    open Microsoft.AspNetCore.Http
+    open Giraffe
+    let fromReadModel<'R when 'R :> ReadModel> (ctx: HttpContext) =
+        ctx.GetService<'R>()
+    let fetch findReadModel (ctx: HttpContext) : Task<'S> =
+        let readModel = findReadModel ctx
+        let stateRetriever = unbox<IRetrieveState<'S>> readModel
+        match ctx.TryGetQueryStringValue "processedPosition" |> Option.bind (Position.parse) with
+        | Some position ->
+            stateRetriever.State position
+        | None ->
+            stateRetriever.State()
+
 
 type Msg<'Event, 'Result> =
     private

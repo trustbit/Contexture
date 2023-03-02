@@ -52,10 +52,10 @@ module Namespaces =
             updateAndReturnNamespaces (AddLabel(contextId, namespaceId, command))
 
     module QueryEndpoints =
-
+        open ReadModels
         let getNamespaces boundedContextId =
             fun (next: HttpFunc) (ctx: HttpContext) -> task {
-                let! namespaceState = ctx.GetService<ReadModels.Namespace.AllNamespacesReadModel>().State()
+                let! namespaceState = ctx |> State.fetch State.fromReadModel<ReadModels.Namespace.AllNamespacesReadModel>
                 let namespaces =
                     boundedContextId
                     |> ReadModels.Namespace.namespacesOf namespaceState
@@ -68,7 +68,7 @@ module Namespaces =
 
         let getAllNamespaces =
             fun (next: HttpFunc) (ctx: HttpContext) -> task {
-                let! state = ctx.GetService<ReadModels.Namespace.AllNamespacesReadModel>().State()
+                let! state = ctx |> State.fetch State.fromReadModel<ReadModels.Namespace.AllNamespacesReadModel>
 
                 let namespaces =
                     ReadModels.Namespace.allNamespaces state
@@ -110,9 +110,10 @@ module Namespaces =
                 updateAndReturnTemplate (AddTemplateLabel(templateId, command))
 
         module QueryEndpoints =
+            open ReadModels
             let getAllTemplates =
                 fun (next: HttpFunc) (ctx: HttpContext) -> task {
-                    let! templateState = ctx.GetService<ReadModels.Templates.AllTemplatesReadModel>().State()
+                    let! templateState = ctx |> State.fetch State.fromReadModel<ReadModels.Templates.AllTemplatesReadModel>
 
                     let templates =
                         ReadModels.Templates.allTemplates templateState
@@ -122,7 +123,7 @@ module Namespaces =
 
             let getTemplate templateId =
                 fun (next: HttpFunc) (ctx: HttpContext) -> task {
-                    let! templateState = ctx.GetService<ReadModels.Templates.AllTemplatesReadModel>().State()
+                    let! templateState = ctx |> State.fetch State.fromReadModel<ReadModels.Templates.AllTemplatesReadModel>
                     let template =
                         templateId
                         |> ReadModels.Templates.template templateState 

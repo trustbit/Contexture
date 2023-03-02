@@ -13,18 +13,18 @@ open ReadModels
 
 let private projectAllData (ctx: HttpContext) =
     task {
-        let! domainState = ctx.GetService<ReadModels.Domain.AllDomainReadModel>().State()
+        let! domainState = ctx |> State.fetch State.fromReadModel<ReadModels.Domain.AllDomainReadModel>
 
         let! boundedContextState =
-            ctx.GetService<ReadModels.BoundedContext.AllBoundedContextsReadModel>().State()
+            ctx |> State.fetch State.fromReadModel<ReadModels.BoundedContext.AllBoundedContextsReadModel>
 
-        let! namespaceState = ctx.GetService<ReadModels.Namespace.AllNamespacesReadModel>().State()
+        let! namespaceState = ctx |> State.fetch State.fromReadModel<ReadModels.Namespace.AllNamespacesReadModel>
 
         let! collaborationState =
-            ctx.GetService<ReadModels.Collaboration.AllCollaborationsReadModel>().State()
+            ctx |> State.fetch State.fromReadModel<ReadModels.Collaboration.AllCollaborationsReadModel>
 
         let! namespaceTemplatesState =
-            ctx.GetService<ReadModels.Templates.AllTemplatesReadModel>().State()
+            ctx |> State.fetch State.fromReadModel<ReadModels.Templates.AllTemplatesReadModel>
 
         let domains = domainState |> Domain.allDomains
         let boundedContexts = boundedContextState |> BoundedContext.allBoundedContexts

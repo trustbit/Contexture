@@ -50,9 +50,10 @@ module Collaborations =
                 
     module QueryEndpoints =
         open Contexture.Api.ReadModels
+        open ReadModels
         let getCollaborations =
             fun (next: HttpFunc) (ctx: HttpContext) -> task {
-                let! collaborationState = ctx.GetService<ReadModels.Collaboration.AllCollaborationsReadModel>().State()
+                let! collaborationState = ctx |> State.fetch State.fromReadModel<ReadModels.Collaboration.AllCollaborationsReadModel>
                 let collaborations =
                     collaborationState |> Collaboration.activeCollaborations
                     
@@ -61,7 +62,7 @@ module Collaborations =
 
         let getCollaboration collaborationId =
             fun (next: HttpFunc) (ctx: HttpContext) -> task {
-                let! collaborationState = ctx.GetService<ReadModels.Collaboration.AllCollaborationsReadModel>().State()
+                let! collaborationState = ctx |> State.fetch State.fromReadModel<ReadModels.Collaboration.AllCollaborationsReadModel>
                 let result =
                     collaborationId
                     |> Collaboration.collaboration collaborationState

@@ -4,6 +4,7 @@ open Contexture.Api.Aggregates
 open Contexture.Api.Aggregates.BoundedContext.ValueObjects
 open Contexture.Api
 open Contexture.Api.Infrastructure
+open Contexture.Api.Infrastructure.ReadModels
 open Contexture.Api.ReadModels
 open Microsoft.AspNetCore.Http
 
@@ -13,7 +14,7 @@ open Microsoft.Extensions.Hosting
 module Views =
     open Layout
     open Giraffe.ViewEngine
-
+    open ReadModels
     let breadcrumb (domain: Domain.Domain) =
         div [ _class "row" ] [
             div [ _class "col" ] [
@@ -56,15 +57,10 @@ let index boundedContextId =
 
             let eventStore = ctx.GetService<EventStore>()
 
-            let! domainState =
-                ctx
-                    .GetService<ReadModels.Domain.AllDomainReadModel>()
-                    .State()
+            let! domainState = ctx |> State.fetch State.fromReadModel<ReadModels.Domain.AllDomainReadModel>
 
             let! boundedContextState =
-                ctx
-                    .GetService<ReadModels.BoundedContext.AllBoundedContextsReadModel>()
-                    .State()
+                ctx |> State.fetch State.fromReadModel<ReadModels.BoundedContext.AllBoundedContextsReadModel>
 
             let boundedContext =
                 boundedContextId

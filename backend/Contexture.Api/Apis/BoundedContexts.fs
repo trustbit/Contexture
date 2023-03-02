@@ -110,6 +110,7 @@ module BoundedContexts =
     module QueryEndpoints =
         open Contexture.Api.ReadModels
         open Contexture.Api.ReadModels.Find
+        open ReadModels
 
         let private mapToBoundedContext namespaceState domainState boundedContextState ids =
             fun (next: HttpFunc) (ctx: HttpContext) -> task {
@@ -144,13 +145,13 @@ module BoundedContexts =
 
         let getBoundedContextsByQuery (item: Query) =
             fun (next: HttpFunc) (ctx: HttpContext) -> task {
-                let! domainState = ctx.GetService<ReadModels.Domain.AllDomainReadModel>().State()
-                let! boundedContextState = ctx.GetService<ReadModels.BoundedContext.AllBoundedContextsReadModel>().State()
-                let! namespaceState = ctx.GetService<ReadModels.Namespace.AllNamespacesReadModel>().State()
-                let! boundedContextFindState = ctx.GetService<Find.BoundedContexts.ReadModel>().State()
-                let! domainFindState = ctx.GetService<Find.Domains.ReadModel>().State()
-                let! labelFindState = ctx.GetService<Find.Labels.ReadModel>().State()
-                let! namespaceFindState = ctx.GetService<Find.Namespaces.ReadModel>().State()
+                let! domainState = ctx |> State.fetch State.fromReadModel<ReadModels.Domain.AllDomainReadModel>
+                let! boundedContextState = ctx |> State.fetch State.fromReadModel<ReadModels.BoundedContext.AllBoundedContextsReadModel>
+                let! namespaceState = ctx |> State.fetch State.fromReadModel<ReadModels.Namespace.AllNamespacesReadModel>
+                let! boundedContextFindState = ctx |> State.fetch State.fromReadModel<Find.BoundedContexts.ReadModel>
+                let! domainFindState = ctx |> State.fetch State.fromReadModel<Find.Domains.ReadModel>
+                let! labelFindState = ctx |> State.fetch State.fromReadModel<Find.Labels.ReadModel>
+                let! namespaceFindState = ctx |> State.fetch State.fromReadModel<Find.Namespaces.ReadModel>
 
                 let namespaceIds =
                     SearchFor.NamespaceId.find namespaceFindState item.Namespace
@@ -211,9 +212,9 @@ module BoundedContexts =
 
         let getBoundedContexts =
             fun (next: HttpFunc) (ctx: HttpContext) -> task {
-                let! domainState = ctx.GetService<ReadModels.Domain.AllDomainReadModel>().State()
-                let! boundedContextState = ctx.GetService<ReadModels.BoundedContext.AllBoundedContextsReadModel>().State()
-                let! namespaceState = ctx.GetService<ReadModels.Namespace.AllNamespacesReadModel>().State()
+                let! domainState = ctx |> State.fetch State.fromReadModel<ReadModels.Domain.AllDomainReadModel>
+                let! boundedContextState = ctx |> State.fetch State.fromReadModel<ReadModels.BoundedContext.AllBoundedContextsReadModel>
+                let! namespaceState = ctx |> State.fetch State.fromReadModel<ReadModels.Namespace.AllNamespacesReadModel>
                 let lookup =
                     boundedContextState
                     |> BoundedContext.boundedContextLookup
@@ -240,9 +241,9 @@ module BoundedContexts =
 
         let getBoundedContext contextId =
             fun (next: HttpFunc) (ctx: HttpContext) -> task {
-                let! domainState = ctx.GetService<ReadModels.Domain.AllDomainReadModel>().State()
-                let! boundedContextState = ctx.GetService<ReadModels.BoundedContext.AllBoundedContextsReadModel>().State()
-                let! namespaceState = ctx.GetService<ReadModels.Namespace.AllNamespacesReadModel>().State()
+                let! domainState = ctx |> State.fetch State.fromReadModel<ReadModels.Domain.AllDomainReadModel>
+                let! boundedContextState = ctx |> State.fetch State.fromReadModel<ReadModels.BoundedContext.AllBoundedContextsReadModel>
+                let! namespaceState = ctx |> State.fetch State.fromReadModel<ReadModels.Namespace.AllNamespacesReadModel>
 
                 let namespacesOf =
                     Namespace.namespacesOf namespaceState
