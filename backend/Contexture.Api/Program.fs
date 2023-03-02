@@ -118,6 +118,7 @@ let configureJsonSerializer (services: IServiceCollection) =
             .WithUnionUntagged()
             .WithUnionUnwrapRecordCases()
             .WithUnionUnwrapFieldlessTags()
+            .WithUnionTagCaseInsensitive()
             
     fSharpOptions.AddToJsonSerializerOptions(options)
     
