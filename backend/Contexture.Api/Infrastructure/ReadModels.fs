@@ -4,19 +4,17 @@ open System.Threading.Tasks
 open Contexture.Api.Infrastructure.Storage
 open Microsoft.AspNetCore.Http
 
-type EventHandler<'Event> = EventEnvelope<'Event> list -> Async<unit>
-
 type ReadModelInitialization =
     abstract member ReplayAndConnect: SubscriptionStartingPosition -> Async<Subscription>
 
 module ReadModelInitialization =
-    type private RMI<'Event>(eventStore: EventStore, handler: EventHandler<'Event>) =
+    type private RMI<'Event>(eventStore: EventStore, handler: SubscriptionHandler<'Event>) =
         interface ReadModelInitialization with
-            member _.ReplayAndConnect position = eventStore.Subscribe position handler
+            member _.ReplayAndConnect starting = eventStore.Subscribe starting handler
 
-
-    let initializeWith (eventStore: EventStore) (handler: EventHandler<'Event>) : ReadModelInitialization =
+    let initializeWith (eventStore: EventStore) (handler: SubscriptionHandler<'Event>) : ReadModelInitialization =
         RMI(eventStore, handler) :> ReadModelInitialization
+
 type IRetrieveState<'State> =
     abstract State : unit -> Task<'State>
     abstract State : Position -> Task<'State>
@@ -24,7 +22,7 @@ type ReadModel = interface end
 type ReadModel<'Event, 'State> =
     inherit IRetrieveState<'State>
     inherit ReadModel
-    abstract member EventHandler: EventEnvelope<'Event> list -> Async<unit>
+    abstract member EventHandler: Position -> EventEnvelope<'Event> list -> Async<unit>
     
 module State =
     open Microsoft.AspNetCore.Http
@@ -58,7 +56,7 @@ module State =
 
 type Msg<'Event, 'Result> =
     private
-    | Notify of EventEnvelope<'Event> list * AsyncReplyChannel<unit>
+    | Notify of Position * EventEnvelope<'Event> list * AsyncReplyChannel<unit>
     | State of AsyncReplyChannel<'Result>
     | StateAfter of Position * AsyncReplyChannel<'Result>
 
@@ -73,14 +71,9 @@ let readModel
                     let! msg = inbox.Receive()
 
                     match msg with
-                    | Notify(eventEnvelopes, reply) ->
+                    | Notify(maxPosition,eventEnvelopes, reply) ->
                         reply.Reply()
-                        
-                        let highestPosition =
-                            eventEnvelopes
-                            |> List.map(fun e -> e.Metadata.Position)
-                            |> List.maxOr processedPosition
-                        return! loop (highestPosition, eventEnvelopes |> updateState state)
+                        return! loop (maxPosition, eventEnvelopes |> updateState state)
 
                     | State reply ->
                         reply.Reply state
@@ -99,8 +92,8 @@ let readModel
         Agent<Msg<_, _>>.Start (eventSubscriber)
 
     { new ReadModel<'Event, 'State> with
-        member _.EventHandler eventEnvelopes =
-            agent.PostAndAsyncReply(fun reply -> Notify(eventEnvelopes, reply))
+        member _.EventHandler position eventEnvelopes =
+            agent.PostAndAsyncReply(fun reply -> Notify(position, eventEnvelopes, reply))
 
         member _.State() =
             agent.PostAndAsyncReply State |> Async.StartAsTask

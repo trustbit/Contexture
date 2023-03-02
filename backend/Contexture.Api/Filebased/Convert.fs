@@ -95,7 +95,7 @@ module Domain =
         |> convertToOption
 
     let subscription logger (database: SingleFileBasedDatastore) : SubscriptionHandler<Domain.Event> =
-        fun (events: EventEnvelope<Domain.Event> list) ->
+        fun _ (events: EventEnvelope<Domain.Event> list) ->
             database.Change(fun document ->
                 events
                 |> List.fold (applyToCollection mapDomainToSerialization) (Ok document.Domains)
@@ -165,7 +165,7 @@ module BoundedContext =
 
 
     let subscription logger (database: SingleFileBasedDatastore) : SubscriptionHandler<Event> =
-        fun (events: EventEnvelope<Event> list) ->
+        fun _ (events: EventEnvelope<Event> list) ->
             database.Change(fun document ->
                 events
                 |> List.fold (applyToCollection mapSerialization) (Ok document.BoundedContexts)
@@ -218,7 +218,7 @@ module Collaboration =
         |> convertToOption
 
     let subscription logger (database: SingleFileBasedDatastore) : SubscriptionHandler<Collaboration.Event> =
-        fun (events: EventEnvelope<Collaboration.Event> list) ->
+        fun _ (events: EventEnvelope<Collaboration.Event> list) ->
             database.Change(fun document ->
                 events
                 |> List.fold (applyToCollection mapToSerialization) (Ok document.Collaborations)
@@ -256,7 +256,7 @@ module Namespace =
 
 
     let subscription logger (database: SingleFileBasedDatastore) : SubscriptionHandler<Event> =
-        fun (events: EventEnvelope<Event> list) ->
+        fun _ (events: EventEnvelope<Event> list) ->
             database.Change(fun document ->
                 events
                 |> List.fold (applyToCollection asNamespaceWithBoundedContext) (Ok document.BoundedContexts)
@@ -286,7 +286,7 @@ module NamespaceTemplate =
         |> List.singleton
 
     let subscription logger (database: SingleFileBasedDatastore) : SubscriptionHandler<Event> =
-        fun (events: EventEnvelope<Event> list) ->
+        fun _ (events: EventEnvelope<Event> list) ->
             database.Change(fun document ->
                 events
                 |> List.fold (applyToCollection Projections.asTemplate) (Ok document.NamespaceTemplates)

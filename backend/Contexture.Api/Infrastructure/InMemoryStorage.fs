@@ -199,10 +199,10 @@ let initialize clock (initialEvents: EventDefinition list) =
                 let cancel = new CancellationTokenSource()
                 let mutable lastVersion = None
 
-                let recordingSubscription version events =
+                let recordingSubscription position events =
                     async {
-                        do! subscription events
-                        lastVersion <- Some version
+                        do! subscription position events
+                        lastVersion <- Some position
                     }
 
                 let resultTask =

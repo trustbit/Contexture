@@ -72,11 +72,11 @@ type EventStore(storage: Storage.EventStorage) =
     let asTyped items : EventEnvelope<'E> list = items |> List.map EventEnvelope.unbox
 
     let subscribeStreamKind position (subscription: SubscriptionHandler<'E>) =
-        let upcastSubscription events = events |> asTyped |> subscription
+        let upcastSubscription position events = events |> asTyped |> subscription position
         storage.Subscribe (FromKind(StreamKind.Of<'E>(), position)) upcastSubscription
 
     let subscribeAll position (subscription: SubscriptionHandler<'E>) =
-        let upcastSubscription events = events |> asTyped |> subscription
+        let upcastSubscription position events = events |> asTyped |> subscription position
         storage.Subscribe (FromAll position) upcastSubscription
 
     let allStreams () : Async<Position * EventEnvelope<'E> list> =

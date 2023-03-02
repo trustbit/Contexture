@@ -79,9 +79,9 @@ type EventEnvelope =
       EventType: System.Type
       StreamKind: StreamKind }
 
-type SubscriptionHandler = EventEnvelope list -> Async<unit>
+type SubscriptionHandler = Position -> EventEnvelope list -> Async<unit>
 
-type SubscriptionHandler<'E> = EventEnvelope<'E> list -> Async<unit>
+type SubscriptionHandler<'E> = Position -> EventEnvelope<'E> list -> Async<unit>
 
 module EventEnvelope =
     let box (envelope: EventEnvelope<'E>) =

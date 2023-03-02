@@ -50,7 +50,7 @@ let waitForEventsOnSubscription start (eventStore: EventStore) action eventCallb
                 TaskCreationOptions.RunContinuationsAsynchronously
             )
 
-        let subscriptionHandler events =
+        let subscriptionHandler _ events =
             if not (List.isEmpty events) then
                 receivedEvents.SetResult events
 

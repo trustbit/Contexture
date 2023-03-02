@@ -288,7 +288,8 @@ type Storage(persistence: IPersistence, clock: Clock, logger: INStoreLoggerFacto
         fun chunk ->
             task {
                 let envelopes = EventEnvelope.ofChunk chunk
-                do! subscription envelopes
+                let position = Position.ofChunk chunk
+                do! subscription position envelopes
                 return true
             }
 
@@ -296,10 +297,13 @@ type Storage(persistence: IPersistence, clock: Clock, logger: INStoreLoggerFacto
         fun chunk ->
             task {
                 let envelopes = EventEnvelope.ofChunk chunk
+                let position = Position.ofChunk chunk
                 let filtered = envelopes |> List.filter (fun e -> e.StreamKind = streamKind)
 
                 if not (List.isEmpty filtered) then
-                    do! subscription filtered
+                    do! subscription position filtered
+                else
+                    do! subscription position List.empty
 
                 return true
             }
