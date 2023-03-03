@@ -244,7 +244,11 @@ type Storage(persistence: IPersistence, clock: Clock, logger: INStoreLoggerFacto
                     | Empty, item when isNull item || item.Position = 0 ->
                         (stream |> unbox<OptimisticConcurrencyStream>).MarkAsNew()
                         return! doAppend ()
-                    | Empty, _ -> return Error(LockingConflict((Version.from 0), exn "not empty"))
+                    | Empty, item ->
+                        return Error(LockingConflict(Version.ofChunk item, exn "Stream is not empty"))
+                    | AtVersion expected, item when expected = Version.start && (isNull item || item.Position = 0 ) ->
+                        (stream |> unbox<OptimisticConcurrencyStream>).MarkAsNew()
+                        return! doAppend ()
                     | AtVersion expected, item when not (isNull item) ->
                         let currentVersion = Version.ofChunk item
 
@@ -258,10 +262,15 @@ type Storage(persistence: IPersistence, clock: Clock, logger: INStoreLoggerFacto
                                 )
                         else
                             return! doAppend ()
-                    | AtVersion expected, _ ->
+                    | AtVersion expected, item ->
+                        let version =
+                            if isNull item then
+                                Version.from 0
+                            else
+                                Version.ofChunk item
                         return
-                            Error(LockingConflict(Version.from 0, exn $"Expected {expected} version but got unknown"))
-                    | (Unknown, _) -> return! doAppend ()
+                            Error(LockingConflict(version, exn $"Expected {expected} version but got {version}"))
+                    | Unknown, _ -> return! doAppend ()
                 with :? ConcurrencyException as e ->
                     let! currentVersion = stream.PeekAsync()
                     return Error(LockingConflict(Version.ofChunk currentVersion, e))
