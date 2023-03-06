@@ -30,6 +30,7 @@
     <Compile Include="Infrastructure\NStoreBased.fs" />
     <Compile Include="Infrastructure\Projections.fs" />
     <Compile Include="Infrastructure\ReadModels.fs" />
+    <Compile Include="Infrastructure\Subscriptions.fs" />
     <Compile Include="CommandHandlers.fs" />
     <Compile Include="ReadModels\ApplicationReadModels.fs" />
     <Compile Include="ReadModels\Find\Types.fs" />

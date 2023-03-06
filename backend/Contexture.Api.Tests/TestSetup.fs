@@ -52,7 +52,7 @@ module TestHost =
         
         host.Services.GetServices<ReadModels.ReadModelInitialization>()
         |> Contexture.Api.App.connectAndReplayReadModels
-        |> Async.bind (Contexture.Api.App.waitUntilCaughtUp >> Async.AwaitTask)
+        |> Async.bind (Subscriptions.waitUntilCaughtUp >> Async.AwaitTask)
         |> Async.RunSynchronously
         
         host.Start()

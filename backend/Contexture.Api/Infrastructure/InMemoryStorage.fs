@@ -194,7 +194,7 @@ let initialize clock (initialEvents: EventDefinition list) =
         member _.All() =
             agent.PostAndAsyncReply(fun reply -> GetAll(reply))
 
-        member _.Subscribe definition subscription =
+        member _.Subscribe name definition subscription =
             async {
                 let cancel = new CancellationTokenSource()
                 let mutable lastVersion = None
@@ -213,6 +213,7 @@ let initialize clock (initialEvents: EventDefinition list) =
 
                 return
                     { new Subscription with
+                        member _.Name = name
                         member _.Status =
                             match lastVersion with
                             | None -> NotRunning

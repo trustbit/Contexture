@@ -56,8 +56,8 @@ let waitForEventsOnSubscription start (eventStore: EventStore) action eventCallb
 
             Async.Sleep(0)
 
-        let! subscription = eventStore.Subscribe start subscriptionHandler
-        do! Contexture.Api.App.waitUntilCaughtUp [ subscription ]
+        let! subscription = eventStore.Subscribe "UnitTestSubscription" start subscriptionHandler
+        do! Subscriptions.waitUntilCaughtUp [ subscription ]
 
         do! Async.StartAsTask(action ())
 

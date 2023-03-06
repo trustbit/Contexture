@@ -21,7 +21,6 @@ open Microsoft.Extensions.Options
 open System.Text.Json
 open System.Text.Json.Serialization
 
-
 module SystemRoutes =
     let errorHandler (ex : Exception) (logger : ILogger) =
         logger.LogError(ex, "An unhandled exception has occurred while executing the request.")
@@ -30,11 +29,46 @@ module SystemRoutes =
     let status : HttpHandler =
         fun (next: HttpFunc) (ctx: HttpContext) ->
             let env = ctx.GetService<ContextureConfiguration>()
-            match env.GitHash with
-            | hash when not (String.IsNullOrEmpty hash) ->
-                json {| GitHash = hash |} next ctx
-            | _ ->
-                text "No status information" next ctx
+            let payload =
+                {|
+                    Health = true
+                    GitHash = env.GitHash
+                |}
+            json payload next ctx
+         
+    // is there a better way to surface the subscriptions?
+    let mutable subscriptions : Subscription list option = None
+            
+    let readiness: HttpHandler =
+        fun (next: HttpFunc) (ctx: HttpContext) ->
+            match subscriptions with
+            | Some subs ->
+                let status = Subscriptions.calculateStatistics subs
+                let payload =
+                    {| CaughtUp =
+                         status.CaughtUp
+                         |> List.map (fun (position, name) -> {| Name = name; Position = position |})
+                       Failed =
+                         status.Failed
+                         |> List.map (fun (e, position, name) -> {| Name = name; Position = position; Error = e.Message |})
+                       Processing =
+                         status.Processing
+                         |> List.map (fun (position, name) -> {| Name = name; Position = position |})
+                       NotRunning =
+                         status.NotRunning
+                         |> List.map (fun ( name) -> {| Name = name |})
+                       Stopped =
+                         status.Stopped
+                         |> List.map (fun (position, name) -> {| Name = name; Position = position |})
+                    |}
+                // TODO: what if we are never able to catch up under (very) high load?
+                // Are we then really not ready to process or is this an OKish situation?
+                if Subscriptions.didAllSubscriptionsCatchup status.CaughtUp subs then
+                    Successful.ok (json payload) next ctx
+                else
+                    ServerErrors.serviceUnavailable (json payload) next ctx    
+            | None ->
+                ServerErrors.serviceUnavailable (text "No subscriptions yet") next ctx            
 
 module Routes =
     let webApp hostFrontend =
@@ -47,7 +81,12 @@ module Routes =
                        Apis.Namespaces.routes
                        AllRoutes.routes
                 ])
-             route "/meta" >=> GET >=> SystemRoutes.status
+             subRoute "/meta"
+                ( choose [
+                    route "/health" >=> GET >=> SystemRoutes.status
+                    route "/readiness" >=> GET >=> SystemRoutes.readiness
+                    GET >=> SystemRoutes.status
+                ])
              hostFrontend
              RequestErrors.NOT_FOUND "Not found"
         ]
@@ -130,7 +169,21 @@ let configureJsonSerializer (services: IServiceCollection) =
 let registerReadModel<'R, 'E, 'S when 'R :> ReadModels.ReadModel<'E,'S> and 'R : not struct> (readModel: 'R) (services: IServiceCollection) =
     services.AddSingleton<'R>(readModel) |> ignore
     let initializeReadModel (s: IServiceProvider) =
-        ReadModels.ReadModelInitialization.initializeWith (s.GetRequiredService<EventStore>()) readModel.EventHandler
+        let rec formatAsString (runtimeType: Type) =
+            if runtimeType.IsGenericType
+               && (runtimeType.FullName.StartsWith("Microsoft") || runtimeType.FullName.StartsWith("System")) then
+                let arguments = runtimeType.GetGenericArguments()
+                let typeParameters =
+                    arguments
+                    |> Array.map formatAsString
+                    |> String.concat ","
+                $"{runtimeType.Name}<{typeParameters}>"
+            else
+                runtimeType.FullName
+        ReadModels.ReadModelInitialization.initializeWith
+            (s.GetRequiredService<EventStore>())
+            $"ReadModel of {formatAsString(typeof<'E>)} for {formatAsString(typeof<'S>)}"
+            readModel.EventHandler
     services.AddSingleton<ReadModels.ReadModelInitialization> initializeReadModel
     
 let configureReadModels (services: IServiceCollection) =
@@ -145,7 +198,6 @@ let configureReadModels (services: IServiceCollection) =
     |> registerReadModel (ReadModels.Find.Labels.readModel())
     |> registerReadModel (ReadModels.Find.Namespaces.readModel())
     |> ignore
-
 
 let configureServices (context: HostBuilderContext) (services : IServiceCollection) =
     services
@@ -187,7 +239,6 @@ let configureServices (context: HostBuilderContext) (services : IServiceCollecti
                         ConnectionString = connectionString,
                         Serializer = NStoreBased.JsonMsSqlSerializer.Default
                     )
-
                 NStore.Persistence.MsSql.MsSqlPersistence(config)
                 )
             .AddSingleton<EventStore> (fun (p:IServiceProvider) ->
@@ -198,7 +249,6 @@ let configureServices (context: HostBuilderContext) (services : IServiceCollecti
                 EventStore.With storage
             )
             |> ignore
-        
     
     services.AddSingleton<Clock>(utcNowClock) |> ignore
      
@@ -229,31 +279,6 @@ let connectAndReplayReadModels (readModels: ReadModels.ReadModelInitialization s
     |> Async.Parallel
     |> Async.map Array.toList
     
-let waitUntilCaughtUp (subscriptions: Subscription List) =
-    task {
-        let getCurrentStatus () =
-            subscriptions
-            |> List.fold (fun (c,e) item ->
-                match item.Status with
-                | CaughtUp p ->  (p,item) :: c, e
-                | Failed (ex,pos) -> c, (ex,pos,item) :: e
-                | _ -> c,e
-            ) (List.empty,List.empty)
-            
-        let selectPositions status =
-            status |> fst |> List.map fst |> List.distinct 
-        let initialStatus = getCurrentStatus()
-        let mutable lastStatus = initialStatus
-        let mutable counter = 0
-        while not(lastStatus |> fst |> List.length = (subscriptions |> List.length ) && (lastStatus |> selectPositions |> List.length = 1)) do
-            do! Task.Delay(100)
-            let calculatedStatus = getCurrentStatus()
-            lastStatus <- calculatedStatus
-            counter <- counter + 1
-            if counter > 100 then
-                failwithf "No result after %i iterations. Last Status %A" counter lastStatus
-    }
-    
 let runAsync (host: IHost) =
     task {
         let config = host.Services.GetRequiredService<ContextureConfiguration>()
@@ -269,7 +294,7 @@ let runAsync (host: IHost) =
                 host.Services.GetServices<ReadModels.ReadModelInitialization>()
 
             let! readModelSubscriptions = connectAndReplayReadModels readModels
-            do! waitUntilCaughtUp readModelSubscriptions
+            do! Subscriptions.waitUntilCaughtUp readModelSubscriptions
 
             let store = host.Services.GetRequiredService<EventStore>()
         
@@ -280,17 +305,21 @@ let runAsync (host: IHost) =
             let subscriptionLogger = loggerFactory.CreateLogger("subscriptions")
 
             // subscriptions for syncing back to the filebased-db are added after initial seeding/loading
+            let subscribeTo name subscriptionDefinition =
+                store.Subscribe name End (subscriptionDefinition subscriptionLogger database)
             let! fileSyncSubscriptions  =
                 Async.Parallel [
-                    store.Subscribe End (FileBased.Convert.Collaboration.subscription subscriptionLogger database)
-                    store.Subscribe End (FileBased.Convert.Domain.subscription subscriptionLogger database)
-                    store.Subscribe End (FileBased.Convert.BoundedContext.subscription subscriptionLogger database)
-                    store.Subscribe End (FileBased.Convert.Namespace.subscription subscriptionLogger database)
-                    store.Subscribe End (FileBased.Convert.NamespaceTemplate.subscription subscriptionLogger database)
+                    subscribeTo "FileBased.Convert.Collaboration.subscription" FileBased.Convert.Collaboration.subscription
+                    subscribeTo "FileBased.Convert.Domain.subscription" FileBased.Convert.Domain.subscription
+                    subscribeTo "FileBased.Convert.BoundedContext.subscription" FileBased.Convert.BoundedContext.subscription
+                    subscribeTo "FileBased.Convert.Namespace.subscription" FileBased.Convert.Namespace.subscription
+                    subscribeTo "FileBased.Convert.NamespaceTemplate.subscription" FileBased.Convert.NamespaceTemplate.subscription
                 ]
                 |> Async.map Array.toList
-                
-            do! waitUntilCaughtUp (readModelSubscriptions @ fileSyncSubscriptions)
+      
+            SystemRoutes.subscriptions <- Some (readModelSubscriptions @ fileSyncSubscriptions)
+            if host.Services.GetRequiredService<IWebHostEnvironment>().IsDevelopment() then
+                do! Subscriptions.waitUntilCaughtUp (readModelSubscriptions @ fileSyncSubscriptions)
         | SqlServerBased _ ->
             // TODO: properly provision database table?
             let persistence = host.Services.GetRequiredService<NStore.Persistence.MsSql.MsSqlPersistence>()
@@ -299,8 +328,9 @@ let runAsync (host: IHost) =
             let readModels = host.Services.GetServices<ReadModels.ReadModelInitialization>()
 
             let! readModelSubscriptions = connectAndReplayReadModels readModels
-            
-            do! waitUntilCaughtUp readModelSubscriptions
+            SystemRoutes.subscriptions <- Some readModelSubscriptions
+            if host.Services.GetRequiredService<IWebHostEnvironment>().IsDevelopment() then
+                do! Subscriptions.waitUntilCaughtUp readModelSubscriptions
 
         return! host.RunAsync()
     }

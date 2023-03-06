@@ -8,12 +8,12 @@ type ReadModelInitialization =
     abstract member ReplayAndConnect: SubscriptionStartingPosition -> Async<Subscription>
 
 module ReadModelInitialization =
-    type private RMI<'Event>(eventStore: EventStore, handler: SubscriptionHandler<'Event>) =
+    type private RMI<'Event>(eventStore: EventStore, name: string, handler: SubscriptionHandler<'Event>) =
         interface ReadModelInitialization with
-            member _.ReplayAndConnect starting = eventStore.Subscribe starting handler
+            member _.ReplayAndConnect starting = eventStore.Subscribe name starting handler
 
-    let initializeWith (eventStore: EventStore) (handler: SubscriptionHandler<'Event>) : ReadModelInitialization =
-        RMI(eventStore, handler) :> ReadModelInitialization
+    let initializeWith (eventStore: EventStore) name (handler: SubscriptionHandler<'Event>) : ReadModelInitialization =
+        RMI(eventStore, name, handler) :> ReadModelInitialization
 
 type IRetrieveState<'State> =
     abstract State : unit -> Task<'State>

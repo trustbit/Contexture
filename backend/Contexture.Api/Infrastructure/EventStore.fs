@@ -28,6 +28,7 @@ and SubscriptionStartingPosition =
 
 type Subscription =
     inherit IAsyncDisposable
+    abstract Name : string
     abstract Status: SubscriptionStatus
 
 and SubscriptionStatus =
@@ -58,7 +59,7 @@ type EventStorage =
         StreamIdentifier -> ExpectedVersion -> EventDefinition list -> Async<Result<Version * Position, AppendError>>
 
     abstract member All: unit -> Async<EventResult>
-    abstract member Subscribe: SubscriptionDefinition -> SubscriptionHandler -> Async<Subscription>
+    abstract member Subscribe: string -> SubscriptionDefinition -> SubscriptionHandler -> Async<Subscription>
 
 namespace Contexture.Api.Infrastructure
 
@@ -71,13 +72,13 @@ type EventStore(storage: Storage.EventStorage) =
 
     let asTyped items : EventEnvelope<'E> list = items |> List.map EventEnvelope.unbox
 
-    let subscribeStreamKind position (subscription: SubscriptionHandler<'E>) =
+    let subscribeStreamKind name position (subscription: SubscriptionHandler<'E>) =
         let upcastSubscription position events = events |> asTyped |> subscription position
-        storage.Subscribe (FromKind(StreamKind.Of<'E>(), position)) upcastSubscription
+        storage.Subscribe name (FromKind(StreamKind.Of<'E>(), position)) upcastSubscription
 
-    let subscribeAll position (subscription: SubscriptionHandler<'E>) =
+    let subscribeAll name position (subscription: SubscriptionHandler<'E>) =
         let upcastSubscription position events = events |> asTyped |> subscription position
-        storage.Subscribe (FromAll position) upcastSubscription
+        storage.Subscribe name (FromAll position) upcastSubscription
 
     let allStreams () : Async<Position * EventEnvelope<'E> list> =
         async {
@@ -129,8 +130,10 @@ type EventStore(storage: Storage.EventStorage) =
 
     member _.AllStreams() = allStreams ()
 
-    member _.Subscribe position (subscription: SubscriptionHandler<'E>) =
-        subscribeStreamKind position subscription
+    member _.Subscribe name position (subscription: SubscriptionHandler<'E>) =
+        subscribeStreamKind name position subscription
 
-    member _.SubscribeAll position (subscription: SubscriptionHandler<'E>) = subscribeAll position subscription
+    member _.SubscribeAll name position (subscription: SubscriptionHandler<'E>) =
+        subscribeAll name position subscription
+
     member _.All toAllStream = all toAllStream

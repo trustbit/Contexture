@@ -329,7 +329,14 @@ type Storage(persistence: IPersistence, clock: Clock, logger: INStoreLoggerFacto
                 }
             , OnComplete =
                 fun pos ->
-                    subscriptionStatus <- CaughtUp(Position.from pos)
+                    let completedStatus = Position.from pos
+                    match subscriptionStatus with
+                    | Processing status
+                    | CaughtUp status
+                    | Stopped status
+                    | Failed(_, Some status) when completedStatus >= status  ->
+                        subscriptionStatus <- CaughtUp completedStatus
+                    | _ -> ()
                     Task.CompletedTask
             , OnError =
                 fun (pos: int64) (ex: Exception) ->
@@ -337,7 +344,14 @@ type Storage(persistence: IPersistence, clock: Clock, logger: INStoreLoggerFacto
                     Task.CompletedTask
             , OnStart =
                 fun pos ->
-                    subscriptionStatus <- Processing(Position.from pos)
+                    let processingPos = Position.from pos    
+                    match subscriptionStatus with
+                    | CaughtUp status when processingPos > Position.nextPosition status ->
+                        subscriptionStatus <- Processing processingPos
+                    | CaughtUp _ ->
+                        ()
+                    | _ ->
+                        subscriptionStatus <- Processing processingPos
                     Task.CompletedTask
             , OnStop =
                 fun pos ->
@@ -352,7 +366,7 @@ type Storage(persistence: IPersistence, clock: Clock, logger: INStoreLoggerFacto
         | From position -> position |> Position.value |> Task.FromResult
         | End -> persistence.ReadLastPositionAsync()
 
-    let startAsPolling position (subscription: ChunkProcessor) =
+    let startAsPolling name position (subscription: ChunkProcessor) =
         task {
             let wrappedSubscription, status = captureStatus subscription
             let! positionValue = valueFromPosition position
@@ -364,11 +378,12 @@ type Storage(persistence: IPersistence, clock: Clock, logger: INStoreLoggerFacto
 
             return
                 { new Subscription with
+                    member _.Name = name
                     member _.Status = status ()
                     member _.DisposeAsync() = ValueTask(pollingClient.Stop()) }
         }
 
-    let subscribe definition (subscription: SubscriptionHandler) =
+    let subscribe name definition (subscription: SubscriptionHandler) =
         match definition with
         | FromStream(streamIdentifier, version) ->
             let stream =
@@ -389,6 +404,8 @@ type Storage(persistence: IPersistence, clock: Clock, logger: INStoreLoggerFacto
 
             Task.FromResult
                 { new Subscription with
+                    member _.Name = name
+
                     member _.Status = status ()
 
                     member _.DisposeAsync() =
@@ -404,8 +421,8 @@ type Storage(persistence: IPersistence, clock: Clock, logger: INStoreLoggerFacto
                             readTask.Dispose()
                             return ()
                         } }
-        | FromAll position -> startAsPolling position (unfilteredSubscription subscription)
-        | FromKind(streamKind, position) -> startAsPolling position (filteredSubscription streamKind subscription)
+        | FromAll position -> startAsPolling name position (unfilteredSubscription subscription)
+        | FromKind(streamKind, position) -> startAsPolling name position (filteredSubscription streamKind subscription)
 
     interface EventStorage with
         member this.All() : Async<EventResult> = Async.AwaitTask(fetchAll ())
@@ -417,8 +434,8 @@ type Storage(persistence: IPersistence, clock: Clock, logger: INStoreLoggerFacto
         member this.Stream version identifier =
             Async.AwaitTask(read identifier version)
 
-        member this.Subscribe definition subscription =
-            Async.AwaitTask(subscribe definition subscription)
+        member this.Subscribe name definition subscription =
+            Async.AwaitTask(subscribe name definition subscription)
 
 type private MicrosoftLoggingLogger(logger:ILogger) =
     interface INStoreLogger with
