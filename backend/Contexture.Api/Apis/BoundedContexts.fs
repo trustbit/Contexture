@@ -34,21 +34,22 @@ module BoundedContexts =
             (findNamespaces: BoundedContextId -> Projections.Namespace list)
             (boundedContext: Projections.BoundedContext)
             =
-            { Id = boundedContext.Id
-              ParentDomainId = boundedContext.DomainId
-              ShortName = boundedContext.ShortName
-              Name = boundedContext.Name
-              Description = boundedContext.Description
-              Classification = boundedContext.Classification
-              BusinessDecisions = boundedContext.BusinessDecisions
-              UbiquitousLanguage = boundedContext.UbiquitousLanguage
-              Messages = boundedContext.Messages
-              DomainRoles = boundedContext.DomainRoles
-              Domain =
-                  boundedContext.DomainId
-                  |> findDomain
-                  |> Option.get
-              Namespaces = boundedContext.Id |> findNamespaces }
+            boundedContext.DomainId
+            |> findDomain
+            |> Option.map (fun domain ->
+                { Id = boundedContext.Id
+                  ParentDomainId = boundedContext.DomainId
+                  ShortName = boundedContext.ShortName
+                  Name = boundedContext.Name
+                  Description = boundedContext.Description
+                  Classification = boundedContext.Classification
+                  BusinessDecisions = boundedContext.BusinessDecisions
+                  UbiquitousLanguage = boundedContext.UbiquitousLanguage
+                  Messages = boundedContext.Messages
+                  DomainRoles = boundedContext.DomainRoles
+                  Domain = domain
+                  Namespaces = boundedContext.Id |> findNamespaces }
+                )
 
     module CommandEndpoints =
         open System
@@ -123,7 +124,7 @@ module BoundedContexts =
                 let boundedContexts =
                     ids
                     |> List.choose (fun id -> boundedContextLookup |> Map.tryFind id)
-                    |> List.map (Results.convertBoundedContextWithDomain (Domain.domain domainState) namespacesOf)
+                    |> List.choose (Results.convertBoundedContextWithDomain (Domain.domain domainState) namespacesOf)
 
                 return! json boundedContexts next ctx
             }
@@ -253,7 +254,7 @@ module BoundedContexts =
                     |> BoundedContext.boundedContext boundedContextState
                 let result =
                     boundedContext
-                    |> Option.map (Results.convertBoundedContextWithDomain (Domain.domain domainState) namespacesOf)
+                    |> Option.bind (Results.convertBoundedContextWithDomain (Domain.domain domainState) namespacesOf)
                     |> Option.map json
                     |> Option.defaultValue (RequestErrors.NOT_FOUND(sprintf "BoundedContext %O not found" contextId))
 
