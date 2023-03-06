@@ -1,5 +1,5 @@
 <template>
-  <div class="grid auto-cols-max gap-y-4 overflow-x-scroll sm:auto-cols-auto">
+  <div class="grid auto-cols-max gap-y-4 overflow-x-auto sm:auto-cols-auto">
     <div class="grid grid-cols-3 gap-x-4">
       <div class="space-y-4">
         <BCCDescription class="bg-gray-100" />

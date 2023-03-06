@@ -11,7 +11,7 @@
         <span class="italic text-gray-700">({{ t("bounded_context_canvas.domain_roles.empty") }})</span>
       </div>
 
-      <div class="max-h-28 overflow-y-scroll">
+      <div class="max-h-28 overflow-y-auto">
         <ContextureAccordionItem v-for="domainRole in domainRoles" :key="domainRole.name">
           <template #title>
             <div class="flex w-full justify-between">
@@ -56,7 +56,7 @@
               {{ t("bounded_context_canvas.domain_roles.actions.open.select") }}
             </h3>
           </div>
-          <ul class="flex h-72 flex-col gap-y-4 overflow-y-scroll px-2">
+          <ul class="flex h-72 flex-col gap-y-4 overflow-y-auto px-2">
             <li v-for="predefineDomainRole in predefinedDomainRoles" :key="predefineDomainRole.name">
               <ContextureRadio
                 v-model="selectedPredefinedRole"
