@@ -1,8 +1,8 @@
 <template>
   <div class="sm:flex sm:h-[calc(100vh-56px)]">
     <div class="h-full border-r border-r-blue-100 sm:w-1/4">
-      <div class="flex h-full flex-grow flex-col overflow-y-scroll sm:flex">
-        <div class="max-h-60 overflow-y-scroll border sm:h-2/3 sm:max-h-full">
+      <div class="flex h-full flex-grow flex-col overflow-y-auto sm:flex">
+        <div class="max-h-60 overflow-y-auto border sm:h-2/3 sm:max-h-full">
           <ContextureAccordionItem class="space-y-2" :default-open="true">
             <template #title>
               <div class="flex justify-between pr-2 align-middle sm:pr-4">
@@ -56,7 +56,7 @@
             </template>
           </ContextureAccordionItem>
         </div>
-        <div class="flex-grow overflow-y-scroll border p-4">
+        <div class="flex-grow overflow-y-auto border p-4">
           <div>
             <h2 class="text-base font-bold">{{ t("search.presentation_mode") }}</h2>
           </div>
@@ -80,7 +80,7 @@
         </div>
       </div>
     </div>
-    <div class="h-full overflow-y-scroll bg-gray-100 sm:w-3/4">
+    <div class="h-full overflow-y-auto bg-gray-100 sm:w-3/4">
       <div class="text-center">
         <div v-if="options.selectedVisualization === 0" class="h-full">
           <div class="invisible">{{ t("search.sunburst") }}</div>
@@ -103,7 +103,7 @@
           @delete-filter="onDeleteFilter"
         />
 
-        <div v-if="options.selectedTextPresentationMode >= 0" class="h-full overflow-y-scroll p-1 sm:p-4">
+        <div v-if="options.selectedTextPresentationMode >= 0" class="h-full overflow-y-auto p-1 sm:p-4">
           <ContextureHelpfulErrorAlert
             v-if="error"
             :error="error"

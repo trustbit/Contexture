@@ -67,7 +67,7 @@
             </div>
           </div>
           <TabPanels>
-            <div class="mt-8 overflow-x-scroll">
+            <div class="mt-8 overflow-x-auto">
               <TabPanel>
                 <BCCV3 />
               </TabPanel>

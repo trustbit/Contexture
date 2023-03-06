@@ -1,7 +1,7 @@
 <template>
   <ContextureBlankHeader :title="t('domains.bubble.title')" />
 
-  <div class="mt-4 flex overflow-x-scroll">
+  <div class="mt-4 flex overflow-x-auto">
     <div class="flex flex-col">
       <ContexturePrimaryButton
         v-if="activeDomainBubble"
