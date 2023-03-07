@@ -332,6 +332,8 @@ type Storage(persistence: IPersistence, clock: Clock, logger: INStoreLoggerFacto
                 fun pos ->
                     let completedStatus = Position.from pos
                     match subscriptionStatus with
+                    | Processing status when status >= completedStatus && completedStatus = Position.start ->
+                        subscriptionStatus <- CaughtUp status
                     | Processing status
                     | CaughtUp status
                     | Stopped status
