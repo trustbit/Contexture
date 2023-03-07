@@ -79,10 +79,6 @@ type EventEnvelope =
       EventType: System.Type
       StreamKind: StreamKind }
 
-type SubscriptionHandler = Position -> EventEnvelope list -> Async<unit>
-
-type SubscriptionHandler<'E> = Position -> EventEnvelope<'E> list -> Async<unit>
-
 module EventEnvelope =
     let box (envelope: EventEnvelope<'E>) =
         { Metadata = envelope.Metadata
@@ -113,3 +109,12 @@ type ExpectedVersion =
 type EventStream<'Event> =
     abstract Read: Version -> Async<StreamResult<'Event>>
     abstract Append: ExpectedVersion -> EventDefinition<'Event> list -> Async<Result<Version * Position, AppendError>>
+
+type StreamIdentifier = private StreamIdentifier of StreamKind * EventSource
+module StreamIdentifier =
+    let name (StreamIdentifier(kind, source)) =
+        $"{StreamKind.toString kind}/{source.ToString()}"
+
+    let from (eventSource: EventSource) (kind: StreamKind) = StreamIdentifier(kind, eventSource)
+    let source (StreamIdentifier(_, source)) = source
+    let kind (StreamIdentifier(kind, _)) = kind

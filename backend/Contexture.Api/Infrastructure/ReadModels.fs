@@ -1,7 +1,7 @@
 module Contexture.Api.Infrastructure.ReadModels
 
 open System.Threading.Tasks
-open Contexture.Api.Infrastructure.Storage
+open Contexture.Api.Infrastructure.Subscriptions
 open Microsoft.AspNetCore.Http
 
 type ReadModelInitialization =

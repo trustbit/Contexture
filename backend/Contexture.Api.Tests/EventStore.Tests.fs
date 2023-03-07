@@ -4,10 +4,8 @@ open System
 open System.Threading
 open System.Threading.Tasks
 open Contexture.Api.Infrastructure
+open Contexture.Api.Infrastructure.Subscriptions
 open Contexture.Api.Infrastructure.Storage
-open DotNet.Testcontainers.Builders
-open DotNet.Testcontainers.Configurations
-open DotNet.Testcontainers.Containers
 open FsToolkit.ErrorHandling
 open Microsoft.FSharp.Control
 open NStore.Core.Logging
@@ -57,7 +55,7 @@ let waitForEventsOnSubscription start (eventStore: EventStore) action eventCallb
             Async.Sleep(0)
 
         let! subscription = eventStore.Subscribe "UnitTestSubscription" start subscriptionHandler
-        do! Subscriptions.waitUntilCaughtUp [ subscription ]
+        do! Runtime.waitUntilCaughtUp [ subscription ]
 
         do! Async.StartAsTask(action ())
 

@@ -4,6 +4,8 @@ open System
 open System.IO
 open System.Net
 open System.Net.Http
+open Contexture.Api.Infrastructure
+open Contexture.Api.Infrastructure.Subscriptions
 open Contexture.Api.Infrastructure.Storage
 open Contexture.Api.Tests.EnvironmentSimulation
 open FsToolkit.ErrorHandling
@@ -14,7 +16,7 @@ open Microsoft.Extensions.DependencyInjection
 open Microsoft.AspNetCore.TestHost
 open Microsoft.Extensions.Logging
 
-open Contexture.Api.Infrastructure
+
 open Microsoft.Extensions.Options
 
 module TestHost =
@@ -52,7 +54,7 @@ module TestHost =
         
         host.Services.GetServices<ReadModels.ReadModelInitialization>()
         |> Contexture.Api.App.connectAndReplayReadModels
-        |> Async.bind (Subscriptions.waitUntilCaughtUp >> Async.AwaitTask)
+        |> Async.bind (Runtime.waitUntilCaughtUp >> Async.AwaitTask)
         |> Async.RunSynchronously
         
         host.Start()

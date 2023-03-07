@@ -5,7 +5,7 @@ open Contexture.Api.Aggregates.Namespace
 open Contexture.Api.Aggregates.NamespaceTemplate.Projections
 open Contexture.Api.FileBased.Database
 open Contexture.Api.Infrastructure
-open Contexture.Api.Infrastructure.Storage
+open Contexture.Api.Infrastructure.Subscriptions
 open Microsoft.Extensions.Logging
 
 module BridgeEventSourcingWithFilebasedDatabase =

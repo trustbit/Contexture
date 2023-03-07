@@ -2,41 +2,8 @@ namespace Contexture.Api.Infrastructure.Storage
 
 open System
 open Contexture.Api.Infrastructure
+open Contexture.Api.Infrastructure.Subscriptions
 
-type StreamIdentifier = private StreamIdentifier of StreamKind * EventSource
-
-module StreamKind =
-    let asIdentifier source kind = StreamIdentifier(kind, source)
-
-module StreamIdentifier =
-    let name (StreamIdentifier(kind, source)) =
-        $"{StreamKind.toString kind}/{source.ToString()}"
-
-    let from (eventSource: EventSource) (kind: StreamKind) = StreamIdentifier(kind, eventSource)
-    let source (StreamIdentifier(_, source)) = source
-    let kind (StreamIdentifier(kind, _)) = kind
-
-type SubscriptionDefinition =
-    | FromAll of SubscriptionStartingPosition
-    | FromKind of StreamKind * SubscriptionStartingPosition
-    | FromStream of StreamIdentifier * Version option
-
-and SubscriptionStartingPosition =
-    | Start
-    | From of Position
-    | End
-
-type Subscription =
-    inherit IAsyncDisposable
-    abstract Name : string
-    abstract Status: SubscriptionStatus
-
-and SubscriptionStatus =
-    | NotRunning
-    | Processing of current: Position
-    | CaughtUp of at: Position
-    | Failed of exn * at: Position option
-    | Stopped of at: Position
 type EventDefinition =
     { Source: EventSource
       Event: obj
@@ -67,6 +34,7 @@ open System
 open Contexture.Api.Infrastructure.Storage
 open Contexture.Api.Infrastructure
 open FsToolkit.ErrorHandling
+open Contexture.Api.Infrastructure.Subscriptions
 
 type EventStore(storage: Storage.EventStorage) =
 

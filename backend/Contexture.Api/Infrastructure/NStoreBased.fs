@@ -16,6 +16,7 @@ open NStore.Core.Persistence
 
 open Contexture.Api.Infrastructure
 open Contexture.Api.Infrastructure.Storage
+open Contexture.Api.Infrastructure.Subscriptions
 
 module Position =
     let ofChunk (chunk: IChunk) = Position chunk.Position

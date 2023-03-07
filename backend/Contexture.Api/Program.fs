@@ -7,6 +7,7 @@ open System.Threading.Tasks
 open Contexture.Api.FileBased.Database
 open Contexture.Api.Infrastructure
 open Contexture.Api.Infrastructure.Storage
+open Contexture.Api.Infrastructure.Subscriptions
 open FsToolkit.ErrorHandling
 open Giraffe
 open Microsoft.AspNetCore.Builder
@@ -43,7 +44,7 @@ module SystemRoutes =
         fun (next: HttpFunc) (ctx: HttpContext) ->
             match subscriptions with
             | Some subs ->
-                let status = Subscriptions.calculateStatistics subs
+                let status = Runtime.calculateStatistics subs
                 let payload =
                     {| CaughtUp =
                          status.CaughtUp
@@ -63,7 +64,7 @@ module SystemRoutes =
                     |}
                 // TODO: what if we are never able to catch up under (very) high load?
                 // Are we then really not ready to process or is this an OKish situation?
-                if Subscriptions.didAllSubscriptionsCatchup status.CaughtUp subs then
+                if Runtime.didAllSubscriptionsCatchup status.CaughtUp subs then
                     Successful.ok (json payload) next ctx
                 else
                     ServerErrors.serviceUnavailable (json payload) next ctx    
@@ -294,7 +295,7 @@ let runAsync (host: IHost) =
                 host.Services.GetServices<ReadModels.ReadModelInitialization>()
 
             let! readModelSubscriptions = connectAndReplayReadModels readModels
-            do! Subscriptions.waitUntilCaughtUp readModelSubscriptions
+            do! Runtime.waitUntilCaughtUp readModelSubscriptions
 
             let store = host.Services.GetRequiredService<EventStore>()
         
@@ -319,7 +320,7 @@ let runAsync (host: IHost) =
       
             SystemRoutes.subscriptions <- Some (readModelSubscriptions @ fileSyncSubscriptions)
             if host.Services.GetRequiredService<IWebHostEnvironment>().IsDevelopment() then
-                do! Subscriptions.waitUntilCaughtUp (readModelSubscriptions @ fileSyncSubscriptions)
+                do! Runtime.waitUntilCaughtUp (readModelSubscriptions @ fileSyncSubscriptions)
         | SqlServerBased _ ->
             // TODO: properly provision database table?
             let persistence = host.Services.GetRequiredService<NStore.Persistence.MsSql.MsSqlPersistence>()
@@ -330,7 +331,7 @@ let runAsync (host: IHost) =
             let! readModelSubscriptions = connectAndReplayReadModels readModels
             SystemRoutes.subscriptions <- Some readModelSubscriptions
             if host.Services.GetRequiredService<IWebHostEnvironment>().IsDevelopment() then
-                do! Subscriptions.waitUntilCaughtUp readModelSubscriptions
+                do! Runtime.waitUntilCaughtUp readModelSubscriptions
 
         return! host.RunAsync()
     }
