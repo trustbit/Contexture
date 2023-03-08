@@ -44,8 +44,12 @@ type EventStore(storage: Storage.EventStorage) =
         let upcastSubscription position events = events |> asTyped |> subscription position
         storage.Subscribe name (FromKind(StreamKind.Of<'E>(), position)) upcastSubscription
 
-    let subscribeAll name position (subscription: SubscriptionHandler<'E>) =
-        let upcastSubscription position events = events |> asTyped |> subscription position
+    let subscribeAll (convertToAll : EventEnvelope -> EventEnvelope<'E> option) name position (subscription: SubscriptionHandler<'E>) =
+        let upcastSubscription position events =
+            let convertedEvents =
+                events
+                |> List.choose convertToAll
+            subscription position convertedEvents
         storage.Subscribe name (FromAll position) upcastSubscription
 
     let allStreams () : Async<Position * EventEnvelope<'E> list> =
@@ -101,7 +105,7 @@ type EventStore(storage: Storage.EventStorage) =
     member _.Subscribe name position (subscription: SubscriptionHandler<'E>) =
         subscribeStreamKind name position subscription
 
-    member _.SubscribeAll name position (subscription: SubscriptionHandler<'E>) =
-        subscribeAll name position subscription
+    member _.SubscribeAll convert name position (subscription: SubscriptionHandler<'E>) =
+        subscribeAll convert name position subscription
 
     member _.All toAllStream = all toAllStream

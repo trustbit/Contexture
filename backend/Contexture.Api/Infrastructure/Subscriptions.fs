@@ -30,6 +30,12 @@ type SubscriptionHandler = Position -> EventEnvelope list -> Async<unit>
 
 type SubscriptionHandler<'E> = Position -> EventEnvelope<'E> list -> Async<unit>
 
+module SubscriptionHandler =
+    let trackPosition tracker (subscription: SubscriptionHandler<_>) : SubscriptionHandler<_> =
+        fun position events -> async {
+            do! subscription position events
+            do! tracker position
+            }
 
 type SubscriptionStatistics =
     {
