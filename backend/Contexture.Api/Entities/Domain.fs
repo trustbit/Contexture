@@ -54,15 +54,22 @@ module Domain =
 
     and CategorizedAsSubdomain =
         { DomainId: DomainId
-          ParentDomainId: DomainId }
+          ParentDomainId: DomainId
+          OldParentDomainId: DomainId option }
 
-    and PromotedToDomain = { DomainId: DomainId }
+    and PromotedToDomain = {
+        DomainId: DomainId
+        OldParentDomain: DomainId
+    }
 
     and VisionRefined =
         { DomainId: DomainId
           Vision: String option }
 
-    and DomainRemoved = { DomainId: DomainId }
+    and DomainRemoved = {
+        DomainId: DomainId
+        OldParentDomain: DomainId option
+    }
 
     and ShortNameAssigned =
         { DomainId: DomainId
@@ -152,14 +159,25 @@ module Domain =
                       Name = name }
             | None -> DomainCreated { DomainId = id; Name = name })
 
-    let moveDomain parent domainId =
-        match parent with
-        | Some parentDomain ->
-            CategorizedAsSubdomain
-                { DomainId = domainId
-                  ParentDomainId = parentDomain }
-        | None -> PromotedToDomain { DomainId = domainId }
-        |> Ok
+    let moveDomain (state:State) parent domainId =
+        match state with
+        | Existing domain ->
+            match parent with
+            | Some parentDomain ->
+                [ CategorizedAsSubdomain
+                    { DomainId = domainId
+                      ParentDomainId = parentDomain
+                      OldParentDomainId = domain.ParentDomainId }
+                ]
+            | None ->
+                match domain.ParentDomainId with
+                | Some currentParent ->
+                    [ PromotedToDomain { DomainId = domainId; OldParentDomain = currentParent }] 
+                | None ->
+                    []
+            |> Ok
+        | _ ->
+            Ok []
 
     let refineVisionOfDomain vision domainId =
         VisionRefined
@@ -192,17 +210,29 @@ module Domain =
                   |> Option.ofObj
                   |> Option.filter (String.IsNullOrWhiteSpace >> not) }
         |> Ok
+        
+    let removeDomain state domainId =
+        match state with
+        | Existing domain ->
+            Ok [
+                DomainRemoved {
+                    DomainId = domainId
+                    OldParentDomain = domain.ParentDomainId 
+                }
+            ]
+        | _ -> Ok []
 
+    let private asList item = item |> Result.map List.singleton
     let decide (command: Command) (state: State) =
         match command with
-        | CreateDomain (domainId, createDomain) -> newDomain domainId createDomain.Name None
+        | CreateDomain (domainId, createDomain) -> newDomain domainId createDomain.Name None |> asList
         | CreateSubdomain (domainId, subdomainId, createDomain) ->
-            newDomain domainId createDomain.Name (Some subdomainId)
-        | RemoveDomain domainId -> Ok <| DomainRemoved { DomainId = domainId }
-        | MoveDomain (domainId, move) -> moveDomain move.ParentDomainId domainId
-        | RenameDomain (domainId, rename) -> renameDomain rename.Name domainId state
-        | RefineVision (domainId, refineVision) -> refineVisionOfDomain refineVision.Vision domainId
-        | AssignShortName (domainId, assignShortName) -> assignShortNameToDomain assignShortName.ShortName domainId
-        |> Result.map List.singleton
+            newDomain domainId createDomain.Name (Some subdomainId) |> asList
+        | RemoveDomain domainId -> removeDomain state domainId
+        | MoveDomain (domainId, move) -> moveDomain state move.ParentDomainId domainId
+        | RenameDomain (domainId, rename) -> renameDomain rename.Name domainId state |> asList
+        | RefineVision (domainId, refineVision) -> refineVisionOfDomain refineVision.Vision domainId |> asList
+        | AssignShortName (domainId, assignShortName) -> assignShortNameToDomain assignShortName.ShortName domainId |> asList
+        
 
    
