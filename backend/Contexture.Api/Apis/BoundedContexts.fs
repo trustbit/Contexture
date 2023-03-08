@@ -60,8 +60,7 @@ module BoundedContexts =
             fun (next: HttpFunc) (ctx: HttpContext) ->
                 task {
                     let database = ctx.GetService<EventStore>()
-                    let clock = ctx.GetService<Clock>()
-                    let eventStoreBased = EventBased.eventStoreBasedCommandHandler clock database
+                    let eventStoreBased = EventBased.eventStoreBasedCommandHandler database
                     match! BoundedContext.useHandler eventStoreBased command with
                     | Ok (updatedContext,_,position) ->
                         return! redirectTo false (State.appendProcessedPosition (sprintf "/api/boundedcontexts/%O" updatedContext) position) next ctx
@@ -101,8 +100,7 @@ module BoundedContexts =
             fun (next: HttpFunc) (ctx: HttpContext) ->
                 task {
                     let database = ctx.GetService<EventStore>()
-                    let clock = ctx.GetService<Clock>()
-                    let eventStoreBased = EventBased.eventStoreBasedCommandHandler clock database
+                    let eventStoreBased = EventBased.eventStoreBasedCommandHandler database
                     match! BoundedContext.useHandler eventStoreBased (RemoveBoundedContext contextId) with
                     | Ok (id,version,_) -> return! json id next ctx
                     | Error e -> return! ServerErrors.INTERNAL_ERROR e next ctx

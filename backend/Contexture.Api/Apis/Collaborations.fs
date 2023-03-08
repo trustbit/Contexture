@@ -20,8 +20,7 @@ module Collaborations =
             fun (next: HttpFunc) (ctx: HttpContext) ->
                 task {
                     let database = ctx.GetService<EventStore>()
-                    let clock = ctx.GetService<Clock>()
-                    let eventBasedCommandHandler = CommandHandler.EventBased.eventStoreBasedCommandHandler clock database
+                    let eventBasedCommandHandler = CommandHandler.EventBased.eventStoreBasedCommandHandler database
                     match! command |> Collaboration.useHandler eventBasedCommandHandler with
                     | Ok (collaborationId,_,position) ->
                         return! redirectTo false (State.appendProcessedPosition (sprintf "/api/collaborations/%O" collaborationId) position) next ctx
@@ -43,8 +42,7 @@ module Collaborations =
             fun (next: HttpFunc) (ctx: HttpContext) ->
                 task {
                     let database = ctx.GetService<EventStore>()
-                    let clock = ctx.GetService<Clock>()
-                    match! Collaboration.useHandler (EventBased.eventStoreBasedCommandHandler clock database) (RemoveConnection collaborationId) with
+                    match! Collaboration.useHandler (EventBased.eventStoreBasedCommandHandler database) (RemoveConnection collaborationId) with
                     | Ok (collaborationId,version,_) -> return! json collaborationId next ctx
                     | Error e -> return! ServerErrors.INTERNAL_ERROR e next ctx
                 }

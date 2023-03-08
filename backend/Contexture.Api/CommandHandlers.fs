@@ -51,7 +51,7 @@ module CommandHandler =
         type GetStreamName<'Identity> = 'Identity -> EventSource
         type StreamBasedCommandHandler<'Identity,'State,'Cmd,'Event,'Error> = GetStreamName<'Identity> -> Aggregate<'State,'Cmd,'Event,'Error> -> HandleIdentityAndCommand<'Identity, 'Cmd,'Error>
         
-        let eventStoreBasedCommandHandler clock (eventStore:EventStore) : StreamBasedCommandHandler<_,_,_,_,_> =
+        let eventStoreBasedCommandHandler (eventStore:EventStore) : StreamBasedCommandHandler<_,_,_,_,_> =
             fun getStreamName aggregate  ->
                 let loadStream identity = async {
                     let streamName = getStreamName identity

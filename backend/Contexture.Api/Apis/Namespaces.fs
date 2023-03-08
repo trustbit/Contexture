@@ -23,8 +23,7 @@ module Namespaces =
             fun (next: HttpFunc) (ctx: HttpContext) ->
                 task {
                     let database = ctx.GetService<EventStore>()
-                    let clock = ctx.GetService<Clock>()
-                    let eventBasedHandler = EventBased.eventStoreBasedCommandHandler clock database
+                    let eventBasedHandler = EventBased.eventStoreBasedCommandHandler database
                     match! Namespace.useHandler eventBasedHandler command with
                     | Ok (updatedContext,version,position) ->
                         let! namespaceState = ctx.GetService<ReadModels.Namespace.AllNamespacesReadModel>().State(position)
@@ -88,8 +87,7 @@ module Namespaces =
                 fun (next: HttpFunc) (ctx: HttpContext) ->
                     task {
                         let database = ctx.GetService<EventStore>()
-                        let clock = ctx.GetService<Clock>()
-                        let eventBasedCommandHandler = EventBased.eventStoreBasedCommandHandler clock database 
+                        let eventBasedCommandHandler = EventBased.eventStoreBasedCommandHandler database 
                         match! NamespaceTemplate.useHandler eventBasedCommandHandler command with
                         | Ok (updatedTemplate,_,position) ->
                             return! redirectTo false (State.appendProcessedPosition (sprintf "/api/namespaces/templates/%O" updatedTemplate) position) next ctx
