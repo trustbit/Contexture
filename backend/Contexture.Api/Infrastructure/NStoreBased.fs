@@ -76,13 +76,14 @@ and private SerializableEventEnvelope =
       Source: EventSource
     }    
 
-type JsonMsSqlSerializer(settings: JsonSerializerOptions) =
+module ReflectionBasedTypeResolver =
     let exportedTypesAssemblyCache =
         lazy
             AppDomain.CurrentDomain.GetAssemblies()
             |> Seq.filter (fun a -> not a.IsDynamic)
+            |> Seq.filter (fun a -> not(a.FullName.StartsWith "System" || a.FullName.StartsWith "Microsoft"))
             |> Seq.collect (fun a -> a.ExportedTypes)
-            |> Seq.map(fun t -> t.FullName,t)
+            |> Seq.map(fun t -> t.FullName, t)
             |> Map.ofSeq
         
     let findType (eventTypeName:string) =
@@ -97,9 +98,10 @@ type JsonMsSqlSerializer(settings: JsonSerializerOptions) =
             if secondAttempt |> Option.isNone then
                 invalidArg (nameof eventTypeName) $"Cannot resolve a runtime type for {eventTypeName}"
             secondAttempt.Value
-            
+
+type JsonMsSqlSerializer(settings: JsonSerializerOptions, typeResolver: string -> Type) =
     let deserialize streamKind (item: SerializableEventEnvelope) : EventDefinition =
-        let eventType = findType item.EventType
+        let eventType = typeResolver item.EventType
 
         { Event = JsonSerializer.Deserialize(item.Payload, eventType, settings)
           EventType = eventType
@@ -132,7 +134,7 @@ type JsonMsSqlSerializer(settings: JsonSerializerOptions) =
             )
         )
 
-        JsonMsSqlSerializer options
+        JsonMsSqlSerializer(options, ReflectionBasedTypeResolver.findType)
 
     interface IMsSqlPayloadSerializer with
         member _.Deserialize(serialized, serializerInfo) =
@@ -149,7 +151,7 @@ type JsonMsSqlSerializer(settings: JsonSerializerOptions) =
                     RecordedAt = deserialized.RecordedAt
                 }
             else
-                let returnType = Type.GetType serializerInfo
+                let returnType = typeResolver serializerInfo
                 JsonSerializer.Deserialize(serialized, returnType, settings)
 
         member _.Serialize(payload, serializerInfo) =
@@ -278,7 +280,6 @@ type Storage(persistence: IPersistence, clock: Clock, logger: INStoreLoggerFacto
             with e ->
                 return Error(UnknownError e)
         }
-
 
     let stream (identifier: StreamIdentifier) =
         task {
