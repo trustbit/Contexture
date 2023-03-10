@@ -116,7 +116,7 @@ type EventStoreBehavior() =
             Then.assertSingle stream source
             Assert.Equal(expectedVersion, streamVersion)
 
-            let! allPosition, allStreams = eventStore.All(List.map EventEnvelope.unbox)
+            let! allPosition, allStreams = eventStore.All EventEnvelope.tryUnbox
             Then.assertAll allStreams [ source ]
             Assert.NotEmpty allStreams
             Assert.Equal(allPosition |> Position.value, streamVersion |> Version.value)
@@ -136,7 +136,7 @@ type EventStoreBehavior() =
                 Then.assertSingle stream source
 
             let! (version, allStreams: EventEnvelope<Fixture.TestStream> list) =
-                eventStore.All(List.map EventEnvelope.unbox)
+                eventStore.All EventEnvelope.tryUnbox
 
             Then.assertAll allStreams sources
             Assert.Equal(expectedPosition, version)

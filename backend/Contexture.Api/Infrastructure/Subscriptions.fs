@@ -3,6 +3,7 @@ namespace Contexture.Api.Infrastructure.Subscriptions
 open System.Threading.Tasks
 open FsToolkit.ErrorHandling
 open Contexture.Api.Infrastructure
+
 type SubscriptionDefinition =
     | FromAll of SubscriptionStartingPosition
     | FromKind of StreamKind * SubscriptionStartingPosition
@@ -15,7 +16,7 @@ and SubscriptionStartingPosition =
 
 type Subscription =
     inherit System.IAsyncDisposable
-    abstract Name : string
+    abstract Name: string
     abstract Status: SubscriptionStatus
 
 and SubscriptionStatus =

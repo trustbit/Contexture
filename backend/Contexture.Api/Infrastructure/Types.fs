@@ -46,22 +46,20 @@ type Position = private Position of int64
 module Position =
     let start = Position 0
     let value (Position value) = value
+
     let from value =
         if value < 0L then
             invalidArg $"Value must not be smaller 0 but is {value}" (nameof value)
 
         Position value
+
     let create value =
-        if value < 0L then
-            None
-        else
-            Some (Position value)
-    let parse (value:string) =
-        value
-        |> Int64.TryParse
-        |> Option.ofTryGet
-        |> Option.bind create
-    let nextPosition (Position value) = Position (value + 1L)
+        if value < 0L then None else Some(Position value)
+
+    let parse (value: string) =
+        value |> Int64.TryParse |> Option.ofTryGet |> Option.bind create
+
+    let nextPosition (Position value) = Position(value + 1L)
 
 type EventMetadata =
     { Source: EventSource
@@ -90,6 +88,18 @@ module EventEnvelope =
         { Metadata = envelope.Metadata
           Event = unbox<'E> envelope.Payload }
 
+    let tryUnbox (envelope: EventEnvelope) : EventEnvelope<'E> option =
+        envelope.Payload
+        |> tryUnbox<'E>
+        |> Option.map (fun event ->
+            { Metadata = envelope.Metadata
+              Event = event })
+
+
+    let map mapper (envelope: EventEnvelope<'E>) =
+        { Metadata = envelope.Metadata
+          Event = mapper envelope.Event }
+
 type EventResult = Result<Position * EventEnvelope list, string>
 type EventResult<'e> = Result<Position * EventEnvelope<'e> list, string>
 type StreamResult = Result<Version * EventEnvelope list, string>
@@ -111,6 +121,7 @@ type EventStream<'Event> =
     abstract Append: ExpectedVersion -> EventDefinition<'Event> list -> Async<Result<Version * Position, AppendError>>
 
 type StreamIdentifier = private StreamIdentifier of StreamKind * EventSource
+
 module StreamIdentifier =
     let name (StreamIdentifier(kind, source)) =
         $"{StreamKind.toString kind}/{source.ToString()}"

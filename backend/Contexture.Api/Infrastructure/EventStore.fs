@@ -83,7 +83,7 @@ type EventStore(storage: Storage.EventStorage) =
     let all toAllStream : Async<Position * EventEnvelope<'E> list> =
         async {
             match! storage.All() with
-            | Ok allStreams -> return allStreams |> Tuple.mapSnd (toAllStream)
+            | Ok allStreams -> return allStreams |> Tuple.mapSnd (List.choose toAllStream)
             | Error e ->
                 failwithf "Could not get all streams: %s" e
                 return Position.start, List.empty
