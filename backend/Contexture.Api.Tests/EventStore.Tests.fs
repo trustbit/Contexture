@@ -235,7 +235,7 @@ type InMemoryEventStore() =
     inherit EventStoreBehavior()
 
     override this.anEmptyEventStore() =
-        EventStore.With (InMemoryStorage.empty Fixture.environment.Time) 
+        EventStore.With (InMemory.emptyEventStore Fixture.environment.Time) 
         |> Task.FromResult
 
     override this.anEventStoreWithStreamsAndEvents(count) =
@@ -244,7 +244,7 @@ type InMemoryEventStore() =
         let storage =
             data
             |> List.map (fun (source, event) -> EventDefinition.from source event)
-            |> InMemoryStorage.initialize Fixture.environment.Time
+            |> InMemory.eventStoreWith Fixture.environment.Time
             
         Task.FromResult(
             EventStore.With storage,

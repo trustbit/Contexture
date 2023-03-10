@@ -88,7 +88,6 @@ module Runtime =
                     failwithf "No result after %i iterations. Last Status %A" counter lastStatus
         }
 
-
 module PositionStorage =
     type IStorePositions =
         abstract LastPosition: string -> Async<Position option>
@@ -198,7 +197,6 @@ WHEN NOT MATCHED THEN
                     let! _ = client |> executeNonQuery "DROP TABLE Subscriptions" []
                     return ()
                 }
-
 
             interface IStorePositions with
                 member _.LastPosition name = Async.AwaitTask(getLastPosition name)

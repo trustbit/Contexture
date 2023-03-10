@@ -224,7 +224,7 @@ let configureServices (context: HostBuilderContext) (services : IServiceCollecti
                 )
             .AddSingleton<EventStore> (fun (p:IServiceProvider) ->
                 let clock = p.GetRequiredService<Clock>()
-                let storage = Storage.InMemoryStorage.empty clock
+                let storage = Storage.InMemory.emptyEventStore clock
                 
                 EventStore.With storage
             )

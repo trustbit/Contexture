@@ -1,4 +1,4 @@
-module Contexture.Api.Infrastructure.Storage.InMemoryStorage
+module Contexture.Api.Infrastructure.Storage.InMemory
 
 open System.Collections.Generic
 open System.Threading
@@ -173,7 +173,7 @@ let private singleWriterPipeline clock (initialEvents: EventDefinition list) (in
 
     loop ([], initialHistory)
 
-let initialize clock (initialEvents: EventDefinition list) =
+let eventStoreWith clock (initialEvents: EventDefinition list) =
     let agent = Agent<Msg>.Start (singleWriterPipeline clock initialEvents)
 
     { new EventStorage with
@@ -227,4 +227,4 @@ let initialize clock (initialEvents: EventDefinition list) =
                             ValueTask.CompletedTask }
             } }
 
-let empty clock = initialize clock [ ]
+let emptyEventStore clock = eventStoreWith clock [ ]

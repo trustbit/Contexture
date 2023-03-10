@@ -85,7 +85,7 @@ module Prepare =
         fun (services: IServiceCollection) ->
             services.AddSingleton<EventStore>(fun p ->
                 let clock = p.GetRequiredService<Clock>()
-                EventStore.With (givens |> InMemoryStorage.initialize clock)
+                EventStore.With (givens |> InMemory.eventStoreWith clock)
             )
             |> ignore
 
