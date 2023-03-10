@@ -229,7 +229,7 @@ let configureServices (context: HostBuilderContext) (services : IServiceCollecti
                 EventStore.With storage
             )
             |> ignore
-        services.AddSingleton<PositionStorage.IStorePositions>(PositionStorage.InMemory.PositionStorage())
+        services.AddSingleton<PositionStorage.IStorePositions>(PositionStorage.InMemory.PositionStorage.Empty)
             |> ignore
     | SqlServerBased connectionString ->
         services

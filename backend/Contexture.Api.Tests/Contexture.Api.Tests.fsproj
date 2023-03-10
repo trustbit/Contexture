@@ -13,6 +13,7 @@
         <Compile Include="TestSetup.fs" />
         <Compile Include="Scenario.fs" />
         <Compile Include="EventStore.Tests.fs" />
+        <Compile Include="PositionStorage.Tests.fs" />
         <Compile Include="Fixtures.fs" />
         <Compile Include="ApiTests.fs" />
         <Compile Include="Tests.fs" />

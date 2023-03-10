@@ -95,8 +95,10 @@ module PositionStorage =
         abstract SavePosition: string -> Position -> Async<unit>
 
     module InMemory =
-        type PositionStorage() =
-            let mutable positions: Map<string, Position> = Map.empty
+        type PositionStorage(initial: Map<string, Position>) =
+            let mutable positions: Map<string, Position> = initial
+
+            static member Empty = PositionStorage(Map.empty)
 
             interface IStorePositions with
                 member _.LastPosition name = Async.retn (Map.tryFind name positions)
@@ -187,6 +189,13 @@ WHEN NOT MATCHED THEN
                 task {
                     use! client = openConnection connectionString
                     let! _ = client |> executeNonQuery schemaScript []
+                    return ()
+                }
+
+            static member RemoveSchema(connectionString) =
+                task {
+                    use! client = openConnection connectionString
+                    let! _ = client |> executeNonQuery "DROP TABLE Subscriptions" []
                     return ()
                 }
 
