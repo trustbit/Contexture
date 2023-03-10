@@ -71,6 +71,34 @@ module CommandHandler =
                 
                 handleWithStream loadStream saveStream aggregate
 
+    module Decider =
+        open System.Collections.Generic
+        let private executeCommandSequentially execute commands =
+            async {
+                let results = List()
+                for command in commands do
+                    let! result = execute command
+                    results.Add result
+                return results |> List.ofSeq
+            }
+        let batch (executeCommand: HandleCommand<'identity,'c,'error>) (commands: 'c list) =
+            async {
+                let! results =
+                    executeCommandSequentially executeCommand commands
+                let (position, errors) =
+                    results
+                    |> List.fold (fun (events, errors) result ->
+                        match result with
+                        | Ok (_,_,position) ->(Some position, errors)
+                        | Error error -> (events, errors @ [ error ])
+                        )
+                        (None,List.empty)
+                
+                if not(List.isEmpty errors) then
+                    return Error errors
+                else
+                    return Ok position
+            }
 module FileBasedCommandHandlers =
     open Contexture.Api.Aggregates
     open CommandHandler

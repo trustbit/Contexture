@@ -228,7 +228,9 @@ let configureServices (context: HostBuilderContext) (services : IServiceCollecti
                 
                 EventStore.With storage
             )
-        |> ignore
+            |> ignore
+        services.AddSingleton<PositionStorage.IStorePositions>(PositionStorage.InMemory.PositionStorage())
+            |> ignore
     | SqlServerBased connectionString ->
         services
             .AddSingleton<NStore.Core.Logging.INStoreLoggerFactory,NStoreBased.MicrosoftLoggingLoggerFactory>()
@@ -249,6 +251,8 @@ let configureServices (context: HostBuilderContext) (services : IServiceCollecti
                 let storage = NStoreBased.Storage(persistence,clock, logger)
                 EventStore.With storage
             )
+            |> ignore
+        services.AddSingleton<PositionStorage.IStorePositions>(PositionStorage.SqlServer.PositionStorage(connectionString))
             |> ignore
     
     services.AddSingleton<Clock>(utcNowClock) |> ignore
@@ -283,6 +287,7 @@ let connectAndReplayReadModels (readModels: ReadModels.ReadModelInitialization s
 let runAsync (host: IHost) =
     task {
         let config = host.Services.GetRequiredService<ContextureConfiguration>()
+        let loggerFactory = host.Services.GetRequiredService<ILoggerFactory>()
         
         match config.Engine with
         | FileBased _ ->
@@ -295,14 +300,14 @@ let runAsync (host: IHost) =
                 host.Services.GetServices<ReadModels.ReadModelInitialization>()
 
             let! readModelSubscriptions = connectAndReplayReadModels readModels
-            do! Runtime.waitUntilCaughtUp readModelSubscriptions
-
+            
             let store = host.Services.GetRequiredService<EventStore>()
         
             let! document = database.Read()
             do! FileBased.Convert.importFromDocument store document
-        
-            let loggerFactory = host.Services.GetRequiredService<ILoggerFactory>()
+            
+            do! Runtime.waitUntilCaughtUp readModelSubscriptions
+            
             let subscriptionLogger = loggerFactory.CreateLogger("subscriptions")
 
             // subscriptions for syncing back to the filebased-db are added after initial seeding/loading
@@ -321,11 +326,13 @@ let runAsync (host: IHost) =
             SystemRoutes.subscriptions <- Some (readModelSubscriptions @ fileSyncSubscriptions)
             if host.Services.GetRequiredService<IWebHostEnvironment>().IsDevelopment() then
                 do! Runtime.waitUntilCaughtUp (readModelSubscriptions @ fileSyncSubscriptions)
-        | SqlServerBased _ ->
+        | SqlServerBased connectionString ->
             // TODO: properly provision database table?
             let persistence = host.Services.GetRequiredService<NStore.Persistence.MsSql.MsSqlPersistence>()
             do! persistence.InitAsync(CancellationToken.None)
 
+            do! PositionStorage.SqlServer.PositionStorage.CreateSchema connectionString
+            
             let readModels = host.Services.GetServices<ReadModels.ReadModelInitialization>()
 
             let! readModelSubscriptions = connectAndReplayReadModels readModels
@@ -333,6 +340,12 @@ let runAsync (host: IHost) =
             if host.Services.GetRequiredService<IWebHostEnvironment>().IsDevelopment() then
                 do! Runtime.waitUntilCaughtUp readModelSubscriptions
 
+        let! reaction =
+            Reactions.CascadeDelete.subscribe
+                (loggerFactory.CreateLogger (nameof Reactions.CascadeDelete))
+                 (host.Services.GetRequiredService<EventStore>())
+                 (host.Services.GetRequiredService<PositionStorage.IStorePositions>())
+                 
         return! host.RunAsync()
     }
 
