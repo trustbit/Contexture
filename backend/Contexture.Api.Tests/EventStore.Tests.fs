@@ -12,6 +12,7 @@ open NStore.Core.Logging
 open NStore.Core.Streams
 open NStore.Persistence.MsSql
 open Xunit
+open Assertions
 
 module Fixture =
     let environment = EnvironmentSimulation.FixedTimeEnvironment.FromSystemClock()

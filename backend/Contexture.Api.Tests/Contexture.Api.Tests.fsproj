@@ -11,12 +11,13 @@
         <Compile Include="SqlServerFixture.fs" />
         <Compile Include="EnvironmentSimulation.fs" />
         <Compile Include="TestSetup.fs" />
-        <Compile Include="Scenario.fs" />
+        <Compile Include="Assertions.fs" />
         <Compile Include="EventStore.Tests.fs" />
         <Compile Include="PositionStorage.Tests.fs" />
-        <Compile Include="Fixtures.fs" />
-        <Compile Include="ApiTests.fs" />
         <Compile Include="Tests.fs" />
+        <Compile Include="Specs\Scenario.fs" />
+        <Compile Include="Specs\Fixtures.fs" />
+        <Compile Include="Specs\PublicApiEndpoint.Tests.fs" />
     </ItemGroup>
 
     <ItemGroup>

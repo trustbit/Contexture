@@ -51,21 +51,6 @@ module Then =
             Then.Equal(false, response.IsSuccessStatusCode)
         let shouldHaveStatusCode (statusCode: HttpStatusCode) (response: HttpResponseMessage) =
             Then.Equal(statusCode,response.StatusCode)
-            
-    let expectOk (result: Async<Result<'r, _>>) : Async<unit> =
-        async {
-            match! result with
-            | Ok _ -> return ()
-            | Error e -> return failwithf "Expected an Ok result but got Error:\n%O" e
-        }
-
-    let resultOrFail (result: Async<Result<'r, _>>) : Async<'r> =
-        async {
-            match! result with
-            | Ok r -> return r
-            | Error e -> return failwithf "Expected an Ok result but got Error:\n%O" e
-        }
-
 
 module Utils =
     open Contexture.Api.Tests.EnvironmentSimulation
