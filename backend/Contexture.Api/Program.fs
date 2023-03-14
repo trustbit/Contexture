@@ -345,7 +345,7 @@ let runAsync (host: IHost) =
                 (loggerFactory.CreateLogger (nameof Reactions.CascadeDelete))
                  (host.Services.GetRequiredService<EventStore>())
                  (host.Services.GetRequiredService<PositionStorage.IStorePositions>())
-                 
+        SystemRoutes.subscriptions <-  Some (SystemRoutes.subscriptions.Value @ [ reaction ])
         return! host.RunAsync()
     }
 

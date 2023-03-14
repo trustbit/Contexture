@@ -148,9 +148,6 @@ module FileBasedCommandHandlers =
             |> stateBasedHandler Collaboration.name
             |> CommandHandler.getIdentityFromCommand Collaboration.identify               
             
-        
-
-
     module Namespace =
         open Namespace
         open ValueObjects
@@ -164,9 +161,7 @@ module FileBasedCommandHandlers =
         let useHandler stateBasedHandler =
             aggregate
             |> stateBasedHandler Namespace.name
-            |> CommandHandler.getIdentityFromCommand Namespace.identify   
-
-        
+            |> CommandHandler.getIdentityFromCommand Namespace.identify           
 
     module NamespaceTemplate =
         open NamespaceTemplate
@@ -181,5 +176,3 @@ module FileBasedCommandHandlers =
             aggregate
             |> stateBasedHandler NamespaceTemplate.name
             |> CommandHandler.getIdentityFromCommand NamespaceTemplate.identify   
-
-        

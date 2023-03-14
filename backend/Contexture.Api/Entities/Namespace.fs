@@ -55,7 +55,10 @@ and NamespaceAdded =
       Name: string
       Labels: LabelDefinition list }
 
-and NamespaceRemoved = { NamespaceId: NamespaceId }
+and NamespaceRemoved = {
+    NamespaceId: NamespaceId
+    BoundedContextId: BoundedContextId
+}
 
 and LabelDefinition =
     { LabelId: LabelId
@@ -147,9 +150,12 @@ let decide (command: Command) (state: State) =
     match command with
     | NewNamespace (boundedContextId, namespaceCommand) ->
         addNewNamespace boundedContextId namespaceCommand.Name namespaceCommand.Template namespaceCommand.Labels state
-    | RemoveNamespace (_, namespaceId) ->
+    | RemoveNamespace (boundedContextId, namespaceId) ->
         Ok
-        <| NamespaceRemoved { NamespaceId = namespaceId }
+        <| NamespaceRemoved {
+            NamespaceId = namespaceId
+            BoundedContextId = boundedContextId
+        }
     | AddLabel (_, namespaceId, labelCommand) -> addLabel namespaceId labelCommand.Name labelCommand.Value
     | RemoveLabel (_, labelCommand) ->
         Ok
@@ -157,7 +163,6 @@ let decide (command: Command) (state: State) =
             { NamespaceId = labelCommand.Namespace
               LabelId = labelCommand.Label }
     |> Result.map List.singleton
-
 
 module Projections =
     type Label =

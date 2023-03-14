@@ -25,7 +25,7 @@ module Namespaces =
             let given =
                 Fixtures.Builders.givenADomainWithOneBoundedContext domainId contextId
 
-            use testEnvironment = Prepare.withGiven environment given
+            use! testEnvironment = Prepare.withGiven environment given
 
             //act
             let createNamespaceContent = "{
@@ -91,7 +91,7 @@ module BoundedContexts =
             let given =
                 Fixtures.Builders.givenADomainWithOneBoundedContext domainId contextId
 
-            use testEnvironment = Prepare.withGiven environment given
+            use! testEnvironment = Prepare.withGiven environment given
 
             //act
             let! result =
@@ -115,7 +115,7 @@ module BoundedContexts =
             let given =
                 Fixtures.Builders.givenADomainWithOneBoundedContext domainId contextId
 
-            use testEnvironment = Prepare.withGiven environment given
+            use! testEnvironment = Prepare.withGiven environment given
 
             //act
             let! result =
@@ -140,10 +140,10 @@ module BoundedContexts =
             let given =
                 Fixtures.Builders.givenADomainWithOneBoundedContextAndOneNamespace domainId contextId namespaceId
                 
-            use testEnvironment = Prepare.withGiven simulation given
+            use! testEnvironment = Prepare.withGiven simulation given
 
             //act
-            let! result =
+            let! _,result =
                 testEnvironment
                 |> When.deleting $"api/boundedContexts/%O{contextId}/namespaces/\"%O{namespaceId}\""
 
@@ -194,7 +194,7 @@ module BoundedContexts =
                 let given =
                     searchedBoundedContext @ randomBoundedContext
 
-                use testEnvironment = Prepare.withGiven simulation given
+                use! testEnvironment = Prepare.withGiven simulation given
 
                 //act
                 let! result =
@@ -236,7 +236,7 @@ module BoundedContexts =
                 let given =
                     firstBoundedContext @ secondBoundedContext @ randomBoundedContext
 
-                use testEnvironment = Prepare.withGiven simulation given
+                use! testEnvironment = Prepare.withGiven simulation given
 
                 //act
                 let! result =
@@ -277,7 +277,7 @@ module BoundedContexts =
                 let given =
                     firstBoundedContext @ secondBoundedContext @ randomBoundedContext
 
-                use testEnvironment = Prepare.withGiven simulation given
+                use! testEnvironment = Prepare.withGiven simulation given
 
                 //act
                 let! result =
@@ -347,7 +347,7 @@ module BoundedContexts =
                         |> Fixtures.Namespace.namespaceAdded
                     )
                     
-                use testEnvironment = prepareTestEnvironment simulation searchedBoundedContext
+                use! testEnvironment = prepareTestEnvironment simulation searchedBoundedContext
                 
                 //act
                 let! result =
@@ -392,7 +392,7 @@ module BoundedContexts =
                         secondContextId |> BoundedContext.shortName |> BoundedContext.shortNameAssigned
                     ]                
                     
-                use testEnvironment = prepareTestEnvironment simulation given
+                use! testEnvironment = prepareTestEnvironment simulation given
                 
                 //act
                 let! result =
@@ -413,7 +413,7 @@ module BoundedContexts =
             [<Fact>]
             member __.``it is possible to find label names by using 'arch*' as StartsWith``() =
                 task {
-                    use testEnvironment =
+                    use! testEnvironment =
                         Builders.givenADomainWithOneBoundedContextAndOneNamespace domainId contextId namespaceId
                         |> prepareTestEnvironment simulation
 
@@ -429,7 +429,7 @@ module BoundedContexts =
             [<Fact>]
             member __.``it is possible to find label names by using '*tect' as EndsWith``() =
                 task {
-                    use testEnvironment =
+                    use! testEnvironment =
                         Builders.givenADomainWithOneBoundedContextAndOneNamespace domainId contextId namespaceId
                         |> prepareTestEnvironment simulation
 
@@ -445,7 +445,7 @@ module BoundedContexts =
             [<Fact>]
             member __.``it is possible to find label names by using '*rchitec*' as Contains``() =
                 task {
-                    use testEnvironment =
+                    use! testEnvironment =
                         Builders.givenADomainWithOneBoundedContextAndOneNamespace domainId contextId namespaceId
                         |> prepareTestEnvironment simulation
 
@@ -461,7 +461,7 @@ module BoundedContexts =
             [<Fact>]
             member __.``it is possible to find namespace names by using '*ea*' as Contains``() =
                 task {
-                    use testEnvironment =
+                    use! testEnvironment =
                         Builders.givenADomainWithOneBoundedContextAndOneNamespace domainId contextId namespaceId
                         |> prepareTestEnvironment simulation
 
@@ -512,7 +512,7 @@ module BoundedContexts =
                 |> Given.andOneEvent namespaceAdded
                 |> Given.andOneEvent otherNamespaceAdded
 
-            use testEnvironment = Prepare.withGiven environment given
+            use! testEnvironment = Prepare.withGiven environment given
 
             //act - search by name
             let! result =

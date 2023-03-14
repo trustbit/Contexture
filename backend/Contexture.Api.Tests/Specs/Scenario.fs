@@ -1,9 +1,14 @@
 namespace Contexture.Api.Tests
 
+open System.Collections.Generic
 open System.Net
 open System.Net.Http
+open System.Threading.Tasks
 open Contexture.Api.Infrastructure
 open Contexture.Api.Infrastructure.Storage
+open Contexture.Api.Infrastructure.Subscriptions
+open Contexture.Api.Reactions
+open FsToolkit.ErrorHandling
 
 
 type Given = EventEnvelope list
@@ -20,16 +25,27 @@ module When =
 
     open TestHost
 
+    let private captureEvents action (environment: TestHostEnvironment) = task {
+        let mutable capturedEvents = List()
+        let captureEvents =
+            fun position events ->
+                capturedEvents.AddRange events
+                Async.retn ()
+        let store = environment.GetService<EventStore>()
+        let! subscription = store.SubscribeAll AllEvents.fromEnvelope "capture events" Subscriptions.End captureEvents
+        let! result = action environment
+        do! Runtime.waitUntilCaughtUp [ subscription ]
+        do! Task.Delay 1000
+        return capturedEvents |> List.ofSeq,result
+    }
     let deleting (url: string) (environment: TestHostEnvironment) =
         task {
-            let! result = environment.Client.DeleteAsync(url)
-            return result
+            return! environment |> captureEvents (fun env -> env.Client.DeleteAsync(url))
         }
     
     let postingJson (url: string) (jsonContent: string) (environment: TestHostEnvironment) =
         task {
-            let! result = environment.Client.PostAsync(url, new StringContent(jsonContent))
-            return result.EnsureSuccessStatusCode()
+            return! environment |> captureEvents (fun env -> env.Client.PostAsync(url, new StringContent(jsonContent)))
         }
 
     let gettingJson<'t> (url: string) (environment: TestHostEnvironment) =
@@ -49,6 +65,9 @@ module Then =
     module Response =
         let shouldNotBeSuccessful (response: HttpResponseMessage) =
             Then.Equal(false, response.IsSuccessStatusCode)
+        let shouldBeSuccessful (response: HttpResponseMessage) =
+            ignore <| response.EnsureSuccessStatusCode()
+            
         let shouldHaveStatusCode (statusCode: HttpStatusCode) (response: HttpResponseMessage) =
             Then.Equal(statusCode,response.StatusCode)
 

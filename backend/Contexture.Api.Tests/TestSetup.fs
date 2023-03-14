@@ -43,33 +43,48 @@ module TestHost =
     let useClockFromEnvironment (env: ISimulateEnvironment) (services: IServiceCollection) =
         services.AddSingleton<Contexture.Api.Infrastructure.Clock>(env.Time)
 
-    let runServer environmentSimulation testConfiguration =
-        let configureTest (services: IServiceCollection) =
-            services
-            |> useClockFromEnvironment environmentSimulation
-            |> testConfiguration
-            
-        let host =
-            createHost configureTest Contexture.Api.App.configureServices Contexture.Api.App.configureApp
-        
+    let runReadModels (host: IHost) =
         host.Services.GetServices<ReadModels.ReadModelInitialization>()
         |> Contexture.Api.App.connectAndReplayReadModels
         |> Async.bind (Runtime.waitUntilCaughtUp >> Async.AwaitTask)
-        |> Async.RunSynchronously
         
-        host.Start()
-        host
+    let runReactions (host: IHost) =
+        let loggerFactory = host.Services.GetRequiredService<ILoggerFactory>()
+        [ Contexture.Api.Reactions.CascadeDelete.subscribe
+            (loggerFactory.CreateLogger (nameof Contexture.Api.Reactions.CascadeDelete))
+             (host.Services.GetRequiredService<EventStore>())
+             (host.Services.GetRequiredService<PositionStorage.IStorePositions>())
+        ]
+        |> Async.Parallel
+        |> Async.map Array.toList
+        |> Async.bind(Runtime.waitUntilCaughtUp >> Async.AwaitTask)
 
+    let runServer environmentSimulation testConfiguration =
+        task {
+            let configureTest (services: IServiceCollection) =
+                services
+                |> useClockFromEnvironment environmentSimulation
+                |> testConfiguration
+                
+            let host =
+                createHost configureTest Contexture.Api.App.configureServices Contexture.Api.App.configureApp
+            
+            do! runReadModels host
+            do! runReactions host
+            
+            do! host.StartAsync()
+            return host
+        }
     type TestHostEnvironment(server: IHost) =
         let client = lazy (server.GetTestClient())
-        member __.Server = server
-        member __.Client = client.Value
+        member _.Server = server
+        member _.Client = client.Value
 
-        member __.GetService<'Service>() =
+        member _.GetService<'Service>() =
             server.Services.GetRequiredService<'Service>()
 
         interface IDisposable with
-            member __.Dispose() =
+            member _.Dispose() =
                 server.Dispose()
 
                 if client.IsValueCreated then
@@ -91,12 +106,12 @@ module Prepare =
 
     let buildServerWithEvents events = events |> registerEvents
 
-    let withGiven environment (givenEvents: EventDefinition list) =           
+    let withGiven environment (givenEvents: EventDefinition list) = task {       
         let testConfiguration =
            buildServerWithEvents givenEvents
-        let testHost =
+        let! testHost =
             TestHost.runServer environment testConfiguration
-            |> TestHost.asTestHost
-
-        testHost
+            
+        return TestHost.asTestHost testHost
+        }
 

@@ -2,14 +2,13 @@ namespace Contexture.Api.Reactions
 
 open Contexture.Api
 open Contexture.Api.Aggregates
-open Contexture.Api.Aggregates.BoundedContext.Projections
+open Contexture.Api.FileBasedCommandHandlers
 open Contexture.Api.Infrastructure
 open Contexture.Api.Infrastructure.Subscriptions
 open Contexture.Api.Infrastructure.Subscriptions.PositionStorage
 open FsToolkit.ErrorHandling
 open FsToolkit.ErrorHandling.Operator.AsyncResult
 open Microsoft.Extensions.Logging
-open Microsoft.FSharp.Control
 
 type AllEvents =
     | BoundedContexts of BoundedContext.Event
@@ -32,8 +31,6 @@ type AllEvents =
             event |> EventEnvelope.unbox |> EventEnvelope.map Collaboration |> Some
         | _ -> None
 
-
-
 module CascadeDelete =
     open Domain.ValueObjects
     open BoundedContext.ValueObjects
@@ -43,13 +40,15 @@ module CascadeDelete =
         { DomainChildren: Map<DomainId, Set<DomainId>>
           BoundedContexts: Map<DomainId, Set<BoundedContextId>>
           DomainCollaborations: Map<DomainId, Set<CollaborationId>>
-          BoundedContextCollaborations: Map<BoundedContextId, Set<CollaborationId>> }
+          BoundedContextCollaborations: Map<BoundedContextId, Set<CollaborationId>>
+          BoundedContextNamespaces : Map<BoundedContextId,Set<Namespace.ValueObjects.NamespaceId>> }
 
         static member Initial =
             { DomainChildren = Map.empty
               BoundedContexts = Map.empty
               DomainCollaborations = Map.empty
-              BoundedContextCollaborations = Map.empty }
+              BoundedContextCollaborations = Map.empty
+              BoundedContextNamespaces = Map.empty }
 
     let private removeEntry key item (map: Map<_, Set<_>>) =
         map
@@ -102,6 +101,25 @@ module CascadeDelete =
                 DomainCollaborations = Map.remove d.DomainId state.DomainCollaborations }
         | Domains(Domain.DomainRemoved d) when d.OldParentDomain.IsNone ->
             { state with DomainCollaborations = Map.remove d.DomainId state.DomainCollaborations }
+          
+        | Collaboration (Collaboration.CollaboratorsConnected c) ->
+            let addToState collaborator state =
+                match collaborator with
+                | BoundedContext bc ->
+                    { state with BoundedContextCollaborations = state.BoundedContextCollaborations |> addEntry bc c.CollaborationId }
+                | Domain d ->
+                    { state with DomainCollaborations = state.DomainCollaborations |> addEntry d c.CollaborationId }
+                | _ -> state
+            state
+            |> addToState c.Initiator
+            |> addToState c.Recipient
+            
+        | Namespaces (Namespace.NamespaceAdded e) ->
+            { state with BoundedContextNamespaces = state.BoundedContextNamespaces |> addEntry e.BoundedContextId e.NamespaceId }
+        | Namespaces (Namespace.NamespaceImported e) ->
+            { state with BoundedContextNamespaces = state.BoundedContextNamespaces |> addEntry e.BoundedContextId e.NamespaceId }
+        | Namespaces (Namespace.NamespaceRemoved e) ->
+            { state with BoundedContextNamespaces = state.BoundedContextNamespaces |> removeEntry e.BoundedContextId e.NamespaceId }
         | _ -> state
 
 
@@ -139,6 +157,14 @@ module CascadeDelete =
                         store
                         FileBasedCommandHandlers.Collaboration.useHandler
                         Collaboration.RemoveConnection
+                do!
+                    state.BoundedContextNamespaces
+                    |> Map.tryFind e.BoundedContextId
+                    |> triggerDelete
+                        logError
+                        store
+                        FileBasedCommandHandlers.Namespace.useHandler
+                        (fun id -> Namespace.RemoveNamespace(e.BoundedContextId, id)) 
             | Domains(Domain.DomainRemoved e) ->
                 do!
                     state.DomainChildren
