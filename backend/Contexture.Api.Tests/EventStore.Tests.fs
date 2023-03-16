@@ -148,7 +148,7 @@ type EventStoreBehavior() =
         task {
             let! eventStore = this.anEmptyEventStore ()
             let source,event = Fixture.generateEvent ()
-            do! eventStore.Append source Empty [ event ] |> Then.expectOk
+            do! eventStore.Append source Empty (NonEmptyList.singleton event) |> Then.expectOk
 
             let expectedPosition = Position.from 1
             let expectedVersion = Version.from 1
@@ -174,7 +174,7 @@ type EventStoreBehavior() =
                 waitForEventsOnSubscription
                     Start
                     eventStore
-                    (fun () -> eventStore.Append source Empty [ event ] |> Then.expectOk)
+                    (fun () -> eventStore.Append source Empty (NonEmptyList.singleton event) |> Then.expectOk)
                     (fun events -> Then.assertSingle events source)
         }
 
@@ -189,7 +189,7 @@ type EventStoreBehavior() =
                     (From(Position.from 1))
                     eventStore
                     (fun () ->
-                        eventStore.Append source (AtVersion(Version.from 1)) [ event ]
+                        eventStore.Append source (AtVersion(Version.from 1)) (NonEmptyList.singleton event)
                         |> Then.expectOk)
                     (fun events ->
                         Then.assertSingle events source
@@ -302,9 +302,10 @@ type MsSqlBackedEventStore(msSql: MsSqlFixture) =
                             StreamKind = StreamKind.Of e
                             EventType = e.GetType()
                         })
+                    |> NonEmptyList.fromList
                 let payload =
                     {
-                        NStoreBased.Events = eventDefinitions
+                        NStoreBased.Events = Option.get eventDefinitions
                         NStoreBased.RecordedAt = Fixture.environment.Time()
                     }
                 let! _ = stream.AppendAsync(payload)

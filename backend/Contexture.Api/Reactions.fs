@@ -4,6 +4,7 @@ open Contexture.Api
 open Contexture.Api.Aggregates
 open Contexture.Api.FileBasedCommandHandlers
 open Contexture.Api.Infrastructure
+open Contexture.Api.Infrastructure.Projections
 open Contexture.Api.Infrastructure.Subscriptions
 open Contexture.Api.Infrastructure.Subscriptions.PositionStorage
 open FsToolkit.ErrorHandling
@@ -31,6 +32,102 @@ type AllEvents =
             event |> EventEnvelope.unbox |> EventEnvelope.map Collaboration |> Some
         | _ -> None
 
+    static member select<'E> (event: AllEvents) =
+        match event with
+        | e when typeof<'E> = typeof<AllEvents> -> e |> unbox<'E>
+        | BoundedContexts e when typeof<'E> = typeof<BoundedContext.Event> -> e |> unbox<'E>
+        | Domains e when typeof<'E> = typeof<Domain.Event>-> e |> unbox<'E>
+        | Namespaces e when typeof<'E> = typeof<Namespace.Event>-> e |> unbox<'E>
+        | NamespaceTemplates e when typeof<'E> = typeof<NamespaceTemplate.Event>-> e |> unbox<'E>
+        | Collaboration e when typeof<'E> = typeof<Collaboration.Event>-> e |> unbox<'E>
+        | other -> failwithf "Unable to match %s from %O" typeof<'E>.FullName other
+        
+type Reaction<'State, 'Event> =
+        abstract member Projection: Projection<'State, 'Event>
+        abstract member Reaction: 'State -> EventEnvelope<'Event> -> Async<unit>
+
+module Reaction =
+    let fromAllEvents map (reaction: Reaction<'State,'E>) : Reaction<'State,AllEvents> =
+        { new Reaction<_,_> with
+            member _.Projection =
+                { Update = fun state event -> reaction.Projection.Update state (map event)
+                  Init = reaction.Projection.Init }
+            member _.Reaction state event = reaction.Reaction state (EventEnvelope.map map event)
+        }
+
+type ReactionInitialization =
+    abstract member ReplayAndConnect: unit -> Async<Subscription>
+
+module ReactionInitialization =
+    let trackStateInMemory
+        (initialState: 'State)
+        (reaction: Reaction<'State, AllEvents>)
+        : SubscriptionHandler<AllEvents> =
+        let mutable state = initialState
+
+        fun _ events ->
+            async {
+                do!
+                    events
+                    |> List.map (reaction.Reaction state)
+                    |> Async.Sequential
+                    |> Async.Ignore
+
+                state <- List.fold reaction.Projection.Update state (events |> List.map (fun e -> e.Event))
+                ()
+            }
+    type private ReplayFromStartWithAllEventsReactionInitialization<'State>
+        (
+            logger: ILogger,
+            store: EventStore,
+            storage: IStorePositions,
+            name: string,
+            reaction: Reaction<'State, AllEvents>
+        ) =
+        
+        interface ReactionInitialization with
+            member _.ReplayAndConnect() =
+                async {
+                    use _ = logger.BeginScope("Initializing Reaction {Name}", name)
+                    let! lastProcessedPosition = storage.LastPosition name
+                    logger.LogDebug("Replaying until {LastProcessedPosition}", lastProcessedPosition)
+                    let! _, allData = store.All AllEvents.fromEnvelope
+                    logger.LogDebug("Fetched {EventCount} events", allData.Length)
+
+                    let initialState =
+                        allData
+                        |> List.filter (fun e ->
+                            match lastProcessedPosition with
+                            | Some processed -> e.Metadata.Position <= processed
+                            | None -> true)
+                        |> List.map (fun e -> e.Event)
+                        |> List.fold reaction.Projection.Update reaction.Projection.Init
+
+                    logger.LogDebug("State {StateType} initialized", typeof<'State>.FullName)
+
+                    let reaction =
+                        SubscriptionHandler.trackPosition
+                            (storage.SavePosition name)
+                            (trackStateInMemory initialState reaction)
+
+                    let startingPosition =
+                        lastProcessedPosition |> Option.map From |> Option.defaultValue Start
+
+                    let! subscription = store.SubscribeAll AllEvents.fromEnvelope name startingPosition reaction
+                    return subscription
+                }
+
+    let initializeWithReplayFromStartWithAllEvents
+        logger
+        (store: EventStore)
+        (storage: IStorePositions)
+        name
+        (reaction: Reaction<'State, 'E>)
+        : ReactionInitialization =
+        ReplayFromStartWithAllEventsReactionInitialization(logger, store, storage, name, Reaction.fromAllEvents AllEvents.select<'E> reaction)
+        :> ReactionInitialization
+
+
 module CascadeDelete =
     open Domain.ValueObjects
     open BoundedContext.ValueObjects
@@ -41,7 +138,7 @@ module CascadeDelete =
           BoundedContexts: Map<DomainId, Set<BoundedContextId>>
           DomainCollaborations: Map<DomainId, Set<CollaborationId>>
           BoundedContextCollaborations: Map<BoundedContextId, Set<CollaborationId>>
-          BoundedContextNamespaces : Map<BoundedContextId,Set<Namespace.ValueObjects.NamespaceId>> }
+          BoundedContextNamespaces: Map<BoundedContextId, Set<Namespace.ValueObjects.NamespaceId>> }
 
         static member Initial =
             { DomainChildren = Map.empty
@@ -101,25 +198,30 @@ module CascadeDelete =
                 DomainCollaborations = Map.remove d.DomainId state.DomainCollaborations }
         | Domains(Domain.DomainRemoved d) when d.OldParentDomain.IsNone ->
             { state with DomainCollaborations = Map.remove d.DomainId state.DomainCollaborations }
-          
-        | Collaboration (Collaboration.CollaboratorsConnected c) ->
+
+        | Collaboration(Collaboration.CollaboratorsConnected c) ->
             let addToState collaborator state =
                 match collaborator with
                 | BoundedContext bc ->
-                    { state with BoundedContextCollaborations = state.BoundedContextCollaborations |> addEntry bc c.CollaborationId }
+                    { state with
+                        BoundedContextCollaborations =
+                            state.BoundedContextCollaborations |> addEntry bc c.CollaborationId }
                 | Domain d ->
                     { state with DomainCollaborations = state.DomainCollaborations |> addEntry d c.CollaborationId }
                 | _ -> state
-            state
-            |> addToState c.Initiator
-            |> addToState c.Recipient
-            
-        | Namespaces (Namespace.NamespaceAdded e) ->
-            { state with BoundedContextNamespaces = state.BoundedContextNamespaces |> addEntry e.BoundedContextId e.NamespaceId }
-        | Namespaces (Namespace.NamespaceImported e) ->
-            { state with BoundedContextNamespaces = state.BoundedContextNamespaces |> addEntry e.BoundedContextId e.NamespaceId }
-        | Namespaces (Namespace.NamespaceRemoved e) ->
-            { state with BoundedContextNamespaces = state.BoundedContextNamespaces |> removeEntry e.BoundedContextId e.NamespaceId }
+
+            state |> addToState c.Initiator |> addToState c.Recipient
+
+        | Namespaces(Namespace.NamespaceAdded e) ->
+            { state with
+                BoundedContextNamespaces = state.BoundedContextNamespaces |> addEntry e.BoundedContextId e.NamespaceId }
+        | Namespaces(Namespace.NamespaceImported e) ->
+            { state with
+                BoundedContextNamespaces = state.BoundedContextNamespaces |> addEntry e.BoundedContextId e.NamespaceId }
+        | Namespaces(Namespace.NamespaceRemoved e) ->
+            { state with
+                BoundedContextNamespaces =
+                    state.BoundedContextNamespaces |> removeEntry e.BoundedContextId e.NamespaceId }
         | _ -> state
 
 
@@ -157,14 +259,12 @@ module CascadeDelete =
                         store
                         FileBasedCommandHandlers.Collaboration.useHandler
                         Collaboration.RemoveConnection
+
                 do!
                     state.BoundedContextNamespaces
                     |> Map.tryFind e.BoundedContextId
-                    |> triggerDelete
-                        logError
-                        store
-                        FileBasedCommandHandlers.Namespace.useHandler
-                        (fun id -> Namespace.RemoveNamespace(e.BoundedContextId, id)) 
+                    |> triggerDelete logError store FileBasedCommandHandlers.Namespace.useHandler (fun id ->
+                        Namespace.RemoveNamespace(e.BoundedContextId, id))
             | Domains(Domain.DomainRemoved e) ->
                 do!
                     state.DomainChildren
@@ -191,43 +291,9 @@ module CascadeDelete =
             | _ -> ()
         }
 
-    let reactWithState logger (store: EventStore) (initialState: State) : SubscriptionHandler<AllEvents> =
-        let mutable state = initialState
-
-        fun position events ->
-            async {
-                do!
-                    events
-                    |> List.map (handleEvent logger store state)
-                    |> Async.Sequential
-                    |> Async.Ignore
-
-                state <- List.fold project state (events |> List.map (fun e -> e.Event))
-                ()
-            }
-
-
-    let subscribe logger (store: EventStore) (storage: IStorePositions) =
-        async {
-            let name = "CascadeDelete"
-            let! lastProcessedPosition = storage.LastPosition name
-            let! _, allData = store.All AllEvents.fromEnvelope
-
-            let initialState =
-                allData
-                |> List.filter (fun e ->
-                    match lastProcessedPosition with
-                    | Some processed -> e.Metadata.Position <= processed
-                    | None -> true)
-                |> List.map (fun e -> e.Event)
-                |> List.fold project State.Initial
-
-            let reaction =
-                SubscriptionHandler.trackPosition (storage.SavePosition name) (reactWithState logger store initialState)
-
-            let startingPosition =
-                lastProcessedPosition |> Option.map From |> Option.defaultValue Start
-
-            let! subscription = store.SubscribeAll AllEvents.fromEnvelope name startingPosition reaction
-            return subscription
+    let reaction (loggerFactory:ILoggerFactory) store =
+        { new Reaction<_,_> with
+            member _.Projection = { Update = project; Init = State.Initial }
+            member _.Reaction state event = handleEvent (loggerFactory.CreateLogger "CascadeDelete") store state event
         }
+    

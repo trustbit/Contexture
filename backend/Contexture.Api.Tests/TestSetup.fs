@@ -7,6 +7,7 @@ open System.Net.Http
 open Contexture.Api.Infrastructure
 open Contexture.Api.Infrastructure.Subscriptions
 open Contexture.Api.Infrastructure.Storage
+open Contexture.Api.Reactions
 open Contexture.Api.Tests.EnvironmentSimulation
 open FsToolkit.ErrorHandling
 open Microsoft.AspNetCore.Hosting
@@ -49,14 +50,8 @@ module TestHost =
         |> Async.bind (Runtime.waitUntilCaughtUp >> Async.AwaitTask)
         
     let runReactions (host: IHost) =
-        let loggerFactory = host.Services.GetRequiredService<ILoggerFactory>()
-        [ Contexture.Api.Reactions.CascadeDelete.subscribe
-            (loggerFactory.CreateLogger (nameof Contexture.Api.Reactions.CascadeDelete))
-             (host.Services.GetRequiredService<EventStore>())
-             (host.Services.GetRequiredService<PositionStorage.IStorePositions>())
-        ]
-        |> Async.Parallel
-        |> Async.map Array.toList
+        host.Services.GetServices<ReactionInitialization>()
+        |> Contexture.Api.App.connectAndReplayReactions
         |> Async.bind(Runtime.waitUntilCaughtUp >> Async.AwaitTask)
 
     let runServer environmentSimulation testConfiguration =

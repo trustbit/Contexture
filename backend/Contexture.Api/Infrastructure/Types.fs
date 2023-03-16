@@ -1,6 +1,7 @@
 namespace Contexture.Api.Infrastructure
 
 open System
+open Contexture.Api.Infrastructure.NonEmptyList
 
 type EventSource = Guid
 
@@ -115,10 +116,10 @@ type ExpectedVersion =
     | Empty
     | AtVersion of Version
     | Unknown
-
+    
 type EventStream<'Event> =
     abstract Read: Version -> Async<StreamResult<'Event>>
-    abstract Append: ExpectedVersion -> EventDefinition<'Event> list -> Async<Result<Version * Position, AppendError>>
+    abstract Append: ExpectedVersion -> NonEmptyList<EventDefinition<'Event>> -> Async<Result<Version * Position, AppendError>>
 
 type StreamIdentifier = private StreamIdentifier of StreamKind * EventSource
 

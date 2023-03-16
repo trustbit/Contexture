@@ -2,6 +2,7 @@ namespace Contexture.Api.Infrastructure.Storage
 
 open System
 open Contexture.Api.Infrastructure
+open Contexture.Api.Infrastructure.NonEmptyList
 open Contexture.Api.Infrastructure.Subscriptions
 
 type EventDefinition =
@@ -23,7 +24,7 @@ type EventStorage =
     abstract member AllStreamsOf: StreamKind -> Async<EventResult>
 
     abstract member Append:
-        StreamIdentifier -> ExpectedVersion -> EventDefinition list -> Async<Result<Version * Position, AppendError>>
+        StreamIdentifier -> ExpectedVersion -> NonEmptyList<EventDefinition> -> Async<Result<Version * Position, AppendError>>
 
     abstract member All: unit -> Async<EventResult>
     abstract member Subscribe: string -> SubscriptionDefinition -> SubscriptionHandler -> Async<Subscription>
@@ -71,7 +72,7 @@ type EventStore(storage: Storage.EventStorage) =
             member _.Append version definitions =
                 let eventDefinitions =
                     definitions
-                    |> List.map (fun payload ->
+                    |> NonEmptyList.map (fun payload ->
                         { Source = identifier |> StreamIdentifier.source
                           Event = box payload
                           EventType = typeof<'E>

@@ -37,7 +37,7 @@ module Version =
         |> Option.defaultValue Version.start
 
 type NStoreEventBatch =
-    { Events: EventDefinition list
+    { Events: NonEmptyList<EventDefinition>
       RecordedAt: DateTimeOffset }
 
 module EventEnvelope =
@@ -47,7 +47,7 @@ module EventEnvelope =
         |> Option.map (
             fun batch ->
                 batch.Events
-                |> List.map (fun e ->
+                |> NonEmptyList.map (fun e ->
                     {
                         Payload = e.Event
                         StreamKind = e.StreamKind
@@ -59,6 +59,7 @@ module EventEnvelope =
                             RecordedAt = batch.RecordedAt
                         }
                     })
+                |> NonEmptyList.asList
         )
         |> Option.defaultValue []
 
@@ -145,11 +146,18 @@ type JsonMsSqlSerializer(settings: JsonSerializerOptions, typeResolver: string -
                     JsonSerializer.Deserialize<SerializableBatch>(serialized, settings)
 
                 let streamKind = deserialized.StreamKind |> StreamKind.ofString
-                let events = deserialized.Events |> List.map (deserialize streamKind)
-                box {
-                    Events = events
-                    RecordedAt = deserialized.RecordedAt
-                }
+                let events =
+                    deserialized.Events
+                    |> List.map (deserialize streamKind)
+                    |> NonEmptyList.fromList
+                match events with
+                | Some events ->
+                    box {
+                        Events = events
+                        RecordedAt = deserialized.RecordedAt
+                    }
+                | None ->
+                    failwithf "Received empty batch of events in stream %s at %O" deserialized.StreamKind deserialized.RecordedAt
             else
                 let returnType = typeResolver serializerInfo
                 JsonSerializer.Deserialize(serialized, returnType, settings)
@@ -161,9 +169,13 @@ type JsonMsSqlSerializer(settings: JsonSerializerOptions, typeResolver: string -
                 match payload |> tryUnbox<NStoreEventBatch> with
                 | Some eventBatch ->
                     let batch =
-                        { StreamKind = StreamKind.toString eventBatch.Events.Head.StreamKind
+                        { StreamKind =
+                            eventBatch.Events
+                            |> NonEmptyList.head
+                            |> fun h -> h.StreamKind
+                            |> StreamKind.toString
                           RecordedAt = eventBatch.RecordedAt
-                          Events = eventBatch.Events |> List.map serialize }
+                          Events = eventBatch.Events |> NonEmptyList.map serialize |> NonEmptyList.asList}
 
                     serializerInfo <- nameof SerializableBatch
                     JsonSerializer.SerializeToUtf8Bytes(batch, settings)
@@ -224,7 +236,7 @@ type Storage(persistence: IPersistence, clock: Clock, logger: INStoreLoggerFacto
             return Ok(Version.maxVersion recorder, items)
         }
 
-    let append identifier expectedVersion (definitions: EventDefinition list) =
+    let append identifier expectedVersion (definitions: NonEmptyList<EventDefinition>) =
         task {
             let envelopes =
                 {

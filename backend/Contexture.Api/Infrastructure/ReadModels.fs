@@ -32,27 +32,27 @@ module State =
     [<Literal>]
     let private processedPosition = "processedPosition"
     
-    let appendProcessedPosition (url: string) (position:Position) =
-        let parts = url.Split("?")
-        let queryString =
-            if parts.Length = 2 then
-                QueryString("?" + parts[1])
-            else
-                QueryString()
-                
-        PathString(parts[0]).Add(queryString.Add(processedPosition, position |> Position.value |> string))
+    let appendProcessedPosition (url: string) (position: Position option) =
+        match position with
+        | Some position ->
+            let parts = url.Split("?")
+            let queryString =
+                if parts.Length = 2 then
+                    QueryString("?" + parts[1])
+                else
+                    QueryString()
+                    
+            PathString(parts[0]).Add(queryString.Add(processedPosition, position |> Position.value |> string))
+        | None -> url
 
     let fromReadModel<'R when 'R :> ReadModel> (ctx: HttpContext) =
         ctx.GetService<'R>()
     let fetch findReadModel (ctx: HttpContext) : Task<'S> =
         let readModel = findReadModel ctx
         let stateRetriever = unbox<IRetrieveState<'S>> readModel
-        match ctx.TryGetQueryStringValue processedPosition |> Option.bind (Position.parse) with
-        | Some position ->
-            stateRetriever.State position
-        | None ->
-            stateRetriever.State()
-
+        ctx.TryGetQueryStringValue processedPosition
+        |> Option.bind Position.parse
+        |> stateRetriever.State
 
 type Msg<'Event, 'Result> =
     private
@@ -95,9 +95,13 @@ let readModel
         member _.EventHandler position eventEnvelopes =
             agent.PostAndAsyncReply(fun reply -> Notify(position, eventEnvelopes, reply))
 
-        member _.State() =
-            agent.PostAndAsyncReply State |> Async.StartAsTask
+        // member _.State() =
+        //     agent.PostAndAsyncReply State |> Async.StartAsTask
         
         member _.State position =
-            agent.PostAndAsyncReply (fun reply -> StateAfter(position,reply)) |> Async.StartAsTask
+            match position with
+            | Some position ->
+                agent.PostAndAsyncReply (fun reply -> StateAfter(position,reply)) |> Async.StartAsTask
+            | None ->
+                agent.PostAndAsyncReply State |> Async.StartAsTask
     }

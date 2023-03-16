@@ -11,8 +11,8 @@ module CommandHandler =
         | Exception of exn
         | EntityNotFound of 'Id
 
-    type HandleIdentityAndCommand<'Identity,'Command,'Error> = 'Identity -> 'Command -> Async<Result<'Identity * Version * Position,CommandHandlerError<'Error,'Identity>>>
-    type HandleCommand<'Identity,'Command,'Error> = 'Command -> Async<Result<'Identity * Version * Position,CommandHandlerError<'Error,'Identity>>>
+    type HandleIdentityAndCommand<'Identity,'Command,'Error> = 'Identity -> 'Command -> Async<Result<'Identity * Version * Position option,CommandHandlerError<'Error,'Identity>>>
+    type HandleCommand<'Identity,'Command,'Error> = 'Command -> Async<Result<'Identity * Version * Position option,CommandHandlerError<'Error,'Identity>>>
     
     let getIdentityFromCommand identifyCommand (handler: HandleIdentityAndCommand<_,_,_>) : HandleCommand<_,_,_> =
         fun command -> async {
@@ -41,8 +41,12 @@ module CommandHandler =
                 
             match aggregate.Decider command state with
             | Ok newEvents ->
-                let! version,position = saveStream identity version newEvents
-                return Ok (identity,version, position)
+                match NonEmptyList.fromList newEvents with
+                | Some newEvents ->
+                    let! version,position = saveStream identity version newEvents
+                    return Ok (identity,version, Some position)
+                | None ->
+                    return Ok (identity, version, None)
             | Error e ->
                 return e |> DomainError |> Error
         }

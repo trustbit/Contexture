@@ -8,6 +8,8 @@ open Contexture.Api.FileBased.Database
 open Contexture.Api.Infrastructure
 open Contexture.Api.Infrastructure.Storage
 open Contexture.Api.Infrastructure.Subscriptions
+open Contexture.Api.Infrastructure.Subscriptions.PositionStorage
+open Contexture.Api.Reactions
 open FsToolkit.ErrorHandling
 open Giraffe
 open Microsoft.AspNetCore.Builder
@@ -166,26 +168,37 @@ let configureJsonSerializer (services: IServiceCollection) =
     |> SystemTextJson.Serializer
     |> services.AddSingleton<Json.ISerializer>
     |> ignore
-    
+
+let rec private formatAsString (runtimeType: Type) =
+    if runtimeType.IsGenericType
+       && (runtimeType.FullName.StartsWith("Microsoft") || runtimeType.FullName.StartsWith("System")) then
+        let arguments = runtimeType.GetGenericArguments()
+        let typeParameters =
+            arguments
+            |> Array.map formatAsString
+            |> String.concat ","
+        $"{runtimeType.Name}<{typeParameters}>"
+    else
+        runtimeType.FullName
 let registerReadModel<'R, 'E, 'S when 'R :> ReadModels.ReadModel<'E,'S> and 'R : not struct> (readModel: 'R) (services: IServiceCollection) =
     services.AddSingleton<'R>(readModel) |> ignore
     let initializeReadModel (s: IServiceProvider) =
-        let rec formatAsString (runtimeType: Type) =
-            if runtimeType.IsGenericType
-               && (runtimeType.FullName.StartsWith("Microsoft") || runtimeType.FullName.StartsWith("System")) then
-                let arguments = runtimeType.GetGenericArguments()
-                let typeParameters =
-                    arguments
-                    |> Array.map formatAsString
-                    |> String.concat ","
-                $"{runtimeType.Name}<{typeParameters}>"
-            else
-                runtimeType.FullName
         ReadModels.ReadModelInitialization.initializeWith
             (s.GetRequiredService<EventStore>())
             $"ReadModel of {formatAsString(typeof<'E>)} for {formatAsString(typeof<'S>)}"
             readModel.EventHandler
     services.AddSingleton<ReadModels.ReadModelInitialization> initializeReadModel
+    
+let registerReaction<'R, 'E, 'S when 'R :> Reactions.Reaction<'S,'E> and 'R : not struct> (reaction: IServiceProvider -> 'R) (services: IServiceCollection) =
+    let initializeReaction (s: IServiceProvider) =
+        let loggerFactory = s.GetRequiredService<ILoggerFactory>()
+        Reactions.ReactionInitialization.initializeWithReplayFromStartWithAllEvents
+            (loggerFactory.CreateLogger "ReactionInitialization")
+            (s.GetRequiredService<EventStore>())
+            (s.GetRequiredService<IStorePositions>())
+            $"Reaction of {formatAsString(typeof<'E>)} for {formatAsString(typeof<'S>)}"
+            (reaction s)
+    services.AddSingleton<Reactions.ReactionInitialization> initializeReaction
     
 let configureReadModels (services: IServiceCollection) =
     services
@@ -198,7 +211,10 @@ let configureReadModels (services: IServiceCollection) =
     |> registerReadModel (ReadModels.Find.Domains.readModel())
     |> registerReadModel (ReadModels.Find.Labels.readModel())
     |> registerReadModel (ReadModels.Find.Namespaces.readModel())
-    |> ignore
+    
+let configureReactions (services: IServiceCollection) =
+    services
+    |> registerReaction (fun s -> Reactions.CascadeDelete.reaction (s.GetRequiredService<ILoggerFactory>()) (s.GetRequiredService<EventStore>()))
 
 let configureServices (context: HostBuilderContext) (services : IServiceCollection) =
     services
@@ -257,7 +273,10 @@ let configureServices (context: HostBuilderContext) (services : IServiceCollecti
     
     services.AddSingleton<Clock>(utcNowClock) |> ignore
      
-    services |> configureReadModels
+    services
+    |> configureReadModels
+    |> configureReactions
+    |> ignore
     
     services.AddCors() |> ignore
     services.AddGiraffe() |> ignore
@@ -281,6 +300,12 @@ let buildHost args =
 let connectAndReplayReadModels (readModels: ReadModels.ReadModelInitialization seq) =
     readModels
     |> Seq.map (fun r -> r.ReplayAndConnect Start)
+    |> Async.Parallel
+    |> Async.map Array.toList
+    
+let connectAndReplayReactions (readModels: Reactions.ReactionInitialization seq) =
+    readModels
+    |> Seq.map (fun r -> r.ReplayAndConnect ())
     |> Async.Parallel
     |> Async.map Array.toList
     
@@ -340,12 +365,8 @@ let runAsync (host: IHost) =
             if host.Services.GetRequiredService<IWebHostEnvironment>().IsDevelopment() then
                 do! Runtime.waitUntilCaughtUp readModelSubscriptions
 
-        let! reaction =
-            Reactions.CascadeDelete.subscribe
-                (loggerFactory.CreateLogger (nameof Reactions.CascadeDelete))
-                 (host.Services.GetRequiredService<EventStore>())
-                 (host.Services.GetRequiredService<PositionStorage.IStorePositions>())
-        SystemRoutes.subscriptions <-  Some (SystemRoutes.subscriptions.Value @ [ reaction ])
+        let! reactionSubscriptions = connectAndReplayReactions (host.Services.GetServices<Reactions.ReactionInitialization>())
+        SystemRoutes.subscriptions <-  Some (SystemRoutes.subscriptions.Value @ reactionSubscriptions)
         return! host.RunAsync()
     }
 

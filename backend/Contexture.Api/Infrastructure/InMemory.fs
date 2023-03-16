@@ -13,7 +13,7 @@ type Msg =
     | Get of StreamKind * AsyncReplyChannel<EventResult>
     | GetStream of StreamIdentifier * AsyncReplyChannel<StreamResult>
     | GetAll of AsyncReplyChannel<EventResult>
-    | Append of EventDefinition list * AsyncReplyChannel<Version * Position>
+    | Append of NonEmptyList<EventDefinition> * AsyncReplyChannel<Version * Position>
     | Notify of Position * EventEnvelope list * (Position -> EventEnvelope list -> Async<unit>)
     | Subscribe of SubscriptionDefinition * (Position -> EventEnvelope list -> Async<unit>) * AsyncReplyChannel<unit>
 
@@ -100,7 +100,10 @@ let private singleWriterPipeline clock (initialEvents: EventDefinition list) (in
 
                 return! loop state
             | Append(eventDefinitions, reply) ->
-                let extendedHistory,envelopes = eventDefinitions |> List.fold (appendToHistory clock) (history, List.empty)
+                let extendedHistory,envelopes =
+                    eventDefinitions
+                    |> NonEmptyList.asList
+                    |> List.fold (appendToHistory clock) (history, List.empty)
 
                 let position, version =
                     extendedHistory.items |> List.head |> (fun (p, v, _) -> p, v)

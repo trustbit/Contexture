@@ -6,6 +6,7 @@ open Contexture.Api.Aggregates.NamespaceTemplate.Projections
 open Contexture.Api.FileBased.Database
 open Contexture.Api.Infrastructure
 open Contexture.Api.Infrastructure.Subscriptions
+open FsToolkit.ErrorHandling
 open Microsoft.Extensions.Logging
 
 module BridgeEventSourcingWithFilebasedDatabase =
@@ -298,7 +299,13 @@ let importFromDocument (store: EventStore) (database: Document) = async {
     let append items =
         items
         |> List.groupBy (fun (source,_) -> source)
-        |> List.map (fun (source, grouping) -> store.Append source Unknown (grouping |> List.map (fun (_,event) -> event)) )
+        |> List.map (fun (source, grouping) ->
+            match NonEmptyList.fromList grouping with
+            | Some nonEmpty ->
+                Async.Ignore (store.Append source Unknown (nonEmpty |> NonEmptyList.map (fun (_,event) -> event)))                
+            | None ->
+                Async.retn ()
+        )
         |> Async.Sequential
         |> Async.Ignore
     let runAsync (items: Async<Unit> list) =

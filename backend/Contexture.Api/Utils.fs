@@ -42,3 +42,43 @@ type Clock = unit -> System.DateTimeOffset
 module List =
     let maxOr defaultValue items =
         if List.isEmpty items then defaultValue else List.max items
+
+// module NonEmptyList =
+//     type NonEmptyList<'T> =
+//         private Cons of 'T * NonEmptyList<'T> option
+//     let single item = Cons (item, None)
+//     let rec fromList (items: _ list) =
+//         if items.IsEmpty then
+//             None
+//         else
+//             Some (Cons (items.Head, fromList items.Tail))
+//     let rec asList (Cons(head, tail)) =
+//         match tail with
+//         | None -> List.singleton head
+//         | Some tail -> head :: asList tail
+//         
+//     let rec map mapper (Cons(head, tail)) =
+//         Cons(
+//             mapper head,
+//             tail|> Option.map (map mapper)
+//         )
+//         
+//         
+type NonEmptyList<'T> =
+    private Cons of 'T * 'T list
+module NonEmptyList =
+    let head (Cons(head, _)) = head
+    let singleton item = Cons (item, List.empty)
+    let fromList (items: _ list) =
+        if items.IsEmpty then
+            None
+        else
+            Some (Cons (items.Head, items.Tail))
+    let asList (Cons(head, tail)) =
+        head :: tail
+        
+    let map mapper (Cons(head, tail)) =
+        Cons(
+            mapper head,
+            tail |> List.map mapper
+        )
