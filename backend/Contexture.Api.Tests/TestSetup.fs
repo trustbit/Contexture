@@ -46,12 +46,12 @@ module TestHost =
 
     let runReadModels (host: IHost) =
         host.Services.GetServices<ReadModels.ReadModelInitialization>()
-        |> Contexture.Api.App.connectAndReplayReadModels
+        |> Contexture.Api.App.Startup.connectAndReplayReadModels
         |> Async.bind (Runtime.waitUntilCaughtUp >> Async.AwaitTask)
         
     let runReactions (host: IHost) =
         host.Services.GetServices<ReactionInitialization>()
-        |> Contexture.Api.App.connectAndReplayReactions
+        |> Contexture.Api.App.Startup.connectAndReplayReactions
         |> Async.bind(Runtime.waitUntilCaughtUp >> Async.AwaitTask)
 
     let runServer environmentSimulation testConfiguration =
@@ -62,7 +62,7 @@ module TestHost =
                 |> testConfiguration
                 
             let host =
-                createHost configureTest Contexture.Api.App.configureServices Contexture.Api.App.configureApp
+                createHost configureTest Contexture.Api.App.ServiceConfiguration.configureServices Contexture.Api.App.ApplicationConfiguration.configureApp
             
             do! runReadModels host
             do! runReactions host

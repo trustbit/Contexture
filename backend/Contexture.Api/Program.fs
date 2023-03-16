@@ -2,29 +2,23 @@ module Contexture.Api.App
 
 open System
 open System.Threading
-open System.Threading.Tasks
 
 open Contexture.Api.FileBased.Database
 open Contexture.Api.Infrastructure
 open Contexture.Api.Infrastructure.Storage
 open Contexture.Api.Infrastructure.Subscriptions
 open Contexture.Api.Infrastructure.Subscriptions.PositionStorage
-open Contexture.Api.Reactions
 open FsToolkit.ErrorHandling
 open Giraffe
 open Microsoft.AspNetCore.Builder
-open Microsoft.AspNetCore.Http
 open Microsoft.AspNetCore.Cors.Infrastructure
 open Microsoft.AspNetCore.Hosting
-open Microsoft.Extensions.Configuration
 open Microsoft.Extensions.Hosting
 open Microsoft.Extensions.Logging
 open Microsoft.Extensions.DependencyInjection
-open Microsoft.Extensions.Options
-open System.Text.Json
-open System.Text.Json.Serialization
 
 module SystemRoutes =
+    open Microsoft.AspNetCore.Http
     let errorHandler (ex : Exception) (logger : ILogger) =
         logger.LogError(ex, "An unhandled exception has occurred while executing the request.")
         clearResponse >=> setStatusCode 500 >=> text ex.Message
@@ -74,6 +68,7 @@ module SystemRoutes =
                 ServerErrors.serviceUnavailable (text "No subscriptions yet") next ctx            
 
 module Routes =
+    open Microsoft.AspNetCore.Http
     let webApp hostFrontend =
         choose [
              subRoute "/api"
@@ -127,252 +122,260 @@ module Routes =
 let utcNowClock =
     fun () ->  System.DateTimeOffset.UtcNow
         
-let configureCors (builder : CorsPolicyBuilder) =
-    builder
-        .AllowAnyOrigin()
-        .AllowAnyMethod()
-        .AllowAnyHeader()
-        |> ignore
+module ServiceConfiguration =
+    open System.Text.Json
+    open System.Text.Json.Serialization
+    open Microsoft.Extensions.Configuration
+    open Microsoft.Extensions.Options
 
-let configureApp (app : IApplicationBuilder) =    
-    let env = app.ApplicationServices.GetService<IWebHostEnvironment>()
-    (match env.IsDevelopment() with
-    | true  ->
-        app.UseDeveloperExceptionPage()
-    | false ->
-        app.UseGiraffeErrorHandler(SystemRoutes.errorHandler))
-        .UseCors(configureCors)
-        .UseStaticFiles()
-        .UseGiraffe(Routes.webApp (Routes.frontendHostRoutes env))
-        
-let configureJsonSerializer (services: IServiceCollection) =
-    let options =
-        System.Text.Json.JsonSerializerOptions(
-            Encoder = System.Text.Encodings.Web.JavaScriptEncoder.UnsafeRelaxedJsonEscaping,
-            PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.CamelCase,
-            IgnoreNullValues = true,
-            WriteIndented = true,
-            NumberHandling = System.Text.Json.Serialization.JsonNumberHandling.AllowReadingFromString
-        )
-        
-    let fSharpOptions =
-        JsonFSharpOptions.Default()
-            .WithUnionUntagged()
-            .WithUnionUnwrapRecordCases()
-            .WithUnionUnwrapFieldlessTags()
-            .WithUnionTagCaseInsensitive()
+    let configureJsonSerializer (services: IServiceCollection) =
+        let options =
+            System.Text.Json.JsonSerializerOptions(
+                Encoder = System.Text.Encodings.Web.JavaScriptEncoder.UnsafeRelaxedJsonEscaping,
+                PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.CamelCase,
+                IgnoreNullValues = true,
+                WriteIndented = true,
+                NumberHandling = System.Text.Json.Serialization.JsonNumberHandling.AllowReadingFromString
+            )
             
-    fSharpOptions.AddToJsonSerializerOptions(options)
-    
-    options
-    |> SystemTextJson.Serializer
-    |> services.AddSingleton<Json.ISerializer>
-    |> ignore
-
-let rec private formatAsString (runtimeType: Type) =
-    if runtimeType.IsGenericType
-       && (runtimeType.FullName.StartsWith("Microsoft") || runtimeType.FullName.StartsWith("System")) then
-        let arguments = runtimeType.GetGenericArguments()
-        let typeParameters =
-            arguments
-            |> Array.map formatAsString
-            |> String.concat ","
-        $"{runtimeType.Name}<{typeParameters}>"
-    else
-        runtimeType.FullName
-let registerReadModel<'R, 'E, 'S when 'R :> ReadModels.ReadModel<'E,'S> and 'R : not struct> (readModel: 'R) (services: IServiceCollection) =
-    services.AddSingleton<'R>(readModel) |> ignore
-    let initializeReadModel (s: IServiceProvider) =
-        ReadModels.ReadModelInitialization.initializeWith
-            (s.GetRequiredService<EventStore>())
-            $"ReadModel of {formatAsString(typeof<'E>)} for {formatAsString(typeof<'S>)}"
-            readModel.EventHandler
-    services.AddSingleton<ReadModels.ReadModelInitialization> initializeReadModel
-    
-let registerReaction<'R, 'E, 'S when 'R :> Reactions.Reaction<'S,'E> and 'R : not struct> (reaction: IServiceProvider -> 'R) (services: IServiceCollection) =
-    let initializeReaction (s: IServiceProvider) =
-        let loggerFactory = s.GetRequiredService<ILoggerFactory>()
-        Reactions.ReactionInitialization.initializeWithReplayFromStartWithAllEvents
-            (loggerFactory.CreateLogger "ReactionInitialization")
-            (s.GetRequiredService<EventStore>())
-            (s.GetRequiredService<IStorePositions>())
-            $"Reaction of {formatAsString(typeof<'E>)} for {formatAsString(typeof<'S>)}"
-            (reaction s)
-    services.AddSingleton<Reactions.ReactionInitialization> initializeReaction
-    
-let configureReadModels (services: IServiceCollection) =
-    services
-    |> registerReadModel (ReadModels.Domain.domainsReadModel())
-    |> registerReadModel (ReadModels.Collaboration.collaborationsReadModel())
-    |> registerReadModel (ReadModels.Templates.templatesReadModel())
-    |> registerReadModel (ReadModels.BoundedContext.boundedContextsReadModel())
-    |> registerReadModel (ReadModels.Namespace.allNamespacesReadModel())
-    |> registerReadModel (ReadModels.Find.BoundedContexts.readModel())
-    |> registerReadModel (ReadModels.Find.Domains.readModel())
-    |> registerReadModel (ReadModels.Find.Labels.readModel())
-    |> registerReadModel (ReadModels.Find.Namespaces.readModel())
-    
-let configureReactions (services: IServiceCollection) =
-    services
-    |> registerReaction (fun s -> Reactions.CascadeDelete.reaction (s.GetRequiredService<ILoggerFactory>()) (s.GetRequiredService<EventStore>()))
-
-let configureServices (context: HostBuilderContext) (services : IServiceCollection) =
-    services
-        .AddOptions<Options.ContextureOptions>()
-        .Bind(context.Configuration)
-        |> ignore
-    
-    services.AddSingleton<ContextureConfiguration>(fun p ->
-        let options = p.GetRequiredService<IOptions<Options.ContextureOptions>>().Value
-        Options.buildConfiguration options
-    ) |> ignore 
-
-    let configuration = context.Configuration.Get<Options.ContextureOptions>() |> Options.buildConfiguration
-    
-    match configuration.Engine with
-    | FileBased path ->
-        services
-            .AddSingleton<SingleFileBasedDatastore>(fun services ->
-                // TODO: danger zone - loading should not be done as part of the initialization
-                AgentBased.initializeDatabase(path)
-                |> Async.AwaitTask
-                |> Async.RunSynchronously
-                )
-            .AddSingleton<EventStore> (fun (p:IServiceProvider) ->
-                let clock = p.GetRequiredService<Clock>()
-                let storage = Storage.InMemory.emptyEventStore clock
+        let fSharpOptions =
+            JsonFSharpOptions.Default()
+                .WithUnionUntagged()
+                .WithUnionUnwrapRecordCases()
+                .WithUnionUnwrapFieldlessTags()
+                .WithUnionTagCaseInsensitive()
                 
-                EventStore.With storage
-            )
-            |> ignore
-        services.AddSingleton<PositionStorage.IStorePositions>(PositionStorage.InMemory.PositionStorage.Empty)
-            |> ignore
-    | SqlServerBased connectionString ->
-        services
-            .AddSingleton<NStore.Core.Logging.INStoreLoggerFactory,NStoreBased.MicrosoftLoggingLoggerFactory>()
-            .AddSingleton<NStore.Persistence.MsSql.MsSqlPersistence>(fun p ->
-                let logger = p.GetRequiredService<NStore.Core.Logging.INStoreLoggerFactory>()
-                let config =
-                    NStore.Persistence.MsSql.MsSqlPersistenceOptions(
-                        logger,
-                        ConnectionString = connectionString,
-                        Serializer = NStoreBased.JsonMsSqlSerializer.Default
-                    )
-                NStore.Persistence.MsSql.MsSqlPersistence(config)
-                )
-            .AddSingleton<EventStore> (fun (p:IServiceProvider) ->
-                let clock = p.GetRequiredService<Clock>()
-                let logger = NStoreBased.MicrosoftLoggingLoggerFactory(p.GetRequiredService<ILoggerFactory>())
-                let persistence = p.GetRequiredService<NStore.Persistence.MsSql.MsSqlPersistence>()
-                let storage = NStoreBased.Storage(persistence,clock, logger)
-                EventStore.With storage
-            )
-            |> ignore
-        services.AddSingleton<PositionStorage.IStorePositions>(PositionStorage.SqlServer.PositionStorage(connectionString))
-            |> ignore
-    
-    services.AddSingleton<Clock>(utcNowClock) |> ignore
-     
-    services
-    |> configureReadModels
-    |> configureReactions
-    |> ignore
-    
-    services.AddCors() |> ignore
-    services.AddGiraffe() |> ignore
-    services |> configureJsonSerializer
+        fSharpOptions.AddToJsonSerializerOptions(options)
+        
+        options
+        |> SystemTextJson.Serializer
+        |> services.AddSingleton<Json.ISerializer>
+        |> ignore
 
-let configureLogging (builder : ILoggingBuilder) =
-    builder.AddConsole()
-           .AddDebug() |> ignore
+    let rec private formatAsString (runtimeType: Type) =
+        if runtimeType.IsGenericType
+           && (runtimeType.FullName.StartsWith("Microsoft") || runtimeType.FullName.StartsWith("System")) then
+            let arguments = runtimeType.GetGenericArguments()
+            let typeParameters =
+                arguments
+                |> Array.map formatAsString
+                |> String.concat ","
+            $"{runtimeType.Name}<{typeParameters}>"
+        else
+            runtimeType.FullName
+    let registerReadModel<'R, 'E, 'S when 'R :> ReadModels.ReadModel<'E,'S> and 'R : not struct> (readModel: 'R) (services: IServiceCollection) =
+        services.AddSingleton<'R>(readModel) |> ignore
+        let initializeReadModel (s: IServiceProvider) =
+            ReadModels.ReadModelInitialization.initializeWith
+                (s.GetRequiredService<EventStore>())
+                $"ReadModel of {formatAsString(typeof<'E>)} for {formatAsString(typeof<'S>)}"
+                readModel.EventHandler
+        services.AddSingleton<ReadModels.ReadModelInitialization> initializeReadModel
+        
+    let registerReaction<'R, 'E, 'S when 'R :> Reactions.Reaction<'S,'E> and 'R : not struct> (reaction: IServiceProvider -> 'R) (services: IServiceCollection) =
+        let initializeReaction (s: IServiceProvider) =
+            let loggerFactory = s.GetRequiredService<ILoggerFactory>()
+            Reactions.ReactionInitialization.initializeWithReplayFromStartWithAllEvents
+                (loggerFactory.CreateLogger "ReactionInitialization")
+                (s.GetRequiredService<EventStore>())
+                (s.GetRequiredService<IStorePositions>())
+                $"Reaction of {formatAsString(typeof<'E>)} for {formatAsString(typeof<'S>)}"
+                (reaction s)
+        services.AddSingleton<Reactions.ReactionInitialization> initializeReaction
+        
+    let configureReadModels (services: IServiceCollection) =
+        services
+        |> registerReadModel (ReadModels.Domain.domainsReadModel())
+        |> registerReadModel (ReadModels.Collaboration.collaborationsReadModel())
+        |> registerReadModel (ReadModels.Templates.templatesReadModel())
+        |> registerReadModel (ReadModels.BoundedContext.boundedContextsReadModel())
+        |> registerReadModel (ReadModels.Namespace.allNamespacesReadModel())
+        |> registerReadModel (ReadModels.Find.BoundedContexts.readModel())
+        |> registerReadModel (ReadModels.Find.Domains.readModel())
+        |> registerReadModel (ReadModels.Find.Labels.readModel())
+        |> registerReadModel (ReadModels.Find.Namespaces.readModel())
+        
+    let configureReactions (services: IServiceCollection) =
+        services
+        |> registerReaction (fun s -> Reactions.CascadeDelete.reaction (s.GetRequiredService<ILoggerFactory>()) (s.GetRequiredService<EventStore>()))
+
+    let configureServices (context: HostBuilderContext) (services : IServiceCollection) =
+        services
+            .AddOptions<Options.ContextureOptions>()
+            .Bind(context.Configuration)
+            |> ignore
+        
+        services.AddSingleton<ContextureConfiguration>(fun p ->
+            let options = p.GetRequiredService<IOptions<Options.ContextureOptions>>().Value
+            Options.buildConfiguration options
+        ) |> ignore 
+
+        let configuration = context.Configuration.Get<Options.ContextureOptions>() |> Options.buildConfiguration
+        
+        match configuration.Engine with
+        | FileBased path ->
+            services
+                .AddSingleton<SingleFileBasedDatastore>(fun services ->
+                    // TODO: danger zone - loading should not be done as part of the initialization
+                    AgentBased.initializeDatabase(path)
+                    |> Async.AwaitTask
+                    |> Async.RunSynchronously
+                    )
+                .AddSingleton<EventStore> (fun (p:IServiceProvider) ->
+                    let clock = p.GetRequiredService<Clock>()
+                    let storage = Storage.InMemory.emptyEventStore clock
+                    
+                    EventStore.With storage
+                )
+                |> ignore
+            services.AddSingleton<PositionStorage.IStorePositions>(PositionStorage.InMemory.PositionStorage.Empty)
+                |> ignore
+        | SqlServerBased connectionString ->
+            services
+                .AddSingleton<NStore.Core.Logging.INStoreLoggerFactory,NStoreBased.MicrosoftLoggingLoggerFactory>()
+                .AddSingleton<NStore.Persistence.MsSql.MsSqlPersistence>(fun p ->
+                    let logger = p.GetRequiredService<NStore.Core.Logging.INStoreLoggerFactory>()
+                    let config =
+                        NStore.Persistence.MsSql.MsSqlPersistenceOptions(
+                            logger,
+                            ConnectionString = connectionString,
+                            Serializer = NStoreBased.JsonMsSqlSerializer.Default
+                        )
+                    NStore.Persistence.MsSql.MsSqlPersistence(config)
+                    )
+                .AddSingleton<EventStore> (fun (p:IServiceProvider) ->
+                    let clock = p.GetRequiredService<Clock>()
+                    let logger = NStoreBased.MicrosoftLoggingLoggerFactory(p.GetRequiredService<ILoggerFactory>())
+                    let persistence = p.GetRequiredService<NStore.Persistence.MsSql.MsSqlPersistence>()
+                    let storage = NStoreBased.Storage(persistence,clock, logger)
+                    EventStore.With storage
+                )
+                |> ignore
+            services.AddSingleton<PositionStorage.IStorePositions>(PositionStorage.SqlServer.PositionStorage(connectionString))
+                |> ignore
+        
+        services.AddSingleton<Clock>(utcNowClock) |> ignore
+         
+        services
+        |> configureReadModels
+        |> configureReactions
+        |> ignore
+        
+        services.AddCors() |> ignore
+        services.AddGiraffe() |> ignore
+        services |> configureJsonSerializer
+
+module ApplicationConfiguration =
+    let configureCors (builder : CorsPolicyBuilder) =
+        builder
+            .AllowAnyOrigin()
+            .AllowAnyMethod()
+            .AllowAnyHeader()
+            |> ignore
+
+    let configureApp (app : IApplicationBuilder) =    
+        let env = app.ApplicationServices.GetService<IWebHostEnvironment>()
+        (match env.IsDevelopment() with
+        | true  ->
+            app.UseDeveloperExceptionPage()
+        | false ->
+            app.UseGiraffeErrorHandler(SystemRoutes.errorHandler))
+            .UseCors(configureCors)
+            .UseStaticFiles()
+            .UseGiraffe(Routes.webApp (Routes.frontendHostRoutes env))
+      
+    let configureLogging (builder : ILoggingBuilder) =
+        builder.AddConsole()
+               .AddDebug() |> ignore
 
 let buildHost args =
     Host.CreateDefaultBuilder(args)
-        .ConfigureServices(configureServices)
+        .ConfigureServices(ServiceConfiguration.configureServices)
         .ConfigureWebHostDefaults(
             fun webHostBuilder ->
                 webHostBuilder
-                    .Configure(Action<IApplicationBuilder> configureApp)
-                    .ConfigureLogging(configureLogging)
+                    .Configure(Action<IApplicationBuilder> ApplicationConfiguration.configureApp)
+                    .ConfigureLogging(ApplicationConfiguration.configureLogging)
                     |> ignore)
         .Build()
 
-let connectAndReplayReadModels (readModels: ReadModels.ReadModelInitialization seq) =
-    readModels
-    |> Seq.map (fun r -> r.ReplayAndConnect Start)
-    |> Async.Parallel
-    |> Async.map Array.toList
-    
-let connectAndReplayReactions (readModels: Reactions.ReactionInitialization seq) =
-    readModels
-    |> Seq.map (fun r -> r.ReplayAndConnect ())
-    |> Async.Parallel
-    |> Async.map Array.toList
-    
-let runAsync (host: IHost) =
-    task {
-        let config = host.Services.GetRequiredService<ContextureConfiguration>()
-        let loggerFactory = host.Services.GetRequiredService<ILoggerFactory>()
+module Startup =
+    let connectAndReplayReadModels (readModels: ReadModels.ReadModelInitialization seq) =
+        readModels
+        |> Seq.map (fun r -> r.ReplayAndConnect Start)
+        |> Async.Parallel
+        |> Async.map Array.toList
         
-        match config.Engine with
-        | FileBased _ ->
-            // make sure the database is loaded
-            let database =
-                host.Services.GetRequiredService<FileBased.Database.SingleFileBasedDatastore>()
+    let connectAndReplayReactions (readModels: Reactions.ReactionInitialization seq) =
+        readModels
+        |> Seq.map (fun r -> r.ReplayAndConnect ())
+        |> Async.Parallel
+        |> Async.map Array.toList
+        
+    let runAsync (host: IHost) =
+        task {
+            let config = host.Services.GetRequiredService<ContextureConfiguration>()
+            let loggerFactory = host.Services.GetRequiredService<ILoggerFactory>()
+            
+            match config.Engine with
+            | FileBased _ ->
+                // make sure the database is loaded
+                let database =
+                    host.Services.GetRequiredService<FileBased.Database.SingleFileBasedDatastore>()
+                    
+                // connect and replay before we start import the document
+                let readModels =
+                    host.Services.GetServices<ReadModels.ReadModelInitialization>()
+
+                let! readModelSubscriptions = connectAndReplayReadModels readModels
                 
-            // connect and replay before we start import the document
-            let readModels =
-                host.Services.GetServices<ReadModels.ReadModelInitialization>()
-
-            let! readModelSubscriptions = connectAndReplayReadModels readModels
+                let store = host.Services.GetRequiredService<EventStore>()
             
-            let store = host.Services.GetRequiredService<EventStore>()
-        
-            let! document = database.Read()
-            do! FileBased.Convert.importFromDocument store document
-            
-            do! Runtime.waitUntilCaughtUp readModelSubscriptions
-            
-            let subscriptionLogger = loggerFactory.CreateLogger("subscriptions")
-
-            // subscriptions for syncing back to the filebased-db are added after initial seeding/loading
-            let subscribeTo name subscriptionDefinition =
-                store.Subscribe name End (subscriptionDefinition subscriptionLogger database)
-            let! fileSyncSubscriptions  =
-                Async.Parallel [
-                    subscribeTo "FileBased.Convert.Collaboration.subscription" FileBased.Convert.Collaboration.subscription
-                    subscribeTo "FileBased.Convert.Domain.subscription" FileBased.Convert.Domain.subscription
-                    subscribeTo "FileBased.Convert.BoundedContext.subscription" FileBased.Convert.BoundedContext.subscription
-                    subscribeTo "FileBased.Convert.Namespace.subscription" FileBased.Convert.Namespace.subscription
-                    subscribeTo "FileBased.Convert.NamespaceTemplate.subscription" FileBased.Convert.NamespaceTemplate.subscription
-                ]
-                |> Async.map Array.toList
-      
-            SystemRoutes.subscriptions <- Some (readModelSubscriptions @ fileSyncSubscriptions)
-            if host.Services.GetRequiredService<IWebHostEnvironment>().IsDevelopment() then
-                do! Runtime.waitUntilCaughtUp (readModelSubscriptions @ fileSyncSubscriptions)
-        | SqlServerBased connectionString ->
-            // TODO: properly provision database table?
-            let persistence = host.Services.GetRequiredService<NStore.Persistence.MsSql.MsSqlPersistence>()
-            do! persistence.InitAsync(CancellationToken.None)
-
-            do! PositionStorage.SqlServer.PositionStorage.CreateSchema connectionString
-            
-            let readModels = host.Services.GetServices<ReadModels.ReadModelInitialization>()
-
-            let! readModelSubscriptions = connectAndReplayReadModels readModels
-            SystemRoutes.subscriptions <- Some readModelSubscriptions
-            if host.Services.GetRequiredService<IWebHostEnvironment>().IsDevelopment() then
+                let! document = database.Read()
+                do! FileBased.Convert.importFromDocument store document
+                
                 do! Runtime.waitUntilCaughtUp readModelSubscriptions
+                
+                let subscriptionLogger = loggerFactory.CreateLogger("subscriptions")
 
-        let! reactionSubscriptions = connectAndReplayReactions (host.Services.GetServices<Reactions.ReactionInitialization>())
-        SystemRoutes.subscriptions <-  Some (SystemRoutes.subscriptions.Value @ reactionSubscriptions)
-        return! host.RunAsync()
-    }
+                // subscriptions for syncing back to the filebased-db are added after initial seeding/loading
+                let subscribeTo name subscriptionDefinition =
+                    store.Subscribe name End (subscriptionDefinition subscriptionLogger database)
+                let! fileSyncSubscriptions  =
+                    Async.Parallel [
+                        subscribeTo "FileBased.Convert.Collaboration.subscription" FileBased.Convert.Collaboration.subscription
+                        subscribeTo "FileBased.Convert.Domain.subscription" FileBased.Convert.Domain.subscription
+                        subscribeTo "FileBased.Convert.BoundedContext.subscription" FileBased.Convert.BoundedContext.subscription
+                        subscribeTo "FileBased.Convert.Namespace.subscription" FileBased.Convert.Namespace.subscription
+                        subscribeTo "FileBased.Convert.NamespaceTemplate.subscription" FileBased.Convert.NamespaceTemplate.subscription
+                    ]
+                    |> Async.map Array.toList
+          
+                SystemRoutes.subscriptions <- Some (readModelSubscriptions @ fileSyncSubscriptions)
+                if host.Services.GetRequiredService<IWebHostEnvironment>().IsDevelopment() then
+                    do! Runtime.waitUntilCaughtUp (readModelSubscriptions @ fileSyncSubscriptions)
+            | SqlServerBased connectionString ->
+                // TODO: properly provision database table?
+                let persistence = host.Services.GetRequiredService<NStore.Persistence.MsSql.MsSqlPersistence>()
+                do! persistence.InitAsync(CancellationToken.None)
+
+                do! PositionStorage.SqlServer.PositionStorage.CreateSchema connectionString
+                
+                let readModels = host.Services.GetServices<ReadModels.ReadModelInitialization>()
+
+                let! readModelSubscriptions = connectAndReplayReadModels readModels
+                SystemRoutes.subscriptions <- Some readModelSubscriptions
+                if host.Services.GetRequiredService<IWebHostEnvironment>().IsDevelopment() then
+                    do! Runtime.waitUntilCaughtUp readModelSubscriptions
+
+            let! reactionSubscriptions = connectAndReplayReactions (host.Services.GetServices<Reactions.ReactionInitialization>())
+            SystemRoutes.subscriptions <-  Some (SystemRoutes.subscriptions.Value @ reactionSubscriptions)
+            return! host.RunAsync()
+        }
 
 [<EntryPoint>]
 let main args =
     let host = buildHost args
-    let executingHost = runAsync host
+    let executingHost = Startup.runAsync host
     executingHost.GetAwaiter().GetResult()
     0
