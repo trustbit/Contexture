@@ -16,8 +16,13 @@ module ReadModelInitialization =
         RMI(eventStore, name, handler) :> ReadModelInitialization
 
 type IRetrieveState<'State> =
-    abstract State : unit -> Task<'State>
-    abstract State : Position -> Task<'State>
+    abstract State : Position option -> Task<'State>
+
+[<AutoOpen>]
+module Extensions =
+    type IRetrieveState<'State> with
+        member this.State () =
+            this.State None
 type ReadModel = interface end
 type ReadModel<'Event, 'State> =
     inherit IRetrieveState<'State>
@@ -95,9 +100,6 @@ let readModel
         member _.EventHandler position eventEnvelopes =
             agent.PostAndAsyncReply(fun reply -> Notify(position, eventEnvelopes, reply))
 
-        // member _.State() =
-        //     agent.PostAndAsyncReply State |> Async.StartAsTask
-        
         member _.State position =
             match position with
             | Some position ->

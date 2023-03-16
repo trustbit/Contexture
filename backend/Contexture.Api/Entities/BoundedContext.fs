@@ -206,6 +206,7 @@ type State =
     static member evolve (state: State) (event: Event) =
         match event with
         | BoundedContextRemoved _ -> Deleted
+        | BoundedContextImported i -> Existing i.DomainId
         | BoundedContextCreated p -> Existing p.DomainId
         | BoundedContextMovedToDomain p -> Existing p.DomainId
         | _ -> state
