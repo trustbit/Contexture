@@ -13,6 +13,7 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Global", "Global", "{83030A
 		..\docker-compose.yml = ..\docker-compose.yml
 		..\Makefile = ..\Makefile
 		..\ci-backend.yml = ..\.github/workflows/ci-backend.yml
+		"Backend-README.md" = README.md
 	EndProjectSection
 EndProject
 Global

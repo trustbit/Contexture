@@ -8,7 +8,7 @@ In order to create a new BCC, you need to understand a lot of concepts from DDD 
 While other ways to build a [BCC exist](https://github.com/ddd-crew/bounded-context-canvas), we are building an application to support this modeling process with a dedicated tool developed with an DDD mindset.
 You can read about the ideas of Contexture in the [concept](./concept.md) and you can view the current status of the application at <https://contexture.azurewebsites.net/> (be careful: don't store any sensitive data there; everything you store will be deleted upon the next deployment.)
 
-Note:
+**A short remark on using Contexture**
 
 We think that most of the domain modelling should happen in a collaborative way, by using whitepaper, Post-ITs or online collaboration tools.
 Contexture is and will not be the right tool or a replacement for these interactive modelling sessions!
@@ -37,71 +37,16 @@ Currently two storage engines are supported:
   This engine supports no versioning or change dates at the moment  
 - a SQL-Server based engine that uses an event-sourced storage with support of database base version information and change dates.
 
-### Run and configure the backend
+Make sure the [.NET Framework](https://dotnet.microsoft.com/) is installed on your system!
 
-With the default settings the Contexture server will listen on port `5000` and use the file based engine with  `data/db.json` as database file.
-If you want to have the server listening on any other port, set the environment variable `ASPNETCORE_URLS=http://*:8080` to the desired port.
-To choose and configure a different database engine use the following configurations (the following samples use environment variables but default ASP.NET Core patterns for configurations applies!):
-- `FileBased__Path=/data/db.json` to use the file based engine with the file `db.json` located in the `/data` directory or volume.
-- `SqlBased__ConnectionString=Server=localhost;User Id=sa;Password=development(!)Password` to use the Sql Server engine with the database on `localhost` accessed by the `sa` user and it's (unsafe!) password
+To run the basic default configuration with the file based engine use the following command
 
 ```bash
 cd backend
 dotnet run --project Contexture.Api
 ```
-Note: when running Contexture you might need to exclude current launch-profiles via `--no-launch-profile`.
 
-### Publish and running the backend manually
-
-```bash
-cd backend
-dotnet run --configuration Release Contexture.Api/Contexture.Api.fsproj --output artifacts
-```
-
-Run the published version of the backend:
-```
-cd artifacts
-ASPNETCORE_URLS=http://*:8080 FileBased__Path=data/mydb.json dotnet Contexture.Api.App.dll
-```
-
-### Caveats
-
-- `cors` is configured to allow all origins
-- no authentication and authorization is built into the application
-- no UI for Namespace-template administration.
-  Use the following `curl` commands to manage templates:
-    - get templates
-      ```bash
-      curl http://localhost:5000/api/namespaces/templates
-      ```
-
-    - create a template
-      ```bash
-      curl -X POST \
-         -H "Content-Type: application/json" \
-         -d '{ "name":"barfoo", "description":"my awesome namespace", "labels": [ { "name": "first label", "description":"some description", "placeholder": "some placeholder value"}]}' \
-         http://localhost:5000/api/namespaces/templates
-        ```
-    - add a label template to an existing namespace
-      ```bash
-      curl -X POST \
-         -H "Content-Type: application/json" \
-         -d '{ "name":"barfoo", "description":"some description", "placeholder": "some placeholder value"}' \
-         http://localhost:5000/api/namespaces/templates/<template-id>
-      ```
-    - delete a label from a template
-      ```bash
-      curl -X DELETE http://localhost:5000/api/namespaces/templates/<template-id>/labels/<label-id>
-      ```
-    - delete a namespace
-      ```bash
-      curl -X DELETE http://localhost:5000/api/namespaces/templates/<template-id>
-      ```
-
-### Testing the backend
-
-The integration tests for the SQL-Server based engine are supported by a Docker image using MS-SQL-2019.
-On an ARM-based Mac (M1/M2) [this Docker-Feature](https://github.com/microsoft/mssql-docker/issues/668#issuecomment-1412206521) must be enabled for now.
+More details about configuring and running the backend can be read in this [Readme](./backend/README.md)
 
 ## Contexture frontend application
 
@@ -126,6 +71,21 @@ To build the Docker image use the `Makefile` via `make build-image` or execute t
 To run the `softwarepark/contexture` image use `make run-app` and browse to <http://localhost:3000>.
 
 Your data will be stored in the `/data/db.json` file on the volume `/data`.
+
+### Liveness & Readiness Probes
+
+Contexture provides HTTP based [Liveness & Readiness Probes](https://kubernetes.io/docs/tasks/configure-pod-container/configure-liveness-readiness-startup-probes/) to determine if the container is health & operational
+
+#### Liveness
+
+A `GET` request to `$BASE_URL/meta/health` will return `200 OK` if the application is healthy and currently processing requests.
+
+#### Readiness
+
+A `GET` request to `$BASE_URL/meta/readiness` will return `200 OK` if the application is ready to receive and process new requests.
+It will return a `503 ServiceUnavailable` if the application cannot keep up with the load or is not yet done initializing after startup.
+
+In addition the readiness check will return context information about internal processing to get an indication what parts of the application are lagging.
 
 ## Importing and Exporting data
 
