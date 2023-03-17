@@ -108,6 +108,5 @@ module BoundedContexts =
 
             // assert
             // Then.Response.shouldNotBeSuccessful result
-            do! Then.theResponseShould.beBadRequest result
             do! Then.theResponseShould.beNotFound result
         }

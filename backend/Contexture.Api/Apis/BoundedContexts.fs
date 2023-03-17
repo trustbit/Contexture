@@ -141,6 +141,15 @@ module BoundedContexts =
                   |> Option.map (fun n -> n.IsActive) ]
                 |> List.map (Option.defaultValue false)
                 |> List.exists id
+            static member ValidKeys =
+                let dummy = Unchecked.defaultof<Query>
+                [ SearchFor.Labels.LabelQuery.ValidKeys |> List.map (fun name -> $"{nameof dummy.Label}.{name}")
+                  SearchFor.NamespaceId.NamespaceQuery.ValidKeys |> List.map (fun name -> $"{nameof dummy.Namespace}.{name}")
+                  SearchFor.DomainId.DomainQuery.ValidKeys |> List.map (fun name -> $"{nameof dummy.Domain}.{name}")
+                  SearchFor.BoundedContextId.BoundedContextQuery.ValidKeys |> List.map (fun name -> $"{nameof dummy.BoundedContext}.{name}")
+                ]
+                |> List.collect id
+                |> Set.ofList
 
         let getBoundedContextsByQuery (item: Query) =
             fun (next: HttpFunc) (ctx: HttpContext) -> task {
@@ -229,9 +238,25 @@ module BoundedContexts =
             fun (next: HttpFunc) (ctx: HttpContext) -> task {
                 let nextHandler =
                     if ctx.Request.QueryString.HasValue then
-                        match ctx.TryBindQueryString<Query>() with
-                        | Ok query when query.IsActive -> getBoundedContextsByQuery query
-                        | _ -> getBoundedContexts
+                        let requestKeys =
+                            ctx.Request.Query.Keys
+                            |> Set.ofSeq
+                            |> Set.map (fun s -> s.ToLowerInvariant())
+                        let lowerCaseKeys =
+                            Query.ValidKeys |> Set.map (fun s -> s.ToLowerInvariant())
+                        if lowerCaseKeys |> Set.isSubset requestKeys then
+                            match ctx.TryBindQueryString<Query>() with
+                            | Ok query when query.IsActive -> getBoundedContextsByQuery query
+                            | _ -> getBoundedContexts
+                        else
+                            let unknownQueryParameter =
+                                lowerCaseKeys
+                                |> Set.difference requestKeys
+                                |> String.concat ", "
+                            let supportedQueryParameters =
+                                Query.ValidKeys
+                                |> String.concat ", "
+                            RequestErrors.badRequest (text $"Unknown query parameters(s):\n{unknownQueryParameter}\n\nSupported query parameters:\n{supportedQueryParameters}")
                     else
                         getBoundedContexts
 
