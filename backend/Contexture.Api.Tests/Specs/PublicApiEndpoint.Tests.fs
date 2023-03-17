@@ -107,6 +107,7 @@ module BoundedContexts =
                 |> When.deleting $"api/boundedContexts/%O{contextId}/namespaces/\"%O{namespaceId}\""
 
             // assert
-            Then.Response.shouldNotBeSuccessful result
-            Then.Response.shouldHaveStatusCode HttpStatusCode.NotFound result
+            // Then.Response.shouldNotBeSuccessful result
+            do! Then.theResponseShould.beBadRequest result
+            do! Then.theResponseShould.beNotFound result
         }

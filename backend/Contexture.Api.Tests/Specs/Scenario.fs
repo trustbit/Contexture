@@ -110,14 +110,62 @@ module Then =
         let arePublished { Changes = events } =
             Then.NotEmpty events
     open When
-    module Response =
-        let shouldNotBeSuccessful { Result = response: HttpResponseMessage}=
-            Then.Equal(false, response.IsSuccessStatusCode)
-        let shouldBeSuccessful { Result = response: HttpResponseMessage} =
-            ignore <| response.EnsureSuccessStatusCode()
-            
-        let shouldHaveStatusCode (statusCode: HttpStatusCode) { Result = response: HttpResponseMessage} =
-            Then.Equal(statusCode,response.StatusCode)
+    module theResponseShould =
+        type HttpWhenResult = WhenResult<HttpResponseMessage>
+
+        let private responseBodyLogLine (response:HttpResponseMessage) = task {
+            let! body = response.Content.ReadAsStringAsync()
+            return $"\n----- Details as received from the server -----\n%s{body}\n----- end of server details -----\n"
+            }
+
+        let private nonSuccessAssertions expectedStatusCode (result: HttpWhenResult) : Task = upcast task {
+            let response = result.Result
+            if response.IsSuccessStatusCode || not(response.StatusCode = expectedStatusCode)then
+                let! bodyResponse = responseBodyLogLine response
+                failwith $"Expected a {int expectedStatusCode}-{expectedStatusCode.ToString()} StatusCode but got %O{int response.StatusCode} %s{response.ReasonPhrase}.%s{bodyResponse}"
+            }
+
+        let private successAssertion expectedStatusCode (result: HttpWhenResult) : Task = upcast task {
+            let response = result.Result
+            if not response.IsSuccessStatusCode || expectedStatusCode |> Option.exists(fun expected -> not (response.StatusCode = expected)) then
+                let! bodyResponse = responseBodyLogLine response
+                failwith $"Expected a success StatusCode but got %O{response.StatusCode} %s{response.ReasonPhrase}.%s{bodyResponse}"
+        }
+
+        let beASuccessfulJson (result: HttpWhenResult) : Task = upcast task {
+            do! result |> successAssertion None
+            let response = result.Result
+            if not(response.Content.Headers.ContentType.MediaType = "application/json") then
+                let! bodyResponse = responseBodyLogLine response
+                failwith $"Expected JSON but got %s{response.Content.Headers.ContentType.MediaType}.%s{bodyResponse}"
+        }
+
+        let beASuccessfulJsonWith (assertions: WhenResult<'a> -> unit) (result:HttpWhenResult) : Task = task {
+            let! response = result |> WhenResult.asJsonResponse
+            return assertions response
+        }
+
+        let beSuccessful (result: HttpWhenResult) = successAssertion None result
+        let beForbidden (result: HttpWhenResult) = nonSuccessAssertions HttpStatusCode.Forbidden result
+
+        let beUnauthorized (result: HttpWhenResult) = nonSuccessAssertions HttpStatusCode.Unauthorized result
+
+        let beOk (result: HttpWhenResult) = successAssertion (Some HttpStatusCode.OK) result
+
+        let beInternalServerError (result: HttpWhenResult) = nonSuccessAssertions HttpStatusCode.InternalServerError result
+
+        let beConflict (result: HttpWhenResult) = nonSuccessAssertions HttpStatusCode.Conflict result
+
+        let beNotFound (result: HttpWhenResult)  = nonSuccessAssertions HttpStatusCode.NotFound result
+
+        let beBadRequest (result: HttpWhenResult) = nonSuccessAssertions HttpStatusCode.BadRequest result
+
+        let beARedirectTo path (result: HttpWhenResult) : Task = upcast task {
+            let response = result.Result
+            if response.StatusCode <> HttpStatusCode.Redirect || response.Headers.Location <> path then
+                let! body = response.Content.ReadAsStringAsync()
+                failwith $"Expected a Redirect to %O{path} but got %O{response.Headers.Location} with %O{response.StatusCode} instead. Details from the server:\n%s{body}"
+        }
 
 module Utils =
     open Contexture.Api.Tests.EnvironmentSimulation

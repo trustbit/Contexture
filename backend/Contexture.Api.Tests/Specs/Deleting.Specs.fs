@@ -114,7 +114,7 @@ let ``When deleting the bounded context the collaborations and namespaces are de
             testEnvironment
             |> When.deleting (sprintf "api/boundedContexts/%O" bcToBeDeleted)
 
-        Then.Response.shouldBeSuccessful result
+        do! Then.theResponseShould.beSuccessful result
 
         Then.Events.arePublished result
 
@@ -184,7 +184,7 @@ let ``When deleting a domain the bounded contexts, collaborations and namespaces
 
         let! result = testEnvironment |> When.deleting (sprintf "api/domains/%O" domainToBeDeleted)
 
-        Then.Response.shouldBeSuccessful result
+        do! Then.theResponseShould.beSuccessful result
         Then.Events.arePublished result
 
         result |> Then.containsDomainRemoved domainToBeDeleted
@@ -231,7 +231,7 @@ let ``When deleting a domain with subdomains then the subdomain, bounded context
 
         let! result = testEnvironment |> When.deleting (sprintf "api/domains/%O" domainToBeDeleted)
 
-        Then.Response.shouldBeSuccessful result
+        do! Then.theResponseShould.beSuccessful result
         Then.Events.arePublished result
 
         result |> Then.containsDomainRemoved domainToBeDeleted

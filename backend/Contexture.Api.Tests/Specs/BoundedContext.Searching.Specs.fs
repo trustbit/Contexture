@@ -201,11 +201,10 @@ module ``When searching for bounded contexts`` =
             //act
             let! result =
                 testEnvironment
-                |> When.gettingJson<{| Id: BoundedContextId |} array> (sprintf "api/boundedContexts?bar.foo=baz")
+                |> When.getting (sprintf "api/boundedContexts?bar.foo=baz")
 
             // assert
-            Then.Items.areNotEmpty result
-            result |> WhenResult.map (Seq.map(fun i -> i.Id)) |> Then.Items.contains contextId
+            do! Then.theResponseShould.beBadRequest result
         }
     
     [<Theory>]
