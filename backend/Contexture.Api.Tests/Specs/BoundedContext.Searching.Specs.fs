@@ -16,12 +16,11 @@ module When =
                 environment
                 |> When.gettingJson<{| Id: BoundedContextId |} array> $"api/boundedContexts?%s{queryParameter}"
 
-            return result |> Array.map (fun i -> i.Id)
+            return result |> WhenResult.map (Seq.map (fun i -> i.Id))
         }
 
     module Searching =
         let forALabelNamed name = $"Label.Name=%s{name}"
-
 
 type ``When searching for two different label names``() =
 
@@ -73,8 +72,8 @@ type ``When searching for two different label names``() =
                 |> whenSearchingForDifferentLabels
 
             // assert
-            Then.NotEmpty result
-            Then.Collection(result, (fun x -> Then.Equal(contextId, x)))
+            Then.Items.areNotEmpty result
+            Then.Collection(result.Result, (fun x -> Then.Equal(contextId, x)))
         }
         
     [<Fact>]
@@ -115,8 +114,8 @@ type ``When searching for two different label names``() =
                 |> whenSearchingForDifferentLabels
 
             // assert
-            Then.NotEmpty result
-            Then.Collection(result, (fun x -> Then.Equal(contextId, x)))
+            Then.Items.areNotEmpty result
+            Then.Collection(result.Result, (fun x -> Then.Equal(contextId, x)))
         }
     
     [<Fact>]
@@ -156,7 +155,7 @@ type ``When searching for two different label names``() =
                 |> whenSearchingForDifferentLabels
 
             // assert
-            Then.Empty result
+            Then.Items.areEmpty result
         }
 
 module ``When searching for bounded contexts`` =
@@ -173,8 +172,8 @@ module ``When searching for bounded contexts`` =
 
     module Then =
         let itShouldContainOnlyTheBoundedContext (contextId: BoundedContextId) result =
-            Then.NotEmpty result
-            Then.Collection(result, (fun x -> Then.Equal(contextId, x)))
+            Then.Items.areNotEmpty result
+            Then.Collection(result.Result, (fun x -> Then.Equal(contextId, x)))
             
     let prepareTestEnvironment simulation searchedBoundedContext =
         let randomBoundedContext =
@@ -205,8 +204,8 @@ module ``When searching for bounded contexts`` =
                 |> When.gettingJson<{| Id: BoundedContextId |} array> (sprintf "api/boundedContexts?bar.foo=baz")
 
             // assert
-            Then.NotEmpty result
-            Then.Contains(contextId, result |> Array.map (fun i -> i.Id))
+            Then.Items.areNotEmpty result
+            result |> WhenResult.map (Seq.map(fun i -> i.Id)) |> Then.Items.contains contextId
         }
     
     [<Theory>]
@@ -250,8 +249,8 @@ module ``When searching for bounded contexts`` =
                 |> When.searchingFor $"%s{parameterName}=%s{parameterValue}"
 
             // assert
-            Then.NotEmpty result
-            Then.Collection(result, (fun x -> Then.Equal(contextId, x)))
+            Then.Items.areNotEmpty result
+            Then.Collection(result.Result, (fun x -> Then.Equal(contextId, x)))
         }
 
     [<Fact>]
@@ -295,7 +294,7 @@ module ``When searching for bounded contexts`` =
                 |> When.searchingFor $"Domain.shortName=DomainShortName&BoundedContext.Name=*Third*"
 
             // assert
-            Then.Empty result
+            Then.Items.areEmpty result
         }       
 
     type ``with a single string based parameter``() =
@@ -415,8 +414,8 @@ let ``Can search for bounded contexts by label and value for a specific template
             |> When.searchingFor $"Label.name=arch*&Namespace.Template=%O{templateId}"
 
         // assert
-        Then.NotEmpty result
-        Then.Collection(result, (fun x -> Then.Equal(contextId, x)))
+        Then.Items.areNotEmpty result
+        Then.Collection(result.Result, (fun x -> Then.Equal(contextId, x)))
 
         //act - search by value
         let! result =
@@ -424,8 +423,8 @@ let ``Can search for bounded contexts by label and value for a specific template
             |> When.searchingFor $"Label.value=Joh*&Namespace.Template=%O{templateId}"
 
         // assert
-        Then.NotEmpty result
-        Then.Collection(result, (fun x -> Then.Equal(contextId, x)))
+        Then.Items.areNotEmpty result
+        Then.Collection(result.Result, (fun x -> Then.Equal(contextId, x)))
 
         // act - search by namespace name
         let! result =
@@ -433,6 +432,6 @@ let ``Can search for bounded contexts by label and value for a specific template
             |> When.searchingFor $"Label.value=Joh*&Namespace.Name=%s{name}"
 
         // assert
-        Then.NotEmpty result
-        Then.Collection(result, (fun x -> Then.Equal(contextId, x)))
+        Then.Items.areNotEmpty result
+        Then.Collection(result.Result, (fun x -> Then.Equal(contextId, x)))
     }

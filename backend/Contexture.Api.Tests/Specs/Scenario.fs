@@ -27,6 +27,37 @@ module Given =
     let andOneEvent event given = given @ [ event ]
     let andEvents events given = given @ events
 
+module WhenResult =
+    open System.Net.Http
+    open System.Net.Http.Json
+    
+    let withResult newResult (result: WhenResult<_>) =
+        { TestEnvironment = result.TestEnvironment
+          Changes = result.Changes
+          Result = newResult }
+    let map mapper (result: WhenResult<_>) =
+        result |> withResult (mapper result.Result) 
+        
+    let events chooser { Changes = events} =
+        events 
+        |> List.map (fun e -> e.Event)
+        |> List.choose chooser
+        
+    let asJsonResponse<'a> (result:WhenResult<HttpResponseMessage>) : Task<WhenResult<'a>> =
+        task {
+            let! content = result.Result.Content.ReadAsStringAsync()
+            if result.Result.IsSuccessStatusCode then
+                let! response =
+                    try
+                        result.Result.Content.ReadFromJsonAsync<'a>()
+                    with e ->
+                        failwith $"Could not deserialize '%s{typeof<'a>.FullName}':\n\n%s{e.Message} from content:\n\n%s{content}"
+
+                return result |> withResult response 
+            else
+                return failwith $"Could not get from %s{result.Result.RequestMessage.RequestUri.ToString()}: %O{result} %s{content}"
+        }
+
 module When =
     open System.Net.Http.Json
     
@@ -57,31 +88,24 @@ module When =
             return! environment |> captureEvents (fun env -> env.Client.PostAsync(url, new StringContent(jsonContent)))
         }
 
-    let gettingJson<'t> (url: string) (environment: TestHostEnvironment) =
-        task {        
-            let! result = environment.Client.GetAsync(url)
-            if result.IsSuccessStatusCode then
-                let! content = result.Content.ReadFromJsonAsync<'t>()
-                return content
-            else
-                let! content = result.Content.ReadAsStringAsync() 
-                raise (Xunit.Sdk.XunitException($"Could not get from %O{url}: %O{result} %s{content}"))
-                return Unchecked.defaultof<'t>
+    let getting (url: string) (environment: TestHostEnvironment) =
+        task {
+            return! environment |> captureEvents (fun env -> env.Client.GetAsync(url))
         }
-
-module WhenResult =
-    let map mapper (result: WhenResult<_>) =
-        { TestEnvironment = result.TestEnvironment
-          Changes = result.Changes
-          Result = mapper result.Result }
-        
-    let events chooser { Changes = events} =
-        events 
-        |> List.map (fun e -> e.Event)
-        |> List.choose chooser
+    let gettingJson<'t> (url: string) (environment: TestHostEnvironment) =
+        environment
+        |> getting url
+        |> Task.bind WhenResult.asJsonResponse<'t>
 
 type Then = Xunit.Assert
 module Then =
+    module Items =
+        let areEmpty { Result = items: #seq<_> } =
+            Then.Empty items
+        let areNotEmpty { Result = items: #seq<_> } =
+            Then.NotEmpty items
+        let contains (item:'a) { Result = items: #seq<'a> } =
+            Then.Contains (item, items)
     module Events =
         let arePublished { Changes = events } =
             Then.NotEmpty events

@@ -84,10 +84,9 @@ module BoundedContexts =
                 |> When.gettingJson<{| Id: BoundedContextId |} array> (sprintf "api/boundedContexts")
 
             // assert
-            Then.NotEmpty result
-            Then.Contains(contextId, result |> Array.map (fun i -> i.Id))
+            Then.Items.areNotEmpty result
+            result |> WhenResult.map (Seq.map (fun i -> i.Id)) |> Then.Items.contains contextId
         }
-
         
     [<Fact>]
     let ``When trying to delete a namespace with a malformed namespace-id then the bounded context is not deleted instead``() =
