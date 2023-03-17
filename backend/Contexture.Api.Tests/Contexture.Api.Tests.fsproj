@@ -18,6 +18,7 @@
         <Compile Include="Specs\Scenario.fs" />
         <Compile Include="Specs\Fixtures.fs" />
         <Compile Include="Specs\PublicApiEndpoint.Tests.fs" />
+        <Compile Include="Specs\BoundedContext.Searching.Specs.fs" />
         <Compile Include="Specs\Deleting.Specs.fs" />
     </ItemGroup>
 
