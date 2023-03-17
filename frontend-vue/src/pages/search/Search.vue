@@ -370,12 +370,12 @@ function onClearFilters() {
 }
 
 const queryAsString = computed(() => {
-  if (!route.query) {
-    return "";
-  } else {
+  if (route.query) {
     return `?${Object.entries(route.query)
       .map(([key, value]) => `${encodeURIComponent(key)}=${encodeURIComponent(value as string)}`)
       .join("&")}`;
+  } else {
+    return "";
   }
 });
 </script>
