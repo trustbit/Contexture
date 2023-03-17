@@ -8,10 +8,18 @@ open Contexture.Api.Infrastructure
 open Contexture.Api.Infrastructure.Storage
 open Contexture.Api.Infrastructure.Subscriptions
 open Contexture.Api.Reactions
+open Contexture.Api.Tests.TestHost
 open FsToolkit.ErrorHandling
-
+open TestHost
 
 type Given = EventEnvelope list
+type WhenResult<'Result> =
+        { TestEnvironment: TestHostEnvironment
+          Result: 'Result
+          Changes: EventEnvelope<AllEvents> list }
+
+type When<'R> = TestHostEnvironment -> Task<WhenResult<'R>>
+type ThenAssertion<'T> = WhenResult<'T> -> Task
 
 module Given =
     let noEvents = []
@@ -21,10 +29,7 @@ module Given =
 
 module When =
     open System.Net.Http.Json
-    open System.Net.Http
-
-    open TestHost
-
+    
     let private captureEvents action (environment: TestHostEnvironment) = task {
         let mutable capturedEvents = List()
         let captureEvents =
@@ -36,7 +41,11 @@ module When =
         let! result = action environment
         do! Runtime.waitUntilCaughtUp [ subscription ]
         do! Task.Delay 1000
-        return capturedEvents |> List.ofSeq,result
+        return {
+            TestEnvironment = environment
+            Changes = capturedEvents |> List.ofSeq
+            Result =result
+        }
     }
     let deleting (url: string) (environment: TestHostEnvironment) =
         task {
@@ -60,15 +69,30 @@ module When =
                 return Unchecked.defaultof<'t>
         }
 
+module WhenResult =
+    let map mapper (result: WhenResult<_>) =
+        { TestEnvironment = result.TestEnvironment
+          Changes = result.Changes
+          Result = mapper result.Result }
+        
+    let events chooser { Changes = events} =
+        events 
+        |> List.map (fun e -> e.Event)
+        |> List.choose chooser
+
 type Then = Xunit.Assert
 module Then =
+    module Events =
+        let arePublished { Changes = events } =
+            Then.NotEmpty events
+    open When
     module Response =
-        let shouldNotBeSuccessful (response: HttpResponseMessage) =
+        let shouldNotBeSuccessful { Result = response: HttpResponseMessage}=
             Then.Equal(false, response.IsSuccessStatusCode)
-        let shouldBeSuccessful (response: HttpResponseMessage) =
+        let shouldBeSuccessful { Result = response: HttpResponseMessage} =
             ignore <| response.EnsureSuccessStatusCode()
             
-        let shouldHaveStatusCode (statusCode: HttpStatusCode) (response: HttpResponseMessage) =
+        let shouldHaveStatusCode (statusCode: HttpStatusCode) { Result = response: HttpResponseMessage} =
             Then.Equal(statusCode,response.StatusCode)
 
 module Utils =

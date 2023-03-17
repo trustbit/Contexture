@@ -47,7 +47,7 @@ let scenario (env: ISimulateEnvironment) =
     parentEvents @ subEvents @ subSubEvents
 
 module Then =
-    let containsBoundedContextRemoved boundedContextId events =
+    let containsBoundedContextRemoved boundedContextId { Changes = events } =
         Then.Contains(
             events,
             fun item ->
@@ -57,7 +57,7 @@ module Then =
                 | _ -> false
         )
 
-    let containsDomainRemoved domainId events =
+    let containsDomainRemoved domainId { Changes = events } =
         Then.Contains(
             events,
             fun item ->
@@ -66,7 +66,7 @@ module Then =
                 | _ -> false
         )
 
-    let containsNamespaceRemoved namespaceId events =
+    let containsNamespaceRemoved namespaceId { Changes = events } =
         Then.Contains(
             events,
             fun item ->
@@ -110,26 +110,25 @@ let ``When deleting the bounded context the collaborations and namespaces are de
 
         use! testEnvironment = Prepare.withGiven environment given
 
-        let! events, response =
+        let! result =
             testEnvironment
             |> When.deleting (sprintf "api/boundedContexts/%O" bcToBeDeleted)
 
-        Then.Response.shouldBeSuccessful response
+        Then.Response.shouldBeSuccessful result
 
-        Then.NotEmpty events
+        Then.Events.arePublished result
 
-        events |> Then.containsBoundedContextRemoved bcToBeDeleted
-        events |> Then.containsNamespaceRemoved namespaceOfDeletedBc
+        result |> Then.containsBoundedContextRemoved bcToBeDeleted
+        result |> Then.containsNamespaceRemoved namespaceOfDeletedBc
 
         let collaborationEvents =
-            events
-            |> List.map (fun e -> e.Event)
-            |> List.choose (function
+            result
+            |> WhenResult.events(function
                 | AllEvents.Collaboration e -> Some e
                 | _ -> None)
 
         Then.NotEmpty collaborationEvents
-        Then.Equal(collaborationEvents.Length, events.Length - 2 (* BC and namespace events *) )
+        Then.Equal(collaborationEvents.Length, result.Changes.Length - 2 (* BC and namespace events *) )
 
         let deletedEvents =
             collaborationEvents
@@ -183,24 +182,23 @@ let ``When deleting a domain the bounded contexts, collaborations and namespaces
 
         use! testEnvironment = Prepare.withGiven environment given
 
-        let! events, response = testEnvironment |> When.deleting (sprintf "api/domains/%O" domainToBeDeleted)
+        let! result = testEnvironment |> When.deleting (sprintf "api/domains/%O" domainToBeDeleted)
 
-        Then.Response.shouldBeSuccessful response
-        Then.NotEmpty events
+        Then.Response.shouldBeSuccessful result
+        Then.Events.arePublished result
 
-        events |> Then.containsDomainRemoved domainToBeDeleted
-        events |> Then.containsBoundedContextRemoved bcOfDeletedDomain
-        events |> Then.containsNamespaceRemoved namespaceOfDeletedBc
+        result |> Then.containsDomainRemoved domainToBeDeleted
+        result |> Then.containsBoundedContextRemoved bcOfDeletedDomain
+        result |> Then.containsNamespaceRemoved namespaceOfDeletedBc
 
         let collaborationEvents =
-            events
-            |> List.map (fun e -> e.Event)
-            |> List.choose (function
+            result
+            |> WhenResult.events (function
                 | AllEvents.Collaboration e -> Some e
                 | _ -> None)
 
         Then.NotEmpty collaborationEvents
-        Then.Equal(collaborationEvents.Length, events.Length - 3 (* domain, bc and namespace events *) )
+        Then.Equal(collaborationEvents.Length, result.Changes.Length - 3 (* domain, bc and namespace events *) )
 
         let deletedEvents =
             collaborationEvents
@@ -231,17 +229,17 @@ let ``When deleting a domain with subdomains then the subdomain, bounded context
 
         use! testEnvironment = Prepare.withGiven environment given
 
-        let! events, response = testEnvironment |> When.deleting (sprintf "api/domains/%O" domainToBeDeleted)
+        let! result = testEnvironment |> When.deleting (sprintf "api/domains/%O" domainToBeDeleted)
 
-        Then.Response.shouldBeSuccessful response
-        Then.NotEmpty events
+        Then.Response.shouldBeSuccessful result
+        Then.Events.arePublished result
 
-        events |> Then.containsDomainRemoved domainToBeDeleted
-        events |> Then.containsDomainRemoved otherDomainToBeDeleted
+        result |> Then.containsDomainRemoved domainToBeDeleted
+        result |> Then.containsDomainRemoved otherDomainToBeDeleted
 
-        events |> Then.containsBoundedContextRemoved bcToBeDeleted
-        events |> Then.containsBoundedContextRemoved otherBcToBeDeleted
+        result |> Then.containsBoundedContextRemoved bcToBeDeleted
+        result |> Then.containsBoundedContextRemoved otherBcToBeDeleted
 
-        events |> Then.containsNamespaceRemoved namespaceToBeDeleted
-        events |> Then.containsNamespaceRemoved otherNamespaceToBeDeleted
+        result |> Then.containsNamespaceRemoved namespaceToBeDeleted
+        result |> Then.containsNamespaceRemoved otherNamespaceToBeDeleted
     }

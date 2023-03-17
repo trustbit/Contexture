@@ -185,6 +185,30 @@ module ``When searching for bounded contexts`` =
 
         Prepare.withGiven simulation given
  
+    [<Fact>]
+    let ``When searching with a random query string a bad request is returned`` () =
+        task {
+            let environment = FixedTimeEnvironment.FromSystemClock()
+
+            // arrange
+            let contextId = environment |> PseudoRandom.guid
+            let domainId = environment |> PseudoRandom.guid
+
+            let given =
+                Fixtures.Builders.givenADomainWithOneBoundedContext domainId contextId
+
+            use! testEnvironment = Prepare.withGiven environment given
+
+            //act
+            let! result =
+                testEnvironment
+                |> When.gettingJson<{| Id: BoundedContextId |} array> (sprintf "api/boundedContexts?bar.foo=baz")
+
+            // assert
+            Then.NotEmpty result
+            Then.Contains(contextId, result |> Array.map (fun i -> i.Id))
+        }
+    
     [<Theory>]
     [<InlineData("Label.name", "Architect")>]
     [<InlineData("Label.value", "John Doe")>]

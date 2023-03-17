@@ -17,9 +17,6 @@ open Microsoft.Extensions.DependencyInjection
 open Microsoft.AspNetCore.TestHost
 open Microsoft.Extensions.Logging
 
-
-open Microsoft.Extensions.Options
-
 module TestHost =
     let configureLogging (builder: ILoggingBuilder) =
         builder.AddConsole().AddDebug() |> ignore

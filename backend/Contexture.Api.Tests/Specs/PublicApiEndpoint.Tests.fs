@@ -88,29 +88,6 @@ module BoundedContexts =
             Then.Contains(contextId, result |> Array.map (fun i -> i.Id))
         }
 
-    [<Fact>]
-    let ``Can still list bounded contexts when attaching a random query string`` () =
-        task {
-            let environment = FixedTimeEnvironment.FromSystemClock()
-
-            // arrange
-            let contextId = environment |> PseudoRandom.guid
-            let domainId = environment |> PseudoRandom.guid
-
-            let given =
-                Fixtures.Builders.givenADomainWithOneBoundedContext domainId contextId
-
-            use! testEnvironment = Prepare.withGiven environment given
-
-            //act
-            let! result =
-                testEnvironment
-                |> When.gettingJson<{| Id: BoundedContextId |} array> (sprintf "api/boundedContexts?bar.foo=baz")
-
-            // assert
-            Then.NotEmpty result
-            Then.Contains(contextId, result |> Array.map (fun i -> i.Id))
-        }
         
     [<Fact>]
     let ``When trying to delete a namespace with a malformed namespace-id then the bounded context is not deleted instead``() =
@@ -126,7 +103,7 @@ module BoundedContexts =
             use! testEnvironment = Prepare.withGiven simulation given
 
             //act
-            let! _,result =
+            let! result =
                 testEnvironment
                 |> When.deleting $"api/boundedContexts/%O{contextId}/namespaces/\"%O{namespaceId}\""
 
