@@ -10,14 +10,17 @@
           :label="t('search.field')"
           :display-value="(l) => l"
           :allow-custom-values="true"
-          @complete="searchSuggestions"
+          @complete="searchKeySuggestions"
           class="sm:w-1/2"
         />
 
-        <ContextureInputText
-          :label="t('search.value')"
+        <ContextureAutocomplete
           v-model="selected.value"
-          :skip-validation="true"
+          :suggestions="valueSuggestions"
+          :label="t('search.value')"
+          :display-value="(l) => l"
+          :allow-custom-values="true"
+          @complete="searchValueSuggestions"
           class="sm:ml-2 sm:w-1/2"
         />
       </div>
@@ -30,15 +33,15 @@
 </template>
 
 <script setup lang="ts">
-import { Ref, ref } from "vue";
+import { Ref, ref, watch } from "vue";
+import { useI18n } from "vue-i18n";
 import ContextureAutocomplete from "~/components/primitives/autocomplete/ContextureAutocomplete.vue";
 import ContexturePrimaryButton from "~/components/primitives/button/ContexturePrimaryButton.vue";
-import ContextureInputText from "~/components/primitives/input/ContextureInputText.vue";
-import { useI18n } from "vue-i18n";
+import { NamespaceLabel } from "~/types/namespace";
 
 interface Props {
   namespaceName: string;
-  labels: string[];
+  labels: NamespaceLabel[];
 }
 
 const props = defineProps<Props>();
@@ -46,14 +49,26 @@ const emit = defineEmits<{
   (e: "add", event: any): void;
 }>();
 const { t } = useI18n();
-const keyTerm = ref<string>("");
 
-const keySuggestions = ref<string[]>(
-  props.labels.filter((label) => label.toLowerCase().includes(keyTerm.value?.toLowerCase()))
-);
+const selected: Ref<{ key?: string; value?: string }> = ref<{
+  key?: string;
+  value?: string;
+}>({});
 
-function searchSuggestions(query: string): void {
-  keySuggestions.value = props.labels.filter((l) => l.toLowerCase().includes(query.toLowerCase()));
+const keySuggestions = ref<string[]>(props.labels.map((label) => label.name));
+const valueSuggestions = ref<string[]>([]);
+
+function searchKeySuggestions(query: string): void {
+  keySuggestions.value = props.labels
+    .map((label) => label.name)
+    .filter((label) => label.toLowerCase().includes(query.toLowerCase()));
+}
+
+function searchValueSuggestions(query: string): void {
+  valueSuggestions.value = props.labels
+    .filter((label) => label.name === selected.value.key)
+    .map((label) => label.value)
+    .filter((label) => label.toLowerCase().includes(query.toLowerCase()));
 }
 
 function add() {
@@ -67,8 +82,12 @@ function add() {
   };
 }
 
-const selected: Ref<{ key?: string; value?: string }> = ref<{
-  key?: string;
-  value?: string;
-}>({});
+watch(
+  () => selected.value.key,
+  () => {
+    valueSuggestions.value = props.labels
+      .filter((label) => label.name === selected.value.key)
+      .map((label) => label.value);
+  }
+);
 </script>

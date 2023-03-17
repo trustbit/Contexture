@@ -43,7 +43,7 @@
                           <div class="w-[200px] py-2 sm:w-[500px]">
                             <ContextureAddFilterPopoverContent
                               :namespace-name="namespace"
-                              :labels="labelNamesForNamespace[namespace]"
+                              :labels="labelsForNamespace[namespace]"
                               @add="(label) => addFilter(index, label)"
                             />
                           </div>
@@ -163,7 +163,6 @@ import { useI18n } from "vue-i18n";
 import { LocationQueryValue, useRoute, useRouter } from "vue-router";
 import ContextureBoundedContextCard from "~/components/bounded-context/ContextureBoundedContextCard.vue";
 import ContextureAccordionItem from "~/components/primitives/accordion/ContextureAccordionItem.vue";
-import ContextureHelpfulErrorAlert from "~/components/primitives/alert/ContextureHelpfulErrorAlert.vue";
 import ContextureBadge from "~/components/primitives/badge/ContextureBadge.vue";
 import ContextureSearch from "~/components/primitives/input/ContextureSearch.vue";
 import ContextureListItem from "~/components/primitives/list/ContextureListItem.vue";
@@ -178,7 +177,8 @@ import { useDomainsStore } from "~/stores/domains";
 import { useNamespaces } from "~/stores/namespaces";
 import { BoundedContext } from "~/types/boundedContext";
 import { Domain } from "~/types/domain";
-import { Namespace } from "~/types/namespace";
+import ContextureHelpfulErrorAlert from "~/components/primitives/alert/ContextureHelpfulErrorAlert.vue";
+import { Namespace, NamespaceLabel } from "~/types/namespace";
 
 interface SearchSettings {
   selectedTextPresentationMode: number;
@@ -282,14 +282,14 @@ watch(activeFilters, (value) => {
   router.push({ query: queryParams });
 });
 
-const labelNamesForNamespace = computed<{
-  [name: string]: string[];
+const labelsForNamespace = computed<{
+  [name: string]: NamespaceLabel[];
 }>(() => {
-  return namespaces.value.reduce((acc: { [name: string]: string[] }, curr: Namespace) => {
+  return namespaces.value.reduce((acc: { [name: string]: NamespaceLabel[] }, curr: Namespace) => {
     if (!acc[curr.id]) {
       acc[curr.name] = [];
     }
-    acc[curr.name] = [...acc[curr.name], ...curr.labels.map((l) => l.name)];
+    acc[curr.name] = [...acc[curr.name], ...curr.labels.map((l) => l)];
     return acc;
   }, {});
 });
