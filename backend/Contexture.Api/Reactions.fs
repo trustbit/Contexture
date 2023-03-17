@@ -292,8 +292,9 @@ module CascadeDelete =
         }
 
     let reaction (loggerFactory:ILoggerFactory) store =
+        let logger = loggerFactory.CreateLogger "CascadeDelete"
         { new Reaction<_,_> with
             member _.Projection = { Update = project; Init = State.Initial }
-            member _.Reaction state event = handleEvent (loggerFactory.CreateLogger "CascadeDelete") store state event
+            member _.Reaction state event = handleEvent logger store state event
         }
     
