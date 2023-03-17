@@ -81,28 +81,29 @@
       </div>
     </div>
     <div class="h-full overflow-y-auto bg-gray-100 sm:w-3/4">
-      <div class="text-center">
-        <div v-if="options.selectedVisualization === 0" class="h-full">
-          <div class="invisible">{{ t("search.sunburst") }}</div>
-          <visualization-sunburst mode="filtered" />
-        </div>
-        <div v-if="options.selectedVisualization === 1" class="h-full">
-          <div class="invisible">{{ t("search.sunburst_highlighted") }}</div>
-          <visualization-sunburst mode="highlighted" />
-        </div>
-        <div v-if="options.selectedVisualization === 2" class="h-full">
-          <div class="invisible">{{ t("search.hierarchical_edge") }}</div>
-          <hierarchical-edge v-if="options.selectedVisualization === 2" />
-        </div>
+      <ContextureActiveFilters
+        :active-filters="activeFilters"
+        @clear-filters="onClearFilters"
+        @delete-filter="onDeleteFilter"
+      />
+
+      <div v-if="options.selectedVisualization > -1" class="h-full text-center">
+        <visualization-sunburst
+          v-if="options.selectedVisualization === 0"
+          id="sunburst-filtered"
+          :query="queryAsString"
+          mode="filtered"
+        />
+        <visualization-sunburst
+          v-if="options.selectedVisualization === 1"
+          id="sunburst-highlighted"
+          :query="queryAsString"
+          mode="highlighted"
+        />
+        <hierarchical-edge v-if="options.selectedVisualization === 2" id="hierarchicalEdge" :query="queryAsString" />
       </div>
 
       <div v-if="options.selectedTextPresentationMode > -1" class="h-full">
-        <ContextureActiveFilters
-          :active-filters="activeFilters"
-          @clear-filters="onClearFilters"
-          @delete-filter="onDeleteFilter"
-        />
-
         <div v-if="options.selectedTextPresentationMode >= 0" class="h-full overflow-y-auto p-1 sm:p-4">
           <ContextureHelpfulErrorAlert
             v-if="error"
@@ -162,6 +163,7 @@ import { useI18n } from "vue-i18n";
 import { LocationQueryValue, useRoute, useRouter } from "vue-router";
 import ContextureBoundedContextCard from "~/components/bounded-context/ContextureBoundedContextCard.vue";
 import ContextureAccordionItem from "~/components/primitives/accordion/ContextureAccordionItem.vue";
+import ContextureHelpfulErrorAlert from "~/components/primitives/alert/ContextureHelpfulErrorAlert.vue";
 import ContextureBadge from "~/components/primitives/badge/ContextureBadge.vue";
 import ContextureSearch from "~/components/primitives/input/ContextureSearch.vue";
 import ContextureListItem from "~/components/primitives/list/ContextureListItem.vue";
@@ -171,13 +173,12 @@ import { ActiveFilter } from "~/components/search/activeFilter";
 import ContextureActiveFilters from "~/components/search/ContextureActiveFilters.vue";
 import ContextureAddFilterPopoverContent from "~/components/search/ContextureAddFilter.vue";
 import { useFetch } from "~/composables/useFetch";
+import { arrayContentEqual } from "~/core/arrayContentEqual";
 import { useDomainsStore } from "~/stores/domains";
 import { useNamespaces } from "~/stores/namespaces";
 import { BoundedContext } from "~/types/boundedContext";
 import { Domain } from "~/types/domain";
 import { Namespace } from "~/types/namespace";
-import ContextureHelpfulErrorAlert from "~/components/primitives/alert/ContextureHelpfulErrorAlert.vue";
-import { arrayContentEqual } from "~/core/arrayContentEqual";
 
 interface SearchSettings {
   selectedTextPresentationMode: number;
@@ -367,4 +368,14 @@ const domainCount = computed(() => {
 function onClearFilters() {
   activeFilters.value = [];
 }
+
+const queryAsString = computed(() => {
+  if (!route.query) {
+    return "";
+  } else {
+    return `?${Object.entries(route.query)
+      .map(([key, value]) => `${encodeURIComponent(key)}=${encodeURIComponent(value as string)}`)
+      .join("&")}`;
+  }
+});
 </script>
