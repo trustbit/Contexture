@@ -70,8 +70,8 @@ module When =
         let store = environment.GetService<EventStore>()
         let! subscription = store.SubscribeAll AllEvents.fromEnvelope "capture events" Subscriptions.End captureEvents
         let! result = action environment
-        do! Runtime.waitUntilCaughtUp [ subscription ]
-        do! Task.Delay 1000
+        do! Runtime.waitUntilCaughtUp (subscription :: environment.Subscriptions)
+        // do! Task.Delay 1000
         return {
             TestEnvironment = environment
             Changes = capturedEvents |> List.ofSeq

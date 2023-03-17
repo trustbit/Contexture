@@ -81,9 +81,10 @@ module Runtime =
             while not (didAllSubscriptionsCatchup lastStatus.CaughtUp subscriptions) do
                 do! Task.Delay(100)
                 let calculatedStatus = calculateStatistics subscriptions
+                // if nothing changed since the last iteration we increase the counter to fail eventually
+                if calculatedStatus = lastStatus then
+                    counter <- counter + 1
                 lastStatus <- calculatedStatus
-                counter <- counter + 1
-
                 if counter > 100 then
                     failwithf "No result after %i iterations. Last Status %A" counter lastStatus
         }
