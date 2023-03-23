@@ -223,7 +223,8 @@ module ServiceConfiguration =
                     )
                 .AddSingleton<EventStore> (fun (p:IServiceProvider) ->
                     let clock = p.GetRequiredService<Clock>()
-                    let storage = Storage.InMemory.emptyEventStore clock
+                    let factory = p.GetRequiredService<ILoggerFactory>()
+                    let storage = Storage.InMemory.emptyEventStore factory clock
                     
                     EventStore.With storage
                 )
@@ -285,8 +286,11 @@ module ApplicationConfiguration =
             .UseGiraffe(Routes.webApp (Routes.frontendHostRoutes env))
       
     let configureLogging (builder : ILoggingBuilder) =
-        builder.AddConsole()
-               .AddDebug() |> ignore
+        builder
+            .AddSimpleConsole(fun f -> f.IncludeScopes <- true)
+            .AddConsole()
+            .AddDebug()
+        |> ignore
 
 let buildHost args =
     Host.CreateDefaultBuilder(args)
@@ -334,7 +338,7 @@ module Startup =
                 let! document = database.Read()
                 do! FileBased.Convert.importFromDocument store document
                 
-                do! Runtime.waitUntilCaughtUp readModelSubscriptions
+                let! _ = Runtime.waitUntilCaughtUp readModelSubscriptions
                 
                 let subscriptionLogger = loggerFactory.CreateLogger("subscriptions")
 
@@ -353,7 +357,8 @@ module Startup =
           
                 SystemRoutes.subscriptions <- Some (readModelSubscriptions @ fileSyncSubscriptions)
                 if host.Services.GetRequiredService<IWebHostEnvironment>().IsDevelopment() then
-                    do! Runtime.waitUntilCaughtUp (readModelSubscriptions @ fileSyncSubscriptions)
+                    let! _ = Runtime.waitUntilCaughtUp (readModelSubscriptions @ fileSyncSubscriptions)
+                    ()
             | SqlServerBased connectionString ->
                 // TODO: properly provision database table?
                 let persistence = host.Services.GetRequiredService<NStore.Persistence.MsSql.MsSqlPersistence>()
@@ -366,7 +371,8 @@ module Startup =
                 let! readModelSubscriptions = connectAndReplayReadModels readModels
                 SystemRoutes.subscriptions <- Some readModelSubscriptions
                 if host.Services.GetRequiredService<IWebHostEnvironment>().IsDevelopment() then
-                    do! Runtime.waitUntilCaughtUp readModelSubscriptions
+                    let! _ = Runtime.waitUntilCaughtUp readModelSubscriptions
+                    ()
 
             let! reactionSubscriptions = connectAndReplayReactions (host.Services.GetServices<Reactions.ReactionInitialization>())
             SystemRoutes.subscriptions <-  Some (SystemRoutes.subscriptions.Value @ reactionSubscriptions)

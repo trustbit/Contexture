@@ -65,7 +65,7 @@ module ReactionInitialization =
         : SubscriptionHandler<AllEvents> =
         let mutable state = initialState
 
-        fun _ events ->
+        fun position events ->
             async {
                 do!
                     events

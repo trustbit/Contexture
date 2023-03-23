@@ -62,7 +62,7 @@ module When =
     open System.Net.Http.Json
     
     let private captureEvents action (environment: TestHostEnvironment) = task {
-        let mutable capturedEvents = List()
+        let capturedEvents = List()
         let captureEvents =
             fun position events ->
                 capturedEvents.AddRange events
@@ -70,8 +70,7 @@ module When =
         let store = environment.GetService<EventStore>()
         let! subscription = store.SubscribeAll AllEvents.fromEnvelope "capture events" Subscriptions.End captureEvents
         let! result = action environment
-        do! Runtime.waitUntilCaughtUp (subscription :: environment.Subscriptions)
-        // do! Task.Delay 1000
+        let! statistics = Runtime.waitUntilCaughtUp (subscription :: environment.Subscriptions)
         return {
             TestEnvironment = environment
             Changes = capturedEvents |> List.ofSeq

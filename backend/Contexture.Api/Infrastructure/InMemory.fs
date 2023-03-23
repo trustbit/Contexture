@@ -1,5 +1,6 @@
 module Contexture.Api.Infrastructure.Storage.InMemory
 
+open System
 open System.Collections.Generic
 open System.Threading
 open System.Threading.Tasks
@@ -7,15 +8,15 @@ open Contexture.Api.Infrastructure
 open Contexture.Api.Infrastructure.Storage
 open FsToolkit.ErrorHandling
 open Contexture.Api.Infrastructure.Subscriptions
+open Microsoft.Extensions.Logging
 
-type Msg =
+type private SingleWriterPipelineMsg =
     private
     | Get of StreamKind * AsyncReplyChannel<EventResult>
     | GetStream of StreamIdentifier * AsyncReplyChannel<StreamResult>
     | GetAll of AsyncReplyChannel<EventResult>
     | Append of NonEmptyList<EventDefinition> * AsyncReplyChannel<Version * Position>
-    | Notify of Position * EventEnvelope list * (Position -> EventEnvelope list -> Async<unit>)
-    | Subscribe of SubscriptionDefinition * (Position -> EventEnvelope list -> Async<unit>) * AsyncReplyChannel<unit>
+    | ForwardTo of string * SubscriptionDefinition * (Position -> EventEnvelope list -> unit) * AsyncReplyChannel<unit>
 
 type private History =
     { items: (Position * Version * EventEnvelope) list
@@ -79,7 +80,7 @@ let private appendToHistory clock (history: History, envelopes) (definition: Eve
 
     { history with items = (position, eventVersion, envelope) :: history.items },envelopes @ [ envelope ]
 
-let private singleWriterPipeline clock (initialEvents: EventDefinition list) (inbox: Agent<Msg>) =
+let private singleWriterPipeline clock (initialEvents: EventDefinition list) (inbox: Agent<SingleWriterPipelineMsg>) =
     let rec loop state =
         let (subscriptions, history) = state
 
@@ -117,27 +118,28 @@ let private singleWriterPipeline clock (initialEvents: EventDefinition list) (in
 
                 let byKind = envelopes |> List.groupBy (fun e -> e.StreamKind) |> Map.ofList
 
-                let subscriptionsToNotifyWithEvents,remainingSubscriptions =
+                let subscriptionsToNotifyWithEvents, remainingSubscriptions =
                     subscriptions
-                    |> List.fold (fun (toNotify,other) (definition, s) ->
+                    |> Map.toList
+                    |> List.fold (fun (toNotify,other) (name, (definition, s)) ->
                         match definition with
                         | FromStream(streamIdentifier, _) when byIdentifier |> Map.containsKey streamIdentifier ->
-                            toNotify @ [ (s, byIdentifier |> Map.find streamIdentifier)],other
-                        | FromAll _ -> toNotify @ [ s, envelopes],other
+                            toNotify @ [ (name, s, byIdentifier |> Map.find streamIdentifier )],other
+                        | FromAll _ -> toNotify @ [name, s, envelopes],other
                         | FromKind(streamKind, _) when byKind |> Map.containsKey streamKind ->
-                            toNotify @ [ s, byKind |> Map.find streamKind],other
+                            toNotify @ [ name, s, byKind |> Map.find streamKind ],other
                         | _ ->
-                            toNotify, s :: other
+                            toNotify, (name,s) :: other
                         ) (List.empty,List.empty)
-
+                
                 subscriptionsToNotifyWithEvents
-                |> List.iter (fun (s, events) -> inbox.Post(Notify(position, events, s)))
+                |> List.iter (fun (name,s, events) -> s position events)
                 
                 remainingSubscriptions
-                |> List.iter (fun s -> inbox.Post(Notify(position,List.empty,s)))
-               
+                |> List.iter (fun (name,s) -> s position List.Empty)
+                
                 return! loop (subscriptions, extendedHistory)
-            | Subscribe(definition, subscription, reply) ->
+            | ForwardTo(name, definition, subscription, reply) ->
                 let skipUntil position items =
                     items
                     |> List.skipWhile (fun (p, _, _) ->
@@ -159,26 +161,68 @@ let private singleWriterPipeline clock (initialEvents: EventDefinition list) (in
                 let lastPosition = history.items |> withMaxPosition |> fst
 
                 if not events.IsEmpty then
-                    inbox.Post(Notify(lastPosition, events |> List.map selectItem, subscription))
+                    subscription lastPosition (events |> List.map selectItem) 
                 else
-                    inbox.Post(Notify(lastPosition, List.empty, subscription))
-
+                    subscription lastPosition List.empty
+                
                 reply.Reply()
-                return! loop ((definition, subscription) :: subscriptions, history)
-
-            | Notify(version, events, subscription) ->
-                Async.Start <| subscription version events
-
-                return! loop state
+                return! loop (subscriptions |> Map.add name (definition,subscription), history)
         }
 
     let initialHistory,_ = initialEvents |> List.fold (appendToHistory clock) (History.Empty,[])
 
-    loop ([], initialHistory)
+    loop (Map.empty, initialHistory)
+type private SubscriptionMsg =
+    | Enqueue of Position * EventEnvelope list 
+    | Process
+    | Status of AsyncReplyChannel<Choice<Position option,Position option>>
 
-let eventStoreWith clock (initialEvents: EventDefinition list) =
-    let agent = Agent<Msg>.Start (singleWriterPipeline clock initialEvents)
+let private subscriptionFor (name: string) (subscription:SubscriptionHandler) =
+    let agent = Agent<SubscriptionMsg>.Start(fun inbox ->
+        let rec loop state =
+            let processing, position, backlog = state
+            async {
+                let! msg = inbox.Receive()
+                match msg with
+                | Enqueue (enqueuePosition, events) ->
+                    let newState =
+                        backlog
+                        |> List.append events
+                        |> List.sortBy (fun e -> e.Metadata.Position)
+                   
+                    let newPosition =
+                        match position with
+                        | Some p when p < enqueuePosition -> enqueuePosition
+                        | Some p -> p
+                        | _ -> enqueuePosition
+                    if not processing then
+                        inbox.Post Process
+                    let b = name
+                    return! loop (true, Some newPosition,newState)
+                | Process ->
+                    match position with
+                    | Some p ->
+                        do! subscription p backlog
+                        return! loop (false, position, List.Empty)
+                    | None ->
+                        return! loop (false, position, backlog)
+                | Status reply ->
+                    let b = name
+                    if backlog.IsEmpty then
+                        reply.Reply (Choice1Of2 position)
+                    else
+                        reply.Reply (Choice2Of2 position)
+                    return! loop state
+                }
+            
+        loop (false, None,List.empty))
+    agent.Error.Add(fun e -> System.Console.WriteLine(e.ToString()))
+    agent.Post Process
+    agent
 
+let eventStoreWith (loggerFactory: ILoggerFactory) clock (initialEvents: EventDefinition list) =
+    let logger = loggerFactory.CreateLogger("InMemory-EventStore")
+    let agent = Agent<SingleWriterPipelineMsg>.Start (singleWriterPipeline clock initialEvents)
     { new EventStorage with
         member _.Stream version identifier =
             agent.PostAndAsyncReply(fun reply -> GetStream(identifier, reply))
@@ -194,40 +238,39 @@ let eventStoreWith clock (initialEvents: EventDefinition list) =
             }
 
         member _.All() =
-            agent.PostAndAsyncReply(fun reply -> GetAll(reply))
-
+            agent.PostAndAsyncReply(GetAll)
+       
         member _.Subscribe name definition subscription =
-            async {
                 let cancel = new CancellationTokenSource()
-                let mutable lastVersion = None
-
-                let recordingSubscription position events =
-                    async {
-                        do! subscription position events
-                        lastVersion <- Some position
-                    }
-
+                let subscriptionStorage = subscriptionFor name subscription
+                let enqueue position events =
+                    subscriptionStorage.Post(Enqueue(position,events))
                 let resultTask =
                     Async.StartAsTask(
-                        agent.PostAndAsyncReply(fun reply -> Subscribe(definition, recordingSubscription, reply)),
+                        agent.PostAndAsyncReply(fun reply -> ForwardTo(name, definition, enqueue, reply)),
                         cancellationToken = cancel.Token
                     )
-
-                return
+                let subscriptionInstance =
                     { new Subscription with
                         member _.Name = name
                         member _.Status =
-                            match lastVersion with
-                            | None -> NotRunning
-                            | Some v -> CaughtUp v
+                            match subscriptionStorage.PostAndReply(fun reply -> Status(reply)) with
+                            | Choice1Of2 (Some position) ->
+                                CaughtUp position
+                            | Choice2Of2 (Some position) ->
+                                Processing position
+                            | _ ->
+                                NotRunning
 
                         member _.DisposeAsync() =
                             if not cancel.IsCancellationRequested then
                                 cancel.Cancel()
                                 cancel.Dispose()
-
+                                
+                            (subscriptionStorage :> IDisposable).Dispose()
                             resultTask.Dispose()
                             ValueTask.CompletedTask }
-            } }
+                Async.retn subscriptionInstance
+            } 
 
-let emptyEventStore clock = eventStoreWith clock [ ]
+let emptyEventStore factory clock = eventStoreWith factory clock [ ]

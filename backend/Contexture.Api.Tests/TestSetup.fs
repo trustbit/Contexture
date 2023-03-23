@@ -19,7 +19,10 @@ open Microsoft.Extensions.Logging
 
 module TestHost =
     let configureLogging (builder: ILoggingBuilder) =
-        builder.AddConsole().AddDebug() |> ignore
+        builder
+            .AddSimpleConsole(fun f -> f.IncludeScopes <- true)
+            .AddDebug()
+        |> ignore
 
     let createHost configureTest configureServices configure =
         Host
@@ -43,7 +46,7 @@ module TestHost =
 
     let private waitUntilCaughtUp subscriptionsTask = async {
         let! subscriptions = subscriptionsTask
-        do! subscriptions |> (Runtime.waitUntilCaughtUp >> Async.AwaitTask)
+        let! _ = subscriptions |> (Runtime.waitUntilCaughtUp >> Async.AwaitTask)
         return subscriptions
     }
     let runReadModels (host: IHost) = 
@@ -96,7 +99,8 @@ module Prepare =
         fun (services: IServiceCollection) ->
             services.AddSingleton<EventStore>(fun p ->
                 let clock = p.GetRequiredService<Clock>()
-                EventStore.With (givens |> InMemory.eventStoreWith clock)
+                let factory = p.GetRequiredService<ILoggerFactory>()
+                EventStore.With (givens |> InMemory.eventStoreWith factory clock)
             )
             |> ignore
 
