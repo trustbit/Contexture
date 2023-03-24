@@ -7,6 +7,7 @@ open Contexture.Api.Infrastructure
 open Contexture.Api.Infrastructure.Subscriptions
 open Contexture.Api.Infrastructure.Storage
 open FsToolkit.ErrorHandling
+open Microsoft.Extensions.Logging.Abstractions
 open Microsoft.FSharp.Control
 open NStore.Core.Logging
 open NStore.Core.Streams
@@ -56,7 +57,7 @@ let waitForEventsOnSubscription start (eventStore: EventStore) action eventCallb
             Async.Sleep(0)
 
         let! subscription = eventStore.Subscribe "UnitTestSubscription" start subscriptionHandler
-        do! Runtime.waitUntilCaughtUp [ subscription ]
+        let! _ = Runtime.waitUntilCaughtUp [ subscription ]
 
         do! Async.StartAsTask(action ())
 
@@ -236,7 +237,7 @@ type InMemoryEventStore() =
     inherit EventStoreBehavior()
 
     override this.anEmptyEventStore() =
-        EventStore.With (InMemory.emptyEventStore Fixture.environment.Time) 
+        EventStore.With (InMemory.emptyEventStore NullLoggerFactory.Instance Fixture.environment.Time) 
         |> Task.FromResult
 
     override this.anEventStoreWithStreamsAndEvents(count) =
@@ -245,7 +246,7 @@ type InMemoryEventStore() =
         let storage =
             data
             |> List.map (fun (source, event) -> EventDefinition.from source event)
-            |> InMemory.eventStoreWith Fixture.environment.Time
+            |> InMemory.eventStoreWith NullLoggerFactory.Instance Fixture.environment.Time
             
         Task.FromResult(
             EventStore.With storage,

@@ -16,6 +16,10 @@ module SearchFor =
               Name: string [] }
             member this.IsActive =
                 this.Name.Length > 0 || this.Template.Length > 0
+            static member ValidKeys =
+                let dummy = Unchecked.defaultof<NamespaceQuery>
+                [ nameof dummy.Template
+                  nameof dummy.Name ]
 
         let findRelevantNamespaces (availableNamespaces: Namespaces.NamespaceFinder) (item: NamespaceQuery) =
                 let namespacesByName =
@@ -46,6 +50,10 @@ module SearchFor =
               Value: string [] }
             member this.IsActive =
                 not (Seq.isEmpty (Seq.append this.Name this.Value))
+            static member ValidKeys =
+                let dummy = Unchecked.defaultof<LabelQuery>
+                [ nameof dummy.Name
+                  nameof dummy.Value ]
 
         let findRelevantLabels (namespacesByLabel: Labels.NamespacesByLabel) (item: LabelQuery) =
             let byNameResults =
@@ -74,6 +82,10 @@ module SearchFor =
               ShortName: string [] }
             member this.IsActive =
                 not (Seq.isEmpty (Seq.append this.Name this.ShortName))
+            static member ValidKeys =
+                let dummy = Unchecked.defaultof<DomainQuery>
+                [ nameof dummy.Name
+                  nameof dummy.ShortName ]
 
         let findRelevantDomains (findDomains: Domains.DomainByShortNameAndNameModel) (query: DomainQuery) =
             let foundByName =
@@ -102,6 +114,10 @@ module SearchFor =
               ShortName: string [] }
             member this.IsActive =
                 not (Seq.isEmpty (Seq.append this.Name this.ShortName))
+            static member ValidKeys =
+                let dummy = Unchecked.defaultof<BoundedContextQuery>
+                [ nameof dummy.Name
+                  nameof dummy.ShortName ]
 
         let findRelevantBoundedContexts
             (findBoundedContext: Find.BoundedContexts.BoundedContextByShortNameAndNameModel)

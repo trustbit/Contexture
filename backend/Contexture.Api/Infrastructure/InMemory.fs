@@ -1,5 +1,6 @@
 module Contexture.Api.Infrastructure.Storage.InMemory
 
+open System
 open System.Collections.Generic
 open System.Threading
 open System.Threading.Tasks
@@ -7,227 +8,282 @@ open Contexture.Api.Infrastructure
 open Contexture.Api.Infrastructure.Storage
 open FsToolkit.ErrorHandling
 open Contexture.Api.Infrastructure.Subscriptions
+open Microsoft.Extensions.Logging
 
-type Msg =
-    private
-    | Get of StreamKind * AsyncReplyChannel<EventResult>
-    | GetStream of StreamIdentifier * AsyncReplyChannel<StreamResult>
-    | GetAll of AsyncReplyChannel<EventResult>
-    | Append of NonEmptyList<EventDefinition> * AsyncReplyChannel<Version * Position>
-    | Notify of Position * EventEnvelope list * (Position -> EventEnvelope list -> Async<unit>)
-    | Subscribe of SubscriptionDefinition * (Position -> EventEnvelope list -> Async<unit>) * AsyncReplyChannel<unit>
+module private SingleWriterPipeline =
+    type Msg =
+        | Get of StreamKind * AsyncReplyChannel<EventResult>
+        | GetStream of StreamIdentifier * AsyncReplyChannel<StreamResult>
+        | GetAll of AsyncReplyChannel<EventResult>
+        | Append of NonEmptyList<EventDefinition> * AsyncReplyChannel<Version * Position>
+        | ForwardTo of
+            string *
+            SubscriptionDefinition *
+            (Position -> EventEnvelope list -> unit) *
+            AsyncReplyChannel<unit>
 
-type private History =
-    { items: (Position * Version * EventEnvelope) list
-      byIdentifier: Dictionary<StreamIdentifier, (Position * Version * EventEnvelope) list>
-      byEventType: Dictionary<StreamKind, (Position * Version * EventEnvelope) list> }
+    type private History =
+        { items: (Position * Version * EventEnvelope) list
+          byIdentifier: Dictionary<StreamIdentifier, (Position * Version * EventEnvelope) list>
+          byEventType: Dictionary<StreamKind, (Position * Version * EventEnvelope) list> }
 
-    static member Empty =
-        { items = []
-          byIdentifier = Dictionary()
-          byEventType = Dictionary() }
+        static member Empty =
+            { items = []
+              byIdentifier = Dictionary()
+              byEventType = Dictionary() }
 
-let private stream history source =
-    let (success, events) = history.byIdentifier.TryGetValue source
-    if success then events else []
+    let private stream history source =
+        let (success, events) = history.byIdentifier.TryGetValue source
+        if success then events else []
 
-let private getAllStreamsOf history key =
-    let (success, items) = history.byEventType.TryGetValue key
-    if success then items else []
+    let private getAllStreamsOf history key =
+        let (success, items) = history.byEventType.TryGetValue key
+        if success then items else []
 
-let private selectVersion (_, version, _) = version
-let private selectPosition (position, _, _) = position
-let private selectItem (_, _, item) = item
+    let private selectVersion (_, version, _) = version
+    let private selectPosition (position, _, _) = position
+    let private selectItem (_, _, item) = item
 
-let private withMaxPosition (items: (Position * Version * EventEnvelope) list) =
-    if List.isEmpty items then
-        Position.start, []
-    else
-        items |> List.maxBy selectPosition |> selectPosition, items |> List.map selectItem
+    let private withMaxPosition (items: (Position * Version * EventEnvelope) list) =
+        if List.isEmpty items then
+            Position.start, []
+        else
+            items |> List.maxBy selectPosition |> selectPosition, items |> List.map selectItem
 
-let private withMaxVersion (items: (Position * Version * EventEnvelope) list) =
-    if List.isEmpty items then
-        Version.start, []
-    else
-        items |> List.maxBy selectVersion |> selectVersion, items |> List.map selectItem
+    let private withMaxVersion (items: (Position * Version * EventEnvelope) list) =
+        if List.isEmpty items then
+            Version.start, []
+        else
+            items |> List.maxBy selectVersion |> selectVersion, items |> List.map selectItem
 
-let private appendToHistory clock (history: History, envelopes) (definition: EventDefinition) =
-    let source = definition.Source
-    let streamKind = definition.StreamKind
-    let key = StreamIdentifier.from source streamKind
-    let position = Position.from (int64 history.items.Length + 1L)
-    let existingStream = key |> stream history
-    let eventVersion = Version.from (existingStream.Length + 1)
+    let private appendToHistory clock (history: History, envelopes) (definition: EventDefinition) =
+        let source = definition.Source
+        let streamKind = definition.StreamKind
+        let key = StreamIdentifier.from source streamKind
+        let position = Position.from (int64 history.items.Length + 1L)
+        let existingStream = key |> stream history
+        let eventVersion = Version.from (existingStream.Length + 1)
 
-    let envelope = {
-        Metadata =
-            { Source = definition.Source
-              RecordedAt = clock ()
-              Position = position
-              Version = eventVersion
-            }
-        Payload = definition.Event
-        EventType = definition.EventType
-        StreamKind = definition.StreamKind
-        }
-    let fullStream =
-        existingStream |> (fun s -> s @ [ position, eventVersion, envelope ])
+        let envelope =
+            { Metadata =
+                { Source = definition.Source
+                  RecordedAt = clock ()
+                  Position = position
+                  Version = eventVersion }
+              Payload = definition.Event
+              EventType = definition.EventType
+              StreamKind = definition.StreamKind }
 
-    history.byIdentifier.[key] <- fullStream
-    let allEvents = getAllStreamsOf history streamKind
-    history.byEventType.[streamKind] <- allEvents @ [ position, eventVersion, envelope ]
+        let fullStream =
+            existingStream |> (fun s -> s @ [ position, eventVersion, envelope ])
 
-    { history with items = (position, eventVersion, envelope) :: history.items },envelopes @ [ envelope ]
+        history.byIdentifier.[key] <- fullStream
+        let allEvents = getAllStreamsOf history streamKind
+        history.byEventType.[streamKind] <- allEvents @ [ position, eventVersion, envelope ]
 
-let private singleWriterPipeline clock (initialEvents: EventDefinition list) (inbox: Agent<Msg>) =
-    let rec loop state =
-        let (subscriptions, history) = state
+        { history with items = (position, eventVersion, envelope) :: history.items }, envelopes @ [ envelope ]
 
-        async {
-            let! msg = inbox.Receive()
+    let singleWriterPipeline clock (initialEvents: EventDefinition list) (inbox: Agent<Msg>) =
+        let rec loop state =
+            let (subscriptions, history) = state
 
-            match msg with
-            | Get(kind, reply) ->
-                kind |> getAllStreamsOf history |> withMaxPosition |> Ok |> reply.Reply
+            async {
+                let! msg = inbox.Receive()
 
-                return! loop state
-            | GetStream(identifier, reply) ->
-                identifier |> stream history |> withMaxVersion |> Ok |> reply.Reply
+                match msg with
+                | Get(kind, reply) ->
+                    kind |> getAllStreamsOf history |> withMaxPosition |> Ok |> reply.Reply
 
-                return! loop state
-            | GetAll reply ->
-                history.items |> withMaxPosition |> Ok |> reply.Reply
+                    return! loop state
+                | GetStream(identifier, reply) ->
+                    identifier |> stream history |> withMaxVersion |> Ok |> reply.Reply
 
-                return! loop state
-            | Append(eventDefinitions, reply) ->
-                let extendedHistory,envelopes =
-                    eventDefinitions
-                    |> NonEmptyList.asList
-                    |> List.fold (appendToHistory clock) (history, List.empty)
+                    return! loop state
+                | GetAll reply ->
+                    history.items |> withMaxPosition |> Ok |> reply.Reply
 
-                let position, version =
-                    extendedHistory.items |> List.head |> (fun (p, v, _) -> p, v)
+                    return! loop state
+                | Append(eventDefinitions, reply) ->
+                    let extendedHistory, envelopes =
+                        eventDefinitions
+                        |> NonEmptyList.asList
+                        |> List.fold (appendToHistory clock) (history, List.empty)
 
-                reply.Reply(version,position)
+                    let position, version =
+                        extendedHistory.items |> List.head |> (fun (p, v, _) -> p, v)
 
-                let byIdentifier =
-                    envelopes
-                    |> List.groupBy (fun e -> StreamIdentifier.from e.Metadata.Source e.StreamKind)
-                    |> Map.ofList
+                    reply.Reply(version, position)
 
-                let byKind = envelopes |> List.groupBy (fun e -> e.StreamKind) |> Map.ofList
+                    let byIdentifier =
+                        envelopes
+                        |> List.groupBy (fun e -> StreamIdentifier.from e.Metadata.Source e.StreamKind)
+                        |> Map.ofList
 
-                let subscriptionsToNotifyWithEvents,remainingSubscriptions =
-                    subscriptions
-                    |> List.fold (fun (toNotify,other) (definition, s) ->
+                    let byKind = envelopes |> List.groupBy (fun e -> e.StreamKind) |> Map.ofList
+
+                    let subscriptionsToNotifyWithEvents, remainingSubscriptions =
+                        subscriptions
+                        |> Map.toList
+                        |> List.fold
+                            (fun (toNotify, other) (name, (definition, s)) ->
+                                match definition with
+                                | FromStream(streamIdentifier, _) when byIdentifier |> Map.containsKey streamIdentifier ->
+                                    toNotify @ [ (name, s, byIdentifier |> Map.find streamIdentifier) ], other
+                                | FromAll _ -> toNotify @ [ name, s, envelopes ], other
+                                | FromKind(streamKind, _) when byKind |> Map.containsKey streamKind ->
+                                    toNotify @ [ name, s, byKind |> Map.find streamKind ], other
+                                | _ -> toNotify, (name, s) :: other)
+                            (List.empty, List.empty)
+
+                    subscriptionsToNotifyWithEvents
+                    |> List.iter (fun (name, s, events) -> s position events)
+
+                    remainingSubscriptions |> List.iter (fun (name, s) -> s position List.Empty)
+
+                    return! loop (subscriptions, extendedHistory)
+                | ForwardTo(name, definition, subscription, reply) ->
+                    let skipUntil position items =
+                        items
+                        |> List.skipWhile (fun (p, _, _) ->
+                            match position with
+                            | Start -> false
+                            | End -> true
+                            | From pos when pos = Position.start -> false
+                            | From pos -> p <= pos)
+
+                    let events =
                         match definition with
-                        | FromStream(streamIdentifier, _) when byIdentifier |> Map.containsKey streamIdentifier ->
-                            toNotify @ [ (s, byIdentifier |> Map.find streamIdentifier)],other
-                        | FromAll _ -> toNotify @ [ s, envelopes],other
-                        | FromKind(streamKind, _) when byKind |> Map.containsKey streamKind ->
-                            toNotify @ [ s, byKind |> Map.find streamKind],other
-                        | _ ->
-                            toNotify, s :: other
-                        ) (List.empty,List.empty)
+                        | FromAll position -> history.items |> skipUntil position
+                        | FromKind(kind, position) -> kind |> getAllStreamsOf history |> skipUntil position
+                        | FromStream(identifier, version) ->
+                            identifier
+                            |> stream history
+                            |> List.skipWhile (fun (_, v, _) -> if version.IsNone then false else v < version.Value)
 
-                subscriptionsToNotifyWithEvents
-                |> List.iter (fun (s, events) -> inbox.Post(Notify(position, events, s)))
-                
-                remainingSubscriptions
-                |> List.iter (fun s -> inbox.Post(Notify(position,List.empty,s)))
-               
-                return! loop (subscriptions, extendedHistory)
-            | Subscribe(definition, subscription, reply) ->
-                let skipUntil position items =
-                    items
-                    |> List.skipWhile (fun (p, _, _) ->
-                        match position with
-                        | Start -> false
-                        | End -> true
-                        | From pos when pos = Position.start -> false
-                        | From pos -> p <= pos)
+                    let lastPosition = history.items |> withMaxPosition |> fst
 
-                let events =
-                    match definition with
-                    | FromAll position -> history.items |> skipUntil position
-                    | FromKind(kind, position) -> kind |> getAllStreamsOf history |> skipUntil position
-                    | FromStream(identifier, version) ->
-                        identifier
-                        |> stream history
-                        |> List.skipWhile (fun (_, v, _) -> if version.IsNone then false else v < version.Value)
+                    if not events.IsEmpty then
+                        subscription lastPosition (events |> List.map selectItem)
+                    else
+                        subscription lastPosition List.empty
 
-                let lastPosition = history.items |> withMaxPosition |> fst
+                    reply.Reply()
+                    return! loop (subscriptions |> Map.add name (definition, subscription), history)
+            }
 
-                if not events.IsEmpty then
-                    inbox.Post(Notify(lastPosition, events |> List.map selectItem, subscription))
-                else
-                    inbox.Post(Notify(lastPosition, List.empty, subscription))
+        let initialHistory, _ =
+            initialEvents |> List.fold (appendToHistory clock) (History.Empty, [])
 
-                reply.Reply()
-                return! loop ((definition, subscription) :: subscriptions, history)
+        loop (Map.empty, initialHistory)
 
-            | Notify(version, events, subscription) ->
-                Async.Start <| subscription version events
+module private SingleWriterSubscription =
+    type Msg =
+        | Enqueue of Position * EventEnvelope list
+        | Process
+        | Status of AsyncReplyChannel<Choice<Position option, Position option>>
 
-                return! loop state
-        }
+    let subscriptionFor (name: string) (subscription: SubscriptionHandler) =
+        let agent =
+            Agent<Msg>.Start
+                (fun inbox ->
+                    let rec loop state =
+                        let processing, position, backlog = state
 
-    let initialHistory,_ = initialEvents |> List.fold (appendToHistory clock) (History.Empty,[])
+                        async {
+                            let! msg = inbox.Receive()
 
-    loop ([], initialHistory)
+                            match msg with
+                            | Enqueue(enqueuePosition, events) ->
+                                let newState =
+                                    backlog |> List.append events |> List.sortBy (fun e -> e.Metadata.Position)
 
-let eventStoreWith clock (initialEvents: EventDefinition list) =
-    let agent = Agent<Msg>.Start (singleWriterPipeline clock initialEvents)
+                                let newPosition =
+                                    match position with
+                                    | Some p when p < enqueuePosition -> enqueuePosition
+                                    | Some p -> p
+                                    | _ -> enqueuePosition
+
+                                if not processing then
+                                    inbox.Post Process
+
+                                let b = name
+                                return! loop (true, Some newPosition, newState)
+                            | Process ->
+                                match position with
+                                | Some p ->
+                                    do! subscription p backlog
+                                    return! loop (false, position, List.Empty)
+                                | None -> return! loop (false, position, backlog)
+                            | Status reply ->
+                                let b = name
+
+                                if backlog.IsEmpty then
+                                    reply.Reply(Choice1Of2 position)
+                                else
+                                    reply.Reply(Choice2Of2 position)
+
+                                return! loop state
+                        }
+
+                    loop (false, None, List.empty))
+
+        agent.Error.Add(fun e -> System.Console.WriteLine(e.ToString()))
+        agent.Post Process
+        agent
+
+let eventStoreWith (loggerFactory: ILoggerFactory) clock (initialEvents: EventDefinition list) =
+    let logger = loggerFactory.CreateLogger("InMemory-EventStore")
+
+    let agent =
+        Agent<SingleWriterPipeline.Msg>.Start (SingleWriterPipeline.singleWriterPipeline clock initialEvents)
 
     { new EventStorage with
         member _.Stream version identifier =
-            agent.PostAndAsyncReply(fun reply -> GetStream(identifier, reply))
+            agent.PostAndAsyncReply(fun reply -> SingleWriterPipeline.GetStream(identifier, reply))
 
         member _.AllStreamsOf streamType =
-            agent.PostAndAsyncReply(fun reply -> Get(streamType, reply))
+            agent.PostAndAsyncReply(fun reply -> SingleWriterPipeline.Get(streamType, reply))
 
         member _.Append identifier expectedVersion events =
-            async {
-                let! result = agent.PostAndAsyncReply(fun reply -> Append(events, reply))
-
-                return Ok result
-            }
+            agent.PostAndAsyncReply(fun reply -> SingleWriterPipeline.Append(events, reply))
+            |> Async.map Ok
 
         member _.All() =
-            agent.PostAndAsyncReply(fun reply -> GetAll(reply))
+            agent.PostAndAsyncReply(SingleWriterPipeline.GetAll)
 
         member _.Subscribe name definition subscription =
-            async {
-                let cancel = new CancellationTokenSource()
-                let mutable lastVersion = None
+            let cancel = new CancellationTokenSource()
+            let subscriptionStorage = SingleWriterSubscription.subscriptionFor name subscription
 
-                let recordingSubscription position events =
-                    async {
-                        do! subscription position events
-                        lastVersion <- Some position
-                    }
+            let enqueue position events =
+                subscriptionStorage.Post(SingleWriterSubscription.Enqueue(position, events))
 
-                let resultTask =
-                    Async.StartAsTask(
-                        agent.PostAndAsyncReply(fun reply -> Subscribe(definition, recordingSubscription, reply)),
-                        cancellationToken = cancel.Token
-                    )
+            let resultTask =
+                Async.StartAsTask(
+                    agent.PostAndAsyncReply(fun reply ->
+                        SingleWriterPipeline.ForwardTo(name, definition, enqueue, reply)),
+                    cancellationToken = cancel.Token
+                )
 
-                return
-                    { new Subscription with
-                        member _.Name = name
-                        member _.Status =
-                            match lastVersion with
-                            | None -> NotRunning
-                            | Some v -> CaughtUp v
+            let subscriptionInstance =
+                { new Subscription with
+                    member _.Name = name
 
-                        member _.DisposeAsync() =
-                            if not cancel.IsCancellationRequested then
-                                cancel.Cancel()
-                                cancel.Dispose()
+                    member _.Status =
+                        match subscriptionStorage.PostAndReply(SingleWriterSubscription.Status) with
+                        | Choice1Of2(Some position) -> CaughtUp position
+                        | Choice2Of2(Some position) -> Processing position
+                        | _ -> NotRunning
 
-                            resultTask.Dispose()
-                            ValueTask.CompletedTask }
-            } }
+                    member _.DisposeAsync() =
+                        if not cancel.IsCancellationRequested then
+                            cancel.Cancel()
+                            cancel.Dispose()
 
-let emptyEventStore clock = eventStoreWith clock [ ]
+                        (subscriptionStorage :> IDisposable).Dispose()
+                        resultTask.Dispose()
+                        ValueTask.CompletedTask }
+
+            Async.retn subscriptionInstance }
+
+let emptyEventStore factory clock = eventStoreWith factory clock []

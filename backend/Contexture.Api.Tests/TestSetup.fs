@@ -17,12 +17,12 @@ open Microsoft.Extensions.DependencyInjection
 open Microsoft.AspNetCore.TestHost
 open Microsoft.Extensions.Logging
 
-
-open Microsoft.Extensions.Options
-
 module TestHost =
     let configureLogging (builder: ILoggingBuilder) =
-        builder.AddConsole().AddDebug() |> ignore
+        builder
+            .AddSimpleConsole(fun f -> f.IncludeScopes <- true)
+            .AddDebug()
+        |> ignore
 
     let createHost configureTest configureServices configure =
         Host
@@ -44,15 +44,20 @@ module TestHost =
     let useClockFromEnvironment (env: ISimulateEnvironment) (services: IServiceCollection) =
         services.AddSingleton<Contexture.Api.Infrastructure.Clock>(env.Time)
 
-    let runReadModels (host: IHost) =
+    let private waitUntilCaughtUp subscriptionsTask = async {
+        let! subscriptions = subscriptionsTask
+        let! _ = subscriptions |> (Runtime.waitUntilCaughtUp >> Async.AwaitTask)
+        return subscriptions
+    }
+    let runReadModels (host: IHost) = 
         host.Services.GetServices<ReadModels.ReadModelInitialization>()
         |> Contexture.Api.App.Startup.connectAndReplayReadModels
-        |> Async.bind (Runtime.waitUntilCaughtUp >> Async.AwaitTask)
+        |> waitUntilCaughtUp
         
     let runReactions (host: IHost) =
         host.Services.GetServices<ReactionInitialization>()
         |> Contexture.Api.App.Startup.connectAndReplayReactions
-        |> Async.bind(Runtime.waitUntilCaughtUp >> Async.AwaitTask)
+        |> waitUntilCaughtUp
 
     let runServer environmentSimulation testConfiguration =
         task {
@@ -64,16 +69,17 @@ module TestHost =
             let host =
                 createHost configureTest Contexture.Api.App.ServiceConfiguration.configureServices Contexture.Api.App.ApplicationConfiguration.configureApp
             
-            do! runReadModels host
-            do! runReactions host
+            let! readModelSubscriptions = runReadModels host
+            let! reactionSubscriptions = runReactions host
             
             do! host.StartAsync()
-            return host
+            return host, readModelSubscriptions @ reactionSubscriptions
         }
-    type TestHostEnvironment(server: IHost) =
+    type TestHostEnvironment(server: IHost, subscriptions: Subscription list) =
         let client = lazy (server.GetTestClient())
         member _.Server = server
         member _.Client = client.Value
+        member _.Subscriptions = subscriptions
 
         member _.GetService<'Service>() =
             server.Services.GetRequiredService<'Service>()
@@ -85,17 +91,16 @@ module TestHost =
                 if client.IsValueCreated then
                     client.Value.Dispose()
 
-    let asTestHost server = new TestHostEnvironment(server)
+    let asTestHost (server,subscriptions) = new TestHostEnvironment(server,subscriptions)
 
 module Prepare =
-
-    open Contexture.Api.Infrastructure
 
     let private registerEvents givens =
         fun (services: IServiceCollection) ->
             services.AddSingleton<EventStore>(fun p ->
                 let clock = p.GetRequiredService<Clock>()
-                EventStore.With (givens |> InMemory.eventStoreWith clock)
+                let factory = p.GetRequiredService<ILoggerFactory>()
+                EventStore.With (givens |> InMemory.eventStoreWith factory clock)
             )
             |> ignore
 
