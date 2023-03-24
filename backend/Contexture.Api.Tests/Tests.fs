@@ -2,8 +2,7 @@ module Tests
 
 open Contexture.Api
 open Xunit
-open Database
-open FSharp.Control.Tasks
+open FileBased.Database
 
 [<Fact>]
 let ``Unversioned JSON deserialization`` () = task {

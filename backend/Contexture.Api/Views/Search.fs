@@ -7,13 +7,12 @@ open Contexture.Api.Infrastructure
 open Contexture.Api.Views
 open Microsoft.AspNetCore.Http
 
-open FSharp.Control.Tasks
-
 open Giraffe
 open Microsoft.Extensions.Hosting
 
 module Search =
     open Projections
+    open ReadModels
     module Views =
 
         open Layout
@@ -51,8 +50,8 @@ module Search =
 
     let getNamespaces : HttpHandler =
         fun (next: HttpFunc) (ctx: HttpContext) -> task {
-            let! namespaceState = ctx.GetService<ReadModels.Namespace.AllNamespacesReadModel>().State()
-            let! templateState = ctx.GetService<ReadModels.Templates.AllTemplatesReadModel>().State()
+            let! namespaceState = ctx |> State.fetch State.fromReadModel<ReadModels.Namespace.AllNamespacesReadModel>
+            let! templateState = ctx |> State.fetch State.fromReadModel<ReadModels.Templates.AllTemplatesReadModel>
 
             let allNamespaces =
                 ReadModels.Namespace.allNamespaces namespaceState

@@ -2,6 +2,7 @@ namespace Contexture.Api.Tests
 
 open System
 open Contexture.Api.Aggregates
+open Contexture.Api.Aggregates.Collaboration
 open Contexture.Api.Aggregates.Namespace
 open Contexture.Api.Tests.EnvironmentSimulation
 
@@ -86,7 +87,16 @@ module Fixtures =
             NamespaceAdded definition
             |> Utils.asEvent definition.BoundedContextId
 
-
+    module Collaboration =
+        let definition collaborationId initiator recipient : CollaboratorsConnected =
+            { Recipient = recipient
+              Initiator = initiator
+              CollaborationId = collaborationId
+              Description = None }
+        let connected definition =
+            CollaboratorsConnected definition
+            |> Utils.asEvent definition.CollaborationId
+            
     module Builders =
         let givenARandomDomainWithBoundedContextAndNamespace environment =
             let namespaceId = environment |> PseudoRandom.guid
@@ -149,3 +159,8 @@ module Fixtures =
                 |> Namespace.appendLabel (Label.newLabel (Guid.NewGuid()))
                 |> Namespace.namespaceAdded
             )
+
+
+        let givenACollaborationBetween collaborationId initiator recipient =
+            Collaboration.definition collaborationId initiator recipient
+            |> Collaboration.connected

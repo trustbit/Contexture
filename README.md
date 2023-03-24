@@ -8,7 +8,7 @@ In order to create a new BCC, you need to understand a lot of concepts from DDD 
 While other ways to build a [BCC exist](https://github.com/ddd-crew/bounded-context-canvas), we are building an application to support this modeling process with a dedicated tool developed with an DDD mindset.
 You can read about the ideas of Contexture in the [concept](./concept.md) and you can view the current status of the application at <https://contexture.azurewebsites.net/> (be careful: don't store any sensitive data there; everything you store will be deleted upon the next deployment.)
 
-Note:
+**A short remark on using Contexture**
 
 We think that most of the domain modelling should happen in a collaborative way, by using whitepaper, Post-ITs or online collaboration tools.
 Contexture is and will not be the right tool or a replacement for these interactive modelling sessions!
@@ -31,64 +31,22 @@ A detailed view of the "Billing" Bounded Context with the help of the Bounded-Co
 
 ## Contexture backend
 
-The Contexture server implements a simple storage backend that exposes a file system backed API and serves static assets through a Giraffe F# application.
+The Contexture server provides the API to store data and serves static assets through a Giraffe F# application.
+Currently two storage engines are supported:
+- a simple, file based engine that persists data in a single specified file with a JSON-based format. 
+  This engine supports no versioning or change dates at the moment  
+- a SQL-Server based engine that uses an event-sourced storage with support of database base version information and change dates.
 
-### Run the backend
+Make sure the [.NET Framework](https://dotnet.microsoft.com/) is installed on your system!
 
-Contexture server will listen on port `5000` per default and use `data/db.json` as default database file.
-If you want to have the server listening on any other port, set the environment variable `ASPNETCORE_URLS=http://*:8080` to the desired port.
-To choose a different database file configure the `DatabasePath` configuration via an environment variable.
-Note: you might need to exclude launch-profiles on start via `--no-launch-profile`.
+To run the basic default configuration with the file based engine use the following command
 
 ```bash
 cd backend
 dotnet run --project Contexture.Api
 ```
 
-### Publish and running the backend manually
-
-```bash
-cd backend
-dotnet run --configuration Release Contexture.Api/Contexture.Api.fsproj --output artifacts
-```
-
-Run the published version of the backend:
-```
-cd artifacts
-ASPNETCORE_URLS=http://*:8080 DATABASEPATH=data/mydb.json dotnet Contexture.Api.App.dll
-```
-
-### Caveats
-
-- `cors` is configured to allow all origins
-- no logging built in
-- no UI for Namespace-template administration.
-  Use the following `curl` commands to manage templates:
-    - get templates
-
-        curl http://localhost:5000/api/namespaces/templates
-
-    - create a template
-
-        curl -X POST \
-            -H "Content-Type: application/json" \
-            -d '{ "name":"barfoo", "description":"my awesome namespace", "labels": [ { "name": "first label", "description":"some description", "placeholder": "some placeholder value"}]}' \
-            http://localhost:5000/api/namespaces/templates
-
-    - add a label template to an existing namespace
-
-        curl -X POST \
-            -H "Content-Type: application/json" \
-            -d '{ "name":"barfoo", "description":"some description", "placeholder": "some placeholder value"}' \
-            http://localhost:5000/api/namespaces/templates/<template-id>
-
-    - delete a label from a template
-
-        curl -X DELETE http://localhost:5000/api/namespaces/templates/<template-id>/labels/<label-id>
-
-    - delete a namespace
-
-        curl -X DELETE http://localhost:5000/api/namespaces/templates/<template-id>
+More details about configuring and running the backend can be read in this [Readme](./backend/README.md)
 
 ## Contexture frontend application
 
@@ -113,6 +71,42 @@ To build the Docker image use the `Makefile` via `make build-image` or execute t
 To run the `softwarepark/contexture` image use `make run-app` and browse to <http://localhost:3000>.
 
 Your data will be stored in the `/data/db.json` file on the volume `/data`.
+
+### Liveness & Readiness Probes
+
+Contexture provides HTTP based [Liveness & Readiness Probes](https://kubernetes.io/docs/tasks/configure-pod-container/configure-liveness-readiness-startup-probes/) to determine if the container is health & operational
+
+#### Liveness
+
+A `GET` request to `$BASE_URL/meta/health` will return `200 OK` if the application is healthy and currently processing requests.
+
+#### Readiness
+
+A `GET` request to `$BASE_URL/meta/readiness` will return `200 OK` if the application is ready to receive and process new requests.
+It will return a `503 ServiceUnavailable` if the application cannot keep up with the load or is not yet done initializing after startup.
+
+In addition the readiness check will return context information about internal processing to get an indication what parts of the application are lagging.
+
+## Importing and Exporting data
+
+The following endpoints to export and import snapshots of data exist:
+
+```bash
+# gets a snapshot of the data from a Contexture instance at $BASE_URL and saves content to $FILENAME.json
+# Note: the result does not contain historic / versioned data at the moment
+curl -X GET $BASE_URL/api/all -o $FILENAME.json
+```
+
+```bash
+# Replaces all data in Contexture with the content of the file - this DELETES all existing data!
+# Returns the content previous the the restore and stores it in $OLD_FILENAME.json
+# Note: after the request the application is terminated and needs to be restarted (by Kubernetes)
+curl -X PUT \
+   -o $OLD_FILENAME.JSON \
+   -H "Content-Type: application/json" \
+   -d @$FILENAME.json \
+   $BASE_URL/api/all
+```
 
 ## Contributors
 

@@ -8,7 +8,6 @@ open Contexture.Api.FileBasedCommandHandlers
 open Contexture.Api.Infrastructure
 
 open Microsoft.AspNetCore.Http
-open FSharp.Control.Tasks
 
 open Giraffe
 
@@ -16,15 +15,15 @@ module Collaborations =
     module CommandEndpoints =
         open System
         open CommandHandler
+        open ReadModels
         let private updateAndReturnCollaboration command =
             fun (next: HttpFunc) (ctx: HttpContext) ->
                 task {
                     let database = ctx.GetService<EventStore>()
-                    let clock = ctx.GetService<Clock>()
-                    let eventBasedCommandHandler = CommandHandler.EventBased.eventStoreBasedCommandHandler clock database
+                    let eventBasedCommandHandler = CommandHandler.EventBased.eventStoreBasedCommandHandler database
                     match! command |> Collaboration.useHandler eventBasedCommandHandler with
-                    | Ok collaborationId ->
-                        return! redirectTo false (sprintf "/api/collaborations/%O" collaborationId) next ctx
+                    | Ok (collaborationId,_,position) ->
+                        return! redirectTo false (State.appendProcessedPosition (sprintf "/api/collaborations/%O" collaborationId) position) next ctx
                     | Error (DomainError error) ->
                         return! RequestErrors.BAD_REQUEST (sprintf "Domain Error %A" error) next ctx
                     | Error e -> return! ServerErrors.INTERNAL_ERROR e next ctx
@@ -43,17 +42,17 @@ module Collaborations =
             fun (next: HttpFunc) (ctx: HttpContext) ->
                 task {
                     let database = ctx.GetService<EventStore>()
-                    let clock = ctx.GetService<Clock>()
-                    match! Collaboration.useHandler (EventBased.eventStoreBasedCommandHandler clock database) (RemoveConnection collaborationId) with
-                    | Ok collaborationId -> return! json collaborationId next ctx
+                    match! Collaboration.useHandler (EventBased.eventStoreBasedCommandHandler database) (RemoveConnection collaborationId) with
+                    | Ok (collaborationId,version,_) -> return! json collaborationId next ctx
                     | Error e -> return! ServerErrors.INTERNAL_ERROR e next ctx
                 }
                 
     module QueryEndpoints =
         open Contexture.Api.ReadModels
+        open ReadModels
         let getCollaborations =
             fun (next: HttpFunc) (ctx: HttpContext) -> task {
-                let! collaborationState = ctx.GetService<ReadModels.Collaboration.AllCollaborationsReadModel>().State()
+                let! collaborationState = ctx |> State.fetch State.fromReadModel<ReadModels.Collaboration.AllCollaborationsReadModel>
                 let collaborations =
                     collaborationState |> Collaboration.activeCollaborations
                     
@@ -62,7 +61,7 @@ module Collaborations =
 
         let getCollaboration collaborationId =
             fun (next: HttpFunc) (ctx: HttpContext) -> task {
-                let! collaborationState = ctx.GetService<ReadModels.Collaboration.AllCollaborationsReadModel>().State()
+                let! collaborationState = ctx |> State.fetch State.fromReadModel<ReadModels.Collaboration.AllCollaborationsReadModel>
                 let result =
                     collaborationId
                     |> Collaboration.collaboration collaborationState

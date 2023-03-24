@@ -3,8 +3,6 @@ namespace Contexture.Api.Views
 open System
 open Giraffe.ViewEngine
 
-open FSharp.Control.Tasks
-
 type Path = string list
 
 type Asset =

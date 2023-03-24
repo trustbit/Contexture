@@ -1,11 +1,11 @@
 ﻿namespace Contexture.Api.Apis
 
 open System
+open System.Threading.Tasks
 open Contexture.Api
 open Contexture.Api.Infrastructure
-open Contexture.Api.Infrastructure.Projections
+open Contexture.Api.Infrastructure.ReadModels
 open Microsoft.AspNetCore.Http
-open FSharp.Control.Tasks
 
 open Giraffe
 
@@ -88,10 +88,9 @@ module Domains =
             fun (next: HttpFunc) (ctx: HttpContext) ->
                 task {
                     let database = ctx.GetService<EventStore>()
-                    let clock = ctx.GetService<Clock>()
-                    let eventStoreBased = EventBased.eventStoreBasedCommandHandler clock database
+                    let eventStoreBased = EventBased.eventStoreBasedCommandHandler database
                     match! Domain.useHandler eventStoreBased (RemoveDomain domainId) with
-                    | Ok domainId -> return! json domainId next ctx
+                    | Ok (domainId,_,_) -> return! json domainId next ctx
                     | Error e -> return! ServerErrors.INTERNAL_ERROR e next ctx
                 }
 
@@ -99,10 +98,10 @@ module Domains =
             fun (next: HttpFunc) (ctx: HttpContext) ->
                 task {
                     let database = ctx.GetService<EventStore>()
-                    let clock = ctx.GetService<Clock>()
-                    let eventStoreBased = EventBased.eventStoreBasedCommandHandler clock database
+                    let eventStoreBased = EventBased.eventStoreBasedCommandHandler database
                     match! Domain.useHandler eventStoreBased command with
-                    | Ok updatedDomain -> return! redirectTo false (sprintf "/api/domains/%O" updatedDomain) next ctx
+                    | Ok (updatedDomain,_,position) ->
+                        return! redirectTo false (State.appendProcessedPosition (sprintf "/api/domains/%O" updatedDomain) position) next ctx
                     | Error (DomainError EmptyName) ->
                         return! RequestErrors.BAD_REQUEST "Name must not be empty" next ctx
                     | Error e -> return! ServerErrors.INTERNAL_ERROR e next ctx
@@ -130,11 +129,10 @@ module Domains =
             fun (next: HttpFunc) (ctx: HttpContext) ->
                 task {
                     let database = ctx.GetService<EventStore>()
-                    let clock = ctx.GetService<Clock>()
-                    let eventStoreBased = EventBased.eventStoreBasedCommandHandler clock database
+                    let eventStoreBased = EventBased.eventStoreBasedCommandHandler database
                     match! BoundedContext.useHandler eventStoreBased (CreateBoundedContext(Guid.NewGuid(), domainId, command)) with
-                    | Ok addedContext ->
-                        return! redirectTo false (sprintf "/api/boundedcontexts/%O" addedContext) next ctx
+                    | Ok (addedContext,_,position) ->
+                        return! redirectTo false (State.appendProcessedPosition (sprintf "/api/boundedcontexts/%O" addedContext) position) next ctx
                     | Error (DomainError Aggregates.BoundedContext.EmptyName) ->
                         return! RequestErrors.BAD_REQUEST "Name must not be empty" next ctx
                     | Error e -> return! ServerErrors.INTERNAL_ERROR e next ctx
@@ -143,12 +141,12 @@ module Domains =
     module QueryEndpoints =
         open Contexture.Api.ReadModels
         open ReadModels
-
+        
         let getDomains =
             fun (next: HttpFunc) (ctx: HttpContext) -> task {
-                let! domainState = ctx.GetService<ReadModels.Domain.AllDomainReadModel>().State()
-                let! boundedContextState = ctx.GetService<ReadModels.BoundedContext.AllBoundedContextsReadModel>().State()
-                let! namespaceState = ctx.GetService<ReadModels.Namespace.AllNamespacesReadModel>().State()
+                let! domainState = ctx |> State.fetch State.fromReadModel<ReadModels.Domain.AllDomainReadModel>
+                let! boundedContextState = ctx |> State.fetch State.fromReadModel<ReadModels.BoundedContext.AllBoundedContextsReadModel>
+                let! namespaceState = ctx |> State.fetch State.fromReadModel<ReadModels.Namespace.AllNamespacesReadModel>
                 let domains = domainState |> Domain.allDomains
                 let subdomainsOf = Domain.subdomainsOf domainState
                 let boundedContextsOf = BoundedContext.boundedContextsByDomain boundedContextState
@@ -163,9 +161,9 @@ module Domains =
 
         let getSubDomains domainId =
             fun (next: HttpFunc) (ctx: HttpContext) -> task {
-                let! domainState =  ctx.GetService<ReadModels.Domain.AllDomainReadModel>().State()
-                let! boundedContextState = ctx.GetService<ReadModels.BoundedContext.AllBoundedContextsReadModel>().State()
-                let! namespaceState = ctx.GetService<ReadModels.Namespace.AllNamespacesReadModel>().State()
+                let! domainState = ctx |> State.fetch State.fromReadModel<ReadModels.Domain.AllDomainReadModel>
+                let! boundedContextState = ctx |> State.fetch State.fromReadModel<ReadModels.BoundedContext.AllBoundedContextsReadModel>
+                let! namespaceState = ctx |> State.fetch State.fromReadModel<ReadModels.Namespace.AllNamespacesReadModel>
                 let domains = Domain.allDomains domainState
                 let subdomainsOf = Domain.subdomainsOf domainState
                 let boundedContextsOf = BoundedContext.boundedContextsByDomain boundedContextState
@@ -181,9 +179,9 @@ module Domains =
          
         let getDomain domainId =
             fun (next: HttpFunc) (ctx: HttpContext) -> task {
-                let! domainState = ctx.GetService<ReadModels.Domain.AllDomainReadModel>().State()
-                let! boundedContextState = ctx.GetService<ReadModels.BoundedContext.AllBoundedContextsReadModel>().State()
-                let! namespaceState = ctx.GetService<ReadModels.Namespace.AllNamespacesReadModel>().State()
+                let! domainState = ctx |> State.fetch State.fromReadModel<ReadModels.Domain.AllDomainReadModel>
+                let! boundedContextState = ctx |> State.fetch State.fromReadModel<ReadModels.BoundedContext.AllBoundedContextsReadModel>
+                let! namespaceState = ctx |> State.fetch State.fromReadModel<ReadModels.Namespace.AllNamespacesReadModel>
                 let subdomainsOf = Domain.subdomainsOf domainState
                 let boundedContextsOf = BoundedContext.boundedContextsByDomain boundedContextState
                 let namespacesOf = Namespace.namespacesOf namespaceState
@@ -200,9 +198,9 @@ module Domains =
 
         let getBoundedContextsOf domainId =
             fun (next: HttpFunc) (ctx: HttpContext) -> task {
-                let! boundedContextState = ctx.GetService<ReadModels.BoundedContext.AllBoundedContextsReadModel>().State()
+                let! boundedContextState = ctx |> State.fetch State.fromReadModel<ReadModels.BoundedContext.AllBoundedContextsReadModel>
                 let boundedContextsOf = BoundedContext.boundedContextsByDomain boundedContextState
-                let! namespaceState = ctx.GetService<ReadModels.Namespace.AllNamespacesReadModel>().State()
+                let! namespaceState = ctx |> State.fetch State.fromReadModel<ReadModels.Namespace.AllNamespacesReadModel>
                 let namespacesOf = Namespace.namespacesOf namespaceState
 
                 let boundedContexts =

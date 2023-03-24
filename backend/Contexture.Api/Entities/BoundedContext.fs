@@ -142,11 +142,14 @@ and BoundedContextRenamed =
     { BoundedContextId: BoundedContextId
       Name: string }
 
-and BoundedContextRemoved = { BoundedContextId: BoundedContextId }
+and BoundedContextRemoved =
+    { BoundedContextId: BoundedContextId
+      DomainId: DomainId }
 
 and BoundedContextMovedToDomain =
     { BoundedContextId: BoundedContextId
-      DomainId: DomainId }
+      DomainId: DomainId
+      OldDomainId: DomainId }
 
 and DescriptionChanged =
     { BoundedContextId: BoundedContextId
@@ -176,7 +179,9 @@ and MessagesUpdated =
     { BoundedContextId: BoundedContextId
       Messages: Messages }
 
-type Errors = | EmptyName
+type Errors =
+    | EmptyName
+    | ContextCannotBeMoved
 
 let identify =
     function
@@ -196,12 +201,15 @@ let name identity = identity
 
 type State =
     | Initial
-    | Existing
+    | Existing of parentDomain: DomainId
     | Deleted
     static member evolve (state: State) (event: Event) =
         match event with
         | BoundedContextRemoved _ -> Deleted
-        | _ -> Existing
+        | BoundedContextImported i -> Existing i.DomainId
+        | BoundedContextCreated p -> Existing p.DomainId
+        | BoundedContextMovedToDomain p -> Existing p.DomainId
+        | _ -> state
 
 let nameValidation name =
     if String.IsNullOrWhiteSpace name then Error EmptyName else Ok name
@@ -232,51 +240,70 @@ let assignShortNameToBoundedContext shortName boundedContextId =
               |> Option.filter (String.IsNullOrWhiteSpace >> not) }
     |> Ok
 
+let private asList item = item |> Result.map List.singleton 
 
 let decide (command: Command) state =
     match command with
-    | CreateBoundedContext (id, domainId, createBc) -> newBoundedContext id domainId createBc.Name
-    | RenameBoundedContext (contextId, rename) -> renameBoundedContext rename.Name contextId
-    | AssignShortName (contextId, shortName) -> assignShortNameToBoundedContext shortName.ShortName contextId
+    | CreateBoundedContext (id, domainId, createBc) -> newBoundedContext id domainId createBc.Name |> asList
+    | RenameBoundedContext (contextId, rename) -> renameBoundedContext rename.Name contextId |> asList
+    | AssignShortName (contextId, shortName) -> assignShortNameToBoundedContext shortName.ShortName contextId  |> asList
     | RemoveBoundedContext contextId ->
-        BoundedContextRemoved { BoundedContextId = contextId }
-        |> Ok
+        match state with
+        | Existing domain ->
+            BoundedContextRemoved {
+                BoundedContextId = contextId
+                DomainId = domain
+            }
+            |> Ok
+            |> asList
+        | _ -> Ok []
     | MoveBoundedContextToDomain (contextId, move) ->
-        BoundedContextMovedToDomain
-            { DomainId = move.ParentDomainId
-              BoundedContextId = contextId }
-        |> Ok
+        match state with
+        | Existing currentParent ->
+            BoundedContextMovedToDomain
+                { DomainId = move.ParentDomainId
+                  BoundedContextId = contextId
+                  OldDomainId = currentParent }
+            |> Ok
+            |> asList
+        | _ ->
+            Error ContextCannotBeMoved
     | ReclassifyBoundedContext (contextId, classification) ->
         BoundedContextReclassified
             { Classification = classification.Classification
               BoundedContextId = contextId }
         |> Ok
+        |> asList
     | ChangeDescription (contextId, descriptionText) ->
         DescriptionChanged
             { Description = descriptionText.Description
               BoundedContextId = contextId }
         |> Ok
+        |> asList
     | UpdateBusinessDecisions (contextId, decisions) ->
         BusinessDecisionsUpdated
             { BusinessDecisions = decisions.BusinessDecisions
               BoundedContextId = contextId }
         |> Ok
+        |> asList
     | UpdateUbiquitousLanguage (contextId, language) ->
         UbiquitousLanguageUpdated
             { UbiquitousLanguage = language.UbiquitousLanguage
               BoundedContextId = contextId }
         |> Ok
+        |> asList
     | UpdateDomainRoles (contextId, roles) ->
         DomainRolesUpdated
             { DomainRoles = roles.DomainRoles
               BoundedContextId = contextId }
         |> Ok
+        |> asList
     | UpdateMessages (contextId, roles) ->
         MessagesUpdated
             { Messages = roles.Messages
               BoundedContextId = contextId }
         |> Ok
-    |> Result.map List.singleton
+        |> asList
 
 module Projections =
     type BoundedContext =

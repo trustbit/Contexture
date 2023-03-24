@@ -4,7 +4,8 @@ build-backend:
 	cd backend && dotnet build
 
 test-backend:
-	cd backend && dotnet test
+	cd backend && dotnet test \
+	    --logger "trx;LogFileName=TestResults.trx"
 
 publish-backend:
 	dotnet publish backend/Contexture.Api/Contexture.Api.fsproj \

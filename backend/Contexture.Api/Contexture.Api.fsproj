@@ -1,17 +1,20 @@
 <Project Sdk="Microsoft.NET.Sdk.Web">
 
   <PropertyGroup>
-    <TargetFramework>net6.0</TargetFramework>
+    <TargetFramework>net7.0</TargetFramework>
     <AssemblyName>Contexture.Api.App</AssemblyName>
     <EnableDefaultContentItems>false</EnableDefaultContentItems>
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="FSharp.SystemTextJson" Version="0.19.13" />
+    <PackageReference Include="FSharp.SystemTextJson" Version="1.1.23" />
     <PackageReference Include="Giraffe" Version="6.0.0" />
-    <PackageReference Include="Newtonsoft.Json" Version="13.0.1" />
+    <PackageReference Include="Newtonsoft.Json" Version="13.0.2" />
     <PackageReference Include="Ply" Version="0.3.1" />
-    <PackageReference Update="FSharp.Core" Version="6.0.5" />
+    <PackageReference Update="FSharp.Core" Version="7.0.200" />
+    <PackageReference Include="NStore.Persistence.MsSql" Version="0.14.0" />
+    <PackageReference Include="FsToolkit.ErrorHandling" Version="4.4.0" />
+    <PackageReference Include="FsToolkit.ErrorHandling.TaskResult" Version="4.4.0" />
   </ItemGroup>
 
   <ItemGroup>
@@ -20,9 +23,16 @@
     <Compile Include="Entities\Collaboration.fs" />
     <Compile Include="Entities\Namespace.fs" />
     <Compile Include="Entities\NamespaceTemplate.fs" />
-    <Compile Include="Database.fs" />
-    <Compile Include="Infrastructure.fs" />
+    <Compile Include="Utils.fs" />
+    <Compile Include="Infrastructure\Types.fs" />
+    <Compile Include="Infrastructure\Subscriptions.fs" />
+    <Compile Include="Infrastructure\EventStore.fs" />
+    <Compile Include="Infrastructure\InMemory.fs" />
+    <Compile Include="Infrastructure\NStoreBased.fs" />
+    <Compile Include="Infrastructure\Projections.fs" />
+    <Compile Include="Infrastructure\ReadModels.fs" />
     <Compile Include="CommandHandlers.fs" />
+    <Compile Include="Reactions.fs" />
     <Compile Include="ReadModels\ApplicationReadModels.fs" />
     <Compile Include="ReadModels\Find\Types.fs" />
     <Compile Include="ReadModels\Find\FindReadModels.fs" />
@@ -34,6 +44,10 @@
     <Compile Include="Views\Views.fs" />
     <Compile Include="Views\Namespaces.fs" />
     <Compile Include="Views\Search.fs" />
+    <Compile Include="Filebased\Database.fs" />
+    <Compile Include="Filebased\Convert.fs" />
+    <Compile Include="Configuration.fs" />
+    <Compile Include="AllRoutes.fs" />
     <Compile Include="Program.fs" />
   </ItemGroup>
   <ItemGroup>

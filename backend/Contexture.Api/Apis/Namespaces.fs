@@ -8,7 +8,6 @@ open Contexture.Api
 open Contexture.Api.Infrastructure
 open Contexture.Api.ReadModels
 open Microsoft.AspNetCore.Http
-open FSharp.Control.Tasks
 
 open Giraffe
 
@@ -16,7 +15,6 @@ module Namespaces =
     open ValueObjects
 
     module CommandEndpoints =
-        open System
         open Namespace
         open FileBasedCommandHandlers
         open CommandHandler
@@ -25,11 +23,10 @@ module Namespaces =
             fun (next: HttpFunc) (ctx: HttpContext) ->
                 task {
                     let database = ctx.GetService<EventStore>()
-                    let clock = ctx.GetService<Clock>()
-                    let eventBasedHandler = EventBased.eventStoreBasedCommandHandler clock database
+                    let eventBasedHandler = EventBased.eventStoreBasedCommandHandler database
                     match! Namespace.useHandler eventBasedHandler command with
-                    | Ok updatedContext ->
-                        let! namespaceState = ctx.GetService<ReadModels.Namespace.AllNamespacesReadModel>().State()
+                    | Ok (updatedContext,version,position) ->
+                        let! namespaceState = ctx.GetService<ReadModels.Namespace.AllNamespacesReadModel>().State(position)
                         // for namespaces we don't use redirects ATM
                         let boundedContext =
                             updatedContext
@@ -54,10 +51,10 @@ module Namespaces =
             updateAndReturnNamespaces (AddLabel(contextId, namespaceId, command))
 
     module QueryEndpoints =
-
+        open ReadModels
         let getNamespaces boundedContextId =
             fun (next: HttpFunc) (ctx: HttpContext) -> task {
-                let! namespaceState = ctx.GetService<ReadModels.Namespace.AllNamespacesReadModel>().State()
+                let! namespaceState = ctx |> State.fetch State.fromReadModel<ReadModels.Namespace.AllNamespacesReadModel>
                 let namespaces =
                     boundedContextId
                     |> ReadModels.Namespace.namespacesOf namespaceState
@@ -70,7 +67,7 @@ module Namespaces =
 
         let getAllNamespaces =
             fun (next: HttpFunc) (ctx: HttpContext) -> task {
-                let! state = ctx.GetService<ReadModels.Namespace.AllNamespacesReadModel>().State()
+                let! state = ctx |> State.fetch State.fromReadModel<ReadModels.Namespace.AllNamespacesReadModel>
 
                 let namespaces =
                     ReadModels.Namespace.allNamespaces state
@@ -84,16 +81,16 @@ module Namespaces =
             open NamespaceTemplate
             open FileBasedCommandHandlers
             open CommandHandler
+            open ReadModels
 
             let private updateAndReturnTemplate command =
                 fun (next: HttpFunc) (ctx: HttpContext) ->
                     task {
                         let database = ctx.GetService<EventStore>()
-                        let clock = ctx.GetService<Clock>()
-                        let eventBasedCommandHandler = EventBased.eventStoreBasedCommandHandler clock database 
+                        let eventBasedCommandHandler = EventBased.eventStoreBasedCommandHandler database 
                         match! NamespaceTemplate.useHandler eventBasedCommandHandler command with
-                        | Ok updatedTemplate ->
-                            return! redirectTo false (sprintf "/api/namespaces/templates/%O" updatedTemplate) next ctx
+                        | Ok (updatedTemplate,_,position) ->
+                            return! redirectTo false (State.appendProcessedPosition (sprintf "/api/namespaces/templates/%O" updatedTemplate) position) next ctx
                         | Error (DomainError error) ->
                             return! RequestErrors.BAD_REQUEST(sprintf "Template Error %A" error) next ctx
                         | Error e -> return! ServerErrors.INTERNAL_ERROR e next ctx
@@ -112,9 +109,10 @@ module Namespaces =
                 updateAndReturnTemplate (AddTemplateLabel(templateId, command))
 
         module QueryEndpoints =
+            open ReadModels
             let getAllTemplates =
                 fun (next: HttpFunc) (ctx: HttpContext) -> task {
-                    let! templateState = ctx.GetService<ReadModels.Templates.AllTemplatesReadModel>().State()
+                    let! templateState = ctx |> State.fetch State.fromReadModel<ReadModels.Templates.AllTemplatesReadModel>
 
                     let templates =
                         ReadModels.Templates.allTemplates templateState
@@ -124,7 +122,7 @@ module Namespaces =
 
             let getTemplate templateId =
                 fun (next: HttpFunc) (ctx: HttpContext) -> task {
-                    let! templateState = ctx.GetService<ReadModels.Templates.AllTemplatesReadModel>().State()
+                    let! templateState = ctx |> State.fetch State.fromReadModel<ReadModels.Templates.AllTemplatesReadModel>
                     let template =
                         templateId
                         |> ReadModels.Templates.template templateState 

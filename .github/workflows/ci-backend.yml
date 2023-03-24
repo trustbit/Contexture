@@ -18,9 +18,17 @@ jobs:
     - uses: actions/checkout@v2
     - uses: actions/setup-dotnet@v2
       with:
-        dotnet-version: '6.0.x'
+        dotnet-version: '7.0.x'
     - run: make publish-backend
       name: Build
     - run: make test-backend
+    - name: Publish Test Report
+      if: github.actor != 'dependabot[bot]' && always()
+      uses: dorny/test-reporter@v1
+      with:
+        token: ${{ secrets.GITHUB_TOKEN }}
+        path: "backend/**/TestResults.trx"
+        name: "Test Report - Contexture Backend"
+        reporter: "dotnet-trx"
     - name: Publish
       run: make publish-backend
