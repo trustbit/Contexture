@@ -1,6 +1,7 @@
 name: Frontend E2E Tests
 
 on:
+  workflow_dispatch:
   pull_request:
     paths:
       - '.github/workflows/CI-frontend-e2e.yml'
