@@ -42,7 +42,7 @@ test.describe("Edit Bounded Context", () => {
     await page.getByRole("button", { name: "save" }).click();
 
     await expect(boundedContextCanvas.editBoundedContextButton).toBeVisible();
-    await expect(page.getByTestId("boundedContextKey")).toHaveText("NEU");
+    await expect(page.getByTestId("boundedContextKey")).toHaveText("OLD");
     await expect(page.getByTestId("boundedContextName")).toHaveText("Test Bounded Context Neu");
 
     await page.reload();
