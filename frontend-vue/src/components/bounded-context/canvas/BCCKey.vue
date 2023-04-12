@@ -32,7 +32,7 @@ import { Form } from "vee-validate";
 import { ref } from "vue";
 import { useI18n } from "vue-i18n";
 import ContextureBoundedContextCanvasElement from "~/components/bounded-context/canvas/ContextureBoundedContextCanvasElement.vue";
-import ContextureChangeKey from "~/components/core/ContextureChangeKey.vue";
+import ContextureChangeKey from "~/components/core/change-short-name/ContextureChangeShortName.vue";
 import ContextureHelpfulErrorAlert, {
   HelpfulErrorProps,
 } from "~/components/primitives/alert/ContextureHelpfulErrorAlert.vue";
