@@ -31,7 +31,7 @@ function checkExistenceIn(arg: string, params: { field?: any; in: any | any[] })
   }
   if (Array.isArray(params.in)) {
     if (params.field) {
-      return !!params.in.find((toFind) => toFind[params.field].toLowerCase() === arg.toLowerCase());
+      return !!params.in.find((toFind) => toFind[params.field]?.toLowerCase() === arg.toLowerCase());
     } else {
       return !!params.in.find((toFind) => toFind.toLowerCase() === arg.toLowerCase());
     }

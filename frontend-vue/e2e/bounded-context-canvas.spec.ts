@@ -83,7 +83,7 @@ test.describe("Edit Bounded Context", () => {
     await shortKey.fill("TestTestTestTestTestTest");
     await expect(page.getByText("String must contain at most 16 character(s)")).toBeVisible();
     await shortKey.fill("?");
-    await expect(page.getByText("Must be valid alphabetic character")).toBeVisible();
+    await expect(page.getByText("Must only contain alphanumeric characters and hyphens")).toBeVisible();
   });
 
   test("should validate name", async ({ page }) => {
