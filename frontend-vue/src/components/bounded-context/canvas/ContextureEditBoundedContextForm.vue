@@ -33,7 +33,7 @@ import { Ref, toRef } from "vue";
 import { useI18n } from "vue-i18n";
 import * as zod from "zod";
 import ContexturePrimaryButton from "~/components/primitives/button/ContexturePrimaryButton.vue";
-import ContextureChangeKey from "~/components/core/ContextureChangeKey.vue";
+import ContextureChangeKey from "~/components/core/change-short-name/ContextureChangeShortName.vue";
 import ContextureInputText from "~/components/primitives/input/ContextureInputText.vue";
 import { BoundedContext } from "~/types/boundedContext";
 
