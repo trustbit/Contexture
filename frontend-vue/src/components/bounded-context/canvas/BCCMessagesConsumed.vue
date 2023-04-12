@@ -1,7 +1,10 @@
 <template>
   <div class="flex flex-col gap-3">
     <div class="rounded bg-white p-4">
-      <div class="flex w-full items-center rounded p-1" :class="[version === 'V4' ? 'bg-blue-50' : '']">
+      <div
+        class="flex w-full items-center rounded p-1"
+        :class="[version === BoundedContextVersion.V4 ? 'bg-blue-50' : '']"
+      >
         <Icon:materialSymbols:exclamation aria-hidden="true" class="mr-1 h-4 w-4" />
         <span class="text-sm font-bold leading-4">{{ t("bounded_context_canvas.messages.commands.handled") }}</span>
       </div>
@@ -40,7 +43,10 @@
     </div>
 
     <div class="rounded bg-white p-4">
-      <div class="flex w-full items-center rounded p-1" :class="[version === 'V4' ? 'bg-orange-100' : '']">
+      <div
+        class="flex w-full items-center rounded p-1"
+        :class="[version === BoundedContextVersion.V4 ? 'bg-orange-100' : '']"
+      >
         <Icon:materialSymbols:flash-on aria-hidden="true" class="mr-1 h-4 w-4" />
         <span class="text-sm font-bold leading-4">{{ t("bounded_context_canvas.messages.events.handled") }}</span>
       </div>
@@ -78,7 +84,10 @@
     </div>
 
     <div class="rounded bg-white p-4">
-      <div class="flex w-full items-center rounded p-1" :class="[version === 'V4' ? 'bg-green-50' : '']">
+      <div
+        class="flex w-full items-center rounded p-1"
+        :class="[version === BoundedContextVersion.V4 ? 'bg-green-50' : '']"
+      >
         <Icon:materialSymbols:question-mark aria-hidden="true" class="mr-1 h-4 w-4" />
         <span class="text-sm font-bold leading-4">{{ t("bounded_context_canvas.messages.queries.handled") }}</span>
       </div>
