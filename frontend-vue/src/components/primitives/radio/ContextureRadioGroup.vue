@@ -10,10 +10,11 @@
         :label="option.label"
         :description="option.description"
         :name="name"
+        :show-error="false"
         @click="onClick"
       />
     </div>
-    <span v-if="errorMessage" class="block border-l-2 border-l-red-500 pl-2 text-sm text-red-500">
+    <span v-if="errorMessage && meta.touched" class="block border-l-2 border-l-red-500 pl-2 text-sm text-red-500">
       {{ errorMessage }}
     </span>
     <span v-if="descriptionPosition === 'bottom'" class="block border-l-2 border-l-blue-500 pl-2 text-sm text-gray-600">
@@ -45,7 +46,7 @@ const emit = defineEmits<{
   (e: "click", value: any): void;
 }>();
 
-const { value, errorMessage } = useField(props.name, undefined, {
+const { value, errorMessage, meta } = useField(props.name, undefined, {
   initialValue: props.modelValue,
 });
 

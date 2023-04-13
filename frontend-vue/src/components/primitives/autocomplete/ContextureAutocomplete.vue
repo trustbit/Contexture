@@ -89,7 +89,7 @@
         </TransitionRoot>
       </div>
     </Combobox>
-    <span v-if="errorMessage" class="block border-l-2 border-l-red-500 pl-2 text-sm text-red-500">
+    <span v-if="errorMessage && meta.touched" class="block border-l-2 border-l-red-500 pl-2 text-sm text-red-500">
       {{ errorMessage }}
     </span>
     <span class="block border-l-2 border-l-blue-500 pl-2 text-sm text-gray-600">
