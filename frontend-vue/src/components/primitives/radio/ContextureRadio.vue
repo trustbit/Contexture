@@ -26,7 +26,7 @@
       </div>
     </div>
     <span
-      v-if="errorMessage && meta.touched && showError"
+      v-if="errorMessage && showError && (meta.touched || meta.dirty)"
       class="block border-l-2 border-l-red-500 pl-2 text-sm text-red-500"
     >
       {{ errorMessage }}

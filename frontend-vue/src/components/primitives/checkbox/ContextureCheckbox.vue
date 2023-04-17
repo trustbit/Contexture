@@ -25,7 +25,10 @@
         </label>
       </div>
     </div>
-    <span v-if="errorMessage" class="block border-l-2 border-l-red-500 pl-2 text-sm text-red-500">
+    <span
+      v-if="errorMessage && (meta.touched || meta.dirty)"
+      class="block border-l-2 border-l-red-500 pl-2 text-sm text-red-500"
+    >
       {{ errorMessage }}
     </span>
   </div>
@@ -53,7 +56,11 @@ const emit = defineEmits<{
   (e: "click", value: any): void;
 }>();
 
-const { value: checkboxValue, errorMessage } = useField(props.name, undefined, {
+const {
+  value: checkboxValue,
+  errorMessage,
+  meta,
+} = useField(props.name, undefined, {
   initialValue: props.modelValue,
 });
 

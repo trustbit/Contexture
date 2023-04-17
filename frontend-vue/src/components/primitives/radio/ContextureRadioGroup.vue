@@ -14,7 +14,10 @@
         @click="onClick"
       />
     </div>
-    <span v-if="errorMessage && meta.touched" class="block border-l-2 border-l-red-500 pl-2 text-sm text-red-500">
+    <span
+      v-if="errorMessage && (meta.touched || meta.dirty)"
+      class="block border-l-2 border-l-red-500 pl-2 text-sm text-red-500"
+    >
       {{ errorMessage }}
     </span>
     <span v-if="descriptionPosition === 'bottom'" class="block border-l-2 border-l-blue-500 pl-2 text-sm text-gray-600">

@@ -21,7 +21,11 @@
       </ContexturePrimaryButton>
     </div>
     <div v-else>
-      <span v-if="activeBoundedContext.description" class="text-gray-700">{{ activeBoundedContext.description }}</span>
+      <div v-if="description">
+        <div class="h-36 overflow-y-auto whitespace-pre-line text-gray-700">
+          <p>{{ description }}</p>
+        </div>
+      </div>
       <span v-else class="italic text-gray-700">({{ t("bounded_context_canvas.description.empty") }})</span>
     </div>
   </ContextureBoundedContextCanvasElement>

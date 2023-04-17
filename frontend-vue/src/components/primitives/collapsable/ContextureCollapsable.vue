@@ -29,11 +29,11 @@
       </div>
     </div>
     <transition
-      enter-active-class="overflow-hidden transition-max-height duration-500 ease-in-out"
+      enter-active-class="overflow-hidden transition-max-height duration-200 ease-in"
       enter-from-class="max-h-0"
       enter-to-class="max-h-[1000px]"
       leave-from-class="max-h-[1000px]"
-      leave-active-class="overflow-hidden transition-max-height duration-500 ease-out"
+      leave-active-class="overflow-hidden transition-max-height duration-200 ease-out"
       leave-to-class="max-h-0"
     >
       <div v-if="!isCollapsed" class="mt-2 text-xs text-gray-900" role="region" :aria-labelledby="`${title}_header`">
