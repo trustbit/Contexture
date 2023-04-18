@@ -36,12 +36,12 @@ test.describe("Edit Bounded Context", () => {
     const boundedContextCanvas = new BoundedContextCanvasPage(page);
 
     await boundedContextCanvas.editBoundedContextButton.click();
-    await page.getByLabel("Short Key").fill("NEU");
+    await page.getByLabel("Short Key").fill("new-key");
     await page.getByLabel("Name (Required)").fill("Test Bounded Context Neu");
     await page.getByRole("button", { name: "save" }).click();
 
-    await expect(boundedContextCanvas.editBoundedContextButton).toBeVisible();
-    await expect(page.getByTestId("boundedContextKey")).toHaveText("NEU");
+    await expect(boundedContextCanvas.editBoundedContextButton).toHaveCount(1);
+    await expect(page.getByTestId("boundedContextKey")).toHaveText("new-key");
     await expect(page.getByTestId("boundedContextName")).toHaveText("Test Bounded Context Neu");
 
     await page.reload();
@@ -62,7 +62,7 @@ test.describe("Edit Bounded Context", () => {
     await page.getByLabel("Name (Required)").fill("Do Not Save");
     await closeButton.click();
 
-    await expect(boundedContextCanvas.editBoundedContextButton).toBeVisible();
+    await expect(boundedContextCanvas.editBoundedContextButton).toHaveCount(1);
     await page.reload();
 
     await expect(page.getByTestId("boundedContextKey")).not.toHaveText("DontSave");

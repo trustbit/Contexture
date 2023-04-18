@@ -2,88 +2,89 @@
   <ContextureBoundedContextCanvasElement
     :title="t('bounded_context_canvas.domain_roles.title')"
     :title-icon="icon"
-    tooltip="How can you characterise the behaviour of this bounded context?"
+    :tooltip="t('bounded_context_canvas.domain_roles.tooltip')"
   >
-    <div>
-      <ContextureHelpfulErrorAlert v-if="submitError" v-bind="submitError" />
+    <ContextureHelpfulErrorAlert v-if="submitError" v-bind="submitError" />
 
-      <div v-if="domainRoles.length === 0">
-        <span class="italic text-gray-700">({{ t("bounded_context_canvas.domain_roles.empty") }})</span>
-      </div>
-
-      <div class="max-h-28 overflow-y-auto">
-        <ContextureAccordionItem v-for="domainRole in domainRoles" :key="domainRole.name">
-          <template #title>
-            <div class="flex w-full justify-between">
-              {{ domainRole.name }}
-              <button @click.prevent="() => onDeleteDomainRole(domainRole)" data-testId="deleteDomainRole">
-                <Icon:material-symbols:delete-outline class="h-5 w-5 text-blue-500 hover:text-blue-600" />
-              </button>
-            </div>
-          </template>
-          <template #default>
-            {{ domainRole.description }}
-          </template>
-        </ContextureAccordionItem>
-      </div>
-
-      <ContextureCollapsable
-        :label="t('bounded_context_canvas.domain_roles.actions.collapsed.add')"
-        class="mt-8"
-        :cancel-text="t('common.cancel')"
-        :collapsed="addNewRoleCollapsed"
-        @update:collapsed="(collapsed) => (addNewRoleCollapsed = collapsed)"
-      >
-        <ContextureDynamicForm
-          :schema="domainRoleSchema"
-          :button-props="{
-            label: t('bounded_context_canvas.domain_roles.actions.open.add'),
-            size: 'sm',
-          }"
-          @submit="onDomainRoleAdd"
-        />
-      </ContextureCollapsable>
-      <ContextureCollapsable
-        :label="t('bounded_context_canvas.domain_roles.actions.collapsed.choose')"
-        class="mt-2"
-        :cancel-text="t('common.cancel')"
-        :collapsed="chooseRoleCollapsed"
-        @update:collapsed="(collapsed) => (chooseRoleCollapsed = collapsed)"
-      >
-        <div class="space-y-6">
-          <div class="pt-6">
-            <h3 class="text-base font-bold text-gray-900">
-              {{ t("bounded_context_canvas.domain_roles.actions.open.select") }}
-            </h3>
-          </div>
-          <ul class="flex h-72 flex-col gap-y-4 overflow-y-auto px-2">
-            <li v-for="predefineDomainRole in predefinedDomainRoles" :key="predefineDomainRole.name">
-              <ContextureRadio
-                v-model="selectedPredefinedRole"
-                :value="predefineDomainRole"
-                name="predefineDomainRole"
-                :disabled="!!activeBoundedContext?.domainRoles?.find((d) => d.name === predefineDomainRole.name)"
-                :label="predefineDomainRole.name"
-                :description="predefineDomainRole.description"
-                label-class="text-sm"
-              />
-            </li>
-          </ul>
-
-          <ContexturePrimaryButton
-            type="submit"
-            size="sm"
-            :label="t('bounded_context_canvas.domain_roles.actions.open.choose')"
-            class="mt-2"
-            @click="onDomainRoleAdd(selectedPredefinedRole)"
-          >
-            <template #left>
-              <icon:material-symbols:add class="mr-2" />
-            </template>
-          </ContexturePrimaryButton>
-        </div>
-      </ContextureCollapsable>
+    <div v-if="domainRoles.length === 0">
+      <span class="italic text-gray-700">({{ t("bounded_context_canvas.domain_roles.empty") }})</span>
     </div>
+
+    <div class="max-h-28 overflow-y-auto">
+      <ContextureAccordionItem v-for="domainRole in domainRoles" :key="domainRole.name">
+        <template #title>
+          <div class="flex w-full justify-between">
+            {{ domainRole.name }}
+            <button @click.prevent="() => onDeleteDomainRole(domainRole)" data-testId="deleteDomainRole">
+              <Icon:material-symbols:delete-outline class="h-5 w-5 text-blue-500 hover:text-blue-600" />
+            </button>
+          </div>
+        </template>
+        <template #default>
+          <span v-if="domainRole.description">{{ domainRole.description }}</span>
+          <span v-else class="italic text-gray-700"
+            >({{ t("bounded_context_canvas.domain_roles.description.empty") }})</span
+          >
+        </template>
+      </ContextureAccordionItem>
+    </div>
+
+    <ContextureCollapsable
+      :label="t('bounded_context_canvas.domain_roles.actions.collapsed.add')"
+      class="mt-8"
+      :cancel-text="t('common.cancel')"
+      :collapsed="addNewRoleCollapsed"
+      @update:collapsed="(collapsed) => (addNewRoleCollapsed = collapsed)"
+    >
+      <ContextureDynamicForm
+        :schema="domainRoleFormSchema"
+        :button-props="{
+          label: t('bounded_context_canvas.domain_roles.actions.open.add'),
+          size: 'sm',
+        }"
+        @submit="onDomainRoleAdd"
+      />
+    </ContextureCollapsable>
+    <ContextureCollapsable
+      :label="t('bounded_context_canvas.domain_roles.actions.collapsed.choose')"
+      class="mt-2"
+      :cancel-text="t('common.cancel')"
+      :collapsed="chooseRoleCollapsed"
+      @update:collapsed="(collapsed) => (chooseRoleCollapsed = collapsed)"
+    >
+      <div class="space-y-6">
+        <div class="pt-6">
+          <h3 class="text-base font-bold text-gray-900">
+            {{ t("bounded_context_canvas.domain_roles.actions.open.select") }}
+          </h3>
+        </div>
+        <ul class="flex h-72 flex-col gap-y-4 overflow-y-auto px-2">
+          <li v-for="predefineDomainRole in selectablePredefinedDomainRoles" :key="predefineDomainRole.name">
+            <ContextureRadio
+              v-model="selectedPredefinedRole"
+              :value="predefineDomainRole"
+              name="predefineDomainRole"
+              :disabled="predefineDomainRole.disabled"
+              :label="predefineDomainRole.name"
+              :description="predefineDomainRole.description"
+              label-class="text-sm"
+            />
+          </li>
+        </ul>
+
+        <ContexturePrimaryButton
+          type="submit"
+          size="sm"
+          :label="t('bounded_context_canvas.domain_roles.actions.open.choose')"
+          class="mt-2"
+          @click="onDomainRoleAdd(selectedPredefinedRole)"
+        >
+          <template #left>
+            <icon:material-symbols:add class="mr-2" />
+          </template>
+        </ContexturePrimaryButton>
+      </div>
+    </ContextureCollapsable>
   </ContextureBoundedContextCanvasElement>
 </template>
 
@@ -118,8 +119,17 @@ const { t } = useI18n();
 const confirmationModal = useConfirmationModalStore();
 
 const domainRoles: Ref<DomainRole[]> = computed(() => activeBoundedContext.value?.domainRoles || []);
+const selectablePredefinedDomainRoles = computed(() =>
+  predefinedDomainRoles.map((role) => {
+    return {
+      name: role.name,
+      description: role.description,
+      disabled: !!activeBoundedContext.value?.domainRoles?.find((d) => d.name === role.name),
+    };
+  })
+);
 
-const domainRoleSchema: DynamicFormSchema<DomainRole> = {
+const domainRoleFormSchema: DynamicFormSchema<DomainRole> = {
   fields: [
     {
       name: "name",

@@ -6,47 +6,48 @@
   <div v-else-if="activeBoundedContext">
     <ContextureHeroHeader>
       <div class="flex flex-col gap-4 px-4 lg:px-20">
-        <div v-if="editMode" class="flex justify-between">
-          <div class="w-full">
-            <ContextureHelpfulErrorAlert v-if="submitError" v-bind="submitError" class="mb-4" />
-            <ContextureEditBoundedContextForm
-              :initial-value="activeBoundedContext"
-              :submit-error="submitError"
-              @submit="onSave"
-            />
-          </div>
+        <transition enter-from-class="opacity-0" enter-active-class="transition-opacity" appear>
+          <div v-if="editMode" class="flex justify-between">
+            <div class="w-full">
+              <ContextureHelpfulErrorAlert v-if="submitError" v-bind="submitError" class="mb-4" />
+              <ContextureEditBoundedContextForm
+                :initial-value="activeBoundedContext"
+                :submit-error="submitError"
+                @submit="onSave"
+              />
+            </div>
 
-          <div>
-            <ContextureRoundedButton @click="editMode = false">
-              <Icon:material-symbols:close :aria-label="t('bounded_context_canvas.close_edit')" />
-            </ContextureRoundedButton>
-          </div>
-        </div>
-
-        <div v-if="!editMode" class="flex justify-between">
-          <div class="flex flex-col gap-4">
-            <span data-testid="boundedContextKey" class="text-gray-700">{{ activeBoundedContext.shortName }}</span>
             <div>
-              <h1 data-testid="boundedContextName" class="text-3xl font-bold text-gray-900">
-                {{ activeBoundedContext.name }}
-              </h1>
+              <ContextureRoundedButton @click="editMode = false">
+                <Icon:material-symbols:close :aria-label="t('bounded_context_canvas.close_edit')" />
+              </ContextureRoundedButton>
             </div>
           </div>
-          <div>
-            <ContextureTooltip content="Edit bounded context" placement="left">
-              <ContextureRoundedButton size="md" @click="editMode = true">
-                <Icon:material-symbols:drive-file-rename-outline
-                  :aria-label="t('bounded_context_canvas.open_edit')"
-                  class="h-4 w-4"
-                />
-              </ContextureRoundedButton>
-            </ContextureTooltip>
+          <div v-else class="flex justify-between">
+            <div class="flex flex-col gap-4">
+              <span data-testid="boundedContextKey" class="text-gray-700">{{ activeBoundedContext.shortName }}</span>
+              <div>
+                <h1 data-testid="boundedContextName" class="text-3xl font-bold text-gray-900">
+                  {{ activeBoundedContext.name }}
+                </h1>
+              </div>
+            </div>
+            <div>
+              <ContextureTooltip content="Edit bounded context" placement="left">
+                <ContextureRoundedButton size="md" @click="editMode = true">
+                  <Icon:material-symbols:drive-file-rename-outline
+                    :aria-label="t('bounded_context_canvas.open_edit')"
+                    class="h-4 w-4"
+                  />
+                </ContextureRoundedButton>
+              </ContextureTooltip>
+            </div>
           </div>
-        </div>
+        </transition>
       </div>
     </ContextureHeroHeader>
 
-    <div class="mx-auto mt-5 px-3 px-4 pb-8 text-gray-900 lg:px-20">
+    <div class="mx-auto mt-5 px-4 pb-8 text-gray-900 lg:px-20">
       <div class="mt-8">
         <TabGroup :default-index="1">
           <div class="flex items-center justify-between">
