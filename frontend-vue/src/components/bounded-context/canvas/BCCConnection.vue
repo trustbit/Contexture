@@ -173,7 +173,7 @@
 <script setup lang="ts">
 import { toFormValidator } from "@vee-validate/zod";
 import { storeToRefs } from "pinia";
-import { Form, useForm } from "vee-validate";
+import { useForm } from "vee-validate";
 import { Ref, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import * as zod from "zod";
@@ -194,7 +194,7 @@ import { useCollaborationsStore } from "~/stores/collaborations";
 import useConfirmationModalStore from "~/stores/confirmationModal";
 import { useDomainsStore } from "~/stores/domains";
 import { BoundedContext } from "~/types/boundedContext";
-import { Collaboration, CollaborationId, collaboratorKeys, CollaboratorKeys } from "~/types/collaboration";
+import { Collaboration, CollaborationId, CollaboratorKeys } from "~/types/collaboration";
 import { Domain } from "~/types/domain";
 
 interface Props {
