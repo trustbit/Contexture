@@ -1,2 +1,2 @@
-FROM softwarepark/contexture:0.2.1
+FROM softwarepark/contexture:latest
 COPY ./test_data/db.json /data/db.json
