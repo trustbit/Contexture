@@ -1,7 +1,7 @@
 import { expect, test } from "@playwright/test";
 import { BoundedContextCanvasPage } from "./pages/bounded-context-canvas.page";
 
-const boundedContextId: string = "";
+let boundedContextId: string = "";
 let domainId: string = "";
 
 test.beforeAll(async ({ request }) => {
@@ -18,8 +18,12 @@ test.beforeAll(async ({ request }) => {
       name: "Test Bounded Context",
     },
   });
-
+  boundedContextId = (await response.json()).id;
   expect(response.ok()).toBeTruthy();
+});
+
+test.beforeEach(async ({ page }) => {
+  await page.goto(`/boundedContext/${boundedContextId}/canvas`);
 });
 
 test.afterAll(async ({ request }) => {
