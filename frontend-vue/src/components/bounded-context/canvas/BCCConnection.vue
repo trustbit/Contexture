@@ -107,34 +107,28 @@
       >
         <div class="flex flex-col gap-3">
           <p class="text-base font-bold">{{ t("bounded_context_canvas.collaborators.add") }}</p>
-          <p class="font-bold">{{ t("bounded_context_canvas.collaborators.select_connection") }}</p>
+          <p class="font-bold">{{ t("bounded_context_canvas.collaborators.connection.label") }}</p>
 
-          <Form
-            class="flex flex-col gap-3"
-            :validation-schema="validationSchema"
-            autocomplete="off"
-            @submit="onCreateCollaborator"
-          >
-            <ContextureRadioGroup v-model="selectedCollaborator" :options="collaboratorOptions" name="collaborator" />
+          <form class="flex flex-col gap-3" autocomplete="off" @submit="onSubmit">
+            <ContextureRadioGroup :options="collaboratorOptions" name="collaborator" />
 
-            <div v-if="selectedCollaborator === 'domain' || selectedCollaborator === 'boundedContext'">
+            <div v-if="values.collaborator === 'domain' || values.collaborator === 'boundedContext'">
               <ContextureAutocomplete
-                v-model="collaboratorRef"
                 :label="t('bounded_context_canvas.collaborators.collaborator')"
                 name="collaboratorRef"
-                :placeholder="t('bounded_context_canvas.collaborators.select_placeholder')"
-                :display-value="(d) => d.name"
-                :suggestions="suggestions"
-                :description="t('bounded_context_canvas.collaborators.select_description')"
+                :display-value="(d) => `${d.name}${d.domain?.name ? ` (in ${d.domain.name})` : ''}`"
+                :suggestions="collaboratorSuggestions"
+                :placeholder="t('bounded_context_canvas.collaborators.collaborator.dropdown.placeholder')"
+                :description="t('bounded_context_canvas.collaborators.collaborator.description')"
                 @complete="searchSuggestions"
               />
             </div>
             <div v-else>
               <ContextureInputText
-                v-model="collaboratorRef"
                 :label="t('bounded_context_canvas.collaborators.collaborator')"
                 name="collaboratorRef"
-                description="The collaborator name that is used inside this bounded context."
+                :placeholder="t('bounded_context_canvas.collaborators.collaborator.input.placeholder')"
+                :description="t('bounded_context_canvas.collaborators.collaborator.description')"
               />
             </div>
 
@@ -155,7 +149,7 @@
                 </template>
               </ContexturePrimaryButton>
             </div>
-          </Form>
+          </form>
         </div>
       </ContextureCollapsable>
       <ContextureHelpfulErrorAlert
@@ -166,7 +160,7 @@
       />
     </div>
 
-    <teleport to="body">
+    <teleport to="body" v-if="selectedRelationship">
       <BCCDefineRelationshipModal
         :open="!!selectedRelationship"
         :relationship="selectedRelationship"
@@ -179,8 +173,8 @@
 <script setup lang="ts">
 import { toFormValidator } from "@vee-validate/zod";
 import { storeToRefs } from "pinia";
-import { Form } from "vee-validate";
-import { ref, watch } from "vue";
+import { useForm } from "vee-validate";
+import { Ref, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import * as zod from "zod";
 import BCCDefineRelationshipModal from "~/components/bounded-context/canvas/BCCDefineRelationshipModal.vue";
@@ -199,7 +193,9 @@ import { useBoundedContextsStore } from "~/stores/boundedContexts";
 import { useCollaborationsStore } from "~/stores/collaborations";
 import useConfirmationModalStore from "~/stores/confirmationModal";
 import { useDomainsStore } from "~/stores/domains";
+import { BoundedContext } from "~/types/boundedContext";
 import { Collaboration, CollaborationId, CollaboratorKeys } from "~/types/collaboration";
+import { Domain } from "~/types/domain";
 
 interface Props {
   collaborations: Collaboration[];
@@ -218,28 +214,52 @@ const { createInboundConnection, createOutboundConnection, deleteCollaborationBy
 const addCollapsed = ref(true);
 const submitError = ref<HelpfulErrorProps>();
 
-const suggestions = ref();
-const selectedCollaborator = ref<CollaboratorKeys>();
-const collaboratorRef = ref();
-const validationSchema = toFormValidator(
-  zod.object({
-    collaborator: zod.string(),
-    collaboratorRef: zod.custom((data) => data, { message: "Required" }),
-    description: zod.string().nullish(),
-  })
-);
+const collaboratorSuggestions: Ref<BoundedContext[] | Domain[]> = ref(boundedContexts.value);
+
+const schema = zod.object({
+  collaborator: zod.enum(["boundedContext", "domain", "externalSystem", "frontend"], {
+    errorMap: () => {
+      return { message: t("bounded_context_canvas.collaborators.connection.required") };
+    },
+  }),
+  collaboratorRef: zod.union([zod.string().min(1), zod.object({})]),
+  description: zod.string(),
+});
+const validationSchema = toFormValidator(schema);
+
+interface CollaboratorFormValue {
+  collaborator: CollaboratorKeys | unknown;
+  collaboratorRef: string | BoundedContext | Domain;
+  description: string;
+}
+
+const initialValues: CollaboratorFormValue = {
+  collaborator: "",
+  collaboratorRef: "",
+  description: "",
+};
+
+const { values, handleSubmit, resetForm, setFieldValue } = useForm({
+  validationSchema: validationSchema,
+  initialValues: initialValues,
+});
+
+const onSubmit = handleSubmit((formValue: CollaboratorFormValue) => {
+  createCollaborator(formValue);
+  resetForm();
+});
 
 function searchSuggestions(query: string): void {
-  if (selectedCollaborator.value === "domain") {
-    suggestions.value =
+  if (values.collaborator === "domain") {
+    collaboratorSuggestions.value =
       query === ""
         ? allDomains.value
         : allDomains.value.filter((option) => {
             return option.name.toLowerCase().includes(query.toLowerCase());
           });
   }
-  if (selectedCollaborator.value === "boundedContext") {
-    suggestions.value =
+  if (values.collaborator === "boundedContext") {
+    collaboratorSuggestions.value =
       query === ""
         ? boundedContexts.value
         : boundedContexts.value.filter((option) => {
@@ -248,12 +268,12 @@ function searchSuggestions(query: string): void {
   }
 }
 
-async function onCreateCollaborator(collaborator: any): Promise<void> {
-  let ref: string;
-  if (selectedCollaborator.value === "frontend" || selectedCollaborator.value === "externalSystem") {
-    ref = collaborator.collaboratorRef;
+async function createCollaborator(formValues: CollaboratorFormValue): Promise<void> {
+  let collaborator: string;
+  if (formValues.collaborator === "frontend" || formValues.collaborator === "externalSystem") {
+    collaborator = formValues.collaboratorRef as string;
   } else {
-    ref = collaborator.collaboratorRef.id;
+    collaborator = (formValues.collaboratorRef as BoundedContext | Domain).id;
   }
   if (props.type === "initiator") {
     const res = await createInboundConnection({
@@ -261,9 +281,9 @@ async function onCreateCollaborator(collaborator: any): Promise<void> {
         boundedContext: activeBoundedContext.value?.id,
       },
       initiator: {
-        [selectedCollaborator.value as string]: ref,
+        [formValues.collaborator as string]: collaborator,
       },
-      description: collaborator.description,
+      description: formValues.description,
     });
 
     if (res.error.value) {
@@ -278,12 +298,12 @@ async function onCreateCollaborator(collaborator: any): Promise<void> {
   } else {
     const res = await createOutboundConnection({
       recipient: {
-        [selectedCollaborator.value as string]: ref,
+        [formValues.collaborator as string]: collaborator,
       },
       initiator: {
         boundedContext: activeBoundedContext.value?.id,
       },
-      description: collaborator.description,
+      description: formValues.description,
     });
 
     if (res.error.value) {
@@ -320,15 +340,14 @@ async function deleteCollaboration(id: CollaborationId) {
 }
 
 watch(
-  () => selectedCollaborator.value,
+  () => values.collaborator,
   () => {
-    collaboratorRef.value = null;
-    suggestions.value = [];
-    if (selectedCollaborator.value === "boundedContext") {
-      suggestions.value = boundedContexts.value;
+    setFieldValue("collaboratorRef", "");
+    if (values.collaborator === "boundedContext") {
+      collaboratorSuggestions.value = boundedContexts.value;
     }
-    if (selectedCollaborator.value === "domain") {
-      suggestions.value = allDomains.value;
+    if (values.collaborator === "domain") {
+      collaboratorSuggestions.value = allDomains.value;
     }
   }
 );

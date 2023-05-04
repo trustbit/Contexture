@@ -25,7 +25,10 @@
         </label>
       </div>
     </div>
-    <span v-if="errorMessage" class="block border-l-2 border-l-red-500 pl-2 text-sm text-red-500">
+    <span
+      v-if="errorMessage && showError && (meta.touched || meta.dirty)"
+      class="block border-l-2 border-l-red-500 pl-2 text-sm text-red-500"
+    >
       {{ errorMessage }}
     </span>
   </div>
@@ -44,16 +47,23 @@ interface Props {
   description?: string;
   labelClass?: string;
   disabled?: boolean;
+  showError?: boolean;
 }
 
-const props = defineProps<Props>();
+const props = withDefaults(defineProps<Props>(), {
+  showError: true,
+});
 
 const emit = defineEmits<{
   (e: "update:modelValue", value: any): void;
   (e: "click", value: any): void;
 }>();
 
-const { value: radioValue, errorMessage } = useField(props.name, undefined, {
+const {
+  value: radioValue,
+  errorMessage,
+  meta,
+} = useField(props.name, undefined, {
   initialValue: props.modelValue,
 });
 

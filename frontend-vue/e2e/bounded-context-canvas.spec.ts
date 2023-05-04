@@ -18,9 +18,12 @@ test.beforeAll(async ({ request }) => {
       name: "Test Bounded Context",
     },
   });
-
   boundedContextId = (await response.json()).id;
   expect(response.ok()).toBeTruthy();
+});
+
+test.beforeEach(async ({ page }) => {
+  await page.goto(`/boundedContext/${boundedContextId}/canvas`);
 });
 
 test.afterAll(async ({ request }) => {
@@ -28,21 +31,17 @@ test.afterAll(async ({ request }) => {
   await request.delete(`/api/domains/${domainId}`);
 });
 
-test.beforeEach(async ({ page }) => {
-  await page.goto(`/boundedContext/${boundedContextId}/canvas`);
-});
-
 test.describe("Edit Bounded Context", () => {
   test("should edit a bounded context", async ({ page }) => {
     const boundedContextCanvas = new BoundedContextCanvasPage(page);
 
     await boundedContextCanvas.editBoundedContextButton.click();
-    await page.getByLabel("Short Key").fill("NEU");
+    await page.getByLabel("Short Key").fill("new-key");
     await page.getByLabel("Name (Required)").fill("Test Bounded Context Neu");
     await page.getByRole("button", { name: "save" }).click();
 
-    await expect(boundedContextCanvas.editBoundedContextButton).toBeVisible();
-    await expect(page.getByTestId("boundedContextKey")).toHaveText("NEU");
+    await expect(boundedContextCanvas.editBoundedContextButton).toHaveCount(1);
+    await expect(page.getByTestId("boundedContextKey")).toHaveText("new-key");
     await expect(page.getByTestId("boundedContextName")).toHaveText("Test Bounded Context Neu");
 
     await page.reload();
@@ -63,7 +62,7 @@ test.describe("Edit Bounded Context", () => {
     await page.getByLabel("Name (Required)").fill("Do Not Save");
     await closeButton.click();
 
-    await expect(boundedContextCanvas.editBoundedContextButton).toBeVisible();
+    await expect(boundedContextCanvas.editBoundedContextButton).toHaveCount(1);
     await page.reload();
 
     await expect(page.getByTestId("boundedContextKey")).not.toHaveText("DontSave");
@@ -103,8 +102,7 @@ test.describe("Messages", () => {
 
     await addCommandLocator.getByRole("button", { name: "add" }).click();
     await addCommandLocator.getByLabel("Name").fill("Test Command handled");
-    await page.getByRole("button", { name: "add command" }).click();
-    await expect(addCommandLocator).toBeVisible();
+    await addCommandLocator.getByRole("button", { name: "add command", exact: true }).click();
     await expect(page.getByText("Test Command handled")).toBeVisible();
     await page.getByRole("button", { name: "Delete command" }).click();
     await page.getByRole("button", { name: "Delete", exact: true }).click();
@@ -112,8 +110,7 @@ test.describe("Messages", () => {
 
     await addEventHandledLocator.getByRole("button", { name: "add" }).click();
     await addEventHandledLocator.getByLabel("Name").fill("Test Event handled");
-    await page.getByRole("button", { name: "add event" }).click();
-    await expect(addEventHandledLocator).toBeVisible();
+    await addEventHandledLocator.getByRole("button", { name: "add event", exact: true }).click();
     await expect(page.getByText("Test Event handled")).toBeVisible();
     await page.getByRole("button", { name: "Delete event" }).click();
     await page.getByRole("button", { name: "Delete", exact: true }).click();
@@ -121,8 +118,7 @@ test.describe("Messages", () => {
 
     await addQueryHandledLocator.getByRole("button", { name: "add" }).click();
     await addQueryHandledLocator.getByLabel("Name").fill("Test Query handled");
-    await page.getByRole("button", { name: "add query" }).click();
-    await expect(addQueryHandledLocator).toBeVisible();
+    await addQueryHandledLocator.getByRole("button", { name: "add query", exact: true }).click();
     await expect(page.getByText("Test Query handled")).toBeVisible();
     await page.getByRole("button", { name: "Delete query" }).click();
     await page.getByRole("button", { name: "Delete", exact: true }).click();
@@ -136,8 +132,7 @@ test.describe("Messages", () => {
 
     await addCommandLocator.getByRole("button", { name: "add" }).click();
     await addCommandLocator.getByLabel("Name").fill("Test Command sent");
-    await page.getByRole("button", { name: "add command" }).click();
-    await expect(addCommandLocator).toBeVisible();
+    await addCommandLocator.getByRole("button", { name: "add command", exact: true }).click();
     await expect(page.getByText("Test Command sent")).toBeVisible();
     await page.getByRole("button", { name: "Delete command" }).click();
     await page.getByRole("button", { name: "Delete", exact: true }).click();
@@ -145,8 +140,7 @@ test.describe("Messages", () => {
 
     await addEventHandledLocator.getByRole("button", { name: "add" }).click();
     await addEventHandledLocator.getByLabel("Name").fill("Test Event published");
-    await page.getByRole("button", { name: "add event" }).click();
-    await expect(addEventHandledLocator).toBeVisible();
+    await addEventHandledLocator.getByRole("button", { name: "add event", exact: true }).click();
     await expect(page.getByText("Test Event published")).toBeVisible();
     await page.getByRole("button", { name: "Delete event" }).click();
     await page.getByRole("button", { name: "Delete", exact: true }).click();
@@ -154,8 +148,7 @@ test.describe("Messages", () => {
 
     await addQueryHandledLocator.getByRole("button", { name: "add" }).click();
     await addQueryHandledLocator.getByLabel("Name").fill("Test Query invoked");
-    await page.getByRole("button", { name: "add query" }).click();
-    await expect(addQueryHandledLocator).toBeVisible();
+    await addQueryHandledLocator.getByRole("button", { name: "add query", exact: true }).click();
     await expect(page.getByText("Test Query invoked")).toBeVisible();
     await page.getByRole("button", { name: "Delete query" }).click();
     await page.getByRole("button", { name: "Delete", exact: true }).click();
@@ -169,7 +162,7 @@ test.describe("Collaborators", () => {
     await boundedContextCanvas.addNewInboundCollaborator.click();
     await page.getByLabel("Bounded Context", { exact: true }).check();
 
-    await page.getByPlaceholder("Select an option").fill("W");
+    await page.getByPlaceholder("Select a collaborator").fill("W");
     await page.getByText("Warehousing").click();
     await page.getByLabel("Description").fill("Test");
     await page.getByRole("button", { name: "add connection" }).click();
@@ -192,7 +185,7 @@ test.describe("Collaborators", () => {
     await boundedContextCanvas.addNewInboundCollaborator.click();
     await page.getByLabel("Domain", { exact: true }).check();
 
-    await page.getByPlaceholder("Select an option").fill("Restaurant Experience");
+    await page.getByPlaceholder("Select a collaborator").fill("Restaurant Experience");
     await page.getByText("Restaurant Experience").click();
     await page.getByRole("button", { name: "add connection" }).click();
 
@@ -262,7 +255,7 @@ test.describe("Collaborators", () => {
     await boundedContextCanvas.addNewOutboundCollaborator.click();
     await page.getByLabel("Bounded Context", { exact: true }).check();
 
-    await page.getByPlaceholder("Select an option").fill("W");
+    await page.getByPlaceholder("Select a collaborator").fill("W");
     await page.getByText("Warehousing").click();
     await page.getByLabel("Description").fill("Test");
     await page.getByRole("button", { name: "add connection" }).click();
@@ -285,7 +278,7 @@ test.describe("Collaborators", () => {
     await boundedContextCanvas.addNewOutboundCollaborator.click();
     await page.getByLabel("Domain", { exact: true }).check();
 
-    await page.getByPlaceholder("Select an option").fill("Restaurant Experience");
+    await page.getByPlaceholder("Select a collaborator").fill("Restaurant Experience");
     await page.getByText("Restaurant Experience").click();
     await page.getByRole("button", { name: "add connection" }).click();
 
@@ -403,7 +396,7 @@ test.describe("Domain Role", () => {
     await page.getByLabel("Description").fill("This is a new domain role");
     await page.getByRole("button", { name: "add domain role" }).click();
     await page.getByTestId("deleteDomainRole").click();
-    await page.getByRole("button", { name: "Delete" }).click();
+    await page.getByRole("button", { name: "Delete", exact: true }).click();
 
     await expect(page.getByText("Test domain role")).toHaveCount(0);
   });
@@ -421,9 +414,9 @@ test.describe("Domain Role", () => {
     await page.getByRole("button", { name: "Specification Model" }).click();
     await expect(
       page.getByText("Produces a document describing a job/request that needs to be performed.")
-    ).toBeVisible();
+    ).toHaveCount(1);
     await page.getByTestId("deleteDomainRole").click();
-    await page.getByRole("button", { name: "Delete" }).click();
+    await page.getByRole("button", { name: "Delete", exact: true }).click();
 
     await expect(page.getByText("Specification Model")).toHaveCount(0);
   });

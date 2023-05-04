@@ -39,7 +39,7 @@ test.describe("Edit domain", () => {
     await page.getByLabel("Vision").fill("This is an updated domain vision");
     await page.getByRole("button", { name: "save" }).click();
 
-    await expect(domainDetails.editDomainButton).toBeVisible();
+    await expect(domainDetails.editDomainButton).toHaveCount(1);
     await expect(page.getByText("SUB", { exact: true })).toBeVisible();
     await expect(page.getByRole("heading", { name: "domain new" })).toBeVisible();
     await expect(page.getByText("This is an updated domain vision")).toBeVisible();
@@ -60,7 +60,7 @@ test.describe("Edit domain", () => {
     await page.getByLabel("Vision").fill("Vision which should not be saved");
     await domainDetails.closeEditDomainButton.click();
 
-    await expect(domainDetails.editDomainButton).toBeVisible();
+    await expect(domainDetails.editDomainButton).toHaveCount(1);
     await expect(page.getByText("DontSave", { exact: true })).not.toBeVisible();
     await expect(page.getByRole("heading", { name: "Name not saved" })).not.toBeVisible();
     await expect(page.getByText("Vision which should not be saved", { exact: true })).not.toBeVisible();

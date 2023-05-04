@@ -21,7 +21,10 @@
           </div>
         </template>
         <template #default>
-          {{ key.description }}
+          <span v-if="key.description">{{ key.description }}</span>
+          <span v-else class="italic text-gray-700"
+            >({{ t("bounded_context_canvas.business_decisions.description.empty") }})</span
+          >
         </template>
       </ContextureAccordionItem>
 

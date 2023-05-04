@@ -152,7 +152,7 @@
 
           <div class="p-2">
             <ContextureTooltip content="View namespaces" placement="top">
-              <RouterLink :to="`/boundedContext/${boundedContext.id}/namespaces`">
+              <RouterLink :to="`/boundedContext/${boundedContext.id}/namespaces`" class="hover:text-blue-600">
                 <icon:material-symbols:add-notes-outline-sharp
                   :aria-label="t('bounded_context.card.view_namespaces')"
                   class="h-6 w-6"

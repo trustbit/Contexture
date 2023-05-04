@@ -1,48 +1,50 @@
 <template>
   <ContextureHeroHeader v-if="domain">
     <div class="container mx-auto px-4 sm:px-0">
-      <div v-if="editMode">
-        <div class="space-y-2">
-          <ContextureHelpfulErrorAlert
-            v-for="(error, index) of editSubmitErrors"
-            :key="`error ${index}`"
-            v-bind="error"
-          />
-        </div>
-        <div class="flex justify-between gap-4">
-          <ContextureEditDomainForm :domain="domain" @submit="onSave" />
+      <transition enter-from-class="opacity-0" enter-active-class="transition-opacity" appear>
+        <div v-if="editMode">
+          <div class="space-y-2">
+            <ContextureHelpfulErrorAlert
+              v-for="(error, index) of editSubmitErrors"
+              :key="`error ${index}`"
+              v-bind="error"
+            />
+          </div>
+          <div class="flex justify-between gap-4">
+            <ContextureEditDomainForm :domain="domain" @submit="onSave" />
 
-          <div>
-            <ContextureRoundedButton @click="onEditCloseClick">
-              <span class="sr-only">{{ t("domains.details.edit.close") }}</span>
-              <Icon:material-symbols:close class="h-4 w-4" />
-            </ContextureRoundedButton>
-          </div>
-        </div>
-      </div>
-      <div v-else>
-        <div class="flex justify-between gap-4">
-          <div class="flex flex-col gap-4">
-            <span class="text-sm text-gray-700">{{ domain.shortName }}</span>
             <div>
-              <h1 class="text-3xl font-bold">
-                {{ domain.name }}
-              </h1>
-            </div>
-            <div>
-              <span class="text-lg text-gray-800">{{ domain.vision }}</span>
-            </div>
-          </div>
-          <div>
-            <ContextureTooltip content="Edit Domain" placement="left">
-              <ContextureRoundedButton size="md" @click="onEditClick">
-                <span class="sr-only">{{ t("domains.details.edit.edit") }}</span>
-                <Icon:material-symbols:drive-file-rename-outline class="h-4 w-4" />
+              <ContextureRoundedButton @click="onEditCloseClick">
+                <span class="sr-only">{{ t("domains.details.edit.close") }}</span>
+                <Icon:material-symbols:close class="h-4 w-4" />
               </ContextureRoundedButton>
-            </ContextureTooltip>
+            </div>
           </div>
         </div>
-      </div>
+        <div v-else>
+          <div class="flex w-full justify-between gap-4">
+            <div class="flex w-full flex-col gap-4">
+              <span class="text-sm text-gray-700">{{ domain.shortName }}</span>
+              <div>
+                <h1 class="text-3xl font-bold">
+                  {{ domain.name }}
+                </h1>
+              </div>
+              <div class="h-36 w-full overflow-y-auto whitespace-pre-line">
+                <span class="text-lg text-gray-800">{{ domain.vision }}</span>
+              </div>
+            </div>
+            <div>
+              <ContextureTooltip content="Edit Domain" placement="left">
+                <ContextureRoundedButton size="md" @click="onEditClick">
+                  <span class="sr-only">{{ t("domains.details.edit.edit") }}</span>
+                  <Icon:material-symbols:drive-file-rename-outline class="h-4 w-4" />
+                </ContextureRoundedButton>
+              </ContextureTooltip>
+            </div>
+          </div>
+        </div>
+      </transition>
     </div>
   </ContextureHeroHeader>
 

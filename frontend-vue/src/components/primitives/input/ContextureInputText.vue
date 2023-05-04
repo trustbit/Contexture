@@ -12,8 +12,8 @@
       class="block w-full rounded border border-blue-100 p-2 text-gray-900 focus-visible:border-blue-500 focus-visible:outline-none focus-visible:ring-blue-500"
       :class="[
         {
-          'border-red-500': errorMessage && meta.touched && !skipValidation,
-          'border-green-500': meta.valid && meta.touched && !skipValidation,
+          'border-red-500': errorMessage && !skipValidation && (meta.touched || meta.dirty),
+          'border-green-500': meta.valid && !skipValidation && (meta.touched || meta.dirty),
           'cursor-not-allowed': disabled,
         },
       ]"
@@ -22,7 +22,10 @@
       @input="onInput"
       @blur="handleBlur"
     />
-    <span v-if="errorMessage" class="block border-l-2 border-l-red-500 pl-2 text-sm text-red-500">
+    <span
+      v-if="errorMessage && (meta.touched || meta.dirty)"
+      class="block border-l-2 border-l-red-500 pl-2 text-sm text-red-500"
+    >
       {{ errorMessage }}
     </span>
     <span class="block border-l-2 border-l-blue-500 pl-2 text-sm text-gray-600">

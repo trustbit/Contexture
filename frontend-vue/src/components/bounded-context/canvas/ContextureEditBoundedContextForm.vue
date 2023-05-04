@@ -12,7 +12,7 @@
       name="name"
       :description="t('bounded_context_canvas.edit.form.description.name')"
       :label="t('bounded_context_canvas.edit.form.label.name')"
-      :rules="validationSchema"
+      :rules="nameValidationSchema"
       required
     />
 
@@ -46,7 +46,7 @@ const emit = defineEmits(["submit"]);
 const { t } = useI18n();
 const editModel: Ref<BoundedContext> = toRef(props, "initialValue");
 
-const validationSchema = toFieldValidator(zod.string().min(1, t("validation.required")));
+const nameValidationSchema = toFieldValidator(zod.string().min(1, t("validation.required")));
 
 function submit(values: any) {
   emit("submit", values);

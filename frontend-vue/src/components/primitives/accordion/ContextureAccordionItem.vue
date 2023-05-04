@@ -15,9 +15,18 @@
         </slot>
       </div>
     </DisclosureButton>
-    <DisclosurePanel class="pb-2 pl-2 pr-2 text-xs text-gray-900 sm:pl-9 sm:pr-2">
-      <slot />
-    </DisclosurePanel>
+    <transition
+      enter-active-class="overflow-hidden transition-max-height duration-200 ease-in"
+      enter-from-class="max-h-0"
+      enter-to-class="max-h-[1000px]"
+      leave-from-class="max-h-[1000px]"
+      leave-active-class="overflow-hidden transition-max-height duration-200 ease-out"
+      leave-to-class="max-h-0"
+    >
+      <DisclosurePanel class="pb-2 pl-2 pr-2 text-xs text-gray-900 sm:pl-9 sm:pr-2">
+        <slot />
+      </DisclosurePanel>
+    </transition>
   </Disclosure>
 </template>
 

@@ -6,6 +6,7 @@
     "dbaeumer.vscode-eslint",
     "EditorConfig.EditorConfig",
     "lokalise.i18n-ally",
-    "bradlc.vscode-tailwindcss"
+    "bradlc.vscode-tailwindcss",
+    "ms-playwright.playwright"
   ]
 }
