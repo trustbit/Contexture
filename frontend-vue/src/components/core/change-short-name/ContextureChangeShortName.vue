@@ -30,8 +30,6 @@ const shortNameValidationRules = toFieldValidator(
   shortNameValidationSchema(props.modelValue, allDomains.value, boundedContexts.value)
 );
 
-console.log(shortNameValidationRules);
-
 function onChange(text: string) {
   emit("update:modelValue", text);
 }
