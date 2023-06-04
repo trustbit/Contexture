@@ -9,12 +9,11 @@
   <ItemGroup>
     <PackageReference Include="FSharp.SystemTextJson" Version="1.1.23" />
     <PackageReference Include="Giraffe" Version="6.0.0" />
-    <PackageReference Include="Newtonsoft.Json" Version="13.0.2" />
-    <PackageReference Include="Ply" Version="0.3.1" />
-    <PackageReference Update="FSharp.Core" Version="7.0.200" />
+    <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
+    <PackageReference Update="FSharp.Core" Version="7.0.300" />
     <PackageReference Include="NStore.Persistence.MsSql" Version="0.14.0" />
-    <PackageReference Include="FsToolkit.ErrorHandling" Version="4.4.0" />
-    <PackageReference Include="FsToolkit.ErrorHandling.TaskResult" Version="4.4.0" />
+    <PackageReference Include="FsToolkit.ErrorHandling.TaskResult" Version="4.6.0" />
+    <PackageReference Include="System.Data.SqlClient" Version="4.8.5"  />
   </ItemGroup>
 
   <ItemGroup>

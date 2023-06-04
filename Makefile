@@ -12,6 +12,12 @@ publish-backend:
         -c Release \
         -o artifacts/backend
 
+publish-docker:
+	dotnet publish backend/Contexture.Api/Contexture.Api.fsproj \
+        -c Release \
+        --os linux \
+        -o artifacts/backend
+
 build-app:
 	cd frontend-vue && npm ci && npm run build
 
@@ -19,7 +25,7 @@ publish-app: build-app
 	mkdir -p artifacts/frontend
 	cp -r frontend-vue/dist/** artifacts/frontend
 
-prepare-image: publish-backend publish-app
+prepare-image: publish-docker publish-app
 	mkdir -p artifacts/image/wwwroot
 	cp -r artifacts/backend/*.* artifacts/image/
 	cp -r artifacts/frontend/** artifacts/image/wwwroot/

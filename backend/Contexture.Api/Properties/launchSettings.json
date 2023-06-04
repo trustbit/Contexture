@@ -22,6 +22,15 @@
         "ASPNETCORE_ENVIRONMENT": "Development"
       },
       "applicationUrl": "http://localhost:5000"
+    },
+    "Contexture.Api SQL-SERVER": {
+      "commandName": "Project",
+      "launchBrowser": true,
+      "environmentVariables": {
+        "ASPNETCORE_ENVIRONMENT": "Development",
+        "SqlBased__ConnectionString":"Server=localhost;User Id=sa;Password=development(!)Password"
+      },
+      "applicationUrl": "http://localhost:5000"
     }
   }
 }
