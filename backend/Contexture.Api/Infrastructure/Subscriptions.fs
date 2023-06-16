@@ -3,6 +3,7 @@ namespace Contexture.Api.Infrastructure.Subscriptions
 open System.Threading.Tasks
 open FsToolkit.ErrorHandling
 open Contexture.Api.Infrastructure
+open Microsoft.Extensions.Logging
 
 type SubscriptionDefinition =
     | FromAll of SubscriptionStartingPosition
@@ -72,7 +73,7 @@ module Runtime =
         (positions |> List.length = 1)
         && (List.length caughtUpSubscriptions) = (List.length subscriptions)
 
-    let waitUntilCaughtUp (subscriptions: Subscription List) =
+    let waitUntilCaughtUp (logger:ILogger) (subscriptions: Subscription List) =
         task {
             let initialStatus = calculateStatistics subscriptions
             let mutable lastStatus = initialStatus
@@ -80,6 +81,7 @@ module Runtime =
             while not (didAllSubscriptionsCatchup lastStatus.CaughtUp subscriptions) do
                 do! Task.Delay(100)
                 let calculatedStatus = calculateStatistics subscriptions
+                logger.LogDebug("Statistics on {Counter} {Statistics}",counter, string lastStatus)
                 // if nothing changed since the last iteration we increase the counter to fail eventually
                 if calculatedStatus = lastStatus then
                     counter <- counter + 1

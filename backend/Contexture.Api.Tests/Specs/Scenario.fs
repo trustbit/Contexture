@@ -10,6 +10,7 @@ open Contexture.Api.Infrastructure.Subscriptions
 open Contexture.Api.Reactions
 open Contexture.Api.Tests.TestHost
 open FsToolkit.ErrorHandling
+open Microsoft.Extensions.Logging.Abstractions
 open TestHost
 
 type Given = EventEnvelope list
@@ -70,7 +71,7 @@ module When =
         let store = environment.GetService<EventStore>()
         let! subscription = store.SubscribeAll AllEvents.fromEnvelope "capture events" Subscriptions.End captureEvents
         let! result = action environment
-        let! statistics = Runtime.waitUntilCaughtUp (subscription :: environment.Subscriptions)
+        let! statistics = Runtime.waitUntilCaughtUp NullLogger.Instance (subscription :: environment.Subscriptions)
         return {
             TestEnvironment = environment
             Changes = capturedEvents |> List.ofSeq

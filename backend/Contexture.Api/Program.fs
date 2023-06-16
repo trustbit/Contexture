@@ -320,9 +320,11 @@ module Startup =
         task {
             let config = host.Services.GetRequiredService<ContextureConfiguration>()
             let loggerFactory = host.Services.GetRequiredService<ILoggerFactory>()
+            let startLogger = loggerFactory.CreateLogger "Start"
             
             match config.Engine with
-            | FileBased _ ->
+            | FileBased path ->
+                startLogger.LogInformation("Using FileBased Logger with {Path}", path)
                 // make sure the database is loaded
                 let database =
                     host.Services.GetRequiredService<FileBased.Database.SingleFileBasedDatastore>()
@@ -336,9 +338,11 @@ module Startup =
                 let store = host.Services.GetRequiredService<EventStore>()
             
                 let! document = database.Read()
+                startLogger.LogInformation("Loaded {Domains}, {BoundedContexts}", document.Domains.All.Length, document.BoundedContexts.All.Length)
                 do! FileBased.Convert.importFromDocument store document
                 
-                let! _ = Runtime.waitUntilCaughtUp readModelSubscriptions
+                
+                let! _ = Runtime.waitUntilCaughtUp startLogger readModelSubscriptions
                 
                 let subscriptionLogger = loggerFactory.CreateLogger("subscriptions")
 
@@ -357,21 +361,24 @@ module Startup =
           
                 SystemRoutes.subscriptions <- Some (readModelSubscriptions @ fileSyncSubscriptions)
                 if host.Services.GetRequiredService<IWebHostEnvironment>().IsDevelopment() then
-                    let! _ = Runtime.waitUntilCaughtUp (readModelSubscriptions @ fileSyncSubscriptions)
+                    let! _ = Runtime.waitUntilCaughtUp startLogger (readModelSubscriptions @ fileSyncSubscriptions)
                     ()
             | SqlServerBased connectionString ->
+                startLogger.LogInformation("Connecting to SQL Server")
                 // TODO: properly provision database table?
                 let persistence = host.Services.GetRequiredService<NStore.Persistence.MsSql.MsSqlPersistence>()
                 do! persistence.InitAsync(CancellationToken.None)
+                startLogger.LogInformation("Initialized NStore Persistence")
 
                 do! PositionStorage.SqlServer.PositionStorage.CreateSchema connectionString
+                startLogger.LogInformation("Initialized Position Storage")
                 
                 let readModels = host.Services.GetServices<ReadModels.ReadModelInitialization>()
 
                 let! readModelSubscriptions = connectAndReplayReadModels readModels
                 SystemRoutes.subscriptions <- Some readModelSubscriptions
                 if host.Services.GetRequiredService<IWebHostEnvironment>().IsDevelopment() then
-                    let! _ = Runtime.waitUntilCaughtUp readModelSubscriptions
+                    let! _ = Runtime.waitUntilCaughtUp startLogger readModelSubscriptions
                     ()
 
             let! reactionSubscriptions = connectAndReplayReactions (host.Services.GetServices<Reactions.ReactionInitialization>())

@@ -57,7 +57,7 @@ let waitForEventsOnSubscription start (eventStore: EventStore) action eventCallb
             Async.Sleep(0)
 
         let! subscription = eventStore.Subscribe "UnitTestSubscription" start subscriptionHandler
-        let! _ = Runtime.waitUntilCaughtUp [ subscription ]
+        let! _ = Runtime.waitUntilCaughtUp NullLogger.Instance [ subscription ]
 
         do! Async.StartAsTask(action ())
 

@@ -16,6 +16,7 @@ open Microsoft.Extensions.Http
 open Microsoft.Extensions.DependencyInjection
 open Microsoft.AspNetCore.TestHost
 open Microsoft.Extensions.Logging
+open Microsoft.Extensions.Logging.Abstractions
 
 module TestHost =
     let configureLogging (builder: ILoggingBuilder) =
@@ -46,7 +47,8 @@ module TestHost =
 
     let private waitUntilCaughtUp subscriptionsTask = async {
         let! subscriptions = subscriptionsTask
-        let! _ = subscriptions |> (Runtime.waitUntilCaughtUp >> Async.AwaitTask)
+        let nullLogger = NullLogger.Instance
+        let! _ = subscriptions |> (Runtime.waitUntilCaughtUp nullLogger >> Async.AwaitTask)
         return subscriptions
     }
     let runReadModels (host: IHost) = 
