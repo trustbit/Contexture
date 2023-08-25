@@ -9,7 +9,6 @@
     "lintFix": "eslint . --fix",
     "typecheck": "vue-tsc --noEmit",
     "preview": "vite preview",
-    "preview:e2e": "vite build && vite preview",
     "test:unit": "vitest --environment jsdom --root src/",
     "test:e2e": "playwright test"
   },
