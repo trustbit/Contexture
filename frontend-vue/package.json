@@ -9,6 +9,7 @@
     "lintFix": "eslint . --fix",
     "typecheck": "vue-tsc --noEmit",
     "preview": "vite preview",
+    "preview:e2e": "vite build && vite preview",
     "test:unit": "vitest --environment jsdom --root src/",
     "test:e2e": "playwright test"
   },
@@ -31,7 +32,7 @@
     "@babel/core": "^7.21.0",
     "@iconify-json/material-symbols": "^1.1.32",
     "@intlify/unplugin-vue-i18n": "^0.8.2",
-    "@playwright/test": "^1.30.0",
+    "@playwright/test": "^1.37.1",
     "@rushstack/eslint-patch": "^1.1.4",
     "@tailwindcss/forms": "^0.5.3",
     "@types/node": "^18.14.2",
