@@ -103,7 +103,7 @@
                   class="absolute right-0 mt-2 w-56 origin-top-right divide-y divide-gray-100 rounded bg-white shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none"
                 >
                   <div class="px-1 py-1">
-                    <MenuItem v-slot="{ active }">
+                    <MenuItem v-if="!subdomainsStore.isCreateSubdomainDisabled" v-slot="{ active }">
                       <button
                         class="group flex w-full items-center rounded-md px-2 py-2 text-sm capitalize"
                         :class="[active ? 'bg-blue-500 text-white' : 'text-gray-900']"
@@ -117,6 +117,7 @@
                         {{ t("common.subdomain") }}
                       </button>
                     </MenuItem>
+
                     <MenuItem v-slot="{ active }">
                       <button
                         class="group flex w-full items-center rounded-md px-2 py-2 text-sm capitalize"
@@ -145,6 +146,7 @@
                     <span class="text-lg">{{ t("domains.details.no_subdomains") }}</span>
                   </div>
                   <ContexturePrimaryButton
+                    v-if="!subdomainsStore.isCreateSubdomainDisabled"
                     :label="t('domains.details.button.create_subdomain')"
                     class="mt-4"
                     @click="onCreateSubdomain"
@@ -196,7 +198,7 @@
 import { Menu, MenuButton, MenuItem, MenuItems, Tab, TabGroup, TabList, TabPanel, TabPanels } from "@headlessui/vue";
 import { useRouteParams, useRouteQuery } from "@vueuse/router";
 import { storeToRefs } from "pinia";
-import { computed, ComputedRef, ref } from "vue";
+import { computed, ComputedRef, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import ContextureCreateBoundedContextModal from "~/components/domains/details/ContextureCreateBoundedContextModal.vue";
 import CreateSubdomainModal from "~/components/domains/details/ContextureCreateSubdomainModal.vue";
@@ -214,10 +216,12 @@ import ContextureHeroHeader from "~/components/core/header/ContextureHeroHeader.
 import ContextureTooltip from "~/components/primitives/tooltip/ContextureTooltip.vue";
 import { useBoundedContextsStore } from "~/stores/boundedContexts";
 import { useDomainsStore } from "~/stores/domains";
+import { useSubdomainsStore } from "~/stores/subDomains";
 import { Domain, UpdateDomain } from "~/types/domain";
 
 const { t } = useI18n();
 const domainStore = useDomainsStore();
+const subdomainsStore = useSubdomainsStore();
 const { loading, subdomainsByDomainId, domainByDomainId } = storeToRefs(domainStore);
 const { boundedContextsByDomainId } = storeToRefs(useBoundedContextsStore());
 const currentDomainId = useRouteParams<string>("id");
@@ -260,6 +264,16 @@ function onEditClick() {
 function onEditCloseClick() {
   editMode.value = false;
 }
+
+watch(
+  () => domain.value,
+  (newDomain) => {
+    if (newDomain) {
+      subdomainsStore.setCurrentDomain(newDomain);
+    }
+  },
+  { immediate: true }
+);
 
 const editSubmitErrors = ref<HelpfulErrorProps[]>();
 
