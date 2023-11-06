@@ -271,6 +271,7 @@
   "domains.modal.create_subdomain.title": "Create Subdomain",
   "navigation.domains": "Domains",
   "navigation.search": "Search",
+  "navigation.analytics": "Analytics",
   "search.active_filters.title": "Active filters",
   "search.add_filter": "add filter",
   "search.field": "Field",

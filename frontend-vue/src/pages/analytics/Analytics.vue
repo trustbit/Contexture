@@ -168,9 +168,9 @@ import ContextureSearch from "~/components/primitives/input/ContextureSearch.vue
 import ContextureListItem from "~/components/primitives/list/ContextureListItem.vue";
 import ContexturePopover from "~/components/primitives/popover/ContexturePopover.vue";
 import ContextureViewSwitcher from "~/components/primitives/viewswitcher/ContextureViewSwitcher.vue";
-import { ActiveFilter } from "~/components/search/activeFilter";
-import ContextureActiveFilters from "~/components/search/ContextureActiveFilters.vue";
-import ContextureAddFilterPopoverContent from "~/components/search/ContextureAddFilter.vue";
+import { ActiveFilter } from "~/components/analytics/activeFilter";
+import ContextureActiveFilters from "~/components/analytics/ContextureActiveFilters.vue";
+import ContextureAddFilterPopoverContent from "~/components/analytics/ContextureAddFilter.vue";
 import { useFetch } from "~/composables/useFetch";
 import { arrayContentEqual } from "~/core/arrayContentEqual";
 import { useDomainsStore } from "~/stores/domains";

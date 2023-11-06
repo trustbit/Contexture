@@ -27,7 +27,7 @@
 import { useI18n } from "vue-i18n";
 import ContextureBadge from "~/components/primitives/badge/ContextureBadge.vue";
 import ContextureWhiteButton from "~/components/primitives/button/ContextureWhiteButton.vue";
-import { ActiveFilter } from "~/components/search/activeFilter";
+import { ActiveFilter } from "~/components/analytics/activeFilter";
 
 interface Props {
   activeFilters: ActiveFilter[];
