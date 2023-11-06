@@ -1,9 +1,9 @@
 <template>
   <div>
     <TabGroup @change="onTabChange" :selected-index="selectedViewTab">
-      <div class="my-5 justify-end sm:flex">
+      <div class="my-2 justify-end sm:my-5 sm:flex">
         <TabList
-          class="flex divide-x divide-blue-500 overflow-hidden rounded-2xl border border-blue-500 text-xs text-blue-500 sm:w-fit lg:mr-10"
+          class="mx-2 flex divide-x divide-blue-500 overflow-hidden rounded-2xl border border-blue-500 text-xs text-blue-500 sm:mr-10 sm:w-fit"
         >
           <Tab
             v-for="tabListOption of tabOptions"
