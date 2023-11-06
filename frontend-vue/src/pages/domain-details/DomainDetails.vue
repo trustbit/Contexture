@@ -196,7 +196,7 @@
 import { Menu, MenuButton, MenuItem, MenuItems, Tab, TabGroup, TabList, TabPanel, TabPanels } from "@headlessui/vue";
 import { useRouteParams, useRouteQuery } from "@vueuse/router";
 import { storeToRefs } from "pinia";
-import { computed, ComputedRef, ref } from "vue";
+import { computed, ComputedRef, ref, watchEffect } from "vue";
 import { useI18n } from "vue-i18n";
 import ContextureCreateBoundedContextModal from "~/components/domains/details/ContextureCreateBoundedContextModal.vue";
 import CreateSubdomainModal from "~/components/domains/details/ContextureCreateSubdomainModal.vue";
@@ -288,4 +288,10 @@ async function onSave(values: UpdateDomain) {
     editMode.value = false;
   }
 }
+
+watchEffect(() => {
+  if (subdomains.value.length === 0) {
+    onTabChange(viewOptions.indexOf(viewOptions[1])); // Set the second tab as active
+  }
+});
 </script>
