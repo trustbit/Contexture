@@ -10,6 +10,7 @@ export const boundedContextRoutes: Record<ContextureRoutes, string> = {
 export const routes: Record<ContextureRoutes, string> = {
   Domains: "Domains",
   DomainDetails: "DomainDetails",
+  Analytics: "Analytics",
   Search: "Search",
   ...boundedContextRoutes,
 };
@@ -45,6 +46,11 @@ export default [
     name: routes.Analytics,
     path: "/analytics",
     component: Analytics,
+  },
+  {
+    name: routes.Search,
+    path: "/search",
+    component: Root,
   },
   { path: "/:pathMatch(.*)*", redirect: { name: routes.Domains } },
 ];

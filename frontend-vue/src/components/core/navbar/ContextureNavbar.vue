@@ -49,6 +49,11 @@ const items: NavbarItem[] = [
     to: "/analytics",
     additionalActiveRouteMatches: [],
   },
+  {
+    title: t("navigation.search"),
+    to: "/search",
+    additionalActiveRouteMatches: [routes.Search],
+  },
 ];
 
 function isActiveRoute(item: NavbarItem): boolean {

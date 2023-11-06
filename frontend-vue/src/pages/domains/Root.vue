@@ -31,7 +31,8 @@
 <script lang="ts" setup>
 import { Disclosure, Tab, TabGroup, TabList, TabPanel, TabPanels } from "@headlessui/vue";
 import { useRouteQuery } from "@vueuse/router";
-import { computed, Ref } from "vue";
+import { useRoute } from "vue-router";
+import { computed, Ref, watchEffect } from "vue";
 import { useI18n } from "vue-i18n";
 import BubbleView from "~/pages/domains/BubbleView.vue";
 import GridView from "~/pages/domains/GridView.vue";
@@ -58,7 +59,9 @@ enum ViewOption {
 }
 
 const { t } = useI18n();
-const queryParamType: Ref<string> = useRouteQuery<ViewOption>("type", ViewOption.GRID, { mode: "push" });
+const route = useRoute();
+const defaultViewOption = route.path === "/search" ? ViewOption.LIST : ViewOption.GRID;
+const queryParamType: Ref<string> = useRouteQuery<ViewOption>("type", defaultViewOption, { mode: "push" });
 const selectedViewTab = computed(() => tabOptions.findIndex((t) => t.id === queryParamType.value) || 0);
 
 const tabOptions: TabListOption[] = [
@@ -97,4 +100,10 @@ const tabPanelViews: TabPanelOption[] = [
 function onTabChange(newSelectedTab: number): void {
   queryParamType.value = tabOptions[newSelectedTab].id;
 }
+
+watchEffect(() => {
+  if (route.path !== "/search" && queryParamType.value === ViewOption.LIST) {
+    queryParamType.value = tabOptions[0].id;
+  }
+});
 </script>
