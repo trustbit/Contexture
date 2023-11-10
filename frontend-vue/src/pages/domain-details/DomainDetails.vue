@@ -196,7 +196,7 @@
 import { Menu, MenuButton, MenuItem, MenuItems, Tab, TabGroup, TabList, TabPanel, TabPanels } from "@headlessui/vue";
 import { useRouteParams, useRouteQuery } from "@vueuse/router";
 import { storeToRefs } from "pinia";
-import { computed, ComputedRef, ref, watchEffect } from "vue";
+import { computed, ComputedRef, ref } from "vue";
 import { useI18n } from "vue-i18n";
 import ContextureCreateBoundedContextModal from "~/components/domains/details/ContextureCreateBoundedContextModal.vue";
 import CreateSubdomainModal from "~/components/domains/details/ContextureCreateSubdomainModal.vue";
@@ -215,7 +215,6 @@ import ContextureTooltip from "~/components/primitives/tooltip/ContextureTooltip
 import { useBoundedContextsStore } from "~/stores/boundedContexts";
 import { useDomainsStore } from "~/stores/domains";
 import { Domain, UpdateDomain } from "~/types/domain";
-import { useRouter } from "vue-router";
 
 const { t } = useI18n();
 const domainStore = useDomainsStore();
@@ -231,9 +230,18 @@ const createSubdomainOpen = ref<boolean>(false);
 const createBoundedContextOpen = ref<boolean>(false);
 const boundedContexts = computed(() => boundedContextsByDomainId.value[currentDomainId.value] || []);
 const viewOptions = ["subdomain", "boundedContext"];
-const selectedView = useRouteQuery<string>("view", "subdomain", { mode: "push" });
-const selectedTab = computed<number>(() => viewOptions.indexOf(selectedView.value));
-const router = useRouter();
+const selectedView = useRouteQuery<string>("view", "subdomain");
+const selectedTab = computed<number>(() => getSelectedTab());
+let isInitialRoute = true;
+
+function getSelectedTab() {
+  if (isInitialRoute && selectedView.value === "subdomain" && subdomains.value.length === 0) {
+    isInitialRoute = false;
+    selectedView.value = "boundedContext";
+    return viewOptions.indexOf("boundedContext");
+  }
+  return viewOptions.indexOf(selectedView.value);
+}
 
 function onTabChange(newSelectedTab: number): void {
   selectedView.value = viewOptions[newSelectedTab];
@@ -290,13 +298,4 @@ async function onSave(values: UpdateDomain) {
     editMode.value = false;
   }
 }
-
-watchEffect(() => {
-  if (loading) {
-    return;
-  }
-  if (subdomains.value.length === 0) {
-    router.replace({ query: { view: viewOptions[1] } });
-  }
-});
 </script>
