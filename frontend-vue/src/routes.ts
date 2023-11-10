@@ -18,7 +18,7 @@ const Root = () => import("./pages/domains/Root.vue");
 const DomainDetails = () => import("./pages/domain-details/DomainDetails.vue");
 const BoundedContextCanvas = () => import("./pages/bounded-context/BoundedContextCanvas.vue");
 const BoundedContextNamespaces = () => import("./pages/bounded-context/BoundedContextNamespaces.vue");
-const Search = () => import("./pages/search/Search.vue");
+const Analytics = () => import("./pages/analytics/Analytics.vue");
 
 export default [
   {
@@ -42,9 +42,9 @@ export default [
     component: BoundedContextNamespaces,
   },
   {
-    name: routes.Search,
-    path: "/search",
-    component: Search,
+    name: routes.Analytics,
+    path: "/analytics",
+    component: Analytics,
   },
   { path: "/:pathMatch(.*)*", redirect: { name: routes.Domains } },
 ];

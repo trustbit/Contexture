@@ -27,7 +27,7 @@
                 <ContextureBadge color="blue" mode="light" size="sm" variant="filled">
                   <b>{{ label.name }}&nbsp;</b>
                   <RouterLink
-                    :to="`/search?Label.Name=${label.name}&Label.Value=${label.value}`"
+                    :to="`/analytics?Label.Name=${label.name}&Label.Value=${label.value}`"
                     class="hover:underline"
                   >
                     {{ label.value }}
@@ -126,7 +126,7 @@
                   <ContextureBadge color="blue" mode="light" size="sm" variant="filled">
                     <b>{{ label.name }}&nbsp;</b>
                     <RouterLink
-                      :to="`/search?Label.Name=${label.name}&Label.Value=${label.value}`"
+                      :to="`/analytics?Label.Name=${label.name}&Label.Value=${label.value}`"
                       class="hover:underline"
                     >
                       {{ label.value }}
