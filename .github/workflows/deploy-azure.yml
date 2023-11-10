@@ -3,7 +3,6 @@ name: Deploy Contexture to Azure Web App
 on:
   push:
     branches:
-      - master
       - main
   workflow_dispatch:
 
