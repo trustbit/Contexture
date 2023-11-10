@@ -215,6 +215,7 @@ import ContextureTooltip from "~/components/primitives/tooltip/ContextureTooltip
 import { useBoundedContextsStore } from "~/stores/boundedContexts";
 import { useDomainsStore } from "~/stores/domains";
 import { Domain, UpdateDomain } from "~/types/domain";
+import { useRouter } from "vue-router";
 
 const { t } = useI18n();
 const domainStore = useDomainsStore();
@@ -232,6 +233,7 @@ const boundedContexts = computed(() => boundedContextsByDomainId.value[currentDo
 const viewOptions = ["subdomain", "boundedContext"];
 const selectedView = useRouteQuery<string>("view", "subdomain", { mode: "push" });
 const selectedTab = computed<number>(() => viewOptions.indexOf(selectedView.value));
+const router = useRouter();
 
 function onTabChange(newSelectedTab: number): void {
   selectedView.value = viewOptions[newSelectedTab];
@@ -290,8 +292,11 @@ async function onSave(values: UpdateDomain) {
 }
 
 watchEffect(() => {
+  if (loading) {
+    return;
+  }
   if (subdomains.value.length === 0) {
-    onTabChange(viewOptions.indexOf(viewOptions[1])); // Set the second tab as active
+    router.replace({ query: { view: viewOptions[1] } });
   }
 });
 </script>
