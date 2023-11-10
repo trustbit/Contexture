@@ -230,8 +230,18 @@ const createSubdomainOpen = ref<boolean>(false);
 const createBoundedContextOpen = ref<boolean>(false);
 const boundedContexts = computed(() => boundedContextsByDomainId.value[currentDomainId.value] || []);
 const viewOptions = ["subdomain", "boundedContext"];
-const selectedView = useRouteQuery<string>("view", "subdomain", { mode: "push" });
-const selectedTab = computed<number>(() => viewOptions.indexOf(selectedView.value));
+const selectedView = useRouteQuery<string>("view", "subdomain");
+const selectedTab = computed<number>(() => getSelectedTab());
+let isInitialRoute = true;
+
+function getSelectedTab() {
+  if (isInitialRoute && selectedView.value === "subdomain" && subdomains.value.length === 0) {
+    isInitialRoute = false;
+    selectedView.value = "boundedContext";
+    return viewOptions.indexOf("boundedContext");
+  }
+  return viewOptions.indexOf(selectedView.value);
+}
 
 function onTabChange(newSelectedTab: number): void {
   selectedView.value = viewOptions[newSelectedTab];
