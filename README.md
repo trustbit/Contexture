@@ -79,7 +79,6 @@ Create a `.env` file in the root directory of your project and specify the envir
 CONTEXTURE_MAX_SUBDOMAINS_NESTING_LEVEL=1
 ```
 
-
 ## Running with Docker
 
 To build the Docker image use the `Makefile` via `make build-image` or execute the commands manually.
