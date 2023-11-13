@@ -46,12 +46,7 @@ export const useSubdomainsStore = defineStore("subdomains", () => {
     };
   }
 
-  const isRootSubdomain = computed(() => {
-    const parentDomainId = currentDomain.value?.parentDomainId || false;
-    return parentDomainId && domainLevel.value === 2;
-  });
-
-  const isCreateSubdomainDisabled = computed(() => {
+  const isCreateSubdomainEnabled = computed(() => {
     return domainLevel.value >= maxSubdomainsLevel.value;
   });
 
@@ -64,8 +59,7 @@ export const useSubdomainsStore = defineStore("subdomains", () => {
     maxSubdomainsLevel,
     domainLevel,
     isSubdomain,
-    isRootSubdomain,
-    isCreateSubdomainDisabled,
+    isCreateSubdomainEnabled,
     setCurrentDomain,
     setSubdomainLevel,
   };
