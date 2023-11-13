@@ -103,7 +103,7 @@
                   class="absolute right-0 mt-2 w-56 origin-top-right divide-y divide-gray-100 rounded bg-white shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none"
                 >
                   <div class="px-1 py-1">
-                    <MenuItem v-if="subdomainsStore.isCreateSubdomainEnabled" v-slot="{ active }">
+                    <MenuItem v-if="isCreateSubdomainEnabled" v-slot="{ active }">
                       <button
                         class="group flex w-full items-center rounded-md px-2 py-2 text-sm capitalize"
                         :class="[active ? 'bg-blue-500 text-white' : 'text-gray-900']"
@@ -143,10 +143,14 @@
               <div class="mt-6">
                 <div v-if="!subdomains.length" class="mb-4">
                   <div>
-                    <span class="text-lg">{{ t("domains.details.no_subdomains") }}</span>
+                    <span class="text-lg">{{
+                      isCreateSubdomainEnabled
+                        ? t("domains.details.no_subdomains")
+                        : t("domains.details.no_subdomains_limit")
+                    }}</span>
                   </div>
                   <ContexturePrimaryButton
-                    v-if="subdomainsStore.isCreateSubdomainEnabled"
+                    v-if="isCreateSubdomainEnabled"
                     :label="t('domains.details.button.create_subdomain')"
                     class="mt-4"
                     @click="onCreateSubdomain"
@@ -216,12 +220,10 @@ import ContextureHeroHeader from "~/components/core/header/ContextureHeroHeader.
 import ContextureTooltip from "~/components/primitives/tooltip/ContextureTooltip.vue";
 import { useBoundedContextsStore } from "~/stores/boundedContexts";
 import { useDomainsStore } from "~/stores/domains";
-import { useSubdomainsStore } from "~/stores/subDomains";
 import { Domain, UpdateDomain } from "~/types/domain";
 
 const { t } = useI18n();
 const domainStore = useDomainsStore();
-const subdomainsStore = useSubdomainsStore();
 const { loading, subdomainsByDomainId, domainByDomainId } = storeToRefs(domainStore);
 const { boundedContextsByDomainId } = storeToRefs(useBoundedContextsStore());
 const currentDomainId = useRouteParams<string>("id");
@@ -265,16 +267,6 @@ function onEditCloseClick() {
   editMode.value = false;
 }
 
-watch(
-  () => domain.value,
-  (newDomain) => {
-    if (newDomain) {
-      subdomainsStore.setCurrentDomain(newDomain);
-    }
-  },
-  { immediate: true }
-);
-
 const editSubmitErrors = ref<HelpfulErrorProps[]>();
 
 async function onSave(values: UpdateDomain) {
@@ -302,4 +294,14 @@ async function onSave(values: UpdateDomain) {
     editMode.value = false;
   }
 }
+
+const isCreateSubdomainEnabled = ref(domainStore.isCreateSubdomainEnabled(currentDomainId.value));
+
+watch(
+  () => currentDomainId.value,
+  () => {
+    isCreateSubdomainEnabled.value = domainStore.isCreateSubdomainEnabled(currentDomainId.value);
+  },
+  { immediate: true }
+);
 </script>
