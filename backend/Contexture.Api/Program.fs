@@ -72,6 +72,7 @@ module Routes =
     let webApp hostFrontend =
         choose [
              subRoute "/api"
+                Authorization.authorize >=>
                  (choose [
                        Apis.Domains.routes
                        Apis.BoundedContexts.routes
@@ -123,10 +124,16 @@ let utcNowClock =
     fun () ->  System.DateTimeOffset.UtcNow
         
 module ServiceConfiguration =
+    open System.Text
     open System.Text.Json
     open System.Text.Json.Serialization
     open Microsoft.Extensions.Configuration
     open Microsoft.Extensions.Options
+    open System.Security.Claims
+    open Microsoft.AspNetCore.Authentication.JwtBearer
+    open Microsoft.IdentityModel.Tokens
+    open System.IdentityModel.Tokens.Jwt
+    open Infrastructure.Authorization
 
     let configureJsonSerializer (services: IServiceCollection) =
         let options =
@@ -258,6 +265,7 @@ module ServiceConfiguration =
         services.AddSingleton<Clock>(utcNowClock) |> ignore
          
         services
+        |> configureAuthorization configuration.AuthorizationConfiguration
         |> configureReadModels
         |> configureReactions
         |> ignore
@@ -279,10 +287,13 @@ module ApplicationConfiguration =
         (match env.IsDevelopment() with
         | true  ->
             app.UseDeveloperExceptionPage()
+                .UseAuthentication()
+                .UseAuthorization()
         | false ->
             app.UseGiraffeErrorHandler(SystemRoutes.errorHandler))
             .UseCors(configureCors)
             .UseStaticFiles()
+            .UseAuthentication()
             .UseGiraffe(Routes.webApp (Routes.frontendHostRoutes env))
       
     let configureLogging (builder : ILoggingBuilder) =

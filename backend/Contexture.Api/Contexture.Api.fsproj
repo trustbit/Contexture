@@ -9,11 +9,12 @@
   <ItemGroup>
     <PackageReference Include="FSharp.SystemTextJson" Version="1.1.23" />
     <PackageReference Include="Giraffe" Version="6.0.0" />
+    <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="7.0.13" />
     <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
     <PackageReference Update="FSharp.Core" Version="7.0.300" />
     <PackageReference Include="NStore.Persistence.MsSql" Version="0.14.0" />
     <PackageReference Include="FsToolkit.ErrorHandling.TaskResult" Version="4.6.0" />
-    <PackageReference Include="System.Data.SqlClient" Version="4.8.5"  />
+    <PackageReference Include="System.Data.SqlClient" Version="4.8.5" />
   </ItemGroup>
 
   <ItemGroup>
@@ -30,6 +31,7 @@
     <Compile Include="Infrastructure\NStoreBased.fs" />
     <Compile Include="Infrastructure\Projections.fs" />
     <Compile Include="Infrastructure\ReadModels.fs" />
+    <Compile Include="Infrastructure\Authorization.fs" />
     <Compile Include="CommandHandlers.fs" />
     <Compile Include="Reactions.fs" />
     <Compile Include="ReadModels\ApplicationReadModels.fs" />
