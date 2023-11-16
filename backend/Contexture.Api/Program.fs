@@ -125,14 +125,9 @@ let utcNowClock =
         
 module ServiceConfiguration =
     open System.Text
-    open System.Text.Json
     open System.Text.Json.Serialization
     open Microsoft.Extensions.Configuration
     open Microsoft.Extensions.Options
-    open System.Security.Claims
-    open Microsoft.AspNetCore.Authentication.JwtBearer
-    open Microsoft.IdentityModel.Tokens
-    open System.IdentityModel.Tokens.Jwt
     open Infrastructure.Authorization
 
     let configureJsonSerializer (services: IServiceCollection) =
@@ -294,6 +289,7 @@ module ApplicationConfiguration =
             .UseCors(configureCors)
             .UseStaticFiles()
             .UseAuthentication()
+            .UseAuthorization()
             .UseGiraffe(Routes.webApp (Routes.frontendHostRoutes env))
       
     let configureLogging (builder : ILoggingBuilder) =
