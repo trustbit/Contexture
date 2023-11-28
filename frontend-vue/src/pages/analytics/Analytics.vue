@@ -193,6 +193,11 @@
         </TabPanel>
       </TabPanels>
     </TabGroup>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
   </div>
 </template>
 
@@ -226,6 +231,7 @@ import { Namespace, NamespaceLabel } from "~/types/namespace";
 import IconsMaterialSymbolsApps from "~icons/material-symbols/apps";
 import IconsMaterialSymbolsCalendarViewWeekOutline from "~icons/material-symbols/calendar-view-week-outline";
 import IconsMaterialSymbolsWorkspaceOutline from "~icons/material-symbols/workspaces-outline";
+
 
 interface SearchSettings {
   selectedTextPresentationMode: number;
