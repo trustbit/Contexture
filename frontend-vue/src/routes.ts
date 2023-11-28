@@ -16,6 +16,7 @@ export const routes: Record<ContextureRoutes, string> = {
 };
 
 const Root = () => import("./pages/domains/Root.vue");
+const Search = () => import("./pages/domains/Search.vue");
 const DomainDetails = () => import("./pages/domain-details/DomainDetails.vue");
 const BoundedContextCanvas = () => import("./pages/bounded-context/BoundedContextCanvas.vue");
 const BoundedContextNamespaces = () => import("./pages/bounded-context/BoundedContextNamespaces.vue");
@@ -50,7 +51,7 @@ export default [
   {
     name: routes.Search,
     path: "/search",
-    component: Root,
+    component: Search,
   },
   { path: "/:pathMatch(.*)*", redirect: { name: routes.Domains } },
 ];
