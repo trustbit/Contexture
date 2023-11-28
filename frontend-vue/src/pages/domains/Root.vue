@@ -100,10 +100,4 @@ const tabPanelViews: TabPanelOption[] = [
 function onTabChange(newSelectedTab: number): void {
   queryParamType.value = tabOptions[newSelectedTab].id;
 }
-
-watchEffect(() => {
-  if (route.path !== "/search" && queryParamType.value === ViewOption.LIST) {
-    queryParamType.value = tabOptions[0].id;
-  }
-});
 </script>
