@@ -64,8 +64,7 @@
             :suggestions="boundedContextNameSuggestions"
             :display-value="(l: any) => l"
             :allow-custom-values="true"
-            @complete="searchKeySuggestions"
-            @keyup.enter="applyKeySuggestions($event.target.value, newLabel)"
+            @complete="searchKeySuggestions($event, newLabel)"
           ></ContextureAutocomplete>
 
           <div class="ml-4">
@@ -161,13 +160,10 @@ watch(
   }
 );
 
-function searchKeySuggestions(query: string): void {
+function searchKeySuggestions(query: string, newLabel: { value?: string; name: string; template?: string }): void {
   const results = fuse.search(query);
   boundedContextNameSuggestions.value = results.map((result: { item: string }) => result.item);
-}
 
-function applyKeySuggestions(query: string, newLabel: { value: string; name: string }): void {
-  const results = fuse.search(query);
   if (results.length > 0) {
     newLabel.value = results[0].item;
   }
