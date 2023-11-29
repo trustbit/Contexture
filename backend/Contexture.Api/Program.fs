@@ -8,6 +8,8 @@ open Contexture.Api.Infrastructure
 open Contexture.Api.Infrastructure.Storage
 open Contexture.Api.Infrastructure.Subscriptions
 open Contexture.Api.Infrastructure.Subscriptions.PositionStorage
+open Contexture.Api.Infrastructure.Security
+open Contexture.Api.Infrastructure.Security.Configuration
 open FsToolkit.ErrorHandling
 open Giraffe
 open Microsoft.AspNetCore.Builder
@@ -72,7 +74,7 @@ module Routes =
     let webApp hostFrontend =
         choose [
              subRoute "/api"
-                Authorization.authorize >=>
+                Security.protectApiRoutes >=>
                  (choose [
                        Apis.Domains.routes
                        Apis.BoundedContexts.routes
@@ -86,7 +88,7 @@ module Routes =
                     route "/readiness" >=> GET >=> SystemRoutes.readiness
                     GET >=> SystemRoutes.status
                 ])
-             hostFrontend
+             Security.protectFrontendRoutes >=> hostFrontend
              RequestErrors.NOT_FOUND "Not found"
         ]
 
@@ -128,7 +130,6 @@ module ServiceConfiguration =
     open System.Text.Json.Serialization
     open Microsoft.Extensions.Configuration
     open Microsoft.Extensions.Options
-    open Infrastructure.Authorization
 
     let configureJsonSerializer (services: IServiceCollection) =
         let options =
@@ -260,7 +261,7 @@ module ServiceConfiguration =
         services.AddSingleton<Clock>(utcNowClock) |> ignore
          
         services
-        |> configureAuthorization configuration.AuthorizationConfiguration
+        |> configureSecurity
         |> configureReadModels
         |> configureReactions
         |> ignore
