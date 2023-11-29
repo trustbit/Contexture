@@ -33,8 +33,9 @@ A detailed view of the "Billing" Bounded Context with the help of the Bounded-Co
 
 The Contexture server provides the API to store data and serves static assets through a Giraffe F# application.
 Currently two storage engines are supported:
-- a simple, file based engine that persists data in a single specified file with a JSON-based format. 
-  This engine supports no versioning or change dates at the moment  
+
+- a simple, file based engine that persists data in a single specified file with a JSON-based format.
+   This engine supports no versioning or change dates at the moment
 - a SQL-Server based engine that uses an event-sourced storage with support of database base version information and change dates.
 
 Make sure the [.NET Framework](https://dotnet.microsoft.com/) is installed on your system!
@@ -44,6 +45,7 @@ To run the basic default configuration with the file based engine use the follow
 ```bash
 cd backend
 dotnet run --project Contexture.Api
+
 ```
 
 More details about configuring and running the backend can be read in this [Readme](./backend/README.md)
@@ -60,9 +62,22 @@ Make sure [Node](https://nodejs.org/en/) is installed and NPM is in your path.
 cd frontend-vue
 npm install
 npm run dev
+
 ```
 
 Make sure the backend part is reachable with its default url <http://localhost:3000>
+
+## Environment Variables
+
+- `CONTEXTURE_MAX_SUBDOMAINS_NESTING_LEVEL`: This environment variable defines the maximum level of subdomain nesting that the application will support. It should be set to a positive integer. If not set, the application defaults to a nesting level of 1.
+
+### Setting Up Environment Variables
+
+Create a `.env` file in the root directory of your project and specify the environment variables like so:
+
+```.env
+CONTEXTURE_MAX_SUBDOMAINS_NESTING_LEVEL=1
+```
 
 ## Running with Docker
 
@@ -95,6 +110,7 @@ The following endpoints to export and import snapshots of data exist:
 # gets a snapshot of the data from a Contexture instance at $BASE_URL and saves content to $FILENAME.json
 # Note: the result does not contain historic / versioned data at the moment
 curl -X GET $BASE_URL/api/all -o $FILENAME.json
+
 ```
 
 ```bash
@@ -106,6 +122,7 @@ curl -X PUT \
    -H "Content-Type: application/json" \
    -d @$FILENAME.json \
    $BASE_URL/api/all
+
 ```
 
 ## Contributors

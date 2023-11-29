@@ -12,7 +12,7 @@
           class="inline-block h-3 w-3 transform rounded-full bg-white transition"
         />
       </Switch>
-      <SwitchLabel class="ml-2 text-xs text-gray-600">
+      <SwitchLabel class="text-md ml-2 text-gray-800">
         {{ label }}
       </SwitchLabel>
     </div>
