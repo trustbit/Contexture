@@ -5,6 +5,7 @@ open Microsoft.Extensions.DependencyInjection
 open Microsoft.AspNetCore.Authentication.JwtBearer
 open Microsoft.IdentityModel.Tokens
 open Giraffe
+open Microsoft.AspNetCore.Builder
 open Microsoft.AspNetCore.Authorization
 open Microsoft.AspNetCore.Authentication.Cookies
 open Microsoft.AspNetCore.Authentication.OpenIdConnect
@@ -44,7 +45,7 @@ module Security =
         GetDataPolicy: PolicyRequirements
     }
 
-    type ContextureSecurity = 
+    type SecurityConfiguration = 
     | Enabled of SecuritySettings
     | Disabled
 
@@ -123,15 +124,24 @@ module Security =
             ]
         services.AddAuthorization(fun options -> policies |> List.iter (configurePolicy options))    
 
-    let configure security (services : IServiceCollection) =
-        services.AddSingleton<ContextureSecurity>(fun _ -> security) |> ignore
-        
-        match security with
+    let configureSecurity configuration (services : IServiceCollection) =
+        services.AddSingleton<SecurityConfiguration>(fun _ -> configuration) |> ignore
+        match configuration with
         | Enabled configuration ->
             services
             |> configureAuthentication configuration
             |> configureAuthorization configuration
         | Disabled -> services
+
+    let useSecurity (app : IApplicationBuilder) = 
+        let configuration = app.ApplicationServices.GetRequiredService<SecurityConfiguration>()
+        match configuration with
+        | Enabled _ ->
+            app.UseAuthentication().UseAuthorization()
+        | Disabled -> app
+
+    type IApplicationBuilder with
+        member x.UseSecurity() = useSecurity x
 
     let allowAnonymous: HttpHandler = fun next ctx -> next ctx
 
@@ -145,7 +155,7 @@ module Security =
         authorizeByPolicyName policyName authorizationFailed next ctx
 
     let protectApiRoutes: HttpHandler = fun next ctx ->
-        let contextureSecurity = ctx.RequestServices.GetRequiredService<ContextureSecurity>()
+        let contextureSecurity = ctx.RequestServices.GetRequiredService<SecurityConfiguration>()
         match contextureSecurity with
         | Enabled _ ->
             match ctx.Request.Method with
@@ -164,7 +174,7 @@ module Security =
         requiresAuthentication (challenge OpenIdConnectDefaults.AuthenticationScheme)
 
     let protectFrontendRoutes: HttpHandler = fun next ctx ->
-        let contextureSecurity = ctx.RequestServices.GetRequiredService<ContextureSecurity>()
+        let contextureSecurity = ctx.RequestServices.GetRequiredService<SecurityConfiguration>()
         match contextureSecurity with
         | Enabled settings ->
             match settings.AuthenticationScheme with
@@ -173,19 +183,16 @@ module Security =
         | Disabled -> allowAnonymous next ctx
 
 
-    module Configuration = 
-        open Microsoft.Extensions.Configuration
-        open Microsoft.Extensions.Options
-
+    module Options = 
         [<CLIMutable>]
         type ClaimRequirementOptions = {
-        ClaimType: string
-        AllowedValues : string array
+            ClaimType: string
+            AllowedValues : string array
         }
 
         [<CLIMutable>]
         type PolicyOptions = {
-        RequiredClaims: ClaimRequirementOptions array
+            RequiredClaims: ClaimRequirementOptions array
         }
 
         [<CLIMutable>]
@@ -230,8 +237,9 @@ module Security =
                 |> Requirements
             )
 
-        let tryMapBearerSettings authenticationOptions = 
-            tryUnbox authenticationOptions.Bearer
+        let tryMapOIDCSettings authenticationOptions = 
+            let unboxed = tryUnbox authenticationOptions.OIDC
+            unboxed
             |> Option.map(fun x -> OIDC {
                     Authority = x.Authority
                     ClientId = x.ClientId
@@ -240,17 +248,20 @@ module Security =
                 }
             )
 
-        let tryMapOIDCSettings authenticationOptions = 
-            tryUnbox authenticationOptions.OIDC
+        let tryMapBearerSettings authenticationOptions = 
+            tryUnbox authenticationOptions.Bearer
             |> Option.map(fun x -> Bearer {
                     IssuerSigningKey = x.IssuerSigningKey
                 }
             )
 
         let getAuthenticationSettings authenticationOptions = 
-            tryMapBearerSettings authenticationOptions
-            |> Option.orElse (tryMapOIDCSettings authenticationOptions)
-            |> Option.defaultWith (failwith "Unable to initialize authentication settings")
+            let opts =
+                tryMapBearerSettings authenticationOptions
+                |> Option.orElse (tryMapOIDCSettings authenticationOptions)
+            
+            opts
+            |> Option.defaultWith (fun () -> failwith "Unable to initialize authentication settings")
 
         let getAuthorizationSettings options =
             tryUnbox options
@@ -262,23 +273,17 @@ module Security =
             )
             |> Option.defaultValue {| ModifyDataPolicy = AllowAnonymous; GetDataPolicy = AllowAnonymous |}
 
-        let getSecuritySettings options = 
-            let authenticationSettings = getAuthenticationSettings options.Authentication
-            let authorizationSettings = getAuthorizationSettings options.Authorization
-            {
-                AuthenticationScheme = authenticationSettings
-                GetDataPolicy = authorizationSettings.GetDataPolicy
-                ModifyDataPolicy = authorizationSettings.ModifyDataPolicy
-            }
+        let buildSecurityConfiguration (options:SecurityOptions) = 
+            tryUnbox options
+            |> Option.map(fun o ->
+                let authenticationSettings = getAuthenticationSettings o.Authentication
+                let authorizationSettings = getAuthorizationSettings o.Authorization
+                let securitySettings =  {
+                    AuthenticationScheme = authenticationSettings
+                    GetDataPolicy = authorizationSettings.GetDataPolicy
+                    ModifyDataPolicy = authorizationSettings.ModifyDataPolicy
+                }
 
-        let configureSecurity (services: IServiceCollection) =
-            services.AddOptions<SecurityOptions>().BindConfiguration("Security") |> ignore
-
-            services.AddSingleton<ContextureSecurity>(fun x-> 
-                let securityOptions = x.GetService<IOptions<SecurityOptions>>()
-                
-                match securityOptions.Value |> tryUnbox with
-                | Some options -> 
-                    options |> getSecuritySettings |> Enabled
-                | None -> Disabled
+                Enabled securitySettings
             )
+            |> Option.defaultValue Disabled

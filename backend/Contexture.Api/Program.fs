@@ -9,7 +9,6 @@ open Contexture.Api.Infrastructure.Storage
 open Contexture.Api.Infrastructure.Subscriptions
 open Contexture.Api.Infrastructure.Subscriptions.PositionStorage
 open Contexture.Api.Infrastructure.Security
-open Contexture.Api.Infrastructure.Security.Configuration
 open FsToolkit.ErrorHandling
 open Giraffe
 open Microsoft.AspNetCore.Builder
@@ -207,7 +206,7 @@ module ServiceConfiguration =
             .AddOptions<Options.ContextureOptions>()
             .Bind(context.Configuration)
             |> ignore
-        
+            
         services.AddSingleton<ContextureConfiguration>(fun p ->
             let options = p.GetRequiredService<IOptions<Options.ContextureOptions>>().Value
             Options.buildConfiguration options
@@ -261,7 +260,7 @@ module ServiceConfiguration =
         services.AddSingleton<Clock>(utcNowClock) |> ignore
          
         services
-        |> configureSecurity
+        |> configureSecurity configuration.Security
         |> configureReadModels
         |> configureReactions
         |> ignore
@@ -282,15 +281,12 @@ module ApplicationConfiguration =
         let env = app.ApplicationServices.GetService<IWebHostEnvironment>()
         (match env.IsDevelopment() with
         | true  ->
-            app.UseDeveloperExceptionPage()
-                .UseAuthentication()
-                .UseAuthorization()
+            app.UseDeveloperExceptionPage().UseSecurity()
         | false ->
             app.UseGiraffeErrorHandler(SystemRoutes.errorHandler))
             .UseCors(configureCors)
             .UseStaticFiles()
-            .UseAuthentication()
-            .UseAuthorization()
+            .UseSecurity()
             .UseGiraffe(Routes.webApp (Routes.frontendHostRoutes env))
       
     let configureLogging (builder : ILoggingBuilder) =

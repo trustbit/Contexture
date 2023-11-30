@@ -40,7 +40,7 @@ module TestHost =
             .CreateDefaultBuilder()
             .UseEnvironment("Tests")
             .ConfigureServices( fun s -> 
-                configure securityConfiguration s |> ignore
+                configureSecurity securityConfiguration s |> ignore
             )
             .ConfigureWebHostDefaults(fun webHostBuilder ->
                 webHostBuilder
