@@ -8,6 +8,7 @@ open Contexture.Api.Infrastructure
 open Contexture.Api.Infrastructure.Storage
 open Contexture.Api.Infrastructure.Subscriptions
 open Contexture.Api.Infrastructure.Subscriptions.PositionStorage
+open Contexture.Api.Infrastructure.Security
 open FsToolkit.ErrorHandling
 open Giraffe
 open Microsoft.AspNetCore.Builder
@@ -72,6 +73,7 @@ module Routes =
     let webApp hostFrontend =
         choose [
              subRoute "/api"
+                Security.protectApiRoutes >=>
                  (choose [
                        Apis.Domains.routes
                        Apis.BoundedContexts.routes
@@ -85,7 +87,7 @@ module Routes =
                     route "/readiness" >=> GET >=> SystemRoutes.readiness
                     GET >=> SystemRoutes.status
                 ])
-             hostFrontend
+             Security.protectFrontendRoutes >=> hostFrontend
              RequestErrors.NOT_FOUND "Not found"
         ]
 
@@ -123,7 +125,7 @@ let utcNowClock =
     fun () ->  System.DateTimeOffset.UtcNow
         
 module ServiceConfiguration =
-    open System.Text.Json
+    open System.Text
     open System.Text.Json.Serialization
     open Microsoft.Extensions.Configuration
     open Microsoft.Extensions.Options
@@ -204,7 +206,7 @@ module ServiceConfiguration =
             .AddOptions<Options.ContextureOptions>()
             .Bind(context.Configuration)
             |> ignore
-        
+            
         services.AddSingleton<ContextureConfiguration>(fun p ->
             let options = p.GetRequiredService<IOptions<Options.ContextureOptions>>().Value
             Options.buildConfiguration options
@@ -258,6 +260,7 @@ module ServiceConfiguration =
         services.AddSingleton<Clock>(utcNowClock) |> ignore
          
         services
+        |> configureSecurity configuration.Security
         |> configureReadModels
         |> configureReactions
         |> ignore
@@ -278,11 +281,12 @@ module ApplicationConfiguration =
         let env = app.ApplicationServices.GetService<IWebHostEnvironment>()
         (match env.IsDevelopment() with
         | true  ->
-            app.UseDeveloperExceptionPage()
+            app.UseDeveloperExceptionPage().UseSecurity()
         | false ->
             app.UseGiraffeErrorHandler(SystemRoutes.errorHandler))
             .UseCors(configureCors)
             .UseStaticFiles()
+            .UseSecurity()
             .UseGiraffe(Routes.webApp (Routes.frontendHostRoutes env))
       
     let configureLogging (builder : ILoggingBuilder) =
