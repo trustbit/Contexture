@@ -2,7 +2,7 @@
   <div>
     <span class="font-bold">{{ namespaceName }}</span>
 
-    <form @submit="add" autocomplete="off">
+    <form @submit="handleAddFilter" autocomplete="off">
       <div class="mt-4 sm:flex">
         <ContextureAutocomplete
           v-model="selected.key"
@@ -55,7 +55,7 @@ const selected: Ref<{ key?: string; value?: string }> = ref<{
   value?: string;
 }>({});
 
-const keySuggestions = ref<string[]>(props.labels.map((label) => label.name));
+const keySuggestions = ref<string[]>([...new Set(props.labels.map((label) => label.name))]);
 const valueSuggestions = ref<string[]>([]);
 
 function searchKeySuggestions(query: string): void {
@@ -65,13 +65,15 @@ function searchKeySuggestions(query: string): void {
 }
 
 function searchValueSuggestions(query: string): void {
-  valueSuggestions.value = props.labels
-    .filter((label) => label.name === selected.value.key)
-    .map((label) => label.value)
-    .filter((label) => label.toLowerCase().includes(query.toLowerCase()));
+  valueSuggestions.value = [...new Set(
+    props.labels
+      .filter((label) => label.name === selected.value.key)
+      .map((label) => label.value)
+      .filter((label) => label.toLowerCase().includes(query.toLowerCase()))
+  )];
 }
 
-function add() {
+function handleAddFilter() {
   emit("add", {
     key: selected.value?.key,
     value: selected.value.value,
@@ -85,9 +87,11 @@ function add() {
 watch(
   () => selected.value.key,
   () => {
-    valueSuggestions.value = props.labels
-      .filter((label) => label.name === selected.value.key)
-      .map((label) => label.value);
+    valueSuggestions.value = [...new Set(
+      props.labels
+        .filter((label) => label.name === selected.value.key)
+        .map((label) => label.value)
+    )];
   }
 );
 </script>

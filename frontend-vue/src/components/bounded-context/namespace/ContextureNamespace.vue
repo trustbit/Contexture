@@ -56,16 +56,7 @@
             :skip-validation="true"
           ></ContextureInputText>
 
-          <ContextureAutocomplete
-            v-model="newLabel.value"
-            class="ml-2 grow"
-            :name="`newLabelValue-${index}`"
-            :placeholder="t('common.value')"
-            :suggestions="boundedContextNameSuggestions"
-            :display-value="(l: any) => l"
-            :allow-custom-values="true"
-            @complete="searchKeySuggestions($event, newLabel)"
-          ></ContextureAutocomplete>
+          <NamespaceValueAutocomplete v-model="newLabel.value" :namespace-label-name="newLabel.name" />
 
           <div class="ml-4">
             <ContextureTextLinkButton @click.prevent="() => onDeleteNewLabel(index)">
@@ -103,12 +94,10 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref, watch } from "vue";
+import { computed, ref } from "vue";
 import { useI18n } from "vue-i18n";
-import Fuse from "fuse.js";
 
 import ContextureAccordionItem from "~/components/primitives/accordion/ContextureAccordionItem.vue";
-import ContextureAutocomplete from "~/components/primitives/autocomplete/ContextureAutocomplete.vue";
 import ContexturePrimaryButton from "~/components/primitives/button/ContexturePrimaryButton.vue";
 import ContextureTextLinkButton from "~/components/primitives/button/ContextureTextLinkButton.vue";
 import ContextureWhiteButton from "~/components/primitives/button/ContextureWhiteButton.vue";
@@ -116,7 +105,7 @@ import ContextureInputText from "~/components/primitives/input/ContextureInputTe
 import ContextureListItem from "~/components/primitives/list/ContextureListItem.vue";
 
 import { CreateNamespaceLabel, Namespace, NamespaceLabel } from "~/types/namespace";
-import { useDomainsStore } from "~/stores/domains";
+import NamespaceValueAutocomplete from "~/components/bounded-context/namespace/NamespaceValueAutocomplete.vue";
 
 interface Props {
   namespace: Namespace;
@@ -136,38 +125,6 @@ const { t } = useI18n();
 const newLabels = ref<CreateNamespaceLabel[]>([]);
 const editMode = ref(false);
 const showEmptyMessage = computed(() => props.namespace.labels.length === 0 && !editMode.value);
-const domainStore = useDomainsStore();
-const boundedContextNameSuggestions = ref<string[]>([]);
-
-const fuseOptions = {
-  shouldSort: true,
-  threshold: 0.6,
-  location: 0,
-  distance: 100,
-  maxPatternLength: 32,
-  minMatchCharLength: 1,
-  includeScore: true,
-  keys: ["name"],
-};
-
-let fuse: Fuse<string> = new Fuse(boundedContextNameSuggestions.value, fuseOptions);
-
-watch(
-  () => domainStore.allBoundedContextsNames,
-  (newVal) => {
-    boundedContextNameSuggestions.value = newVal;
-    fuse = new Fuse(boundedContextNameSuggestions.value, fuseOptions);
-  }
-);
-
-function searchKeySuggestions(query: string, newLabel: { value?: string; name: string; template?: string }): void {
-  const results = fuse.search(query);
-  boundedContextNameSuggestions.value = results.map((result: { item: string }) => result.item);
-
-  if (results.length > 0) {
-    newLabel.value = results[0].item;
-  }
-}
 
 function addNewLabel() {
   newLabels.value = [...newLabels.value, { name: "" }];
