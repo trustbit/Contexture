@@ -193,11 +193,6 @@
         </TabPanel>
       </TabPanels>
     </TabGroup>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
   </div>
 </template>
 
