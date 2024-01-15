@@ -10,11 +10,13 @@ export const boundedContextRoutes: Record<ContextureRoutes, string> = {
 export const routes: Record<ContextureRoutes, string> = {
   Domains: "Domains",
   DomainDetails: "DomainDetails",
+  Analytics: "Analytics",
   Search: "Search",
   ...boundedContextRoutes,
 };
 
-const Root = () => import("./pages/domains/Root.vue");
+const DomainGrid = () => import("./pages/domains/Domains.vue");
+const Search = () => import("./pages/search/Search.vue");
 const DomainDetails = () => import("./pages/domain-details/DomainDetails.vue");
 const BoundedContextCanvas = () => import("./pages/bounded-context/BoundedContextCanvas.vue");
 const BoundedContextNamespaces = () => import("./pages/bounded-context/BoundedContextNamespaces.vue");
@@ -25,7 +27,7 @@ export default [
   {
     name: routes.Domains,
     path: "/",
-    component: Root,
+    component: DomainGrid,
   },
   {
     name: routes.DomainDetails,
@@ -46,6 +48,11 @@ export default [
     name: routes.Analytics,
     path: "/analytics",
     component: Analytics,
+  },
+  {
+    name: routes.Search,
+    path: "/search",
+    component: Search,
   },
   {
     name: "signinCallback",

@@ -49,6 +49,11 @@ const items: NavbarItem[] = [
     ],
   },
   {
+    title: t("navigation.search"),
+    to: "/search",
+    additionalActiveRouteMatches: [routes.Search],
+  },
+  {
     title: t("navigation.analytics"),
     to: "/analytics",
     additionalActiveRouteMatches: [],
