@@ -35,7 +35,7 @@
               </div>
             </div>
             <div>
-              <ContextureTooltip content="Edit Domain" placement="left">
+              <ContextureTooltip content="Edit Domain" placement="left" v-if="canModify">
                 <ContextureRoundedButton size="md" @click="onEditClick">
                   <span class="sr-only">{{ t("domains.details.edit.edit") }}</span>
                   <Icon:material-symbols:drive-file-rename-outline class="h-4 w-4" />
@@ -85,6 +85,7 @@
               <div>
                 <MenuButton
                   class="box-border inline-flex w-full items-center justify-center rounded bg-blue-500 px-4 py-2 text-sm text-gray-50 hover:bg-blue-400 focus:bg-blue-500 focus:shadow-[0px_0px_5px] focus:shadow-blue-300 active:bg-blue-700 disabled:bg-gray-400"
+                  v-if="canModify"
                 >
                   <Icon:materialSymbols:add class="mr-1.5 h-5 w-5" />
                   {{ t("common.create") }}
@@ -169,6 +170,7 @@
                     <span class="text-lg">{{ t("domains.details.no_bounded_contexts") }}</span>
                   </div>
                   <ContexturePrimaryButton
+                    v-if="canModify"
                     :label="t('domains.details.button.create_bounded_context')"
                     class="mt-4"
                     @click="onCreateBoundedContext"
@@ -221,6 +223,7 @@ import ContextureTooltip from "~/components/primitives/tooltip/ContextureTooltip
 import { useBoundedContextsStore } from "~/stores/boundedContexts";
 import { useDomainsStore } from "~/stores/domains";
 import { Domain, UpdateDomain } from "~/types/domain";
+import { useAuthStore } from "~/stores/auth";
 
 const { t } = useI18n();
 const domainStore = useDomainsStore();
@@ -238,6 +241,7 @@ const boundedContexts = computed(() => boundedContextsByDomainId.value[currentDo
 const viewOptions = ["subdomain", "boundedContext"];
 const selectedView = useRouteQuery<string>("view", "subdomain");
 const selectedTab = computed<number>(() => getSelectedTab());
+const { canModify } = useAuthStore()
 let isInitialRoute = true;
 
 function getSelectedTab() {
@@ -305,12 +309,12 @@ async function onSave(values: UpdateDomain) {
   }
 }
 
-const isCreateSubdomainEnabled = ref(domainStore.isCreateSubdomainEnabled(currentDomainId.value));
+const isCreateSubdomainEnabled = ref(canModify && domainStore.isCreateSubdomainEnabled(currentDomainId.value));
 
 watch(
   () => currentDomainId.value,
   () => {
-    isCreateSubdomainEnabled.value = domainStore.isCreateSubdomainEnabled(currentDomainId.value);
+    isCreateSubdomainEnabled.value = canModify && domainStore.isCreateSubdomainEnabled(currentDomainId.value);
   },
   { immediate: true }
 );

@@ -20,6 +20,7 @@
     "@vueuse/core": "^9.12.0",
     "@vueuse/router": "^9.13.0",
     "d3": "^7.8.2",
+    "oidc-client-ts": "^2.4.0",
     "pinia": "^2.0.32",
     "vee-validate": "^4.7.4",
     "vue": "^3.2.47",

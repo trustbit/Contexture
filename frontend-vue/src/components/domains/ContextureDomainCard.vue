@@ -61,7 +61,7 @@
         <div class="flex items-center justify-between px-4 py-2">
           <div class="inline-flex items-center gap-x-1 text-gray-600">
             <div class="p-2">
-              <ContextureTooltip :content="t('common.move')" placement="top">
+              <ContextureTooltip :content="t('common.move')" placement="top" v-if="canModify">
                 <ContextureIconButton @click.prevent="onMoveClick" :data-testId="`move-${domain.name}`">
                   <span class="sr-only">{{ t("domains.card.move_domain") }}</span>
                   <icon:material-symbols:flip-to-back v-if="!domain.parentDomainId" class="h-6 w-6" />
@@ -70,7 +70,7 @@
               </ContextureTooltip>
             </div>
             <div class="p-2">
-              <ContextureTooltip :content="t('common.delete')" placement="top">
+              <ContextureTooltip :content="t('common.delete')" placement="top" v-if="canModify">
                 <ContextureIconButton @click.prevent="onDeleteClick" :data-testId="`delete-${domain.name}`">
                   <span class="sr-only">{{ t("domains.card.delete_domain") }}</span>
                   <icon:material-symbols:delete-outline-rounded class="h-6 w-6" />
@@ -104,6 +104,7 @@ import ContextureMoveDomainModal from "~/components/domains/ContextureMoveDomain
 import ContextureBadge from "~/components/primitives/badge/ContextureBadge.vue";
 import ContextureIconButton from "~/components/primitives/button/ContextureIconButton.vue";
 import ContextureTooltip from "~/components/primitives/tooltip/ContextureTooltip.vue";
+import { useAuthStore } from "~/stores/auth";
 import { useBoundedContextsStore } from "~/stores/boundedContexts";
 import useConfirmationModalStore from "~/stores/confirmationModal";
 import { useDomainsStore } from "~/stores/domains";
@@ -131,6 +132,8 @@ const hasSubdomainsOrBoundedContexts = computed(
 );
 const domainToMove = ref();
 const moveDomainDialogOpen = ref(false);
+
+const { canModify } = useAuthStore()
 
 function onDeleteClick(): void {
   confirmModal.openWithComponent(

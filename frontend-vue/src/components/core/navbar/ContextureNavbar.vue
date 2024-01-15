@@ -15,6 +15,9 @@
           </RouterLink>
         </li>
       </ul>
+      <div class="flex !ml-auto !mr-5"> 
+        <SignIn />
+      </div>
     </div>
   </nav>
 </template>
@@ -23,6 +26,7 @@
 import { useI18n } from "vue-i18n";
 import { useRoute } from "vue-router";
 import { routes } from "~/routes";
+import SignIn from "~/components/core/SignIn.vue"
 
 const { t } = useI18n();
 const route = useRoute();

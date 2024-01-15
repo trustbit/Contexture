@@ -29,6 +29,7 @@
       </ContextureAccordionItem>
 
       <ContextureCollapsable
+        v-if="canModify"
         :label="t('bounded_context_canvas.ubiquitous_language.actions.collapsed.add')"
         :cancel-text="t('common.cancel')"
         class="mt-8"
@@ -64,6 +65,7 @@ import ContextureDynamicForm from "~/components/primitives/dynamic-form/Contextu
 import { DynamicFormSchema } from "~/components/primitives/dynamic-form/dynamicForm";
 import ContextureInputText from "~/components/primitives/input/ContextureInputText.vue";
 import { isUniqueIn } from "~/core/validation";
+import { useAuthStore } from "~/stores/auth";
 import { useBoundedContextsStore } from "~/stores/boundedContexts";
 import useConfirmationModalStore from "~/stores/confirmationModal";
 import { UbiquitousLanguage, UbiquitousLanguageItem } from "~/types/boundedContext";
@@ -74,6 +76,7 @@ const store = useBoundedContextsStore();
 const confirmationModal = useConfirmationModalStore();
 const { activeBoundedContext } = storeToRefs(store);
 const { t } = useI18n();
+const { canModify } = useAuthStore()
 const submitError = ref<HelpfulErrorProps>();
 const addCollapsed = ref(true);
 const ubiquitousLanguage = computed(() => activeBoundedContext.value?.ubiquitousLanguage);

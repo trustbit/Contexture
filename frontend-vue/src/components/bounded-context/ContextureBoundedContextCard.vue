@@ -142,7 +142,7 @@
       <div class="flex items-center justify-between px-4 py-2">
         <div class="inline-flex items-center gap-x-1 text-gray-400">
           <div class="p-2" v-if="showActions">
-            <ContextureTooltip content="Move" placement="top">
+            <ContextureTooltip content="Move" placement="top" v-if="canModify">
               <ContextureIconButton @click.prevent="onMoveClick">
                 <span class="sr-only">{{ t("bounded_context.card.move") }}</span>
                 <icon:material-symbols:backup-table class="h-6 w-6 -scale-x-100" />
@@ -162,7 +162,7 @@
           </div>
 
           <div class="p-2" v-if="showActions">
-            <ContextureTooltip content="Delete" placement="top">
+            <ContextureTooltip content="Delete" placement="top" v-if="canModify">
               <ContextureIconButton @click.prevent="onDeleteClick">
                 <span class="sr-only">{{ t("bounded_context.card.delete_bounded_context") }}</span>
                 <icon:material-symbols:delete-outline-rounded
@@ -202,6 +202,7 @@ import ContextureBadge from "~/components/primitives/badge/ContextureBadge.vue";
 import ContextureIconButton from "~/components/primitives/button/ContextureIconButton.vue";
 import ContextureTooltip from "~/components/primitives/tooltip/ContextureTooltip.vue";
 import { isLink } from "~/core";
+import { useAuthStore } from "~/stores/auth";
 import { useBoundedContextsStore } from "~/stores/boundedContexts";
 import useConfirmationModalStore from "~/stores/confirmationModal";
 import { BoundedContext } from "~/types/boundedContext";
@@ -221,6 +222,7 @@ const confirmationModal = useConfirmationModalStore();
 const boundedContextStore = useBoundedContextsStore();
 const boundedContextToMove = ref<BoundedContext>();
 const moveBoundedContextDialogOpen = ref(false);
+const { canModify } = useAuthStore()
 
 function onDeleteClick(): void {
   confirmationModal.open(

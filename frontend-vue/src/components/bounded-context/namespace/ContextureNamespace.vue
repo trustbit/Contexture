@@ -6,13 +6,13 @@
           {{ namespace.name }}
         </div>
         <div class="space-x-4">
-          <ContextureTextLinkButton @click.prevent="onDeleteNamespace">
+          <ContextureTextLinkButton @click.prevent="onDeleteNamespace" v-if="canModify">
             <template #left>
               <icon:material-symbols:delete-outline-rounded :aria-label="t('common.delete')" class="h-5 w-5" />
             </template>
           </ContextureTextLinkButton>
 
-          <ContextureTextLinkButton v-if="!editMode" @click.prevent="onOpenEditMode">
+          <ContextureTextLinkButton v-if="canModify && !editMode" @click.prevent="onOpenEditMode">
             <template #left>
               <icon:material-symbols:drive-file-rename-outline-outline :aria-label="t('common.edit')" class="h-5 w-5" />
             </template>
@@ -106,6 +106,7 @@ import ContextureTextLinkButton from "~/components/primitives/button/ContextureT
 import ContextureWhiteButton from "~/components/primitives/button/ContextureWhiteButton.vue";
 import ContextureInputText from "~/components/primitives/input/ContextureInputText.vue";
 import ContextureListItem from "~/components/primitives/list/ContextureListItem.vue";
+import { useAuthStore } from "~/stores/auth";
 import { CreateNamespaceLabel, Namespace, NamespaceLabel } from "~/types/namespace";
 
 interface Props {
@@ -123,6 +124,7 @@ interface Emits {
 const props = defineProps<Props>();
 const emit = defineEmits<Emits>();
 const { t } = useI18n();
+const { canModify } = useAuthStore()
 const newLabels = ref<CreateNamespaceLabel[]>([]);
 const editMode = ref(false);
 const showEmptyMessage = computed(() => props.namespace.labels.length === 0 && !editMode.value);

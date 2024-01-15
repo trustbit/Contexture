@@ -33,6 +33,7 @@
         class="mt-8"
         :cancel-text="t('common.cancel')"
         :collapsed="addCollapsed"
+        v-if="canModify"
         @update:collapsed="(collapsed) => (addCollapsed = collapsed)"
       >
         <ContextureDynamicForm
@@ -67,6 +68,7 @@ import { useBoundedContextsStore } from "~/stores/boundedContexts";
 import useConfirmationModalStore from "~/stores/confirmationModal";
 import { BusinessDecision } from "~/types/boundedContext";
 import IconsMaterialSymbolsFormatGavel from "~icons/material-symbols/gavel";
+import { useAuthStore } from "~/stores/auth";
 
 const icon = IconsMaterialSymbolsFormatGavel;
 const store = useBoundedContextsStore();
@@ -76,6 +78,7 @@ const { t } = useI18n();
 const submitError = ref<HelpfulErrorProps>();
 const addCollapsed = ref(true);
 const businessDecisions = computed(() => activeBoundedContext.value?.businessDecisions || []);
+const { canModify } = useAuthStore()
 
 const businessDecisionSchema: DynamicFormSchema<BusinessDecision> = {
   fields: [

@@ -33,7 +33,7 @@
               </div>
             </div>
             <div>
-              <ContextureTooltip content="Edit bounded context" placement="left">
+              <ContextureTooltip content="Edit bounded context" placement="left" v-if="canModify">
                 <ContextureRoundedButton size="md" @click="editMode = true">
                   <Icon:material-symbols:drive-file-rename-outline
                     :aria-label="t('bounded_context_canvas.open_edit')"
@@ -103,6 +103,7 @@ import ContextureHeroHeader from "~/components/core/header/ContextureHeroHeader.
 import ContextureHelpfulErrorAlert from "~/components/primitives/alert/ContextureHelpfulErrorAlert.vue";
 import ContextureRoundedButton from "~/components/primitives/button/ContextureRoundedButton.vue";
 import ContextureTooltip from "~/components/primitives/tooltip/ContextureTooltip.vue";
+import { useAuthStore } from "~/stores/auth";
 import { useBoundedContextsStore } from "~/stores/boundedContexts";
 
 const store = useBoundedContextsStore();
@@ -112,6 +113,7 @@ const editMode = ref(false);
 const boundedContextId = useRouteParams("id");
 const submitError = ref();
 const { activeBoundedContext } = storeToRefs(store);
+const { canModify } = useAuthStore()
 
 async function onSave(values: { name: string; key?: string }) {
   const updateNameRes = await store.updateName(activeBoundedContext.value.id, values.name);

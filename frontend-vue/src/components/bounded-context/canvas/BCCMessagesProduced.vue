@@ -24,6 +24,7 @@
       </ul>
 
       <ContextureCollapsable
+        v-if="canModify"
         :label="t('common.add')"
         class="mt-3"
         :cancel-text="t('common.cancel')"
@@ -65,6 +66,7 @@
         </ContextureListItem>
       </ul>
       <ContextureCollapsable
+        v-if="canModify"
         :label="t('common.add')"
         class="mt-3"
         :cancel-text="t('common.cancel')"
@@ -106,6 +108,7 @@
         </ContextureListItem>
       </ul>
       <ContextureCollapsable
+        v-if="canModify"
         :label="t('common.add')"
         class="mt-3"
         :cancel-text="t('common.cancel')"
@@ -147,6 +150,7 @@ import ContextureCollapsable from "~/components/primitives/collapsable/Contextur
 import ContextureInputText from "~/components/primitives/input/ContextureInputText.vue";
 import ContextureListItem from "~/components/primitives/list/ContextureListItem.vue";
 import { requiredStringRule } from "~/core/validationRules";
+import { useAuthStore } from "~/stores/auth";
 import { useBoundedContextsStore } from "~/stores/boundedContexts";
 import useConfirmationModalStore from "~/stores/confirmationModal";
 import { CreateMessage, MessageProduceKeys, Messages } from "~/types/boundedContext";
@@ -159,6 +163,7 @@ withDefaults(defineProps<Props>(), {
   version: BoundedContextVersion.V4,
 });
 const { t } = useI18n();
+const { canModify } = useAuthStore()
 const confirmationModal = useConfirmationModalStore();
 const store = useBoundedContextsStore();
 const { activeBoundedContext } = storeToRefs(store);

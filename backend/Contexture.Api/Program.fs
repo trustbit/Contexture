@@ -72,7 +72,7 @@ module Routes =
     open Microsoft.AspNetCore.Http
     let webApp hostFrontend =
         choose [
-             subRoute "/api"
+            subRoute "/api"
                 Security.protectApiRoutes >=>
                  (choose [
                        Apis.Domains.routes
@@ -81,14 +81,16 @@ module Routes =
                        Apis.Namespaces.routes
                        AllRoutes.routes
                 ])
-             subRoute "/meta"
+            subRoute "/meta"
                 ( choose [
                     route "/health" >=> GET >=> SystemRoutes.status
                     route "/readiness" >=> GET >=> SystemRoutes.readiness
+                    route "/userInfo" >=> GET >=> Security.userInfo
+                    route "/securityConfiguration" >=> GET >=> Security.securityConfiguration
                     GET >=> SystemRoutes.status
                 ])
-             Security.protectFrontendRoutes >=> hostFrontend
-             RequestErrors.NOT_FOUND "Not found"
+            hostFrontend
+            RequestErrors.NOT_FOUND "Not found"
         ]
 
     let frontendHostRoutes (env: IWebHostEnvironment) : HttpHandler =

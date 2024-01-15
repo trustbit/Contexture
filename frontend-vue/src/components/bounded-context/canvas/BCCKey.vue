@@ -2,7 +2,7 @@
   <ContextureBoundedContextCanvasElement
     :title="t('bounded_context_canvas.key.title')"
     :title-icon="icon"
-    :is-editable="true"
+    :is-editable="canModify"
     :edit-mode="editMode"
     @close="onClose"
     @open="editMode = true"
@@ -37,13 +37,14 @@ import ContextureHelpfulErrorAlert, {
   HelpfulErrorProps,
 } from "~/components/primitives/alert/ContextureHelpfulErrorAlert.vue";
 import ContexturePrimaryButton from "~/components/primitives/button/ContexturePrimaryButton.vue";
+import { useAuthStore } from "~/stores/auth";
 import { useBoundedContextsStore } from "~/stores/boundedContexts";
 import IconsMaterialSymbolsFormatKeyOutline from "~icons/material-symbols/key-outline";
 
 const icon = IconsMaterialSymbolsFormatKeyOutline;
 const store = useBoundedContextsStore();
 const { activeBoundedContext } = storeToRefs(store);
-
+const { canModify } = useAuthStore()
 const { t } = useI18n();
 const key = ref(activeBoundedContext.value.shortName);
 const submitError = ref<HelpfulErrorProps | undefined>();
