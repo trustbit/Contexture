@@ -14,19 +14,10 @@
     "strictNullChecks": true,
     "allowJs": true,
     "forceConsistentCasingInFileNames": true,
-    "types": [
-      "vite/client",
-      "vite-plugin-pages/client",
-      "unplugin-icons/types/vue",
-    ],
+    "types": ["vite/client", "vite-plugin-pages/client", "unplugin-icons/types/vue", "@fuse-open/types"],
     "paths": {
       "~/*": ["src/*"]
     }
   },
-  "exclude": [
-    "dist",
-    "node_modules",
-    "postcss.config.js",
-    "tailwind.config.cjs"
-  ]
+  "exclude": ["dist", "node_modules", "postcss.config.js", "tailwind.config.cjs"]
 }

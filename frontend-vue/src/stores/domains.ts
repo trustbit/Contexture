@@ -1,6 +1,6 @@
 import { UseFetchReturn } from "@vueuse/core";
 import { defineStore } from "pinia";
-import { computed, onMounted, Ref, ref } from "vue";
+import { computed, onMounted, Ref, ref, watch } from "vue";
 import { useFetch } from "~/composables/useFetch";
 import { CreateDomain, Domain, DomainId, UpdateDomain } from "~/types/domain";
 
@@ -172,6 +172,18 @@ export const useDomainsStore = defineStore("domains", () => {
     return domainLevel !== undefined && domainLevel > 0;
   };
 
+  const allBoundedContextsNames = computed(() => {
+    return allDomains.value
+      .filter((d) => d.boundedContexts.length > 0)
+      .map((d) => d.boundedContexts)
+      .map((bc) => bc.map((b) => b.name))
+      .flat();
+  });
+
+  watch(allDomains, () => {
+    allBoundedContextsNames.value;
+  });
+
   onMounted(fetchDomains);
 
   return {
@@ -183,6 +195,7 @@ export const useDomainsStore = defineStore("domains", () => {
     domainByDomainId,
     domainsLevelMap,
     maxSubdomainsLevel,
+    allBoundedContextsNames,
     deleteDomain,
     moveDomain,
     createDomain,
