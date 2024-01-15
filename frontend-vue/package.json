@@ -6,7 +6,7 @@
     "build": "vite build",
     "dev": "vite --port 4200 --host",
     "lint": "eslint .",
-    "lintFix": "eslint . --fix",
+    "lint:fix": "eslint . --fix",
     "typecheck": "vue-tsc --noEmit",
     "preview": "vite preview",
     "test:unit": "vitest --environment jsdom --root src/",

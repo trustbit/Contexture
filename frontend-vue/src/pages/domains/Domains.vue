@@ -1,31 +1,33 @@
 <template>
-  <div class="sm:flex sm:justify-between">
-    <ContextureBlankHeader :title="t('domains.grid.title')" />
+  <div class="mx-auto mt-5 px-3 pt-5 pb-8 lg:container lg:px-0">
+    <div class="sm:flex sm:justify-between">
+      <ContextureBlankHeader :title="t('domains.grid.title')" />
 
-    <ContexturePrimaryButton
-      :label="t('domains.grid.button.create_domain')"
-      class="mt-4 sm:mt-0"
-      @click="onCreateDomain"
-    >
-      <template #left>
-        <Icon:material-symbols:flip-to-back aria-hidden="true" class="mr-2" />
-      </template>
-    </ContexturePrimaryButton>
-  </div>
-
-  <div class="mt-4 sm:mt-10">
-    <div v-if="loading" class="text-sm">
-      {{ t("domains.grid.loading") }}
+      <ContexturePrimaryButton
+        :label="t('domains.grid.button.create_domain')"
+        class="mt-4 sm:mt-0"
+        @click="onCreateDomain"
+      >
+        <template #left>
+          <Icon:material-symbols:flip-to-back aria-hidden="true" class="mr-2" />
+        </template>
+      </ContexturePrimaryButton>
     </div>
-    <ContextureHelpfulErrorAlert
-      v-else-if="loadingError"
-      v-bind="loadingError"
-      :friendly-message="t('domains.grid.error.loading')"
-    />
 
-    <div v-else>
-      <div class="text-sm text-gray-700" v-if="parentDomains.length === 0">{{ $t("domains.empty") }}</div>
-      <ContextureDomainCardGrid v-else :domains="parentDomains" />
+    <div class="mt-4 sm:mt-10">
+      <div v-if="loading" class="text-sm">
+        {{ t("domains.grid.loading") }}
+      </div>
+      <ContextureHelpfulErrorAlert
+        v-else-if="loadingError"
+        v-bind="loadingError"
+        :friendly-message="t('domains.grid.error.loading')"
+      />
+
+      <div v-else>
+        <div class="text-sm text-gray-700" v-if="parentDomains.length === 0">{{ $t("domains.empty") }}</div>
+        <ContextureDomainCardGrid v-else :domains="parentDomains" />
+      </div>
     </div>
   </div>
 
