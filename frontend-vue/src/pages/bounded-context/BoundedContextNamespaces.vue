@@ -135,7 +135,6 @@
                 :description="templateItem.description"
                 :namespace-label-name="templateItem.name"
               />
-
             </div>
 
             <div class="mt-4">

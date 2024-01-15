@@ -65,12 +65,14 @@ function searchKeySuggestions(query: string): void {
 }
 
 function searchValueSuggestions(query: string): void {
-  valueSuggestions.value = [...new Set(
-    props.labels
-      .filter((label) => label.name === selected.value.key)
-      .map((label) => label.value)
-      .filter((label) => label.toLowerCase().includes(query.toLowerCase()))
-  )];
+  valueSuggestions.value = [
+    ...new Set(
+      props.labels
+        .filter((label) => label.name === selected.value.key)
+        .map((label) => label.value)
+        .filter((label) => label.toLowerCase().includes(query.toLowerCase()))
+    ),
+  ];
 }
 
 function handleAddFilter() {
@@ -87,11 +89,9 @@ function handleAddFilter() {
 watch(
   () => selected.value.key,
   () => {
-    valueSuggestions.value = [...new Set(
-      props.labels
-        .filter((label) => label.name === selected.value.key)
-        .map((label) => label.value)
-    )];
+    valueSuggestions.value = [
+      ...new Set(props.labels.filter((label) => label.name === selected.value.key).map((label) => label.value)),
+    ];
   }
 );
 </script>

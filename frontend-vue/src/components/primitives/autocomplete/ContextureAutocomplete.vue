@@ -35,7 +35,7 @@
           @after-leave="query = ''"
         >
           <ComboboxOptions
-            class="absolute mt-1 max-h-60 w-full overflow-auto rounded-md bg-white py-1 text-base shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none sm:text-sm z-10"
+            class="absolute z-10 mt-1 max-h-60 w-full overflow-auto rounded-md bg-white py-1 text-base shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none sm:text-sm"
           >
             <div
               v-if="suggestions?.length === 0 && query !== '' && !allowCustomValues"
@@ -71,7 +71,7 @@
                   'bg-blue-500 text-white': active,
                   'text-gray-900': !active,
                 }"
-                class="relative cursor-default select-none py-2 pl-10 pr-4 border-t"
+                class="relative cursor-default select-none border-t py-2 pl-10 pr-4"
               >
                 <slot name="customValue">
                   <span :class="{ 'font-medium': selected, 'font-normal': !selected }" class="block truncate">
@@ -84,7 +84,7 @@
                   class="absolute inset-y-0 left-0 flex items-center pl-3"
                 >
                   <Icon:material-symbols:check
-                  /></span>
+                /></span>
               </li>
             </ComboboxOption>
           </ComboboxOptions>
@@ -110,7 +110,7 @@ import {
   ComboboxInput,
   ComboboxOption,
   ComboboxOptions,
-  TransitionRoot
+  TransitionRoot,
 } from "@headlessui/vue";
 import { useField } from "vee-validate";
 import { ref, watch } from "vue";

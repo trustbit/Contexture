@@ -9,10 +9,10 @@
     @complete="searchKeySuggestions($event)"
   >
     <template #customValue>
-     <div class="flex justify-items-center items-center align-middle">
-       <Icon:material-symbols:add aria-hidden="true" class="mr-2" />
-       <span>{{ t("common.create-new", {entityName: inputText}) }}</span>
-     </div>
+      <div class="flex items-center justify-items-center align-middle">
+        <Icon:material-symbols:add aria-hidden="true" class="mr-2" />
+        <span>{{ t("common.create-new", { entityName: inputText }) }}</span>
+      </div>
     </template>
   </ContextureAutocomplete>
 </template>
@@ -29,6 +29,8 @@ interface Props {
   namespaceLabelName?: string;
 }
 
+const props = defineProps<Props>();
+
 const fuseOptions: FuseOptions<{ name: string }> = {
   includeScore: true,
   includeMatches: true,
@@ -37,12 +39,11 @@ const fuseOptions: FuseOptions<{ name: string }> = {
   distance: 100,
   maxPatternLength: 32,
   minMatchCharLength: 1,
-  keys: ["name"]
+  keys: ["name"],
 };
 
 const { findNamespaceLabelValuesByLabelName } = useNamespaces();
 const { t } = useI18n();
-const props = defineProps<Props>();
 const suggestions = ref<string[]>(findNamespaceLabelValuesByLabelName(props.namespaceLabelName));
 const fuse = new Fuse(findNamespaceLabelValuesByLabelName(props.namespaceLabelName), fuseOptions);
 const model = defineModel<string>();
@@ -54,7 +55,7 @@ const searchKeySuggestions = (query: string) => {
     model.value = undefined;
     return;
   }
-  inputText.value = query
+  inputText.value = query;
   const namespaceLabelValuesByLabelName = findNamespaceLabelValuesByLabelName(props.namespaceLabelName);
   fuse.setCollection(namespaceLabelValuesByLabelName);
   const results = fuse.search(query);

@@ -222,7 +222,7 @@ import { useNamespaces } from "~/stores/namespaces";
 import { BoundedContext } from "~/types/boundedContext";
 import { Domain } from "~/types/domain";
 import ContextureHelpfulErrorAlert from "~/components/primitives/alert/ContextureHelpfulErrorAlert.vue";
-import { Namespace, NamespaceLabel } from "~/types/namespace";
+import { NamespaceLabel } from "~/types/namespace";
 import IconsMaterialSymbolsCalendarViewWeekOutline from "~icons/material-symbols/calendar-view-week-outline";
 import IconsMaterialSymbolsWorkspaceOutline from "~icons/material-symbols/workspaces-outline";
 

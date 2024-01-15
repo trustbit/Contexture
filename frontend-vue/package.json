@@ -45,7 +45,7 @@
     "autoprefixer": "^10.4.13",
     "babel-loader": "^8.3.0",
     "eslint": "^8.35.0",
-    "eslint-plugin-vue": "^9.9.0",
+    "eslint-plugin-vue": "^9.20.1",
     "jsdom": "^20.0.3",
     "postcss": "^8.4.21",
     "prettier": "^2.8.4",

@@ -9,7 +9,7 @@ import {
   Namespace,
   NamespaceId,
   NamespaceLabel,
-  NamespaceLabelId
+  NamespaceLabelId,
 } from "~/types/namespace";
 
 export const useNamespaces = defineStore("namespaces", () => {
