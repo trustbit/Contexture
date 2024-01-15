@@ -103,7 +103,7 @@
                   class="absolute right-0 mt-2 w-56 origin-top-right divide-y divide-gray-100 rounded bg-white shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none"
                 >
                   <div class="px-1 py-1">
-                    <MenuItem v-slot="{ active }">
+                    <MenuItem v-if="isCreateSubdomainEnabled" v-slot="{ active }">
                       <button
                         class="group flex w-full items-center rounded-md px-2 py-2 text-sm capitalize"
                         :class="[active ? 'bg-blue-500 text-white' : 'text-gray-900']"
@@ -117,6 +117,7 @@
                         {{ t("common.subdomain") }}
                       </button>
                     </MenuItem>
+
                     <MenuItem v-slot="{ active }">
                       <button
                         class="group flex w-full items-center rounded-md px-2 py-2 text-sm capitalize"
@@ -142,9 +143,14 @@
               <div class="mt-6">
                 <div v-if="!subdomains.length" class="mb-4">
                   <div>
-                    <span class="text-lg">{{ t("domains.details.no_subdomains") }}</span>
+                    <span class="text-lg">{{
+                      isCreateSubdomainEnabled
+                        ? t("domains.details.no_subdomains")
+                        : t("domains.details.no_subdomains_limit")
+                    }}</span>
                   </div>
                   <ContexturePrimaryButton
+                    v-if="isCreateSubdomainEnabled"
                     :label="t('domains.details.button.create_subdomain')"
                     class="mt-4"
                     @click="onCreateSubdomain"
@@ -196,7 +202,7 @@
 import { Menu, MenuButton, MenuItem, MenuItems, Tab, TabGroup, TabList, TabPanel, TabPanels } from "@headlessui/vue";
 import { useRouteParams, useRouteQuery } from "@vueuse/router";
 import { storeToRefs } from "pinia";
-import { computed, ComputedRef, ref, watchEffect } from "vue";
+import { computed, ComputedRef, ref, watch, watchEffect } from "vue";
 import { useI18n } from "vue-i18n";
 import ContextureCreateBoundedContextModal from "~/components/domains/details/ContextureCreateBoundedContextModal.vue";
 import CreateSubdomainModal from "~/components/domains/details/ContextureCreateSubdomainModal.vue";
@@ -230,8 +236,18 @@ const createSubdomainOpen = ref<boolean>(false);
 const createBoundedContextOpen = ref<boolean>(false);
 const boundedContexts = computed(() => boundedContextsByDomainId.value[currentDomainId.value] || []);
 const viewOptions = ["subdomain", "boundedContext"];
-const selectedView = useRouteQuery<string>("view", "subdomain", { mode: "push" });
-const selectedTab = computed<number>(() => viewOptions.indexOf(selectedView.value));
+const selectedView = useRouteQuery<string>("view", "subdomain");
+const selectedTab = computed<number>(() => getSelectedTab());
+let isInitialRoute = true;
+
+function getSelectedTab() {
+  if (isInitialRoute && selectedView.value === "subdomain" && subdomains.value.length === 0) {
+    isInitialRoute = false;
+    selectedView.value = "boundedContext";
+    return viewOptions.indexOf("boundedContext");
+  }
+  return viewOptions.indexOf(selectedView.value);
+}
 
 function onTabChange(newSelectedTab: number): void {
   selectedView.value = viewOptions[newSelectedTab];
@@ -288,6 +304,16 @@ async function onSave(values: UpdateDomain) {
     editMode.value = false;
   }
 }
+
+const isCreateSubdomainEnabled = ref(domainStore.isCreateSubdomainEnabled(currentDomainId.value));
+
+watch(
+  () => currentDomainId.value,
+  () => {
+    isCreateSubdomainEnabled.value = domainStore.isCreateSubdomainEnabled(currentDomainId.value);
+  },
+  { immediate: true }
+);
 
 watchEffect(() => {
   if (subdomains.value.length === 0) {

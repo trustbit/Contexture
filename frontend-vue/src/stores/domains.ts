@@ -1,6 +1,6 @@
 import { UseFetchReturn } from "@vueuse/core";
 import { defineStore } from "pinia";
-import { computed, onMounted, Ref, ref } from "vue";
+import { computed, onMounted, Ref, ref, watch } from "vue";
 import { useFetch } from "~/composables/useFetch";
 import { CreateDomain, Domain, DomainId, UpdateDomain } from "~/types/domain";
 
@@ -8,6 +8,7 @@ export const useDomainsStore = defineStore("domains", () => {
   const allDomains: Ref<Domain[]> = ref([]);
   const loading = ref(false);
   const loadingError = ref();
+  const maxSubdomainsLevel: Ref<number> = ref(import.meta.env.CONTEXTURE_MAX_SUBDOMAINS_NESTING_LEVEL || 1);
 
   async function fetchDomains(): Promise<void> {
     loading.value = true;
@@ -49,6 +50,7 @@ export const useDomainsStore = defineStore("domains", () => {
 
     if (res.response.value?.ok) {
       allDomains.value = [...allDomains.value, res.data.value as Domain];
+      domainsLevelMap.value = setDomainsLevelMap(allDomains.value);
     }
 
     return {
@@ -95,6 +97,7 @@ export const useDomainsStore = defineStore("domains", () => {
     const { data, error } = await useFetch<Domain[]>("/api/domains").get();
 
     allDomains.value = data.value ? data.value : [];
+    domainsLevelMap.value = setDomainsLevelMap(data.value);
     return {
       data,
       error,
@@ -137,6 +140,50 @@ export const useDomainsStore = defineStore("domains", () => {
     }, {});
   });
 
+  const calculateDomainLevel = (domainId: string, level = 0): number => {
+    const domain = allDomains.value.find((d) => d.id === domainId);
+    if (domain && domain.parentDomainId) {
+      return calculateDomainLevel(domain.parentDomainId, level + 1);
+    }
+    return level;
+  };
+
+  const setDomainsLevelMap = (domains?: Domain[]): Map<string, number> => {
+    const _domains = domains || allDomains.value;
+    const map = new Map<string, number>();
+    _domains.forEach((domain) => {
+      map.set(domain.id, calculateDomainLevel(domain.id));
+    });
+    return map;
+  };
+
+  const domainsLevelMap = ref(setDomainsLevelMap());
+
+  const isCreateSubdomainEnabled = (domainId: string): boolean => {
+    if (!domainId) {
+      return false;
+    }
+    const domainLevel = domainsLevelMap.value.get(domainId);
+    return domainLevel !== undefined && domainLevel < maxSubdomainsLevel.value;
+  };
+
+  const isSubdomain = (domainId: string): boolean => {
+    const domainLevel = domainsLevelMap.value.get(domainId);
+    return domainLevel !== undefined && domainLevel > 0;
+  };
+
+  const allBoundedContextsNames = computed(() => {
+    return allDomains.value
+      .filter((d) => d.boundedContexts.length > 0)
+      .map((d) => d.boundedContexts)
+      .map((bc) => bc.map((b) => b.name))
+      .flat();
+  });
+
+  watch(allDomains, () => {
+    allBoundedContextsNames.value;
+  });
+
   onMounted(fetchDomains);
 
   return {
@@ -146,10 +193,15 @@ export const useDomainsStore = defineStore("domains", () => {
     parentDomains,
     subdomainsByDomainId,
     domainByDomainId,
+    domainsLevelMap,
+    maxSubdomainsLevel,
+    allBoundedContextsNames,
     deleteDomain,
     moveDomain,
     createDomain,
     createSubDomain,
     updateDomain,
+    isSubdomain,
+    isCreateSubdomainEnabled,
   };
 });

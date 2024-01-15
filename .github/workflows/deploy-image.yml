@@ -3,7 +3,7 @@ name: Deploy docker image
 on:
   push:
     branches:
-      - master
+      - main
     tags:
       - '*'
 jobs:
@@ -11,29 +11,29 @@ jobs:
     name: Build and Deploy
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@master
-    - uses: actions/setup-dotnet@v2
-      with:
-        dotnet-version: '7.0.x'
-    - run: make build-backend
-      name: Build
-    - run: make test-backend
-      name: Test
-    - name: Setup Node.js
-      uses: actions/setup-node@v3
-      with:
-        node-version: '18.x'
-    - run: make prepare-image
-      name: Prepares backend & frontend into an image
-    - name: Publish to Registry
-      uses: elgohr/Publish-Docker-Github-Action@main
-      env:
-        GIT_HASH: ${{ github.sha }}
-      with:
-        name: softwarepark/contexture
-        workdir: artifacts/image
-        username: ${{ secrets.DOCKER_USERNAME }}
-        password: ${{ secrets.DOCKER_PASSWORD }}
-        dockerfile: ../backend/Dockerfile
-        buildargs: GIT_HASH
-        tag_semver: true
+      - uses: actions/checkout@master
+      - uses: actions/setup-dotnet@v2
+        with:
+          dotnet-version: '7.0.x'
+      - run: make build-backend
+        name: Build
+      - run: make test-backend
+        name: Test
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '18.x'
+      - run: make prepare-image
+        name: Prepares backend & frontend into an image
+      - name: Publish to Registry
+        uses: elgohr/Publish-Docker-Github-Action@main
+        env:
+          GIT_HASH: ${{ github.sha }}
+        with:
+          name: softwarepark/contexture
+          workdir: artifacts/image
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
+          dockerfile: ../backend/Dockerfile
+          buildargs: GIT_HASH
+          tag_semver: true
