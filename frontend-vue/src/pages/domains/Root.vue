@@ -34,12 +34,10 @@ import { useRouteQuery } from "@vueuse/router";
 import { useRoute } from "vue-router";
 import { computed, Ref, watchEffect } from "vue";
 import { useI18n } from "vue-i18n";
-import BubbleView from "~/pages/domains/BubbleView.vue";
 import GridView from "~/pages/domains/GridView.vue";
 import ListView from "~/pages/domains/ListView.vue";
 import IconsMaterialSymbolsApps from "~icons/material-symbols/apps";
 import IconsMaterialSymbolsCalendarViewWeekOutline from "~icons/material-symbols/calendar-view-week-outline";
-import IconsMaterialSymbolsWorkspaceOutline from "~icons/material-symbols/workspaces-outline";
 
 interface TabListOption {
   id: ViewOption;
@@ -54,7 +52,6 @@ interface TabPanelOption {
 
 enum ViewOption {
   GRID = "grid",
-  BUBBLE = "bubble",
   LIST = "list",
 }
 
@@ -71,11 +68,6 @@ const tabOptions: TabListOption[] = [
     text: t("domains.buttons.grid"),
   },
   {
-    id: ViewOption.BUBBLE,
-    icon: IconsMaterialSymbolsWorkspaceOutline,
-    text: t("domains.buttons.bubble"),
-  },
-  {
     id: ViewOption.LIST,
     icon: IconsMaterialSymbolsCalendarViewWeekOutline,
     text: t("domains.buttons.list"),
@@ -88,10 +80,6 @@ const tabPanelViews: TabPanelOption[] = [
     component: GridView,
   },
   {
-    id: ViewOption.BUBBLE,
-    component: BubbleView,
-  },
-  {
     id: ViewOption.LIST,
     component: ListView,
   },
@@ -100,4 +88,10 @@ const tabPanelViews: TabPanelOption[] = [
 function onTabChange(newSelectedTab: number): void {
   queryParamType.value = tabOptions[newSelectedTab].id;
 }
+
+watchEffect(() => {
+  if (route.path !== "/search" && queryParamType.value === ViewOption.LIST) {
+    queryParamType.value = tabOptions[0].id;
+  }
+});
 </script>
