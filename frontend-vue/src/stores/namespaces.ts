@@ -1,9 +1,16 @@
 import { defineStore, storeToRefs } from "pinia";
-import { onMounted, Ref, ref } from "vue";
+import { computed, onMounted, Ref, ref } from "vue";
 import { useFetch } from "~/composables/useFetch";
 import { useBoundedContextsStore } from "~/stores/boundedContexts";
 import { BoundedContextId } from "~/types/boundedContext";
-import { CreateNamespace, CreateNamespaceLabel, Namespace, NamespaceId, NamespaceLabelId } from "~/types/namespace";
+import {
+  CreateNamespace,
+  CreateNamespaceLabel,
+  Namespace,
+  NamespaceId,
+  NamespaceLabel,
+  NamespaceLabelId,
+} from "~/types/namespace";
 
 export const useNamespaces = defineStore("namespaces", () => {
   const { activeBoundedContext } = storeToRefs(useBoundedContextsStore());
@@ -97,6 +104,43 @@ export const useNamespaces = defineStore("namespaces", () => {
     };
   }
 
+  const namespaceLabelsByNamespaceName = computed<{
+    [name: string]: NamespaceLabel[];
+  }>(() => {
+    return namespaces.value.reduce((acc: { [name: string]: NamespaceLabel[] }, curr: Namespace) => {
+      curr.labels.forEach((l) => {
+        if (!acc[curr.name]) {
+          acc[curr.name] = [];
+        }
+        acc[curr.name].push(l);
+      });
+      return acc;
+    }, {});
+  });
+
+  const namespaceLabelValuesByLabelName = computed<{
+    [name: string]: string[];
+  }>(() => {
+    return namespaces.value.reduce((acc: { [name: string]: string[] }, curr: Namespace) => {
+      curr.labels.forEach((l) => {
+        if (!acc[l.name]) {
+          acc[l.name] = [];
+        }
+        if (!acc[l.name].includes(l.value)) {
+          acc[l.name].push(l.value);
+        }
+      });
+      return acc;
+    }, {});
+  });
+
+  const findNamespaceLabelValuesByLabelName = (labelName?: string): string[] => {
+    if (!labelName) {
+      return [];
+    }
+    return namespaceLabelValuesByLabelName.value[labelName] || [];
+  };
+
   onMounted(fetchNamespaces);
 
   return {
@@ -104,6 +148,8 @@ export const useNamespaces = defineStore("namespaces", () => {
     deleteNamespace,
     createNamespaceLabel,
     deleteNamespaceLabel,
+    findNamespaceLabelValuesByLabelName,
+    namespaceLabelsByNamespaceName,
     namespaces,
     loading,
     error,

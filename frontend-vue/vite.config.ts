@@ -56,18 +56,6 @@ export default defineConfig({
     Icons({
       compiler: "vue3",
     }),
-
-    {
-      name: "singleHMR",
-      handleHotUpdate({ modules }) {
-        modules.map((m) => {
-          m.importedModules = new Set();
-          m.importers = new Set();
-        });
-
-        return modules;
-      },
-    },
   ],
 
   // https://github.com/vitest-dev/vitest

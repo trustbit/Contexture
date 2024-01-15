@@ -7,4 +7,5 @@ LABEL org.opencontainers.image.revision=$GIT_HASH
 ENV ASPNETCORE_URLS=http://*:3000
 ENV FileBased__Path=/data/db.json
 ENV GitHash=$GIT_HASH
-ENTRYPOINT ["dotnet", "Contexture.Api.App.dll"]
+RUN ["chmod", "+x", "./entrypoint.sh"]
+ENTRYPOINT ["./entrypoint.sh"]

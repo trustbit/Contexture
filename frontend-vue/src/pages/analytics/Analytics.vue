@@ -72,7 +72,7 @@
                                     <div class="w-[200px] py-2 sm:w-[500px]">
                                       <ContextureAddFilterPopoverContent
                                         :namespace-name="namespace"
-                                        :labels="labelsForNamespace[namespace]"
+                                        :labels="findNamespaceLabelsByNamespace(namespace)"
                                         @add="(label) => addFilter(index, label)"
                                       />
                                     </div>
@@ -222,7 +222,7 @@ import { useNamespaces } from "~/stores/namespaces";
 import { BoundedContext } from "~/types/boundedContext";
 import { Domain } from "~/types/domain";
 import ContextureHelpfulErrorAlert from "~/components/primitives/alert/ContextureHelpfulErrorAlert.vue";
-import { Namespace, NamespaceLabel } from "~/types/namespace";
+import { NamespaceLabel } from "~/types/namespace";
 import IconsMaterialSymbolsCalendarViewWeekOutline from "~icons/material-symbols/calendar-view-week-outline";
 import IconsMaterialSymbolsWorkspaceOutline from "~icons/material-symbols/workspaces-outline";
 
@@ -248,7 +248,7 @@ enum ViewOption {
 }
 
 const { t } = useI18n();
-const { namespaces } = storeToRefs(useNamespaces());
+const { namespaces, namespaceLabelsByNamespaceName } = storeToRefs(useNamespaces());
 const { allDomains } = storeToRefs(useDomainsStore());
 const router = useRouter();
 const route = useRoute();
@@ -332,6 +332,10 @@ function onDeleteFilter(index: number): void {
   activeFilters.value = [...activeFilters.value.slice(0, index), ...activeFilters.value.slice(index + 1)];
 }
 
+function findNamespaceLabelsByNamespace(namespaceName: string): NamespaceLabel[] {
+  return namespaceLabelsByNamespaceName.value[namespaceName] || [];
+}
+
 watch(activeFilters, (value) => {
   const queryParams = value.reduce((acc, { key, value }) => {
     if (!acc[key]) {
@@ -342,18 +346,6 @@ watch(activeFilters, (value) => {
   }, {} as Record<string, string[]>);
 
   router.push({ query: queryParams });
-});
-
-const labelsForNamespace = computed<{
-  [name: string]: NamespaceLabel[];
-}>(() => {
-  return namespaces.value.reduce((acc: { [name: string]: NamespaceLabel[] }, curr: Namespace) => {
-    if (!acc[curr.id]) {
-      acc[curr.name] = [];
-    }
-    acc[curr.name] = [...acc[curr.name], ...curr.labels.map((l) => l)];
-    return acc;
-  }, {});
 });
 
 function updateSelectedVisualisation(index: number) {
