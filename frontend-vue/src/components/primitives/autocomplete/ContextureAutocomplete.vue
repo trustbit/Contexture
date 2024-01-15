@@ -1,6 +1,6 @@
 <template>
   <div class="flex flex-col gap-1.5">
-    <Combobox v-model="value" :name="name">
+    <Combobox v-model="value" :name="name" :nullable="nullable">
       <div class="relative">
         <label class="mb-1.5 block text-sm text-gray-900" :for="name">
           <span class="font-bold">{{ label }}</span>
@@ -71,7 +71,7 @@
                   'bg-blue-500 text-white': active,
                   'text-gray-900': !active,
                 }"
-                class="relative cursor-default select-none border-t py-2 pl-10 pr-4"
+                class="relative cursor-default select-none py-2 pl-10 pr-4"
               >
                 <slot name="customValue">
                   <span :class="{ 'font-medium': selected, 'font-normal': !selected }" class="block truncate">
@@ -126,6 +126,7 @@ interface Props {
   suggestions?: any[];
   name?: string;
   allowCustomValues?: boolean;
+  nullable?: boolean;
 }
 
 const props = withDefaults(defineProps<Props>(), {

@@ -6,6 +6,7 @@
     :suggestions="suggestions"
     :display-value="(l: any) => l"
     :allow-custom-values="true"
+    :nullable="true"
     @complete="searchKeySuggestions($event)"
   >
     <template #customValue>
@@ -20,10 +21,9 @@
 <script setup lang="ts">
 import ContextureAutocomplete from "~/components/primitives/autocomplete/ContextureAutocomplete.vue";
 import { useNamespaces } from "~/stores/namespaces";
-import { FuseOptions } from "@vueuse/integrations/useFuse";
 import { ref } from "vue";
 import { useI18n } from "vue-i18n";
-import Fuse from "fuse.js";
+import Fuse, { IFuseOptions } from "fuse.js";
 
 interface Props {
   namespaceLabelName?: string;
@@ -31,13 +31,12 @@ interface Props {
 
 const props = defineProps<Props>();
 
-const fuseOptions: FuseOptions<{ name: string }> = {
+const fuseOptions: IFuseOptions<string> = {
   includeScore: true,
   includeMatches: true,
   threshold: 0.6,
   location: 0,
   distance: 100,
-  maxPatternLength: 32,
   minMatchCharLength: 1,
   keys: ["name"],
 };
