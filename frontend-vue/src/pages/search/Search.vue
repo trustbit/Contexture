@@ -1,25 +1,25 @@
 <template>
   <div class="mx-auto mt-5 px-3 pt-5 pb-8 lg:container lg:px-0">
-    <ContextureBlankHeader :title="t('domains.list.title')" />
+    <ContextureBlankHeader :title="t('domains.search.title')" />
 
     <div class="mt-4 sm:mt-10">
       <div v-if="loading" class="text-sm text-gray-700">
-        {{ t("domains.list.loading") }}
+        {{ t("domains.search.loading") }}
       </div>
       <ContextureHelpfulErrorAlert
         v-else-if="loadingError"
         v-bind="loadingError"
-        :friendly-message="t('domains.list.error.loading')"
+        :friendly-message="t('domains.search.error.loading')"
       />
 
       <div v-else class="w-full">
         <div class="text-sm text-gray-700" v-if="parentDomains.length === 0">{{ t("domains.empty") }}</div>
         <div v-else>
-          <ContextureSearch v-model="searchQuery" :placeholder="t('domains.list.search.bounded_contexts')" />
+          <ContextureSearch v-model="searchQuery" :placeholder="t('domains.search.search-bounded_contexts')" />
 
           <div class="mt-4 flex gap-x-4">
-            <ContextureSwitch v-model="options.showDescription" :label="t('domains.list.show_description')" />
-            <ContextureSwitch v-model="options.showNamespaces" :label="t('domains.list.show_namespaces')" />
+            <ContextureSwitch v-model="options.showDescription" :label="t('domains.search.show_description')" />
+            <ContextureSwitch v-model="options.showNamespaces" :label="t('domains.search.show_namespaces')" />
           </div>
 
           <div class="mt-8 flex flex-col gap-y-4">
@@ -56,7 +56,7 @@
                         >
                           <Icon:material-symbols:flip-to-back aria-hidden="true" class="mr-1.5 text-purple-500" />
                           <span class="font-bold text-blue-900">{{
-                            t("domains.list.subdomains", {
+                            t("domains.search.subdomains", {
                               count: parentDomain.subdomains.length,
                             })
                           }}</span>
@@ -71,7 +71,7 @@
                         >
                           <Icon:material-symbols:select-all aria-hidden="true" class="mr-1.5 text-yellow-500" />
                           <span class="font-bold text-blue-900">{{
-                            t("domains.list.bounded_contexts", {
+                            t("domains.search.bounded_contexts", {
                               count: parentDomain.boundedContexts.length,
                             })
                           }}</span>
@@ -130,7 +130,7 @@
                             <Icon:material-symbols:flip-to-back aria-hidden="true" class="mr-1.5 text-purple-500" />
                             <span class="font-bold text-blue-900">
                               {{
-                                t("domains.list.subdomains", {
+                                t("domains.search.subdomains", {
                                   count: subdomainsByDomainId[subdomain.id].length,
                                 })
                               }}
@@ -147,7 +147,7 @@
                             <Icon:material-symbols:select-all aria-hidden="true" class="mr-1.5 text-yellow-500" />
                             <span class="font-bold text-blue-900">
                               {{
-                                t("domains.list.bounded_contexts", {
+                                t("domains.search.bounded_contexts", {
                                   count: boundedContextsByDomainId[subdomain.id]?.length,
                                 })
                               }}
@@ -251,7 +251,7 @@
                       </div>
                       <div class="flex p-1 text-xs">
                         <Icon:material-symbols:subdirectory-arrow-right aria-hidden="true" class="mr-1 h-4 w-4" />
-                        <span>{{ t("domains.list.direct_bounded_context_child") }}</span>
+                        <span>{{ t("domains.search.direct_bounded_context_child") }}</span>
                       </div>
                     </div>
 
@@ -336,7 +336,7 @@ const { t } = useI18n();
 const { boundedContextsByDomainId } = storeToRefs(useBoundedContextsStore());
 const { subdomainsByDomainId, parentDomains, loading, loadingError } = storeToRefs(useDomainsStore());
 
-const options: Ref<DomainListViewSettings> = useLocalStorage<DomainListViewSettings>("settings.domains.listView", {
+const options: Ref<DomainListViewSettings> = useLocalStorage<DomainListViewSettings>("settings.domains.searchView", {
   showDescription: false,
   showNamespaces: false,
 });

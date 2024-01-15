@@ -204,7 +204,7 @@ import { useI18n } from "vue-i18n";
 import { LocationQueryValue, useRoute, useRouter } from "vue-router";
 import { useRouteQuery } from "@vueuse/router";
 import { Disclosure, Tab, TabGroup, TabList, TabPanel, TabPanels } from "@headlessui/vue";
-import BubbleView from "~/pages/domains/BubbleView.vue";
+import BubbleView from "~/components/analytics/BubbleView.vue";
 import ContextureBoundedContextCard from "~/components/bounded-context/ContextureBoundedContextCard.vue";
 import ContextureAccordionItem from "~/components/primitives/accordion/ContextureAccordionItem.vue";
 import ContextureBadge from "~/components/primitives/badge/ContextureBadge.vue";
@@ -212,7 +212,7 @@ import ContextureSearch from "~/components/primitives/input/ContextureSearch.vue
 import ContextureListItem from "~/components/primitives/list/ContextureListItem.vue";
 import ContexturePopover from "~/components/primitives/popover/ContexturePopover.vue";
 import ContextureViewSwitcher from "~/components/primitives/viewswitcher/ContextureViewSwitcher.vue";
-import { ActiveFilter } from "~/components/analytics/activeFilter";
+import { ActiveFilter } from "~/types/activeFilter";
 import ContextureActiveFilters from "~/components/analytics/ContextureActiveFilters.vue";
 import ContextureAddFilterPopoverContent from "~/components/analytics/ContextureAddFilter.vue";
 import { useFetch } from "~/composables/useFetch";

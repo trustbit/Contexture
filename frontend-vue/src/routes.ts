@@ -15,8 +15,8 @@ export const routes: Record<ContextureRoutes, string> = {
   ...boundedContextRoutes,
 };
 
-const DomainGrid = () => import("./pages/domains/grid/Grid.vue");
-const Search = () => import("./pages/domains/search/Search.vue");
+const DomainGrid = () => import("./pages/domains/Domains.vue");
+const Search = () => import("./pages/search/Search.vue");
 const DomainDetails = () => import("./pages/domain-details/DomainDetails.vue");
 const BoundedContextCanvas = () => import("./pages/bounded-context/BoundedContextCanvas.vue");
 const BoundedContextNamespaces = () => import("./pages/bounded-context/BoundedContextNamespaces.vue");
