@@ -163,7 +163,7 @@ withDefaults(defineProps<Props>(), {
   version: BoundedContextVersion.V4,
 });
 const { t } = useI18n();
-const { canModify } = useAuthStore()
+const { canModify } = useAuthStore();
 const confirmationModal = useConfirmationModalStore();
 const store = useBoundedContextsStore();
 const { activeBoundedContext } = storeToRefs(store);

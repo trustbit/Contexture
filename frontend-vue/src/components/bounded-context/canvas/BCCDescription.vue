@@ -48,7 +48,7 @@ const store = useBoundedContextsStore();
 const { activeBoundedContext } = storeToRefs(store);
 
 const { t } = useI18n();
-const { canModify } = useAuthStore()
+const { canModify } = useAuthStore();
 const description = ref(activeBoundedContext.value.description);
 const submitError = ref();
 const editMode = ref(false);

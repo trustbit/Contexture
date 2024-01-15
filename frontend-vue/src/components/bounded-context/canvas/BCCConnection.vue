@@ -214,7 +214,7 @@ const { activeBoundedContext, boundedContexts, boundedContextsByBoundedContextId
   useBoundedContextsStore()
 );
 const { createInboundConnection, createOutboundConnection, deleteCollaborationById } = useCollaborationsStore();
-const { canModify } = useAuthStore()
+const { canModify } = useAuthStore();
 const addCollapsed = ref(true);
 const submitError = ref<HelpfulErrorProps>();
 

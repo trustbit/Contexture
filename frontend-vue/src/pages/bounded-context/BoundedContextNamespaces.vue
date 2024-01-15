@@ -186,7 +186,7 @@ const { createNamespace, deleteNamespace, createNamespaceLabel, deleteNamespaceL
 const { namespaceTemplates } = storeToRefs(useNamespaceTemplatesStore());
 const confirmationModal = useConfirmationModalStore();
 const { t } = useI18n();
-const { canModify } = useAuthStore()
+const { canModify } = useAuthStore();
 const selectableTemplates = computed(() =>
   namespaceTemplates.value.filter((n) => !boundedContextNamespaces.value.map((n) => n.name).includes(n.name))
 );

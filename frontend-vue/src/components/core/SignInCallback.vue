@@ -12,13 +12,14 @@ import { onMounted } from "vue";
 const authStore = useAuthStore();
 const router = useRouter();
 
-onMounted(()=>{
-  authStore.signinCallback()
+onMounted(() => {
+  authStore
+    .signinCallback()
     .then(() => {
-        router.push("/")
+      router.push("/");
     })
     .catch((err) => {
-      console.error(err)
-    })
-})
+      console.error(err);
+    });
+});
 </script>

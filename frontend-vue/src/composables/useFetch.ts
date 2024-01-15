@@ -9,18 +9,17 @@ export const useFetch = createFetch({
 
   options: {
     async beforeFetch(ctx: BeforeFetchContext) {
-
-      const authStore = useAuthStore()
-      if(authStore.enabled){
-        const accessToken = await authStore.getAccessToken()
+      const authStore = useAuthStore();
+      if (authStore.enabled) {
+        const accessToken = await authStore.getAccessToken();
         const headers = {
-          ...ctx.options.headers, 
-          Authorization: `Bearer ${accessToken}`
-        }
+          ...ctx.options.headers,
+          Authorization: `Bearer ${accessToken}`,
+        };
 
-        ctx.options.headers = headers
+        ctx.options.headers = headers;
       }
-      
+
       return ctx;
     },
     async afterFetch(ctx: AfterFetchContext) {

@@ -44,7 +44,7 @@ import IconsMaterialSymbolsFormatKeyOutline from "~icons/material-symbols/key-ou
 const icon = IconsMaterialSymbolsFormatKeyOutline;
 const store = useBoundedContextsStore();
 const { activeBoundedContext } = storeToRefs(store);
-const { canModify } = useAuthStore()
+const { canModify } = useAuthStore();
 const { t } = useI18n();
 const key = ref(activeBoundedContext.value.shortName);
 const submitError = ref<HelpfulErrorProps | undefined>();

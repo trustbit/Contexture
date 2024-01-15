@@ -50,7 +50,7 @@ import { useAuthStore } from "~/stores/auth";
 const { t } = useI18n();
 const { parentDomains, loading, loadingError } = storeToRefs(useDomainsStore());
 const createDomainModalOpen = ref(false);
-const { canModify } = useAuthStore()
+const { canModify } = useAuthStore();
 
 function onCreateDomain() {
   createDomainModalOpen.value = true;

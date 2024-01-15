@@ -133,7 +133,7 @@ const hasSubdomainsOrBoundedContexts = computed(
 const domainToMove = ref();
 const moveDomainDialogOpen = ref(false);
 
-const { canModify } = useAuthStore()
+const { canModify } = useAuthStore();
 
 function onDeleteClick(): void {
   confirmModal.openWithComponent(

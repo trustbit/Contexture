@@ -241,7 +241,7 @@ const boundedContexts = computed(() => boundedContextsByDomainId.value[currentDo
 const viewOptions = ["subdomain", "boundedContext"];
 const selectedView = useRouteQuery<string>("view", "subdomain");
 const selectedTab = computed<number>(() => getSelectedTab());
-const { canModify } = useAuthStore()
+const { canModify } = useAuthStore();
 let isInitialRoute = true;
 
 function getSelectedTab() {

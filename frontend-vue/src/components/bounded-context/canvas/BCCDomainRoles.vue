@@ -120,7 +120,7 @@ const store = useBoundedContextsStore();
 const { activeBoundedContext } = storeToRefs(store);
 const { t } = useI18n();
 const confirmationModal = useConfirmationModalStore();
-const { canModify } = useAuthStore()
+const { canModify } = useAuthStore();
 const domainRoles: Ref<DomainRole[]> = computed(() => activeBoundedContext.value?.domainRoles || []);
 const selectablePredefinedDomainRoles = computed(() =>
   predefinedDomainRoles.map((role) => {

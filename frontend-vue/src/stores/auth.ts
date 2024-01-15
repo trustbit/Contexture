@@ -1,31 +1,31 @@
-import { Log, UserManager, UserManagerSettings, WebStorageStateStore } from "oidc-client-ts"
-import { defineStore } from "pinia"
-import { Ref, computed, inject, onMounted, ref} from "vue"
+import { Log, UserManager, UserManagerSettings, WebStorageStateStore } from "oidc-client-ts";
+import { defineStore } from "pinia";
+import { Ref, computed, inject, onMounted, ref } from "vue";
 import { AfterFetchContext, createFetch } from "@vueuse/core";
 
 export interface UserInfo {
-  authenticated: boolean,
-  name?: string,
-  permissions: string[]
+  authenticated: boolean;
+  name?: string;
+  permissions: string[];
 }
 
 interface OidcConfiguration {
-  securityType: "oidc"
-  authority: string
-  clientId: string
-  clientSecret: string
+  securityType: "oidc";
+  authority: string;
+  clientId: string;
+  clientSecret: string;
 }
 
 interface SecuirtyDisabled {
-  securityType: "disabled"
+  securityType: "disabled";
 }
 
-type SecurityConfiguration = OidcConfiguration | SecuirtyDisabled
+type SecurityConfiguration = OidcConfiguration | SecuirtyDisabled;
 
 const unauthenticatedUser: UserInfo = {
   authenticated: false,
-  permissions: []
-}
+  permissions: [],
+};
 
 const useFetch = createFetch({
   baseUrl: import.meta.env.VITE_CONTEXTURE_API_BASE_URL,
@@ -48,24 +48,22 @@ const useFetch = createFetch({
 });
 
 export async function getSecurityConfiguration() {
-  const {data} = await useFetch<SecurityConfiguration>("/meta/securityConfiguration").get()
-  return data.value
+  const { data } = await useFetch<SecurityConfiguration>("/meta/securityConfiguration").get();
+  return data.value;
 }
 
 export const useAuthStore = defineStore("auth", () => {
+  const user: Ref<UserInfo> = ref(unauthenticatedUser);
+  const enabled: Ref<boolean> = ref(false);
 
-  const user: Ref<UserInfo> = ref(unauthenticatedUser)
-  const enabled: Ref<boolean> = ref(false)
-  
-  const securityConfiguration = inject<SecurityConfiguration>('securityConfiguration')
+  const securityConfiguration = inject<SecurityConfiguration>("securityConfiguration");
 
-  let userManager: UserManager
+  let userManager: UserManager;
 
-  if(securityConfiguration){
-    if(securityConfiguration.securityType === "oidc")
-    {
-      Log.setLogger(console)
-      Log.setLevel(Log.DEBUG)
+  if (securityConfiguration) {
+    if (securityConfiguration.securityType === "oidc") {
+      Log.setLogger(console);
+      Log.setLevel(Log.DEBUG);
 
       const settings: UserManagerSettings = {
         authority: securityConfiguration.authority,
@@ -73,75 +71,72 @@ export const useAuthStore = defineStore("auth", () => {
         client_secret: securityConfiguration.clientSecret,
         redirect_uri: new URL("signinCallback", window.location.origin).href,
         post_logout_redirect_uri: window.location.origin,
-        response_type: 'code',
-        scope: 'openid profile email',
-        userStore: new WebStorageStateStore({ store: localStorage })
-      }
-      userManager = new UserManager(settings)
-      enabled.value = true
+        response_type: "code",
+        scope: "openid profile email",
+        userStore: new WebStorageStateStore({ store: localStorage }),
+      };
+      userManager = new UserManager(settings);
+      enabled.value = true;
     }
   }
 
-  function setUserInfo(u: UserInfo | null){
-    if(u)
-      user.value = u
+  function setUserInfo(u: UserInfo | null) {
+    if (u) user.value = u;
     else
       user.value = {
         authenticated: false,
         name: "",
-        permissions: []
-      }
+        permissions: [],
+      };
   }
 
-  function signinRedirect(){
-    return userManager.signinRedirect()
+  function signinRedirect() {
+    return userManager.signinRedirect();
   }
 
-  async function signinCallback(){
-    await userManager.signinCallback()
-    await fetchUserInfo()
+  async function signinCallback() {
+    await userManager.signinCallback();
+    await fetchUserInfo();
   }
 
-  async function signinSilent(){
-    await userManager.signinSilent()
-    await fetchUserInfo()
+  async function signinSilent() {
+    await userManager.signinSilent();
+    await fetchUserInfo();
   }
 
-  async function signoutRedirect(){
-    await userManager.signoutRedirect()
-    await fetchUserInfo()
+  async function signoutRedirect() {
+    await userManager.signoutRedirect();
+    await fetchUserInfo();
   }
 
-  async function getAccessToken(){
-    const u = await userManager.getUser()
-    return u?.access_token
+  async function getAccessToken() {
+    const u = await userManager.getUser();
+    return u?.access_token;
   }
 
-  async function fetchUserInfo(){
-    let user = await userManager.getUser()
+  async function fetchUserInfo() {
+    const user = await userManager.getUser();
 
-    const { data, error } = await useFetch<UserInfo>("/meta/userInfo",{
+    const { data, error } = await useFetch<UserInfo>("/meta/userInfo", {
       headers: {
-        Authorization: `Bearer ${user?.access_token}`
-      }
-    })
-    .get()
+        Authorization: `Bearer ${user?.access_token}`,
+      },
+    }).get();
 
-    const userInfo = data.value
-    if(userInfo){
-      userInfo.name = user?.profile.name
-      setUserInfo(userInfo)
+    const userInfo = data.value;
+    if (userInfo) {
+      userInfo.name = user?.profile.name;
+      setUserInfo(userInfo);
     }
   }
 
-  const canModify = computed(()=> !enabled.value || user.value.permissions.includes("modify"))
+  const canModify = computed(() => !enabled.value || user.value.permissions.includes("modify"));
 
-  onMounted(async () =>{
-    if(enabled.value)
-      await fetchUserInfo()
-  })
+  onMounted(async () => {
+    if (enabled.value) await fetchUserInfo();
+  });
 
-  return{
+  return {
     signinRedirect,
     signinCallback,
     signinSilent,
@@ -149,9 +144,6 @@ export const useAuthStore = defineStore("auth", () => {
     signoutRedirect,
     user,
     enabled,
-    canModify
-  }
-})
-
-
-
+    canModify,
+  };
+});

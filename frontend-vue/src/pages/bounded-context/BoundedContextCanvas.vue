@@ -113,7 +113,7 @@ const editMode = ref(false);
 const boundedContextId = useRouteParams("id");
 const submitError = ref();
 const { activeBoundedContext } = storeToRefs(store);
-const { canModify } = useAuthStore()
+const { canModify } = useAuthStore();
 
 async function onSave(values: { name: string; key?: string }) {
   const updateNameRes = await store.updateName(activeBoundedContext.value.id, values.name);

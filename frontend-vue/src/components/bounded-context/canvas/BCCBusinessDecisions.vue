@@ -78,7 +78,7 @@ const { t } = useI18n();
 const submitError = ref<HelpfulErrorProps>();
 const addCollapsed = ref(true);
 const businessDecisions = computed(() => activeBoundedContext.value?.businessDecisions || []);
-const { canModify } = useAuthStore()
+const { canModify } = useAuthStore();
 
 const businessDecisionSchema: DynamicFormSchema<BusinessDecision> = {
   fields: [

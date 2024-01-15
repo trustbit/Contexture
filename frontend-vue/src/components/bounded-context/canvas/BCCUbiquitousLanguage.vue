@@ -76,7 +76,7 @@ const store = useBoundedContextsStore();
 const confirmationModal = useConfirmationModalStore();
 const { activeBoundedContext } = storeToRefs(store);
 const { t } = useI18n();
-const { canModify } = useAuthStore()
+const { canModify } = useAuthStore();
 const submitError = ref<HelpfulErrorProps>();
 const addCollapsed = ref(true);
 const ubiquitousLanguage = computed(() => activeBoundedContext.value?.ubiquitousLanguage);

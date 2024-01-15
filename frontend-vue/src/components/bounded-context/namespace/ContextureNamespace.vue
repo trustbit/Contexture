@@ -134,7 +134,7 @@ interface Emits {
 const props = defineProps<Props>();
 const emit = defineEmits<Emits>();
 const { t } = useI18n();
-const { canModify } = useAuthStore()
+const { canModify } = useAuthStore();
 const newLabels = ref<CreateNamespaceLabel[]>([]);
 const editMode = ref(false);
 const showEmptyMessage = computed(() => props.namespace.labels.length === 0 && !editMode.value);

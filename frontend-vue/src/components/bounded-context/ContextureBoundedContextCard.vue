@@ -222,7 +222,7 @@ const confirmationModal = useConfirmationModalStore();
 const boundedContextStore = useBoundedContextsStore();
 const boundedContextToMove = ref<BoundedContext>();
 const moveBoundedContextDialogOpen = ref(false);
-const { canModify } = useAuthStore()
+const { canModify } = useAuthStore();
 
 function onDeleteClick(): void {
   confirmationModal.open(

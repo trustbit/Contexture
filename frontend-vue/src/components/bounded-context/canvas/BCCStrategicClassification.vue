@@ -189,7 +189,7 @@ import { useAuthStore } from "~/stores/auth";
 
 const icon = IconsMaterialSymbolsFormatTag;
 const { t } = useI18n();
-const { canModify } = useAuthStore()
+const { canModify } = useAuthStore();
 const store = useBoundedContextsStore();
 const { activeBoundedContext } = storeToRefs(store);
 const { reclassify } = store;

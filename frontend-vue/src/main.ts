@@ -22,11 +22,10 @@ export const i18n = createI18n({
   messages,
 });
 
-
-getSecurityConfiguration().then(securityConfiguration => {
+getSecurityConfiguration().then((securityConfiguration) => {
   const pinia = createPinia();
   const app = createApp(App);
-  app.provide("securityConfiguration", securityConfiguration)
+  app.provide("securityConfiguration", securityConfiguration);
 
   const router = createRouter({
     history: createWebHistory(import.meta.env.BASE_URL),
@@ -45,4 +44,4 @@ getSecurityConfiguration().then(securityConfiguration => {
   app.use(i18n);
   app.use(pinia);
   app.mount("#app");
-})
+});
