@@ -8,7 +8,7 @@ import "./styles/main.css";
 import { Bubble } from "~/visualisations/Bubble";
 import { HierarchicalEdge } from "~/visualisations/HierarchicalEdge";
 import { Sunburst } from "~/visualisations/Sunburst";
-import { getOidcConfiguration } from "~/stores/auth";
+import { getSecurityConfiguration } from "~/stores/auth";
 
 const messages = Object.fromEntries(
   Object.entries(import.meta.glob<{ default: any }>("../locales/*.json", { eager: true })).map(([key, value]) => {
@@ -23,10 +23,10 @@ export const i18n = createI18n({
 });
 
 
-getOidcConfiguration().then(securityConfiguration => {
+getSecurityConfiguration().then(securityConfiguration => {
   const pinia = createPinia();
   const app = createApp(App);
-  app.provide("oidcConfiguration", securityConfiguration)
+  app.provide("securityConfiguration", securityConfiguration)
 
   const router = createRouter({
     history: createWebHistory(import.meta.env.BASE_URL),

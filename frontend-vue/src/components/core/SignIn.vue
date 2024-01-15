@@ -1,8 +1,8 @@
-<template v-if="enabled">
-  <div v-if="!user.authenticated">
+<template>
+  <div v-if="enabled && !user.authenticated">
       <button @click="signIn">Sign in</button>
   </div>
-  <div v-if="user.authenticated" class="space-x-4">
+  <div v-if="enabled && user.authenticated" class="space-x-4">
     <label>{{ user.name }}</label>
     <button @click="signOut">Sign out</button>
   </div>

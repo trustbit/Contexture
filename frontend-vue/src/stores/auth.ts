@@ -10,11 +10,17 @@ export interface UserInfo {
 }
 
 interface OidcConfiguration {
-  securityType: string
+  securityType: "oidc"
   authority: string
   clientId: string
   clientSecret: string
 }
+
+interface SecuirtyDisabled {
+  securityType: "disabled"
+}
+
+type SecurityConfiguration = OidcConfiguration | SecuirtyDisabled
 
 const unauthenticatedUser: UserInfo = {
   authenticated: false,
@@ -41,12 +47,9 @@ const useFetch = createFetch({
   },
 });
 
-export async function getOidcConfiguration() {
-  const {data} = await useFetch<OidcConfiguration>("/meta/securityConfiguration").get()
-  if(data.value && data.value.securityType === "oidc")
-    return data.value
-  else 
-    return null
+export async function getSecurityConfiguration() {
+  const {data} = await useFetch<SecurityConfiguration>("/meta/securityConfiguration").get()
+  return data.value
 }
 
 export const useAuthStore = defineStore("auth", () => {
@@ -54,26 +57,29 @@ export const useAuthStore = defineStore("auth", () => {
   const user: Ref<UserInfo> = ref(unauthenticatedUser)
   const enabled: Ref<boolean> = ref(false)
   
-  const oidcConfiguration = inject<OidcConfiguration>('oidcConfiguration')
+  const securityConfiguration = inject<SecurityConfiguration>('securityConfiguration')
 
   let userManager: UserManager
 
-  if(oidcConfiguration){
-    Log.setLogger(console)
-    Log.setLevel(Log.DEBUG)
+  if(securityConfiguration){
+    if(securityConfiguration.securityType === "oidc")
+    {
+      Log.setLogger(console)
+      Log.setLevel(Log.DEBUG)
 
-    const settings: UserManagerSettings = {
-      authority: oidcConfiguration.authority,
-      client_id: oidcConfiguration.clientId,
-      client_secret: oidcConfiguration.clientSecret,
-      redirect_uri: new URL("signinCallback", window.location.origin).href,
-      post_logout_redirect_uri: window.location.origin,
-      response_type: 'code',
-      scope: 'openid profile email',
-      userStore: new WebStorageStateStore({ store: localStorage })
+      const settings: UserManagerSettings = {
+        authority: securityConfiguration.authority,
+        client_id: securityConfiguration.clientId,
+        client_secret: securityConfiguration.clientSecret,
+        redirect_uri: new URL("signinCallback", window.location.origin).href,
+        post_logout_redirect_uri: window.location.origin,
+        response_type: 'code',
+        scope: 'openid profile email',
+        userStore: new WebStorageStateStore({ store: localStorage })
+      }
+      userManager = new UserManager(settings)
+      enabled.value = true
     }
-    userManager = new UserManager(settings)
-    enabled.value = true
   }
 
   function setUserInfo(u: UserInfo | null){
@@ -128,7 +134,7 @@ export const useAuthStore = defineStore("auth", () => {
     }
   }
 
-  const canModify = computed(()=> user.value.permissions.includes("modify"))
+  const canModify = computed(()=> !enabled.value || user.value.permissions.includes("modify"))
 
   onMounted(async () =>{
     if(enabled.value)

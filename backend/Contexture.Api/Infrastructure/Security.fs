@@ -231,7 +231,7 @@ module Security =
         match contextureSecurity with
         | Disabled ->
             let result = {|
-                SecurityType = "none"
+                SecurityType = "disabled"
             |}
             json result next ctx    
         | Enabled securitySettings ->
