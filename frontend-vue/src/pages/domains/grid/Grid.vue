@@ -1,5 +1,5 @@
 <template>
-  <div class="px-3 pt-5 pb-8 lg:px-0 mx-auto mt-5 lg:container">
+  <div class="mx-auto mt-5 px-3 pt-5 pb-8 lg:container lg:px-0">
     <div class="sm:flex sm:justify-between">
       <ContextureBlankHeader :title="t('domains.grid.title')" />
 

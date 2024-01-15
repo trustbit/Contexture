@@ -1,5 +1,5 @@
 <template>
-  <div class="px-3 pt-5 pb-8 lg:px-0 mx-auto mt-5 lg:container">
+  <div class="mx-auto mt-5 px-3 pt-5 pb-8 lg:container lg:px-0">
     <ContextureBlankHeader :title="t('domains.list.title')" />
 
     <div class="mt-4 sm:mt-10">
@@ -56,10 +56,10 @@
                         >
                           <Icon:material-symbols:flip-to-back aria-hidden="true" class="mr-1.5 text-purple-500" />
                           <span class="font-bold text-blue-900">{{
-                              t("domains.list.subdomains", {
-                                count: parentDomain.subdomains.length
-                              })
-                            }}</span>
+                            t("domains.list.subdomains", {
+                              count: parentDomain.subdomains.length,
+                            })
+                          }}</span>
                         </ContextureBadge>
                         <ContextureBadge
                           v-if="parentDomain.boundedContexts.length > 0"
@@ -71,10 +71,10 @@
                         >
                           <Icon:material-symbols:select-all aria-hidden="true" class="mr-1.5 text-yellow-500" />
                           <span class="font-bold text-blue-900">{{
-                              t("domains.list.bounded_contexts", {
-                                count: parentDomain.boundedContexts.length
-                              })
-                            }}</span>
+                            t("domains.list.bounded_contexts", {
+                              count: parentDomain.boundedContexts.length,
+                            })
+                          }}</span>
                         </ContextureBadge>
                       </div>
                     </div>
@@ -129,12 +129,12 @@
                           >
                             <Icon:material-symbols:flip-to-back aria-hidden="true" class="mr-1.5 text-purple-500" />
                             <span class="font-bold text-blue-900">
-                            {{
+                              {{
                                 t("domains.list.subdomains", {
-                                  count: subdomainsByDomainId[subdomain.id].length
+                                  count: subdomainsByDomainId[subdomain.id].length,
                                 })
                               }}
-                          </span>
+                            </span>
                           </ContextureBadge>
                           <ContextureBadge
                             v-if="filteredBoundedContexts[subdomain.id]?.length > 0"
@@ -146,12 +146,12 @@
                           >
                             <Icon:material-symbols:select-all aria-hidden="true" class="mr-1.5 text-yellow-500" />
                             <span class="font-bold text-blue-900">
-                            {{
+                              {{
                                 t("domains.list.bounded_contexts", {
-                                  count: boundedContextsByDomainId[subdomain.id]?.length
+                                  count: boundedContextsByDomainId[subdomain.id]?.length,
                                 })
                               }}
-                          </span>
+                            </span>
                           </ContextureBadge>
                         </div>
 
@@ -338,7 +338,7 @@ const { subdomainsByDomainId, parentDomains, loading, loadingError } = storeToRe
 
 const options: Ref<DomainListViewSettings> = useLocalStorage<DomainListViewSettings>("settings.domains.listView", {
   showDescription: false,
-  showNamespaces: false
+  showNamespaces: false,
 });
 const searchQuery = useRouteQuery<string>("query");
 const searchQueryDebounced = refDebounced(searchQuery, 500);
@@ -400,5 +400,4 @@ const showParentDomain = (parentDomainId: DomainId) => {
     ? filteredSubdomains.value[parentDomainId]?.length > 0 || filteredBoundedContexts.value[parentDomainId]?.length > 0
     : filteredSubdomains;
 };
-
 </script>

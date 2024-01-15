@@ -223,10 +223,8 @@ import { BoundedContext } from "~/types/boundedContext";
 import { Domain } from "~/types/domain";
 import ContextureHelpfulErrorAlert from "~/components/primitives/alert/ContextureHelpfulErrorAlert.vue";
 import { Namespace, NamespaceLabel } from "~/types/namespace";
-import IconsMaterialSymbolsApps from "~icons/material-symbols/apps";
 import IconsMaterialSymbolsCalendarViewWeekOutline from "~icons/material-symbols/calendar-view-week-outline";
 import IconsMaterialSymbolsWorkspaceOutline from "~icons/material-symbols/workspaces-outline";
-
 
 interface SearchSettings {
   selectedTextPresentationMode: number;
