@@ -28,6 +28,7 @@ publish-app: build-app
 prepare-image: publish-docker publish-app
 	mkdir -p artifacts/image/wwwroot
 	cp -r artifacts/backend/*.* artifacts/image/
+	cp entrypoint.sh artifacts/image/entrypoint.sh
 	cp -r artifacts/frontend/** artifacts/image/wwwroot/
 
 build-image: prepare-image
