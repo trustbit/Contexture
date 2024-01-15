@@ -177,6 +177,7 @@
   "common.cancel": "cancel",
   "common.close": "close",
   "common.create": "Create",
+  "common.create-new": "Create new: '{entityName}'",
   "common.delete": "Delete",
   "common.description": "Description",
   "common.domain": "domain | domains",

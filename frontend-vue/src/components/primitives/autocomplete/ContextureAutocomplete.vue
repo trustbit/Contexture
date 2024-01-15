@@ -1,6 +1,6 @@
 <template>
   <div class="flex flex-col gap-1.5">
-    <Combobox v-model="value" :name="name">
+    <Combobox v-model="value" :name="name" :nullable="nullable">
       <div class="relative">
         <label class="mb-1.5 block text-sm text-gray-900" :for="name">
           <span class="font-bold">{{ label }}</span>
@@ -35,7 +35,7 @@
           @after-leave="query = ''"
         >
           <ComboboxOptions
-            class="absolute mt-1 max-h-60 w-full overflow-auto rounded-md bg-white py-1 text-base shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none sm:text-sm"
+            class="absolute z-10 mt-1 max-h-60 w-full overflow-auto rounded-md bg-white py-1 text-base shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none sm:text-sm"
           >
             <div
               v-if="suggestions?.length === 0 && query !== '' && !allowCustomValues"
@@ -43,27 +43,6 @@
             >
               Nothing found.
             </div>
-
-            <ComboboxOption v-if="query && allowCustomValues" :value="query" v-slot="{ selected, active }">
-              <li
-                :class="{
-                  'bg-blue-500 text-white': active,
-                  'text-gray-900': !active,
-                }"
-                class="relative cursor-default select-none py-2 pl-10 pr-4"
-              >
-                <span :class="{ 'font-medium': selected, 'font-normal': !selected }" class="block truncate">
-                  {{ query }}
-                </span>
-                <span
-                  v-if="selected"
-                  :class="{ 'text-white': active, 'text-blue-600': !active }"
-                  class="absolute inset-y-0 left-0 flex items-center pl-3"
-                >
-                  <Icon:material-symbols:check
-                /></span>
-              </li>
-            </ComboboxOption>
 
             <ComboboxOption v-for="d in suggestions" :key="d.id" v-slot="{ selected, active }" :value="d" as="template">
               <li
@@ -76,6 +55,29 @@
                 <span :class="{ 'font-medium': selected, 'font-normal': !selected }" class="block truncate">
                   {{ display(d) }}
                 </span>
+                <span
+                  v-if="selected"
+                  :class="{ 'text-white': active, 'text-blue-600': !active }"
+                  class="absolute inset-y-0 left-0 flex items-center pl-3"
+                >
+                  <Icon:material-symbols:check
+                /></span>
+              </li>
+            </ComboboxOption>
+
+            <ComboboxOption v-if="query && allowCustomValues" :value="query" v-slot="{ selected, active }">
+              <li
+                :class="{
+                  'bg-blue-500 text-white': active,
+                  'text-gray-900': !active,
+                }"
+                class="relative cursor-default select-none py-2 pl-10 pr-4"
+              >
+                <slot name="customValue">
+                  <span :class="{ 'font-medium': selected, 'font-normal': !selected }" class="block truncate">
+                    {{ query }}
+                  </span>
+                </slot>
                 <span
                   v-if="selected"
                   :class="{ 'text-white': active, 'text-blue-600': !active }"
@@ -124,6 +126,7 @@ interface Props {
   suggestions?: any[];
   name?: string;
   allowCustomValues?: boolean;
+  nullable?: boolean;
 }
 
 const props = withDefaults(defineProps<Props>(), {

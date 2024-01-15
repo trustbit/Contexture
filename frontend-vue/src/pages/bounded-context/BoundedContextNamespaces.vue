@@ -80,6 +80,8 @@
         @cancel="onCloseCreateNamespace"
       >
         <div class="flex max-w-full flex-col gap-y-4 pt-4 sm:w-[400px]">
+          <ContextureHelpfulErrorAlert v-if="submitError" v-bind="submitError" class="mb-4" />
+
           <Form @submit="onAddNamespace">
             <ContextureInputText
               name="namespace"
@@ -125,14 +127,14 @@
               v-for="(templateItem, index) of selectedTemplate?.template"
               :key="`template-${index}`"
             >
-              <ContextureInputText
+              <NamespaceValueAutocomplete
+                v-model="createNamespaceVal.labels[index].value"
                 :name="`template-${templateItem.name}-${index}`"
-                class="ml-2 grow"
                 :label="templateItem.name"
                 :placeholder="templateItem.placeholder"
                 :description="templateItem.description"
-                v-model="createNamespaceVal.labels[index].value"
-              ></ContextureInputText>
+                :namespace-label-name="templateItem.name"
+              />
             </div>
 
             <div class="mt-4">
@@ -178,6 +180,7 @@ import { CreateNamespace, CreateNamespaceLabel, Namespace, NamespaceId, Namespac
 import { NamespaceTemplate, NamespaceTemplateItem } from "~/types/namespace-templates";
 import { useRouteParams } from "@vueuse/router";
 import { requiredObjectRule } from "~/core/validationRules";
+import NamespaceValueAutocomplete from "~/components/bounded-context/namespace/NamespaceValueAutocomplete.vue";
 
 const { loading, activeBoundedContext } = storeToRefs(useBoundedContextsStore());
 const { createNamespace, deleteNamespace, createNamespaceLabel, deleteNamespaceLabel } = useNamespaces();
@@ -289,6 +292,7 @@ function onNamespaceTemplateChange(value: NamespaceTemplate) {
 }
 
 function resetCreateNamespace() {
+  submitError.value = undefined;
   isCreateNamespaceOpen.value = false;
   isCreateNamespaceFromTemplateOpen.value = false;
   setTimeout(() => {
