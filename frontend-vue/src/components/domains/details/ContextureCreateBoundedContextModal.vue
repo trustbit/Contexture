@@ -53,6 +53,27 @@ const form: DynamicFormSchema<CreateBoundedContext> = {
       component: ContextureInputText,
       componentProps: {
         label: t("domains.modal.create_bounded_context.form.fields.name.label"),
+        description: t("bounded_context_canvas.edit.form.description.name"),
+        required: true,
+        rules: toFieldValidator(zod.string().min(1)),
+      },
+    },
+    {
+      name: "shortName",
+      component: ContextureInputText,
+      componentProps: {
+        label: t("domains.modal.create_bounded_context.form.fields.short_name.label"),
+        description: t("bounded_context_canvas.edit.form.description.key"),
+        required: true,
+        rules: toFieldValidator(zod.string().min(1)),
+      },
+    },
+    {
+      name: "description",
+      component: ContextureInputText,
+      componentProps: {
+        label: t("domains.modal.create_bounded_context.form.fields.description.label"),
+        description: t("bounded_context_canvas.description.description"),
         required: true,
         rules: toFieldValidator(zod.string().min(1)),
       },

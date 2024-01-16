@@ -84,7 +84,7 @@ type Command =
     | UpdateDomainRoles of BoundedContextId * UpdateDomainRoles
     | UpdateMessages of BoundedContextId * UpdateMessages
 
-and CreateBoundedContext = { Name: string }
+and CreateBoundedContext = { Name: string; ShortName: string option; Description: string option }
 and RenameBoundedContext = { Name: string }
 
 and AssignShortName = { ShortName: string }
@@ -214,6 +214,20 @@ type State =
 let nameValidation name =
     if String.IsNullOrWhiteSpace name then Error EmptyName else Ok name
 
+let assignShortNameToBoundedContext shortName boundedContextId =
+    ShortNameAssigned
+        { BoundedContextId = boundedContextId
+          ShortName =
+              shortName
+              |> Option.filter (String.IsNullOrWhiteSpace >> not) }
+    |> Ok
+
+let changeDescription descriptionText contextId = 
+    DescriptionChanged
+            { Description = descriptionText
+              BoundedContextId = contextId }
+        |> Ok
+
 let newBoundedContext id domainId name =
     name
     |> nameValidation
@@ -223,6 +237,12 @@ let newBoundedContext id domainId name =
               DomainId = domainId
               Name = name })
 
+let createBoundedContext id domainId name shortName description = 
+    FsToolkit.ErrorHandling.Result.map3 (fun a b c -> [a;b;c]) 
+        (newBoundedContext id domainId name) 
+        (assignShortNameToBoundedContext shortName id) 
+        (changeDescription description id)
+
 let renameBoundedContext potentialName boundedContextId =
     potentialName
     |> nameValidation
@@ -231,22 +251,13 @@ let renameBoundedContext potentialName boundedContextId =
             { Name = name
               BoundedContextId = boundedContextId })
 
-let assignShortNameToBoundedContext shortName boundedContextId =
-    ShortNameAssigned
-        { BoundedContextId = boundedContextId
-          ShortName =
-              shortName
-              |> Option.ofObj
-              |> Option.filter (String.IsNullOrWhiteSpace >> not) }
-    |> Ok
-
 let private asList item = item |> Result.map List.singleton 
 
 let decide (command: Command) state =
     match command with
-    | CreateBoundedContext (id, domainId, createBc) -> newBoundedContext id domainId createBc.Name |> asList
+    | CreateBoundedContext (id, domainId, createBc) -> createBoundedContext id domainId createBc.Name createBc.ShortName createBc.Description
     | RenameBoundedContext (contextId, rename) -> renameBoundedContext rename.Name contextId |> asList
-    | AssignShortName (contextId, shortName) -> assignShortNameToBoundedContext shortName.ShortName contextId  |> asList
+    | AssignShortName (contextId, shortName) -> assignShortNameToBoundedContext (shortName.ShortName |> Option.ofObj) contextId  |> asList
     | RemoveBoundedContext contextId ->
         match state with
         | Existing domain ->

@@ -5,6 +5,7 @@
     name="key"
     :rules="shortNameValidationRules"
     @update:model-value="onChange"
+    required
   />
 </template>
 
