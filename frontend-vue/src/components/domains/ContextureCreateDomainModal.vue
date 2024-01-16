@@ -70,7 +70,7 @@ const form: DynamicFormSchema<CreateDomain> = {
         label: t("domains.modal.create.form.fields.vision.label"),
         required: true,
         rules: toFieldValidator(zod.string().min(1)),
-      }
+      },
     },
   ],
 };
