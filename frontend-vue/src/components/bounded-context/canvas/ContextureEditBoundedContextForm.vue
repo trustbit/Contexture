@@ -5,8 +5,6 @@
       :model-value="editModel.shortName"
       name="key"
       :label="t('bounded_context_canvas.edit.form.label.key')"
-      :rules="requiredString"
-      required
     />
 
     <ContextureInputText
