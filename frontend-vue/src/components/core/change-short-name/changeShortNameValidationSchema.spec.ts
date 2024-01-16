@@ -2,12 +2,12 @@ import { describe, expect, test } from "vitest";
 import { shortNameValidationSchema } from "~/components/core/change-short-name/changeShortNameValidationSchema";
 
 describe("change short name validation rules", () => {
-  test.each(["short-name", "a1", "", null, undefined])("'%s' is valid short name", (shortName) => {
+  test.each(["", null, undefined])("'%s' can not be null or empty", (shortName) => {
     const validation = shortNameValidationSchema("", [], []);
 
     const { success } = validation.safeParse(shortName);
 
-    expect(success).toBeTruthy();
+    expect(success).toBeFalsy();
   });
 
   test("cannot exceed 16 characters", () => {
