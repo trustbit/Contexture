@@ -14,6 +14,8 @@ export interface Domain {
 
 export interface CreateDomain {
   name: String;
+  shortName?: String;
+  vision?: String;
 }
 
 export interface UpdateDomain {

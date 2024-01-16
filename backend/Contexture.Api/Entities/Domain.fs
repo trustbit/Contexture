@@ -2,6 +2,8 @@ namespace Contexture.Api.Aggregates
 
 module Domain =
     open System
+    open FsToolkit.ErrorHandling
+
     module ValueObjects =
         type DomainId = Guid
         
@@ -15,7 +17,7 @@ module Domain =
         | AssignShortName of DomainId * AssignShortName
         | RemoveDomain of DomainId
 
-    and CreateDomain = { Name: string }
+    and CreateDomain = { Name: string; Vision: string option; ShortName: string option }
 
     and RenameDomain = { Name: string }
 
@@ -43,7 +45,7 @@ module Domain =
           Name: string
           Vision: string option }
 
-    and DomainCreated = { DomainId: DomainId; Name: String }
+    and DomainCreated = { DomainId: DomainId; Name: String; }
 
     and SubDomainCreated =
         { DomainId: DomainId
@@ -147,17 +149,42 @@ module Domain =
                 Existing { domain with ShortName = c.ShortName }
             | _ -> state
 
-    let newDomain id name parentDomain =
-        name
-        |> nameValidation
-        |> Result.map (fun name ->
-            match parentDomain with
-            | Some parent ->
-                SubDomainCreated
-                    { DomainId = id
-                      ParentDomainId = parent
-                      Name = name }
-            | None -> DomainCreated { DomainId = id; Name = name })
+    let assignShortNameToDomain shortName domainId =
+        ShortNameAssigned
+            { DomainId = domainId
+              ShortName =
+                  shortName
+                  |> Option.filter (String.IsNullOrWhiteSpace >> not) }
+        |> Ok
+
+    let refineVisionOfDomain vision domainId =
+        VisionRefined
+            { DomainId = domainId
+              Vision =
+                  vision
+                  |> Option.filter (String.IsNullOrWhiteSpace >> not) }
+        |> Ok
+
+    let newDomain id name shortName vision parentDomain = result {
+        let! created = 
+            name
+            |> nameValidation
+            |> Result.map (fun name ->
+                match parentDomain with
+                | Some parent ->
+                    SubDomainCreated
+                        { 
+                            DomainId = id
+                            ParentDomainId = parent
+                            Name = name 
+                        }
+                | None -> DomainCreated { DomainId = id; Name = name })
+
+        let! shortNameEvent = assignShortNameToDomain shortName id
+        let! visionEvent = refineVisionOfDomain vision id
+        
+        return [created; shortNameEvent; visionEvent]
+    }
 
     let moveDomain (state:State) parent domainId =
         match state with
@@ -179,15 +206,6 @@ module Domain =
         | _ ->
             Ok []
 
-    let refineVisionOfDomain vision domainId =
-        VisionRefined
-            { DomainId = domainId
-              Vision =
-                  vision
-                  |> Option.ofObj
-                  |> Option.filter (String.IsNullOrWhiteSpace >> not) }
-        |> Ok
-
     let renameDomain potentialName domainId state =
         match state with
         | Existing name ->
@@ -201,16 +219,7 @@ module Domain =
                 })
         | _ ->
             Error DomainAlreadyDeleted 
-
-    let assignShortNameToDomain shortName domainId =
-        ShortNameAssigned
-            { DomainId = domainId
-              ShortName =
-                  shortName
-                  |> Option.ofObj
-                  |> Option.filter (String.IsNullOrWhiteSpace >> not) }
-        |> Ok
-        
+       
     let removeDomain state domainId =
         match state with
         | Existing domain ->
@@ -225,14 +234,14 @@ module Domain =
     let private asList item = item |> Result.map List.singleton
     let decide (command: Command) (state: State) =
         match command with
-        | CreateDomain (domainId, createDomain) -> newDomain domainId createDomain.Name None |> asList
+        | CreateDomain (domainId, createDomain) -> newDomain domainId createDomain.Name createDomain.ShortName createDomain.Vision None
         | CreateSubdomain (domainId, subdomainId, createDomain) ->
-            newDomain domainId createDomain.Name (Some subdomainId) |> asList
+            newDomain domainId createDomain.Name createDomain.ShortName createDomain.Vision (Some subdomainId)
         | RemoveDomain domainId -> removeDomain state domainId
         | MoveDomain (domainId, move) -> moveDomain state move.ParentDomainId domainId
         | RenameDomain (domainId, rename) -> renameDomain rename.Name domainId state |> asList
-        | RefineVision (domainId, refineVision) -> refineVisionOfDomain refineVision.Vision domainId |> asList
-        | AssignShortName (domainId, assignShortName) -> assignShortNameToDomain assignShortName.ShortName domainId |> asList
+        | RefineVision (domainId, refineVision) -> refineVisionOfDomain (refineVision.Vision |> Option.ofObj) domainId |> asList
+        | AssignShortName (domainId, assignShortName) -> assignShortNameToDomain (assignShortName.ShortName |> Option.ofObj) domainId |> asList
         
 
    

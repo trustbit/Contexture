@@ -83,6 +83,8 @@ export interface DomainRole {
 
 export interface CreateBoundedContext {
   name: String;
+  shortName: string;
+  description: String;
 }
 
 export interface CreateMessage {

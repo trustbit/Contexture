@@ -30,6 +30,7 @@ import ContextureModal from "~/components/primitives/modal/ContextureModal.vue";
 import { useBoundedContextsStore } from "~/stores/boundedContexts";
 import { Domain } from "~/types/domain";
 import { CreateBoundedContext } from "~/types/boundedContext";
+import ContextureChangeKey from "~/components/core/change-short-name/ContextureChangeShortName.vue";
 
 interface Props {
   isOpen: boolean;
@@ -53,6 +54,25 @@ const form: DynamicFormSchema<CreateBoundedContext> = {
       component: ContextureInputText,
       componentProps: {
         label: t("domains.modal.create_bounded_context.form.fields.name.label"),
+        description: t("bounded_context_canvas.edit.form.description.name"),
+        required: true,
+        rules: toFieldValidator(zod.string().min(1)),
+      },
+    },
+    {
+      name: "shortName",
+      component: ContextureChangeKey,
+      componentProps: {
+        label: t("domains.modal.create_bounded_context.form.fields.short_name.label"),
+        description: t("bounded_context_canvas.edit.form.description.key"),
+      },
+    },
+    {
+      name: "description",
+      component: ContextureInputText,
+      componentProps: {
+        label: t("domains.modal.create_bounded_context.form.fields.description.label"),
+        description: t("bounded_context_canvas.description.description"),
         required: true,
         rules: toFieldValidator(zod.string().min(1)),
       },

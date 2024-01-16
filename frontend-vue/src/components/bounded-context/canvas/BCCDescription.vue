@@ -12,7 +12,9 @@
       <ContextureTextarea
         v-model="description"
         name="description"
-        description="A few sentences describing the why and what of the context in business language. No technical details here."
+        :description="t('bounded_context_canvas.description.description')"
+        :rules="requiredString"
+        required
       />
       <ContexturePrimaryButton :label="t('common.save')" class="mt-4" size="sm" @click="onUpdate">
         <template #left>
@@ -35,6 +37,8 @@
 import { storeToRefs } from "pinia";
 import { ref } from "vue";
 import { useI18n } from "vue-i18n";
+import * as zod from "zod";
+import { toFieldValidator } from "@vee-validate/zod";
 import ContextureBoundedContextCanvasElement from "~/components/bounded-context/canvas/ContextureBoundedContextCanvasElement.vue";
 import ContextureHelpfulErrorAlert from "~/components/primitives/alert/ContextureHelpfulErrorAlert.vue";
 import ContexturePrimaryButton from "~/components/primitives/button/ContexturePrimaryButton.vue";
@@ -52,6 +56,7 @@ const { canModify } = useAuthStore();
 const description = ref(activeBoundedContext.value.description);
 const submitError = ref();
 const editMode = ref(false);
+const requiredString = toFieldValidator(zod.string().min(1, t("validation.required")));
 
 async function onUpdate() {
   submitError.value = null;

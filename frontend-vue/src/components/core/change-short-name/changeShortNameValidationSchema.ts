@@ -13,6 +13,7 @@ export const shortNameValidationSchema = (
 ) =>
   zod
     .string()
+    .min(1)
     .max(16)
     .superRefine((arg: string, ctx: RefinementCtx) => {
       isUniqueIn<Domain>(arg, ctx, {
@@ -43,10 +44,7 @@ export const shortNameValidationSchema = (
     .refine((term: string) => !endsWith(term, "-"), { message: "Must not end with hyphen" })
     .refine((term: string) => term.split("").every((c) => allowedCharacters.includes(c)), {
       message: "Must only contain alphanumeric characters and hyphens",
-    })
-    .nullable()
-    .optional()
-    .or(zod.literal(""));
+    });
 
 function mapDomain(prop: string, domains: Domain[]): string {
   const domain = domains.find((d) => d.shortName?.toUpperCase() === prop.toUpperCase());
