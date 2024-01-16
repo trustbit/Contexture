@@ -5,6 +5,8 @@
       name="key"
       :description="t('domains.details.edit.form.description.key')"
       :label="t('domains.details.edit.form.label.key')"
+      :rules="requiredString"
+      required
     />
 
     <ContextureInputText
@@ -12,7 +14,7 @@
       name="name"
       :description="t('domains.details.edit.form.description.name')"
       :label="t('domains.details.edit.form.label.name')"
-      :rules="nameValidation"
+      :rules="requiredString"
       required
     />
 
@@ -21,6 +23,8 @@
       name="vision"
       :description="t('domains.details.edit.form.description.vision')"
       :label="t('domains.details.edit.form.label.vision')"
+      :rules="requiredString"
+      required
     />
 
     <div>
@@ -54,7 +58,7 @@ const emit = defineEmits(["submit"]);
 const { t } = useI18n();
 const editModel: Ref<Domain> = toRef(props, "domain");
 
-const nameValidation = toFieldValidator(zod.string().min(1, t("validation.required")));
+const requiredString = toFieldValidator(zod.string().min(1, t("validation.required")));
 
 function submit(values: any) {
   emit("submit", values);

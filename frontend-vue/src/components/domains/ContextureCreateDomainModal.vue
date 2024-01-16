@@ -54,6 +54,24 @@ const form: DynamicFormSchema<CreateDomain> = {
         rules: toFieldValidator(zod.string().min(1)),
       },
     },
+    {
+      name: "shortName",
+      component: ContextureInputText,
+      componentProps: {
+        label: t("domains.modal.create.form.fields.short_name.label"),
+        required: true,
+        rules: toFieldValidator(zod.string().min(1)),
+      },
+    },
+    {
+      name: "vision",
+      component: ContextureInputText,
+      componentProps: {
+        label: t("domains.modal.create.form.fields.vision.label"),
+        required: true,
+        rules: toFieldValidator(zod.string().min(1)),
+      }
+    },
   ],
 };
 

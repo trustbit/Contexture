@@ -261,6 +261,8 @@
   "domains.search.title": "All Domains Search",
   "domains.modal.create.error.submit": "Could not create new domain",
   "domains.modal.create.form.fields.name.label": "Name of the Domain",
+  "domains.modal.create.form.fields.short_name.label": "Short name",
+  "domains.modal.create.form.fields.vision.label": "Vision",
   "domains.modal.create.form.submit": "create domain",
   "domains.modal.create.title": "Create a new Domain",
   "domains.modal.create_bounded_context.error.submit": "Could not create new bounded context",
