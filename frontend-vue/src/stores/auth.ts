@@ -1,4 +1,4 @@
-import { Log, UserManager, UserManagerSettings, WebStorageStateStore } from "oidc-client-ts";
+import { UserManager, UserManagerSettings, WebStorageStateStore } from "oidc-client-ts";
 import { defineStore } from "pinia";
 import { Ref, computed, inject, onMounted, ref } from "vue";
 import { AfterFetchContext, createFetch } from "@vueuse/core";
@@ -62,9 +62,6 @@ export const useAuthStore = defineStore("auth", () => {
 
   if (securityConfiguration) {
     if (securityConfiguration.securityType === "oidc") {
-      Log.setLogger(console);
-      Log.setLevel(Log.DEBUG);
-
       const settings: UserManagerSettings = {
         authority: securityConfiguration.authority,
         client_id: securityConfiguration.clientId,

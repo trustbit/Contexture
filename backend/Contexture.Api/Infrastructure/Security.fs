@@ -117,12 +117,6 @@ module Security =
                 options.MapInboundClaims <- false
                 options.Authority <- settings.Authority
                 options.Audience <- settings.Audience
-
-                
-                options.RequireHttpsMetadata <- false
-                let handler = new HttpClientHandler();
-                handler.ServerCertificateCustomValidationCallback <- HttpClientHandler.DangerousAcceptAnyServerCertificateValidator
-                options.BackchannelHttpHandler <- handler
             )
 
     let configureAuthentication configuration (services : IServiceCollection) = 
