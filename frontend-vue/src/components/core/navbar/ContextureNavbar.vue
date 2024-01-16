@@ -1,10 +1,10 @@
 <template>
-  <nav class="bg-blue-500 py-3.5 px-3 text-white sm:px-0" role="navigation">
-    <div class="flex flex-wrap items-center space-x-5 pl-0 sm:pl-10">
+  <nav class="bg-blue-500 py-3.5 px-3 text-white" role="navigation">
+    <div class="flex flex-row flex-wrap gap-x-5 pl-0 sm:pl-10">
       <div>
         <img alt="Contexture Logo" class="h-7 w-7" src="../../../assets/logo/light/light.png" />
       </div>
-      <ul class="flex space-x-4">
+      <ul class="flex flex-1 space-x-4">
         <li v-for="item in items" :key="item.to">
           <RouterLink
             :class="{ 'router-link-active': isActiveRoute(item) }"
@@ -15,7 +15,7 @@
           </RouterLink>
         </li>
       </ul>
-      <div class="!ml-auto !mr-5 flex">
+      <div class="flex">
         <SignIn />
       </div>
     </div>
@@ -26,7 +26,7 @@
 import { useI18n } from "vue-i18n";
 import { useRoute } from "vue-router";
 import { routes } from "~/routes";
-import SignIn from "~/components/core/SignIn.vue";
+import SignIn from "~/components/core/auth/SignIn.vue";
 
 const { t } = useI18n();
 const route = useRoute();
