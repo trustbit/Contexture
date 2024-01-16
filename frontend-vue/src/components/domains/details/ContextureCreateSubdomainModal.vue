@@ -53,6 +53,7 @@ const form: DynamicFormSchema<CreateDomain> = {
       component: ContextureInputText,
       componentProps: {
         label: t("domains.modal.create_subdomain.form.fields.name.label"),
+        description: t("domains.details.edit.form.description.name"),
         required: true,
         rules: toFieldValidator(zod.string().min(1)),
       },
@@ -62,6 +63,7 @@ const form: DynamicFormSchema<CreateDomain> = {
       component: ContextureInputText,
       componentProps: {
         label: t("domains.modal.create.form.fields.short_name.label"),
+        description: t("domains.details.edit.form.description.key"),
         required: true,
         rules: toFieldValidator(zod.string().min(1)),
       },
@@ -71,6 +73,7 @@ const form: DynamicFormSchema<CreateDomain> = {
       component: ContextureInputText,
       componentProps: {
         label: t("domains.modal.create.form.fields.vision.label"),
+        description: t("domains.details.edit.form.description.vision"),
         required: true,
         rules: toFieldValidator(zod.string().min(1)),
       },
