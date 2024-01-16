@@ -49,12 +49,12 @@
 
       <div class="mt-2">
         <div class="flex items-center" v-for="(newLabel, index) of newLabels" :key="`newLabel-${index}`">
-          <ContextureInputText
+          <NamespaceLabelAutocomplete
             v-model="newLabel.name"
             :name="`newLabelName-${index}`"
             :placeholder="t('common.name')"
             :skip-validation="true"
-          ></ContextureInputText>
+          />
 
           <NamespaceValueAutocomplete v-model="newLabel.value" :namespace-label-name="newLabel.name" />
 
@@ -107,6 +107,7 @@ import ContextureListItem from "~/components/primitives/list/ContextureListItem.
 import { useAuthStore } from "~/stores/auth";
 import { CreateNamespaceLabel, Namespace, NamespaceLabel } from "~/types/namespace";
 import NamespaceValueAutocomplete from "~/components/bounded-context/namespace/NamespaceValueAutocomplete.vue";
+import NamespaceLabelAutocomplete from "~/components/bounded-context/namespace/NamespaceLabelAutocomplete.vue";
 
 interface Props {
   namespace: Namespace;
