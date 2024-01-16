@@ -61,6 +61,6 @@ const searchKeySuggestions = (query: string) => {
 
   suggestions.value = results.map((result: { item: string }) => {
     return result.item;
-  });
+  }).sort();
 };
 </script>
