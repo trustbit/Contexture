@@ -13,10 +13,15 @@ open Microsoft.Extensions.Hosting
 open Microsoft.Extensions.Logging
 open Microsoft.AspNetCore.TestHost
 open Microsoft.AspNetCore.Hosting
+open Microsoft.AspNetCore.Authentication
+open Microsoft.AspNetCore.Authentication.JwtBearer
 open Giraffe
 open Microsoft.AspNetCore.Builder
 
+let securityKey = SymmetricSecurityKey(Encoding.UTF8.GetBytes("6e5ee162-d6a0-40cf-a8cc-c4a60f8d2587"))
+
 module TestHost = 
+    open Microsoft.Extensions.DependencyInjection
 
     let configureLogging (builder: ILoggingBuilder) =
             builder
@@ -32,15 +37,32 @@ module TestHost =
                 GET  >=> setStatusCode 200
                 POST  >=> setStatusCode 200
             ]
-            route "/frontend" >=> protectFrontendRoutes >=> setStatusCode 200
+            route "/frontend" >=> setStatusCode 200
         ]
+
+    let testJwtBearerScheme _configuration (services : IServiceCollection) = 
+        services
+            .AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
+            .AddJwtBearer(fun options ->
+                options.MapInboundClaims <- false
+
+                options.TokenValidationParameters <- TokenValidationParameters(
+                    IssuerSigningKey = securityKey,
+                    ValidateAudience = false,
+                    ValidateIssuer = false
+                )
+            )
+            |> ignore
+
+        services
 
     let createHost securityConfiguration =
         Host
             .CreateDefaultBuilder()
             .UseEnvironment("Tests")
-            .ConfigureServices( fun s -> 
-                configureSecurity securityConfiguration s |> ignore
+            .ConfigureServices( fun s ->
+                testJwtBearerScheme s |> ignore
+                addSecurity testJwtBearerScheme configureAuthorization securityConfiguration s |> ignore
             )
             .ConfigureWebHostDefaults(fun webHostBuilder ->
                 webHostBuilder
@@ -66,7 +88,7 @@ let accessFrontend() =
     new HttpRequestMessage(HttpMethod.Get,"/frontend")
 
 let createToken (claims: (string * string) list) = 
-    let securityKey = SymmetricSecurityKey(Encoding.UTF8.GetBytes("6e5ee162-d6a0-40cf-a8cc-c4a60f8d2587"))
+    let securityKey = securityKey
     securityKey.KeyId <- "keyid"
     let credentials = SigningCredentials(securityKey, SecurityAlgorithms.HmacSha256);
     let tokenClaims = claims |> List.map Claim
@@ -86,6 +108,13 @@ let withToken (claims: (string * string) list) (request :HttpRequestMessage) =
 let withTokenAndValidClaims = withToken [
     JwtRegisteredClaimNames.Sub, "admin"
     "group", "admin"
+    """nested""", """
+        {
+            "json": {
+                "claim": "value"
+            }
+        }
+    """
 ]
 
 let withTokenAndInvalidClaims = withToken [
@@ -102,12 +131,6 @@ let returnsUnauthorized = returns HttpStatusCode.Unauthorized
 
 let returnsForbidden = returns HttpStatusCode.Forbidden
 
-let securitySettings = {
-    AuthenticationScheme = Bearer { IssuerSigningKey = "6e5ee162-d6a0-40cf-a8cc-c4a60f8d2587" }
-    ModifyDataPolicy = Requirements [ RequireClaim {ClaimType = "group"; AllowedValues = [|"admin"|]} ]
-    GetDataPolicy = AllowAnonymous
-}
-
 let executeScenario settings (request: unit -> HttpRequestMessage) assertResponse = task {
     use host = TestHost.createHost settings
     do! host.StartAsync() 
@@ -118,10 +141,18 @@ let executeScenario settings (request: unit -> HttpRequestMessage) assertRespons
 
 module ``using Bearer scheme`` =
 
-    let usingBearerScheme = 
+    let runScenario = 
         Enabled {
-            AuthenticationScheme = Bearer { IssuerSigningKey = "6e5ee162-d6a0-40cf-a8cc-c4a60f8d2587" }
-            ModifyDataPolicy = Requirements [ RequireClaim {ClaimType = "group"; AllowedValues = [|"admin"|]} ]
+            AuthenticationScheme = OIDC {
+                Audience = ""
+                Authority = ""
+                ClientId = ""
+                ClientSecret = None
+            }
+            ModifyDataPolicy = Requirements [ 
+                RequireClaim {ClaimType = "group"; AllowedValues = [|"admin"|]}
+                RequireClaim {ClaimType = "nested:json:claim"; AllowedValues = [|"value"|]} 
+            ]
             GetDataPolicy = AllowAnonymous
         }
         |> executeScenario
@@ -130,19 +161,19 @@ module ``using Bearer scheme`` =
 
         [<Fact>]
         let ``without access token should return ok``() = 
-            usingBearerScheme
+            runScenario
                 getData
                 returnsOk
 
         [<Fact>]
         let ``with access token and valid claims should return ok`` () =
-            usingBearerScheme        
+            runScenario        
                 (getData >> withTokenAndValidClaims)
                 returnsOk
 
         [<Fact>]
         let ``with access token and invalid claims should return ok`` () =
-            usingBearerScheme        
+            runScenario        
                 (getData >> withTokenAndInvalidClaims)
                 returnsOk
 
@@ -151,19 +182,19 @@ module ``using Bearer scheme`` =
 
         [<Fact>]
         let ``without access token should return unauthorized``()=
-            usingBearerScheme
+            runScenario
                 modifyData
                 returnsUnauthorized
 
         [<Fact>]
         let ``with access token and valid claims should return ok``()=
-            usingBearerScheme       
+            runScenario       
                 (modifyData >> withTokenAndValidClaims)
                 returnsOk
         
         [<Fact>]
         let ``with access token and invalid claims should return forbidden``()=
-            usingBearerScheme        
+            runScenario        
                 (modifyData >> withTokenAndInvalidClaims)
                 returnsForbidden
 
@@ -171,18 +202,18 @@ module ``using Bearer scheme`` =
 
         [<Fact>]
         let ``without access token should return ok``() = 
-            usingBearerScheme        
+            runScenario        
                 accessFrontend
                 returnsOk
 
         [<Fact>]
         let ``with access token and valid claims should return ok`` () =
-            usingBearerScheme        
+            runScenario        
                 (accessFrontend >> withTokenAndValidClaims)
                 returnsOk
 
         [<Fact>]
         let ``with access token and invalid claims should return ok`` () =
-            usingBearerScheme        
+            runScenario        
                 (accessFrontend >> withTokenAndInvalidClaims)
                 returnsOk

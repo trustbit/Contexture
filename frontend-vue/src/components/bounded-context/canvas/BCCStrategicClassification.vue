@@ -2,7 +2,7 @@
   <ContextureBoundedContextCanvasElement
     :title="t('bounded_context_canvas.strategic_classification.title')"
     :title-icon="icon"
-    :is-editable="true"
+    :is-editable="canModify"
     :edit-mode="editMode"
     @close="reset"
     @open="editMode = true"
@@ -185,9 +185,11 @@ import ContextureTooltip from "~/components/primitives/tooltip/ContextureTooltip
 import { useBoundedContextsStore } from "~/stores/boundedContexts";
 import { BusinessModel, Classification, DomainType, Evolution } from "~/types/boundedContext";
 import IconsMaterialSymbolsFormatTag from "~icons/material-symbols/tag";
+import { useAuthStore } from "~/stores/auth";
 
 const icon = IconsMaterialSymbolsFormatTag;
 const { t } = useI18n();
+const { canModify } = useAuthStore();
 const store = useBoundedContextsStore();
 const { activeBoundedContext } = storeToRefs(store);
 const { reclassify } = store;

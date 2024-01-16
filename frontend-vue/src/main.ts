@@ -8,6 +8,7 @@ import "./styles/main.css";
 import { Bubble } from "~/visualisations/Bubble";
 import { HierarchicalEdge } from "~/visualisations/HierarchicalEdge";
 import { Sunburst } from "~/visualisations/Sunburst";
+import { getSecurityConfiguration } from "~/stores/auth";
 
 const messages = Object.fromEntries(
   Object.entries(import.meta.glob<{ default: any }>("../locales/*.json", { eager: true })).map(([key, value]) => {
@@ -20,23 +21,27 @@ export const i18n = createI18n({
   locale: "en",
   messages,
 });
-const pinia = createPinia();
 
-const app = createApp(App);
-const router = createRouter({
-  history: createWebHistory(import.meta.env.BASE_URL),
-  routes,
-  scrollBehavior() {
-    // always scroll to top
-    return { top: 0 };
-  },
+getSecurityConfiguration().then((securityConfiguration) => {
+  const pinia = createPinia();
+  const app = createApp(App);
+  app.provide("securityConfiguration", securityConfiguration);
+
+  const router = createRouter({
+    history: createWebHistory(import.meta.env.BASE_URL),
+    routes,
+    scrollBehavior() {
+      // always scroll to top
+      return { top: 0 };
+    },
+  });
+
+  customElements.define("bubble-visualization", Bubble);
+  customElements.define("hierarchical-edge", HierarchicalEdge);
+  customElements.define("visualization-sunburst", Sunburst);
+
+  app.use(router);
+  app.use(i18n);
+  app.use(pinia);
+  app.mount("#app");
 });
-
-customElements.define("bubble-visualization", Bubble);
-customElements.define("hierarchical-edge", HierarchicalEdge);
-customElements.define("visualization-sunburst", Sunburst);
-
-app.use(router);
-app.use(i18n);
-app.use(pinia);
-app.mount("#app");

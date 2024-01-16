@@ -79,7 +79,7 @@
             </div>
           </div>
           <div>
-            <button @click="() => onDeleteCollaboration(collaboration.id)">
+            <button @click="() => onDeleteCollaboration(collaboration.id)" v-if="canModify">
               <span class="sr-only">{{ t("bounded_context_canvas.collaborators.delete.label") }}</span>
               <icon:material-symbols:delete-outline class="h-5 w-5 text-blue-500" />
             </button>
@@ -87,6 +87,7 @@
         </div>
 
         <ContextureWhiteButton
+          v-if="canModify"
           :label="collaboration?.relationshipType ? 'redefine relationship' : 'define relationship'"
           size="sm"
           class="mt-2"
@@ -99,6 +100,7 @@
       </div>
 
       <ContextureCollapsable
+        v-if="canModify"
         :label="t('bounded_context_canvas.collaborators.actions.collapsed.add')"
         :cancel-text="t('common.cancel')"
         class="mt-8"
@@ -189,6 +191,7 @@ import ContextureInputText from "~/components/primitives/input/ContextureInputTe
 import ContextureTextarea from "~/components/primitives/input/ContextureTextarea.vue";
 import ContextureRadioGroup from "~/components/primitives/radio/ContextureRadioGroup.vue";
 import { collaboratorOptions } from "~/constants/collaborators";
+import { useAuthStore } from "~/stores/auth";
 import { useBoundedContextsStore } from "~/stores/boundedContexts";
 import { useCollaborationsStore } from "~/stores/collaborations";
 import useConfirmationModalStore from "~/stores/confirmationModal";
@@ -211,6 +214,7 @@ const { activeBoundedContext, boundedContexts, boundedContextsByBoundedContextId
   useBoundedContextsStore()
 );
 const { createInboundConnection, createOutboundConnection, deleteCollaborationById } = useCollaborationsStore();
+const { canModify } = useAuthStore();
 const addCollapsed = ref(true);
 const submitError = ref<HelpfulErrorProps>();
 

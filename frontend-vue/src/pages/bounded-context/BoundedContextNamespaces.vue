@@ -18,6 +18,7 @@
         <Menu as="div" class="relative inline-block text-left">
           <div>
             <MenuButton
+              v-if="canModify"
               class="box-border inline-flex w-full items-center justify-center rounded bg-blue-500 px-4 py-2 text-sm text-gray-50 hover:bg-blue-400 focus:bg-blue-500 focus:shadow-[0px_0px_5px] focus:shadow-blue-300 active:bg-blue-700 disabled:bg-gray-400"
             >
               <Icon:materialSymbols:add class="mr-1.5 h-5 w-5" />
@@ -180,6 +181,7 @@ import { CreateNamespace, CreateNamespaceLabel, Namespace, NamespaceId, Namespac
 import { NamespaceTemplate, NamespaceTemplateItem } from "~/types/namespace-templates";
 import { useRouteParams } from "@vueuse/router";
 import { requiredObjectRule } from "~/core/validationRules";
+import { useAuthStore } from "~/stores/auth";
 import NamespaceValueAutocomplete from "~/components/bounded-context/namespace/NamespaceValueAutocomplete.vue";
 
 const { loading, activeBoundedContext } = storeToRefs(useBoundedContextsStore());
@@ -187,6 +189,7 @@ const { createNamespace, deleteNamespace, createNamespaceLabel, deleteNamespaceL
 const { namespaceTemplates } = storeToRefs(useNamespaceTemplatesStore());
 const confirmationModal = useConfirmationModalStore();
 const { t } = useI18n();
+const { canModify } = useAuthStore();
 const selectableTemplates = computed(() =>
   namespaceTemplates.value.filter((n) => !boundedContextNamespaces.value.map((n) => n.name).includes(n.name))
 );

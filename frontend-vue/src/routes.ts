@@ -21,6 +21,7 @@ const DomainDetails = () => import("./pages/domain-details/DomainDetails.vue");
 const BoundedContextCanvas = () => import("./pages/bounded-context/BoundedContextCanvas.vue");
 const BoundedContextNamespaces = () => import("./pages/bounded-context/BoundedContextNamespaces.vue");
 const Analytics = () => import("./pages/analytics/Analytics.vue");
+const SignInCallback = () => import("./components/core/auth/SignInCallback.vue");
 
 export default [
   {
@@ -52,6 +53,11 @@ export default [
     name: routes.Search,
     path: "/search",
     component: Search,
+  },
+  {
+    name: "signinCallback",
+    path: "/signinCallback",
+    component: SignInCallback,
   },
   { path: "/:pathMatch(.*)*", redirect: { name: routes.Domains } },
 ];

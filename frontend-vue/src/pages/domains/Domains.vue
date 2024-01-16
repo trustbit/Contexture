@@ -7,6 +7,7 @@
         :label="t('domains.grid.button.create_domain')"
         class="mt-4 sm:mt-0"
         @click="onCreateDomain"
+        v-if="canModify"
       >
         <template #left>
           <Icon:material-symbols:flip-to-back aria-hidden="true" class="mr-2" />
@@ -44,10 +45,12 @@ import ContexturePrimaryButton from "~/components/primitives/button/ContexturePr
 import ContextureBlankHeader from "~/components/core/header/ContextureBlankHeader.vue";
 import ContextureHelpfulErrorAlert from "~/components/primitives/alert/ContextureHelpfulErrorAlert.vue";
 import { useDomainsStore } from "~/stores/domains";
+import { useAuthStore } from "~/stores/auth";
 
 const { t } = useI18n();
 const { parentDomains, loading, loadingError } = storeToRefs(useDomainsStore());
 const createDomainModalOpen = ref(false);
+const { canModify } = useAuthStore();
 
 function onCreateDomain() {
   createDomainModalOpen.value = true;

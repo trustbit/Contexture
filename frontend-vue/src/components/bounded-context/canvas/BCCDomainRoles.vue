@@ -30,6 +30,7 @@
     </div>
 
     <ContextureCollapsable
+      v-if="canModify"
       :label="t('bounded_context_canvas.domain_roles.actions.collapsed.add')"
       class="mt-8"
       :cancel-text="t('common.cancel')"
@@ -46,6 +47,7 @@
       />
     </ContextureCollapsable>
     <ContextureCollapsable
+      v-if="canModify"
       :label="t('bounded_context_canvas.domain_roles.actions.collapsed.choose')"
       class="mt-2"
       :cancel-text="t('common.cancel')"
@@ -107,6 +109,7 @@ import ContextureInputText from "~/components/primitives/input/ContextureInputTe
 import ContextureRadio from "~/components/primitives/radio/ContextureRadio.vue";
 import { predefinedDomainRoles } from "~/constants/domainRoles";
 import { isUniqueIn } from "~/core/validation";
+import { useAuthStore } from "~/stores/auth";
 import { useBoundedContextsStore } from "~/stores/boundedContexts";
 import useConfirmationModalStore from "~/stores/confirmationModal";
 import { DomainRole } from "~/types/boundedContext";
@@ -117,7 +120,7 @@ const store = useBoundedContextsStore();
 const { activeBoundedContext } = storeToRefs(store);
 const { t } = useI18n();
 const confirmationModal = useConfirmationModalStore();
-
+const { canModify } = useAuthStore();
 const domainRoles: Ref<DomainRole[]> = computed(() => activeBoundedContext.value?.domainRoles || []);
 const selectablePredefinedDomainRoles = computed(() =>
   predefinedDomainRoles.map((role) => {

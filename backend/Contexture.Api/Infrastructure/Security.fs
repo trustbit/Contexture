@@ -1,17 +1,15 @@
 namespace Contexture.Api.Infrastructure
 
 open System.Text
+open System.Net.Http
 open Microsoft.Extensions.DependencyInjection
 open Microsoft.AspNetCore.Authentication.JwtBearer
-open Microsoft.IdentityModel.Tokens
 open Giraffe
+open Microsoft.AspNetCore.Http
 open Microsoft.AspNetCore.Builder
 open Microsoft.AspNetCore.Authorization
-open Microsoft.AspNetCore.Authentication.Cookies
-open Microsoft.AspNetCore.Authentication.OpenIdConnect
 
 module Security = 
-
     type RequireClaim = {
         ClaimType: string
         AllowedValues: string array
@@ -26,18 +24,13 @@ module Security =
     
     type OIDCSchemeSettings = {
         Authority: string
+        Audience: string
         ClientId: string
         ClientSecret: string option
-        CookieName: string option
-    }
-
-    type BearerSchemeSettings = {
-        IssuerSigningKey: string
     }
 
     type AuthenticationScheme =
     | OIDC of OIDCSchemeSettings
-    | Bearer of BearerSchemeSettings
 
     type SecuritySettings = {
         AuthenticationScheme: AuthenticationScheme
@@ -53,7 +46,49 @@ module Security =
     let ModifyDataPolicyName = "ModifyData"
 
     [<Literal>]
-    let GetDataPolicyName = "GetData"
+    let ViewDataPolicyName = "ViewData"
+
+    let requireClaimFromJson (path: string) values (ctx: AuthorizationHandlerContext) = task {
+        match path.Split(":") |> Array.toList with
+        | [] -> 
+            return false
+        | claimName::jsonPath ->
+            let claim = ctx.User.Claims |> Seq.tryFind (fun c -> c.Type = claimName)
+
+            let tryFromJson (value:string) = 
+                try
+                    Json.JsonDocument.Parse(value).RootElement |> Some
+                with
+                | _ -> None
+
+            let jsonClaim = claim |> Option.map(fun x-> x.Value) |> Option.bind tryFromJson
+
+            let tryGetJsonElement (jsonElementOption:Json.JsonElement option) (propertyName:string) = 
+                jsonElementOption |> Option.bind(fun jsonElement ->
+                    match jsonElement.TryGetProperty(propertyName) with
+                    | true, x -> Some x
+                    | _ -> None
+                )
+
+            let jsonElement = List.fold tryGetJsonElement jsonClaim jsonPath
+
+            let getValuesFromElement (element: Json.JsonElement) = 
+                match element.ValueKind with
+                | Json.JsonValueKind.Array ->
+                    element.EnumerateArray()
+                    |> Seq.map(fun x -> x.GetString())
+                    |> Seq.toList
+                | Json.JsonValueKind.String ->
+                    element.GetString() |> List.singleton
+                | _ -> []
+
+            let claimValues = jsonElement |> Option.map getValuesFromElement |> Option.defaultValue []
+
+            let containsAnyItem a b = 
+                List.exists (fun item -> List.contains item b) a
+
+            return containsAnyItem claimValues (values |> Array.toList)
+    }
 
     let configurePolicy (authorization: AuthorizationOptions) (name: string, requirements)  = 
         match requirements with
@@ -65,7 +100,9 @@ module Security =
                 |> List.iter (fun requirement ->
                     match requirement with
                     | RequireClaim claimRequirement ->
-                        p.RequireClaim(claimRequirement.ClaimType, claimRequirement.AllowedValues) |> ignore
+                        match claimRequirement.ClaimType.Contains(":") with
+                        | true -> p.RequireAssertion((requireClaimFromJson claimRequirement.ClaimType claimRequirement.AllowedValues)) |> ignore
+                        | false -> p.RequireClaim(claimRequirement.ClaimType, claimRequirement.AllowedValues) |> ignore
                 )
             )
         | AllowAnonymous ->
@@ -73,65 +110,38 @@ module Security =
                 p.RequireAssertion(fun _-> true)|> ignore
             )
 
-    let configureOIDCScheme settings (services : IServiceCollection) = 
-        services
-            .AddAuthentication(fun options ->
-                options.DefaultScheme <- CookieAuthenticationDefaults.AuthenticationScheme
-                options.DefaultChallengeScheme <- OpenIdConnectDefaults.AuthenticationScheme
-            )
-            .AddCookie(fun options ->
-                settings.CookieName |> Option.iter(fun name -> options.Cookie.Name <- name)
-            )
-            .AddOpenIdConnect(fun options ->
-                options.Authority <- settings.Authority
-                options.ClientId <- settings.ClientId
-                settings.ClientSecret |> Option.iter(fun x-> options.ClientSecret <- x)
-                options.ResponseType <- "code"
-                options.SaveTokens <- true
-                options.RequireHttpsMetadata <- false
-                options.MapInboundClaims <- false
-            );
-
-    let configureBearerScheme settings (services : IServiceCollection) =
+    let configureJwtBearerScheme settings (services : IServiceCollection) = 
         services
             .AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
             .AddJwtBearer(fun options ->
                 options.MapInboundClaims <- false
-                options.TokenValidationParameters <- new TokenValidationParameters(
-                    // todo token validation options should be configurable
-
-                    // By default token should always have signature so does signing key needs to be configured
-                    IssuerSigningKey = SymmetricSecurityKey(Encoding.UTF8.GetBytes(settings.IssuerSigningKey)),
-                    ValidateIssuer = false,
-                    ValidateAudience = false,
-                    ValidateIssuerSigningKey = false,
-                    ValidateLifetime = false
-                )
+                options.Authority <- settings.Authority
+                options.Audience <- settings.Audience
             )
-
 
     let configureAuthentication configuration (services : IServiceCollection) = 
         match configuration.AuthenticationScheme with
-        | OIDC settings -> configureOIDCScheme settings services |> ignore
-        | Bearer settings -> configureBearerScheme settings services |> ignore
-
+        | OIDC settings -> configureJwtBearerScheme settings services |> ignore
         services
 
     let configureAuthorization configuration (services : IServiceCollection) = 
         let policies = [
                 ModifyDataPolicyName, configuration.ModifyDataPolicy
-                GetDataPolicyName, configuration.GetDataPolicy
+                ViewDataPolicyName, configuration.GetDataPolicy
             ]
-        services.AddAuthorization(fun options -> policies |> List.iter (configurePolicy options))    
+        services.AddAuthorization(fun options -> policies |> List.iter (configurePolicy options))
 
-    let configureSecurity configuration (services : IServiceCollection) =
+    let addSecurity addAuthentication addAuthorization configuration (services : IServiceCollection) =
         services.AddSingleton<SecurityConfiguration>(fun _ -> configuration) |> ignore
         match configuration with
         | Enabled configuration ->
             services
-            |> configureAuthentication configuration
-            |> configureAuthorization configuration
+            |> addAuthentication configuration
+            |> addAuthorization configuration
         | Disabled -> services
+
+    let configureSecurity configuration (services : IServiceCollection) =
+        addSecurity configureAuthentication configureAuthorization configuration services
 
     let useSecurity (app : IApplicationBuilder) = 
         let configuration = app.ApplicationServices.GetRequiredService<SecurityConfiguration>()
@@ -142,8 +152,6 @@ module Security =
 
     type IApplicationBuilder with
         member x.UseSecurity() = useSecurity x
-
-    let allowAnonymous: HttpHandler = fun next ctx -> next ctx
 
     let authorizationFailed : HttpHandler = fun next ctx -> 
         // distinguish between authentication and authorization failure reasons
@@ -160,7 +168,7 @@ module Security =
         | Enabled _ ->
             match ctx.Request.Method with
             | "GET" ->
-                authorizeBy GetDataPolicyName next ctx 
+                authorizeBy ViewDataPolicyName next ctx 
             | "PUT"
             | "POST"
             | "PATCH"
@@ -170,18 +178,66 @@ module Security =
                 RequestErrors.METHOD_NOT_ALLOWED ctx.Request.Method next ctx
         | _-> next ctx
 
-    let mustBeLoggedIn = 
-        requiresAuthentication (challenge OpenIdConnectDefaults.AuthenticationScheme)
+    type UserInfo = {
+        Authenticated: bool
+        Permissions: string list
+    }
 
-    let protectFrontendRoutes: HttpHandler = fun next ctx ->
+
+    let policyNameToPermission policyName = 
+        match policyName with
+        | ViewDataPolicyName -> "view"
+        | ModifyDataPolicyName -> "modify"
+        | _-> failwith $"unknown policy name {policyName}"
+
+    let getUserInfo (ctx:HttpContext) = task {
+        let authorizationService = ctx.RequestServices.GetService<IAuthorizationService>()
+        let contextureSecurity = ctx.RequestServices.GetRequiredService<SecurityConfiguration>()
+        let evaluatePolicyToPermission (policyName: string) = task{
+            let! authorizationResult = authorizationService.AuthorizeAsync(ctx.User, policyName)
+            return 
+                match authorizationResult.Succeeded with
+                | true -> policyNameToPermission policyName |> Some
+                | _ -> None
+        }
+        
+        match contextureSecurity with
+        | Disabled ->
+            return { Authenticated = true; Permissions = [ModifyDataPolicyName; ViewDataPolicyName] |> List.map policyNameToPermission }
+        | Enabled _ ->
+            match ctx.User.Identity.IsAuthenticated with
+            | true ->
+                let! modify = evaluatePolicyToPermission ModifyDataPolicyName
+                let! view = evaluatePolicyToPermission ViewDataPolicyName
+                let permissions = [modify; view] |> List.choose id
+                return { Authenticated = true; Permissions = permissions}
+            | _ -> 
+                return { Authenticated = false; Permissions = []}
+    }
+
+    let userInfo: HttpHandler = fun next ctx -> task {
+        let! user = getUserInfo ctx                
+        return! json user next ctx
+    }
+
+    let securityConfiguration: HttpHandler = fun next ctx -> 
         let contextureSecurity = ctx.RequestServices.GetRequiredService<SecurityConfiguration>()
         match contextureSecurity with
-        | Enabled settings ->
-            match settings.AuthenticationScheme with
-            | OIDC _ -> mustBeLoggedIn next ctx
-            | Bearer _-> allowAnonymous next ctx
-        | Disabled -> allowAnonymous next ctx
-
+        | Disabled ->
+            let result = {|
+                SecurityType = "disabled"
+            |}
+            json result next ctx    
+        | Enabled securitySettings ->
+            match securitySettings.AuthenticationScheme with
+            | OIDC settings ->
+                let result = {|
+                    SecurityType = "oidc"
+                    Authority = settings.Authority
+                    ClientId = settings.ClientId
+                    ClientSecret = settings.ClientSecret
+                |}
+                json result next ctx
 
     module Options = 
         [<CLIMutable>]
@@ -202,21 +258,15 @@ module Security =
         }
 
         [<CLIMutable>]
-        type BearerAuthenticationSchemeOptions = {
-            IssuerSigningKey: string
-        }
-
-        [<CLIMutable>]
             type OIDCAuthenticationSchemeOptions = {
             Authority: string
+            Audience: string
             ClientId: string
             ClientSecret: string
-            CookieName: string
         }
 
         [<CLIMutable>]
         type AuthenticationOptions = {
-            Bearer: BearerAuthenticationSchemeOptions
             OIDC: OIDCAuthenticationSchemeOptions
         }
 
@@ -242,33 +292,22 @@ module Security =
             unboxed
             |> Option.map(fun x -> OIDC {
                     Authority = x.Authority
+                    Audience = x.Audience
                     ClientId = x.ClientId
                     ClientSecret = Option.ofObj x.ClientSecret
-                    CookieName = Option.ofObj x.CookieName
-                }
-            )
-
-        let tryMapBearerSettings authenticationOptions = 
-            tryUnbox authenticationOptions.Bearer
-            |> Option.map(fun x -> Bearer {
-                    IssuerSigningKey = x.IssuerSigningKey
                 }
             )
 
         let getAuthenticationSettings authenticationOptions = 
-            let opts =
-                tryMapBearerSettings authenticationOptions
-                |> Option.orElse (tryMapOIDCSettings authenticationOptions)
-            
-            opts
+            tryMapOIDCSettings authenticationOptions
             |> Option.defaultWith (fun () -> failwith "Unable to initialize authentication settings")
 
         let getAuthorizationSettings options =
             tryUnbox options
             |> Option.map(fun x-> 
                 {|
-                ModifyDataPolicy = x.ModifyData |> toPolicySettings |> Option.defaultValue AllowAnonymous
-                GetDataPolicy = x.GetData |> toPolicySettings |> Option.defaultValue AllowAnonymous
+                    ModifyDataPolicy = x.ModifyData |> toPolicySettings |> Option.defaultValue AllowAnonymous
+                    GetDataPolicy = x.GetData |> toPolicySettings |> Option.defaultValue AllowAnonymous
                 |}
             )
             |> Option.defaultValue {| ModifyDataPolicy = AllowAnonymous; GetDataPolicy = AllowAnonymous |}
