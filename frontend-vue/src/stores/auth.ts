@@ -114,7 +114,7 @@ export const useAuthStore = defineStore("auth", () => {
   async function fetchUserInfo() {
     const user = await userManager.getUser();
 
-    const { data, error } = await useFetch<UserInfo>("/meta/userInfo", {
+    const { data } = await useFetch<UserInfo>("/meta/userInfo", {
       headers: {
         Authorization: `Bearer ${user?.access_token}`,
       },

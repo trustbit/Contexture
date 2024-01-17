@@ -36,7 +36,7 @@ const fuseOptions: IFuseOptions<string> = {
   keys: ["name"],
 };
 
-const { labelNames } = storeToRefs(useNamespaces()); 
+const { labelNames } = storeToRefs(useNamespaces());
 const { t } = useI18n();
 const suggestions = ref(labelNames.value);
 const fuse = new Fuse(labelNames.value, fuseOptions);
@@ -45,7 +45,7 @@ const inputText = ref("");
 
 const searchKeySuggestions = (query: string) => {
   if (!query) {
-    suggestions.value = labelNames.value
+    suggestions.value = labelNames.value;
     model.value = undefined;
     return;
   }
@@ -57,6 +57,5 @@ const searchKeySuggestions = (query: string) => {
   suggestions.value = results.map((result: { item: string }) => {
     return result.item;
   });
-  
 };
 </script>
