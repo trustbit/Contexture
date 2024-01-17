@@ -2,7 +2,7 @@
   <ContextureAutocomplete
     v-model="model"
     class="ml-2 grow"
-    :placeholder="t('common.value')"
+    :placeholder="t('common.name')"
     :suggestions="suggestions"
     :display-value="(l: any) => l"
     :allow-custom-values="true"
@@ -24,12 +24,7 @@ import { useNamespaces } from "~/stores/namespaces";
 import { ref } from "vue";
 import { useI18n } from "vue-i18n";
 import Fuse, { IFuseOptions } from "fuse.js";
-
-interface Props {
-  namespaceLabelName?: string;
-}
-
-const props = defineProps<Props>();
+import { storeToRefs } from "pinia";
 
 const fuseOptions: IFuseOptions<string> = {
   includeScore: true,
@@ -41,26 +36,26 @@ const fuseOptions: IFuseOptions<string> = {
   keys: ["name"],
 };
 
-const { findNamespaceLabelValuesByLabelName } = useNamespaces();
+const { labelNames } = storeToRefs(useNamespaces());
 const { t } = useI18n();
-const suggestions = ref<string[]>(findNamespaceLabelValuesByLabelName(props.namespaceLabelName));
-const fuse = new Fuse(findNamespaceLabelValuesByLabelName(props.namespaceLabelName), fuseOptions);
+const suggestions = ref(labelNames.value);
+const fuse = new Fuse(labelNames.value, fuseOptions);
 const model = defineModel<string>();
 const inputText = ref("");
 
 const searchKeySuggestions = (query: string) => {
-  if (query == "") {
-    suggestions.value = findNamespaceLabelValuesByLabelName(props.namespaceLabelName);
+  if (!query) {
+    suggestions.value = labelNames.value;
     model.value = undefined;
     return;
   }
+
   inputText.value = query;
-  const namespaceLabelValuesByLabelName = findNamespaceLabelValuesByLabelName(props.namespaceLabelName);
-  fuse.setCollection(namespaceLabelValuesByLabelName);
+  fuse.setCollection(labelNames.value);
   const results = fuse.search(query);
 
   suggestions.value = results.map((result: { item: string }) => {
     return result.item;
-  }).sort();
+  });
 };
 </script>

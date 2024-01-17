@@ -49,12 +49,12 @@
 
       <div class="mt-2">
         <div class="flex items-center" v-for="(newLabel, index) of newLabels" :key="`newLabel-${index}`">
-          <ContextureInputText
+          <NamespaceLabelAutocomplete
             v-model="newLabel.name"
             :name="`newLabelName-${index}`"
             :placeholder="t('common.name')"
             :skip-validation="true"
-          ></ContextureInputText>
+          />
 
           <NamespaceValueAutocomplete v-model="newLabel.value" :namespace-label-name="newLabel.name" />
 
@@ -96,17 +96,15 @@
 <script setup lang="ts">
 import { computed, ref } from "vue";
 import { useI18n } from "vue-i18n";
-
 import ContextureAccordionItem from "~/components/primitives/accordion/ContextureAccordionItem.vue";
 import ContexturePrimaryButton from "~/components/primitives/button/ContexturePrimaryButton.vue";
 import ContextureTextLinkButton from "~/components/primitives/button/ContextureTextLinkButton.vue";
 import ContextureWhiteButton from "~/components/primitives/button/ContextureWhiteButton.vue";
-import ContextureInputText from "~/components/primitives/input/ContextureInputText.vue";
 import ContextureListItem from "~/components/primitives/list/ContextureListItem.vue";
-
+import NamespaceValueAutocomplete from "~/components/bounded-context/namespace/NamespaceValueAutocomplete.vue";
+import NamespaceLabelAutocomplete from "~/components/bounded-context/namespace/NamespaceLabelAutocomplete.vue";
 import { useAuthStore } from "~/stores/auth";
 import { CreateNamespaceLabel, Namespace, NamespaceLabel } from "~/types/namespace";
-import NamespaceValueAutocomplete from "~/components/bounded-context/namespace/NamespaceValueAutocomplete.vue";
 
 interface Props {
   namespace: Namespace;

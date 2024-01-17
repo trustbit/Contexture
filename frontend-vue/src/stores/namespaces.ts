@@ -77,6 +77,14 @@ export const useNamespaces = defineStore("namespaces", () => {
 
     if (!error.value) {
       activeBoundedContext.value!.namespaces = data.value || [];
+
+      const namespace = data.value?.find((n) => n.id === namespaceId);
+      if (namespace) {
+        const idx = namespaces.value.findIndex((n) => n.id == namespace.id);
+        const updatedNamespaces = [...namespaces.value];
+        updatedNamespaces[idx] = namespace;
+        namespaces.value = updatedNamespaces;
+      }
     }
 
     return {
@@ -96,6 +104,14 @@ export const useNamespaces = defineStore("namespaces", () => {
 
     if (!error.value) {
       activeBoundedContext.value!.namespaces = data.value || [];
+
+      const namespace = data.value?.find((n) => n.id === namespaceId);
+      if (namespace) {
+        const idx = namespaces.value.findIndex((n) => n.id == namespace.id);
+        const updatedNamespaces = [...namespaces.value];
+        updatedNamespaces[idx] = namespace;
+        namespaces.value = updatedNamespaces;
+      }
     }
 
     return {
@@ -116,6 +132,17 @@ export const useNamespaces = defineStore("namespaces", () => {
       });
       return acc;
     }, {});
+  });
+
+  const labelNames = computed<string[]>(() => {
+    return [
+      ...new Set(
+        namespaces.value
+          .map((n) => n.labels)
+          .flat()
+          .map((l) => l.name)
+      ),
+    ];
   });
 
   const namespaceLabelValuesByLabelName = computed<{
@@ -149,6 +176,7 @@ export const useNamespaces = defineStore("namespaces", () => {
     createNamespaceLabel,
     deleteNamespaceLabel,
     findNamespaceLabelValuesByLabelName,
+    labelNames,
     namespaceLabelsByNamespaceName,
     namespaces,
     loading,
