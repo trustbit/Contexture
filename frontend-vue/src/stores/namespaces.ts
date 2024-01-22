@@ -161,6 +161,18 @@ export const useNamespaces = defineStore("namespaces", () => {
     }, {});
   });
 
+  const namespaceLabelValues = computed<string[]>(() => {
+    return [
+      ...new Set(
+        namespaces.value
+          .map((n) => n.labels)
+          .flat()
+          .map((l) => l.value)
+          .flat()
+      ),
+    ];
+  });
+
   const findNamespaceLabelValuesByLabelName = (labelName?: string): string[] => {
     if (!labelName) {
       return [];
@@ -178,6 +190,7 @@ export const useNamespaces = defineStore("namespaces", () => {
     findNamespaceLabelValuesByLabelName,
     labelNames,
     namespaceLabelsByNamespaceName,
+    namespaceLabelValues,
     namespaces,
     loading,
     error,

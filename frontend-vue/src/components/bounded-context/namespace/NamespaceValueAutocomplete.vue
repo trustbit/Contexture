@@ -41,12 +41,14 @@ const fuseOptions: IFuseOptions<string> = {
   keys: ["name"],
 };
 
-const { findNamespaceLabelValuesByLabelName } = useNamespaces();
+const { findNamespaceLabelValuesByLabelName, namespaceLabelValues } = useNamespaces();
 const { t } = useI18n();
 const suggestions = ref<string[]>(findNamespaceLabelValuesByLabelName(props.namespaceLabelName));
 const fuse = new Fuse(findNamespaceLabelValuesByLabelName(props.namespaceLabelName), fuseOptions);
 const model = defineModel<string>();
 const inputText = ref("");
+
+const suggestionLimit = 10;
 
 const searchKeySuggestions = (query: string) => {
   if (query == "") {
@@ -57,10 +59,20 @@ const searchKeySuggestions = (query: string) => {
   inputText.value = query;
   const namespaceLabelValuesByLabelName = findNamespaceLabelValuesByLabelName(props.namespaceLabelName);
   fuse.setCollection(namespaceLabelValuesByLabelName);
-  const results = fuse.search(query);
+  const suggestionsForLabel = fuse.search(query);
 
-  suggestions.value = results.map((result: { item: string }) => {
-    return result.item;
-  }).sort();
+  if (suggestionsForLabel.length >= suggestionLimit) {
+    suggestions.value = suggestionsForLabel.map((result: { item: string }) => result.item).sort();
+  } else {
+    fuse.setCollection(namespaceLabelValues);
+    const suggestionsFromAllLabels = fuse.search(query);
+    const suggestionsForLabelValues = suggestionsForLabel.map((result: { item: string }) => result.item).sort();
+    const suggestionsFromAllLabelsValues = suggestionsFromAllLabels.map((result: { item: string }) => result.item);
+
+    suggestions.value = [...new Set(suggestionsForLabelValues.concat(suggestionsFromAllLabelsValues))].slice(
+      0,
+      suggestionLimit
+    );
+  }
 };
 </script>
