@@ -33,6 +33,7 @@
 </template>
 
 <script setup lang="ts">
+import { computed } from "vue";
 import { Ref, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import ContextureAutocomplete from "~/components/primitives/autocomplete/ContextureAutocomplete.vue";
@@ -55,13 +56,12 @@ const selected: Ref<{ key?: string; value?: string }> = ref<{
   value?: string;
 }>({});
 
-const keySuggestions = ref<string[]>([...new Set(props.labels.map((label) => label.name))]);
+const labelNames = computed(() => [...new Set(props.labels.map((label) => label.name))]);
+const keySuggestions = ref<string[]>(labelNames.value);
 const valueSuggestions = ref<string[]>([]);
 
 function searchKeySuggestions(query: string): void {
-  keySuggestions.value = props.labels
-    .map((label) => label.name)
-    .filter((label) => label.toLowerCase().includes(query.toLowerCase()));
+  keySuggestions.value = labelNames.value.filter((label) => label.toLowerCase().includes(query.toLowerCase()));
 }
 
 function searchValueSuggestions(query: string): void {
