@@ -13,7 +13,6 @@ open Microsoft.Extensions.Hosting
 open Microsoft.Extensions.Logging
 open Microsoft.AspNetCore.TestHost
 open Microsoft.AspNetCore.Hosting
-open Microsoft.AspNetCore.Authentication
 open Microsoft.AspNetCore.Authentication.JwtBearer
 open Giraffe
 open Microsoft.AspNetCore.Builder
@@ -22,6 +21,7 @@ let securityKey = SymmetricSecurityKey(Encoding.UTF8.GetBytes("6e5ee162-d6a0-40c
 
 module TestHost = 
     open Microsoft.Extensions.DependencyInjection
+    open Microsoft.AspNetCore.Authentication
 
     let configureLogging (builder: ILoggingBuilder) =
             builder
@@ -40,9 +40,8 @@ module TestHost =
             route "/frontend" >=> setStatusCode 200
         ]
 
-    let testJwtBearerScheme _configuration (services : IServiceCollection) = 
-        services
-            .AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
+    let testJwtBearerScheme _configuration (builder : AuthenticationBuilder) = 
+        builder
             .AddJwtBearer(fun options ->
                 options.MapInboundClaims <- false
 
@@ -54,15 +53,13 @@ module TestHost =
             )
             |> ignore
 
-        services
-
     let createHost securityConfiguration =
         Host
             .CreateDefaultBuilder()
             .UseEnvironment("Tests")
             .ConfigureServices( fun s ->
                 testJwtBearerScheme s |> ignore
-                addSecurity testJwtBearerScheme configureAuthorization securityConfiguration s |> ignore
+                addSecurity (configureAuthentication testJwtBearerScheme configureApiKeyScheme) configureAuthorization securityConfiguration s |> ignore
             )
             .ConfigureWebHostDefaults(fun webHostBuilder ->
                 webHostBuilder
@@ -143,17 +140,18 @@ module ``using Bearer scheme`` =
 
     let runScenario = 
         Enabled {
-            AuthenticationScheme = OIDC {
+            OIDCAuthentication = Some {
                 Audience = ""
                 Authority = ""
                 ClientId = ""
                 ClientSecret = None
+                ModifyDataPolicy = Requirements [ 
+                    RequireClaim {ClaimType = "group"; AllowedValues = [|"admin"|]}
+                    RequireClaim {ClaimType = "nested:json:claim"; AllowedValues = [|"value"|]} 
+                ]
+                GetDataPolicy = AllowAnonymous
             }
-            ModifyDataPolicy = Requirements [ 
-                RequireClaim {ClaimType = "group"; AllowedValues = [|"admin"|]}
-                RequireClaim {ClaimType = "nested:json:claim"; AllowedValues = [|"value"|]} 
-            ]
-            GetDataPolicy = AllowAnonymous
+            ApiKeyAuthentication = None
         }
         |> executeScenario
 
@@ -216,4 +214,86 @@ module ``using Bearer scheme`` =
         let ``with access token and invalid claims should return ok`` () =
             runScenario        
                 (accessFrontend >> withTokenAndInvalidClaims)
+                returnsOk
+
+
+module ``using ApiKeyAuthentication scheme`` = 
+
+    let validApiKey = "test"
+    let invalidApiKey = "invalid"
+
+    let withApiKey (apiKey:string) (request :HttpRequestMessage) = 
+        request.Headers.Add(Contexture.Api.Infrastructure.ApiKeyAuthentication.HeaderName, apiKey)
+        request
+
+    let withValidApiKey = withApiKey validApiKey
+
+    let withInvalidApiKey = withApiKey invalidApiKey
+
+    let runScenario = 
+        Enabled {
+            OIDCAuthentication = None
+            ApiKeyAuthentication = Some {ApiKey = validApiKey}
+        }
+        |> executeScenario
+
+    module ``getting data`` =
+
+        [<Fact>]
+        let ``without api key should return unauthorized`` () =
+            runScenario        
+                (getData)
+                returnsUnauthorized
+
+        [<Fact>]
+        let ``with valid api key should return ok`` () =
+            runScenario        
+                (getData >> withValidApiKey)
+                returnsOk
+
+        [<Fact>]
+        let ``with invalid api key should return unauthorized`` () =
+            runScenario        
+                (getData >> withInvalidApiKey)
+                returnsUnauthorized
+
+
+    module ``modifying data`` = 
+
+        [<Fact>]
+        let ``without api key should return unauthorized`` () =
+            runScenario        
+                (modifyData)
+                returnsUnauthorized
+
+        [<Fact>]
+        let ``with valid api key should return ok``()=
+            runScenario       
+                (modifyData >> withValidApiKey)
+                returnsOk
+        
+        [<Fact>]
+        let ``with invalid api key return unauthorized``()=
+            runScenario        
+                (modifyData >> withInvalidApiKey)
+                returnsUnauthorized
+
+    module ``accessing frontend routes`` =
+
+        [<Fact>]
+        let ``without api key should return ok`` () =
+            runScenario        
+                (accessFrontend)
+                returnsOk
+
+        [<Fact>]
+        let ``with valid api key return ok`` () =
+            runScenario        
+                (accessFrontend >> withValidApiKey)
+                returnsOk
+
+        [<Fact>]
+        let ``with invalid api key return ok`` () =
+            runScenario        
+                (accessFrontend >> withInvalidApiKey)
                 returnsOk
