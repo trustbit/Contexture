@@ -216,7 +216,6 @@ import { ActiveFilter } from "~/types/activeFilter";
 import ContextureActiveFilters from "~/components/analytics/ContextureActiveFilters.vue";
 import ContextureAddFilterPopoverContent from "~/components/analytics/ContextureAddFilter.vue";
 import { useFetch } from "~/composables/useFetch";
-import { arrayContentEqual } from "~/core/arrayContentEqual";
 import { useDomainsStore } from "~/stores/domains";
 import { useNamespaces } from "~/stores/namespaces";
 import { BoundedContext } from "~/types/boundedContext";
@@ -294,16 +293,6 @@ function convertFilter(): ActiveFilter[] {
 }
 
 const activeFilters = ref<ActiveFilter[]>(convertFilter());
-
-watch(
-  () => route.query,
-  () => {
-    const routeFilters = convertFilter();
-    if (!arrayContentEqual(activeFilters.value, routeFilters)) {
-      activeFilters.value = routeFilters;
-    }
-  }
-);
 
 function addFilter(index: number, event: { key?: string; value?: string }): void {
   if (event.key) {
