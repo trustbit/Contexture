@@ -130,21 +130,26 @@ module Security =
     let configurePolicy (builder: AuthorizationBuilder) (name: string, requirements)  = 
         match requirements with
         | Requirements requirementList ->
-            builder.AddPolicy(name, fun p->
-                p.RequireAuthenticatedUser() |> ignore
+            builder.AddPolicy(name, fun policy->
+                policy
+                    .RequireAuthenticatedUser() 
+                    .AddAuthenticationSchemes(JwtBearer.JwtBearerDefaults.AuthenticationScheme)
+                    |> ignore
 
                 requirementList
                 |> List.iter (fun requirement ->
                     match requirement with
                     | RequireClaim claimRequirement ->
                         match claimRequirement.ClaimType.Contains(":") with
-                        | true -> p.RequireAssertion((requireClaimFromJson claimRequirement.ClaimType claimRequirement.AllowedValues)) |> ignore
-                        | false -> p.RequireClaim(claimRequirement.ClaimType, claimRequirement.AllowedValues) |> ignore
+                        | true -> policy.RequireAssertion((requireClaimFromJson claimRequirement.ClaimType claimRequirement.AllowedValues)) |> ignore
+                        | false -> policy.RequireClaim(claimRequirement.ClaimType, claimRequirement.AllowedValues) |> ignore
                 )
             )
         | AllowAnonymous ->
-            builder.AddPolicy(name, fun p ->
-                p.RequireAssertion(fun _-> true)|> ignore
+            builder.AddPolicy(name, fun policy ->
+                policy
+                    .AddAuthenticationSchemes(JwtBearer.JwtBearerDefaults.AuthenticationScheme)
+                    .RequireAssertion(fun _-> true)|> ignore
             )
 
     let configureJwtBearerScheme settings (authenticationBuilder : AuthenticationBuilder) = 
@@ -165,13 +170,28 @@ module Security =
             |> ignore
 
     let configureAuthentication configureJwtBearerScheme configureApiKeyScheme settings (services : IServiceCollection) = 
-        let authenticationBuilder = services.AddAuthentication()
-  
-        settings.OIDCAuthentication
-        |> Option.iter(fun oidcSettings -> configureJwtBearerScheme oidcSettings authenticationBuilder)
+        let authenticationBuilder = services.AddAuthentication("ApiKey_OR_JwtBearer")
 
         settings.ApiKeyAuthentication
         |> Option.iter(fun apiKeySettings -> configureApiKeyScheme apiKeySettings authenticationBuilder)
+
+        settings.OIDCAuthentication
+        |> Option.iter(fun oidcSettings -> configureJwtBearerScheme oidcSettings authenticationBuilder)
+
+        authenticationBuilder.AddPolicyScheme("ApiKey_OR_JwtBearer","ApiKey_OR_JwtBearer", fun options ->
+            options.ForwardDefaultSelector <- fun ctx ->
+                if settings.ApiKeyAuthentication.IsSome then
+                    if ctx.Request.Headers.ContainsKey(ApiKeyAuthentication.HeaderName) then
+                        ApiKeyAuthentication.AuthenticationScheme
+                    elif settings.OIDCAuthentication.IsSome then
+                        JwtBearer.JwtBearerDefaults.AuthenticationScheme
+                    else
+                        ApiKeyAuthentication.AuthenticationScheme
+                else 
+                    JwtBearer.JwtBearerDefaults.AuthenticationScheme
+
+        )
+        |> ignore
 
         services
 
@@ -190,8 +210,10 @@ module Security =
 
         settings.ApiKeyAuthentication
         |> Option.iter(fun configuration ->
-            authorizationBuilder.AddPolicy(ApiKeyPolicyName, fun p -> 
-                p.RequireAuthenticatedUser()
+            authorizationBuilder.AddPolicy(ApiKeyPolicyName, fun policy -> 
+                policy
+                    .AddAuthenticationSchemes(ApiKeyAuthentication.AuthenticationScheme)
+                    .RequireAuthenticatedUser()
                 |> ignore
             )
             |> ignore
