@@ -3,11 +3,44 @@ namespace Contexture.Api.Infrastructure
 open System.Text
 open System.Net.Http
 open Microsoft.Extensions.DependencyInjection
-open Microsoft.AspNetCore.Authentication.JwtBearer
 open Giraffe
 open Microsoft.AspNetCore.Http
 open Microsoft.AspNetCore.Builder
 open Microsoft.AspNetCore.Authorization
+open Microsoft.AspNetCore.Authentication
+
+module ApiKeyAuthentication = 
+    open System.Security.Claims
+
+    [<Literal>]
+    let AuthenticationScheme = "APIKey";
+    [<Literal>]
+    let HeaderName = "x-api-key";
+
+    type ApiKeyAuthenticationOptions() = 
+        inherit AuthenticationSchemeOptions()
+        member val ApiKey = "" with get, set
+
+    type ApiKeyAuthenticationHandler(options, logger, encoder, clock) = 
+        inherit AuthenticationHandler<ApiKeyAuthenticationOptions>(options, logger, encoder, clock)
+        let authenticate (request: HttpRequest) (options: ApiKeyAuthenticationOptions) = 
+            match request.Headers.TryGetValue(HeaderName) with
+            | true, apiKeyHeader -> 
+                match options.ApiKey = apiKeyHeader.ToString() with
+                | true ->
+                    let claims = [Claim("api-key", apiKeyHeader.ToString())]
+                    let identity = ClaimsIdentity(claims, AuthenticationScheme)
+                    let principal = ClaimsPrincipal(identity)
+                    let authenticationTicket = AuthenticationTicket(principal, AuthenticationScheme)
+                    AuthenticateResult.Success(authenticationTicket)
+                | _ ->
+                    AuthenticateResult.Fail("Invalid API key")
+            | _ ->
+                AuthenticateResult.NoResult()
+        
+        override x.HandleAuthenticateAsync() = 
+            let result = authenticate x.Request x.Options
+            System.Threading.Tasks.Task.FromResult(result)
 
 module Security = 
     type RequireClaim = {
@@ -22,20 +55,22 @@ module Security =
     | Requirements of PolicyRequirement list
     | AllowAnonymous
     
-    type OIDCSchemeSettings = {
+    type OIDCAuthenticationSettings = {
         Authority: string
         Audience: string
         ClientId: string
         ClientSecret: string option
-    }
-
-    type AuthenticationScheme =
-    | OIDC of OIDCSchemeSettings
-
-    type SecuritySettings = {
-        AuthenticationScheme: AuthenticationScheme
         ModifyDataPolicy: PolicyRequirements
         GetDataPolicy: PolicyRequirements
+    }
+    
+    type ApiKeyAuthenticationSettings = {
+        ApiKey: string
+    }
+
+    type SecuritySettings = {
+        OIDCAuthentication: OIDCAuthenticationSettings option
+        ApiKeyAuthentication: ApiKeyAuthenticationSettings option
     }
 
     type SecurityConfiguration = 
@@ -44,9 +79,11 @@ module Security =
 
     [<Literal>]
     let ModifyDataPolicyName = "ModifyData"
-
     [<Literal>]
     let ViewDataPolicyName = "ViewData"
+    [<Literal>]
+    let ApiKeyPolicyName = "ApiKey"
+    
 
     let requireClaimFromJson (path: string) values (ctx: AuthorizationHandlerContext) = task {
         match path.Split(":") |> Array.toList with
@@ -90,58 +127,111 @@ module Security =
             return containsAnyItem claimValues (values |> Array.toList)
     }
 
-    let configurePolicy (authorization: AuthorizationOptions) (name: string, requirements)  = 
+    let configurePolicy (builder: AuthorizationBuilder) (name: string, requirements)  = 
         match requirements with
         | Requirements requirementList ->
-            authorization.AddPolicy(name, fun p->
-                p.RequireAuthenticatedUser() |> ignore
+            builder.AddPolicy(name, fun policy->
+                policy
+                    .RequireAuthenticatedUser() 
+                    .AddAuthenticationSchemes(JwtBearer.JwtBearerDefaults.AuthenticationScheme)
+                    |> ignore
 
                 requirementList
                 |> List.iter (fun requirement ->
                     match requirement with
                     | RequireClaim claimRequirement ->
                         match claimRequirement.ClaimType.Contains(":") with
-                        | true -> p.RequireAssertion((requireClaimFromJson claimRequirement.ClaimType claimRequirement.AllowedValues)) |> ignore
-                        | false -> p.RequireClaim(claimRequirement.ClaimType, claimRequirement.AllowedValues) |> ignore
+                        | true -> policy.RequireAssertion((requireClaimFromJson claimRequirement.ClaimType claimRequirement.AllowedValues)) |> ignore
+                        | false -> policy.RequireClaim(claimRequirement.ClaimType, claimRequirement.AllowedValues) |> ignore
                 )
             )
         | AllowAnonymous ->
-            authorization.AddPolicy(name, fun p ->
-                p.RequireAssertion(fun _-> true)|> ignore
+            builder.AddPolicy(name, fun policy ->
+                policy
+                    .AddAuthenticationSchemes(JwtBearer.JwtBearerDefaults.AuthenticationScheme)
+                    .RequireAssertion(fun _-> true)|> ignore
             )
 
-    let configureJwtBearerScheme settings (services : IServiceCollection) = 
-        services
-            .AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
+    let configureJwtBearerScheme settings (authenticationBuilder : AuthenticationBuilder) = 
+        authenticationBuilder
             .AddJwtBearer(fun options ->
                 options.MapInboundClaims <- false
                 options.Authority <- settings.Authority
                 options.Audience <- settings.Audience
             )
+            |> ignore
 
-    let configureAuthentication configuration (services : IServiceCollection) = 
-        match configuration.AuthenticationScheme with
-        | OIDC settings -> configureJwtBearerScheme settings services |> ignore
+    let configureApiKeyScheme apiKeySettings (authenticationBuilder : AuthenticationBuilder) = 
+        authenticationBuilder
+            .AddScheme<ApiKeyAuthentication.ApiKeyAuthenticationOptions, ApiKeyAuthentication.ApiKeyAuthenticationHandler>(ApiKeyAuthentication.AuthenticationScheme, 
+                fun options ->
+                options.ApiKey <- apiKeySettings.ApiKey
+            )
+            |> ignore
+
+    let configureAuthentication configureJwtBearerScheme configureApiKeyScheme settings (services : IServiceCollection) = 
+        let authenticationBuilder = services.AddAuthentication("ApiKey_OR_JwtBearer")
+
+        settings.ApiKeyAuthentication
+        |> Option.iter(fun apiKeySettings -> configureApiKeyScheme apiKeySettings authenticationBuilder)
+
+        settings.OIDCAuthentication
+        |> Option.iter(fun oidcSettings -> configureJwtBearerScheme oidcSettings authenticationBuilder)
+
+        authenticationBuilder.AddPolicyScheme("ApiKey_OR_JwtBearer","ApiKey_OR_JwtBearer", fun options ->
+            options.ForwardDefaultSelector <- fun ctx ->
+                if settings.ApiKeyAuthentication.IsSome then
+                    if ctx.Request.Headers.ContainsKey(ApiKeyAuthentication.HeaderName) then
+                        ApiKeyAuthentication.AuthenticationScheme
+                    elif settings.OIDCAuthentication.IsSome then
+                        JwtBearer.JwtBearerDefaults.AuthenticationScheme
+                    else
+                        ApiKeyAuthentication.AuthenticationScheme
+                else 
+                    JwtBearer.JwtBearerDefaults.AuthenticationScheme
+
+        )
+        |> ignore
+
         services
 
-    let configureAuthorization configuration (services : IServiceCollection) = 
-        let policies = [
+    let configureAuthorization settings (services : IServiceCollection) = 
+        let authorizationBuilder = services.AddAuthorizationBuilder()
+
+        settings.OIDCAuthentication
+        |> Option.iter(fun configuration ->
+            let policies = [
                 ModifyDataPolicyName, configuration.ModifyDataPolicy
                 ViewDataPolicyName, configuration.GetDataPolicy
             ]
-        services.AddAuthorization(fun options -> policies |> List.iter (configurePolicy options))
 
+            policies |> List.iter (configurePolicy authorizationBuilder >> ignore)
+        )
+
+        settings.ApiKeyAuthentication
+        |> Option.iter(fun configuration ->
+            authorizationBuilder.AddPolicy(ApiKeyPolicyName, fun policy -> 
+                policy
+                    .AddAuthenticationSchemes(ApiKeyAuthentication.AuthenticationScheme)
+                    .RequireAuthenticatedUser()
+                |> ignore
+            )
+            |> ignore
+        )
+
+        services
+        
     let addSecurity addAuthentication addAuthorization configuration (services : IServiceCollection) =
         services.AddSingleton<SecurityConfiguration>(fun _ -> configuration) |> ignore
         match configuration with
-        | Enabled configuration ->
+        | Enabled authenticationSchemes ->
             services
-            |> addAuthentication configuration
-            |> addAuthorization configuration
+            |> addAuthentication authenticationSchemes
+            |> addAuthorization authenticationSchemes
         | Disabled -> services
 
     let configureSecurity configuration (services : IServiceCollection) =
-        addSecurity configureAuthentication configureAuthorization configuration services
+        addSecurity (configureAuthentication configureJwtBearerScheme configureApiKeyScheme) configureAuthorization configuration services
 
     let useSecurity (app : IApplicationBuilder) = 
         let configuration = app.ApplicationServices.GetRequiredService<SecurityConfiguration>()
@@ -159,24 +249,36 @@ module Security =
         | true -> setStatusCode 403 next ctx
         | false -> setStatusCode 401 next ctx
 
-    let authorizeBy policyName: HttpHandler = fun next ctx ->
-        authorizeByPolicyName policyName authorizationFailed next ctx
+    let apiKeyAuthorization authorizationFailed : HttpHandler = fun next ctx ->
+        authorizeByPolicyName ApiKeyPolicyName authorizationFailed next ctx
 
-    let protectApiRoutes: HttpHandler = fun next ctx ->
+    let oidcAuthorization authorizationFailed: HttpHandler = fun next ctx ->
+        match ctx.Request.Method with
+        | "GET" ->
+            authorizeByPolicyName ViewDataPolicyName authorizationFailed next ctx
+        | "PUT"
+        | "POST"
+        | "PATCH"
+        | "DELETE" ->
+            authorizeByPolicyName ModifyDataPolicyName authorizationFailed next ctx
+        | _ -> 
+            RequestErrors.METHOD_NOT_ALLOWED ctx.Request.Method next ctx
+
+    let protectApiRoutes: HttpHandler = fun next ctx -> task {
         let contextureSecurity = ctx.RequestServices.GetRequiredService<SecurityConfiguration>()
         match contextureSecurity with
-        | Enabled _ ->
-            match ctx.Request.Method with
-            | "GET" ->
-                authorizeBy ViewDataPolicyName next ctx 
-            | "PUT"
-            | "POST"
-            | "PATCH"
-            | "DELETE" ->
-                authorizeBy ModifyDataPolicyName next ctx
-            | _ -> 
-                RequestErrors.METHOD_NOT_ALLOWED ctx.Request.Method next ctx
-        | _-> next ctx
+        | Enabled settings ->
+            match settings.ApiKeyAuthentication, settings.OIDCAuthentication with
+            | Some _, Some _ ->
+                return! apiKeyAuthorization (oidcAuthorization authorizationFailed) next ctx
+            | Some _, None ->
+                return! apiKeyAuthorization authorizationFailed next ctx
+            | None, Some _ ->
+                return! oidcAuthorization authorizationFailed next ctx
+            | _ ->
+                return! ServerErrors.INTERNAL_ERROR "Invalid security settings" next ctx
+        | _-> return! next ctx
+    }
 
     type UserInfo = {
         Authenticated: bool
@@ -227,15 +329,20 @@ module Security =
             let result = {|
                 SecurityType = "disabled"
             |}
-            json result next ctx    
+            json result next ctx
         | Enabled securitySettings ->
-            match securitySettings.AuthenticationScheme with
-            | OIDC settings ->
+            match securitySettings.OIDCAuthentication with
+            | Some settings ->
                 let result = {|
                     SecurityType = "oidc"
                     Authority = settings.Authority
                     ClientId = settings.ClientId
                     ClientSecret = settings.ClientSecret
+                |}
+                json result next ctx
+            | None ->
+                let result = {|
+                    SecurityType = "disabled"
                 |}
                 json result next ctx
 
@@ -268,6 +375,7 @@ module Security =
         [<CLIMutable>]
         type AuthenticationOptions = {
             OIDC: OIDCAuthenticationSchemeOptions
+            ApiKey: string
         }
 
         [<CLIMutable>]
@@ -287,21 +395,6 @@ module Security =
                 |> Requirements
             )
 
-        let tryMapOIDCSettings authenticationOptions = 
-            let unboxed = tryUnbox authenticationOptions.OIDC
-            unboxed
-            |> Option.map(fun x -> OIDC {
-                    Authority = x.Authority
-                    Audience = x.Audience
-                    ClientId = x.ClientId
-                    ClientSecret = Option.ofObj x.ClientSecret
-                }
-            )
-
-        let getAuthenticationSettings authenticationOptions = 
-            tryMapOIDCSettings authenticationOptions
-            |> Option.defaultWith (fun () -> failwith "Unable to initialize authentication settings")
-
         let getAuthorizationSettings options =
             tryUnbox options
             |> Option.map(fun x-> 
@@ -312,17 +405,35 @@ module Security =
             )
             |> Option.defaultValue {| ModifyDataPolicy = AllowAnonymous; GetDataPolicy = AllowAnonymous |}
 
-        let buildSecurityConfiguration (options:SecurityOptions) = 
-            tryUnbox options
-            |> Option.map(fun o ->
-                let authenticationSettings = getAuthenticationSettings o.Authentication
-                let authorizationSettings = getAuthorizationSettings o.Authorization
-                let securitySettings =  {
-                    AuthenticationScheme = authenticationSettings
+        let tryMapOIDCSettings securityOptions : OIDCAuthenticationSettings option = 
+            let unboxed = tryUnbox securityOptions.Authentication.OIDC
+            unboxed
+            |> Option.map(fun x -> 
+                let authorizationSettings = getAuthorizationSettings securityOptions.Authorization
+
+                {
+                    Authority = x.Authority
+                    Audience = x.Audience
+                    ClientId = x.ClientId
+                    ClientSecret = Option.ofObj x.ClientSecret
                     GetDataPolicy = authorizationSettings.GetDataPolicy
                     ModifyDataPolicy = authorizationSettings.ModifyDataPolicy
                 }
+            )
 
-                Enabled securitySettings
+        let tryMapApiKeySettings securityOptions = 
+            Option.ofObj securityOptions.Authentication.ApiKey
+            |> Option.map(fun key -> {ApiKey = key})
+
+        let buildSecurityConfiguration (options:SecurityOptions) = 
+            tryUnbox options
+            |> Option.map(fun o ->
+                match tryMapOIDCSettings o, tryMapApiKeySettings o with
+                | None, None -> failwith "Could not parse securty configuration"
+                | oidc, apiKey ->
+                    Enabled {
+                        OIDCAuthentication = oidc
+                        ApiKeyAuthentication = apiKey
+                    }
             )
             |> Option.defaultValue Disabled
