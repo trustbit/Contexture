@@ -113,26 +113,25 @@ export const useAuthStore = defineStore("auth", () => {
 
   async function fetchUserInfo() {
     const user = await userManager.getUser();
-    
-    const { data } = await useFetch<{permissions: string[]}>("/meta/userPermissions", {
+
+    const { data } = await useFetch<{ permissions: string[] }>("/meta/userPermissions", {
       headers: {
         Authorization: `Bearer ${user?.access_token}`,
       },
     }).get();
 
     if (data.value) {
-      const { permissions } = data.value
+      const { permissions } = data.value;
       if (user) {
         setUserInfo({
           authenticated: true,
           name: user.profile.name,
-          permissions: permissions
+          permissions: permissions,
         });
-      }
-      else {
+      } else {
         setUserInfo({
           authenticated: false,
-          permissions: permissions
+          permissions: permissions,
         });
       }
     }
