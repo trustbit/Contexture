@@ -53,11 +53,6 @@ module Security =
 
     type AuthorizationHandler = HttpContext -> Task<AuthorizationResult>
 
-    [<Literal>]
-    let ModifyDataPolicyName = "ModifyData"
-    [<Literal>]
-    let ViewDataPolicyName = "ViewData"
-
     module ApiKeyAuthentication = 
 
         [<Literal>]
@@ -281,44 +276,43 @@ module Security =
         | _-> return! next ctx
     }
 
-    type UserInfo = {
-        Authenticated: bool
+    type UserPermissions = {
         Permissions: string list
     }
 
-    let policyNameToPermission policyName = 
-        match policyName with
-        | ViewDataPolicyName -> "view"
-        | ModifyDataPolicyName -> "modify"
-        | _-> failwith $"unknown policy name {policyName}"
+    [<Literal>]
+    let GetDataPermission = "get"
 
-    let getUserInfo (ctx:HttpContext) = task {
-        let authorizationService = ctx.RequestServices.GetService<IAuthorizationService>()
+    [<Literal>]
+    let ModifyDataPermission = "modify"
+
+    let getUserPermission (ctx:HttpContext) = task {
         let contextureSecurity = ctx.RequestServices.GetRequiredService<SecurityConfiguration>()
-        let evaluatePolicyToPermission (policyName: string) = task{
-            let! authorizationResult = authorizationService.AuthorizeAsync(ctx.User, policyName)
+
+        let evaluatePolicyToPermission policy (permissionName: string) = task{
+            let! authorizationResult = authorizeByPolicy policy ctx
             return 
-                match authorizationResult.Succeeded with
-                | true -> policyNameToPermission policyName |> Some
+                match authorizationResult with
+                | Success -> Some permissionName
                 | _ -> None
         }
         
         match contextureSecurity with
         | Disabled ->
-            return { Authenticated = true; Permissions = [ModifyDataPolicyName; ViewDataPolicyName] |> List.map policyNameToPermission }
-        | Enabled _ ->
-            match ctx.User.Identity.IsAuthenticated with
-            | true ->
-                let! modify = evaluatePolicyToPermission ModifyDataPolicyName
-                let! view = evaluatePolicyToPermission ViewDataPolicyName
-                let permissions = [modify; view] |> List.choose id
-                return { Authenticated = true; Permissions = permissions}
+            return { Permissions = [ModifyDataPermission; GetDataPermission] }
+        | Enabled settings ->
+            match settings.OIDCAuthentication with
+            | Some oidcSettings ->
+                let! modifyDataPermission = evaluatePolicyToPermission oidcSettings.ModifyDataPolicy ModifyDataPermission
+                let! getDataPermission = evaluatePolicyToPermission oidcSettings.GetDataPolicy GetDataPermission
+                let permissions = [modifyDataPermission; getDataPermission] |> List.choose id
+                return { Permissions = permissions}
             | _ -> 
-                return { Authenticated = false; Permissions = []}
+                return { Permissions = []}
     }
 
-    let userInfo: HttpHandler = fun next ctx -> task {
-        let! user = getUserInfo ctx                
+    let userPermissions: HttpHandler = fun next ctx -> task {
+        let! user = getUserPermission ctx                
         return! json user next ctx
     }
 

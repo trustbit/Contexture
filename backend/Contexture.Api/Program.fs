@@ -85,7 +85,7 @@ module Routes =
                 ( choose [
                     route "/health" >=> GET >=> SystemRoutes.status
                     route "/readiness" >=> GET >=> SystemRoutes.readiness
-                    route "/userInfo" >=> GET >=> Security.userInfo
+                    route "/userPermissions" >=> GET >=> Security.userPermissions
                     route "/securityConfiguration" >=> GET >=> Security.securityConfiguration
                     GET >=> SystemRoutes.status
                 ])
