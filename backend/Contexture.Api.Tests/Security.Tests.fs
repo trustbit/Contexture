@@ -59,14 +59,13 @@ module TestHost =
             .UseEnvironment("Tests")
             .ConfigureServices( fun s ->
                 testJwtBearerScheme s |> ignore
-                addSecurity (configureAuthentication testJwtBearerScheme configureApiKeyScheme) configureAuthorization securityConfiguration s |> ignore
+                addSecurity (configureAuthentication testJwtBearerScheme configureApiKeyScheme) securityConfiguration s |> ignore
             )
             .ConfigureWebHostDefaults(fun webHostBuilder ->
                 webHostBuilder
                     .Configure(Action<IApplicationBuilder> (fun builder-> 
                         builder
                             .UseAuthentication()
-                            .UseAuthorization()
                             .UseGiraffe(testRoutes)
                     ))
                     .UseTestServer()
@@ -223,7 +222,7 @@ module ``using ApiKeyAuthentication scheme`` =
     let invalidApiKey = "invalid"
 
     let withApiKey (apiKey:string) (request :HttpRequestMessage) = 
-        request.Headers.Add(Contexture.Api.Infrastructure.ApiKeyAuthentication.HeaderName, apiKey)
+        request.Headers.Add(ApiKeyAuthentication.HeaderName, apiKey)
         request
 
     let withValidApiKey = withApiKey validApiKey
