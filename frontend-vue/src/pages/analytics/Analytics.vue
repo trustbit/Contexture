@@ -292,41 +292,8 @@ function convertFilter(): ActiveFilter[] {
     .flat();
 }
 
-const activeFilters = ref<ActiveFilter[]>(convertFilter());
-
-function addFilter(index: number, event: { key?: string; value?: string }): void {
-  if (event.key) {
-    activeFilters.value = [
-      ...activeFilters.value,
-      {
-        key: "Label.Name",
-        value: event.key,
-      },
-    ];
-  }
-  if (event.value) {
-    activeFilters.value = [
-      ...activeFilters.value,
-      {
-        key: "Label.Value",
-        value: event.value,
-      },
-    ];
-  }
-
-  addFilterPopoverOpen.value[index] = false;
-}
-
-function onDeleteFilter(index: number): void {
-  activeFilters.value = [...activeFilters.value.slice(0, index), ...activeFilters.value.slice(index + 1)];
-}
-
-function findNamespaceLabelsByNamespace(namespaceName: string): NamespaceLabel[] {
-  return namespaceLabelsByNamespaceName.value[namespaceName] || [];
-}
-
-watch(activeFilters, (value) => {
-  const queryParams = value.reduce((acc, { key, value }) => {
+function setFilters(filters: ActiveFilter[]) {
+  const queryParams = filters.reduce((acc, { key, value }) => {
     if (!acc[key]) {
       acc[key] = [];
     }
@@ -335,7 +302,39 @@ watch(activeFilters, (value) => {
   }, {} as Record<string, string[]>);
 
   router.push({ query: queryParams });
-});
+}
+
+const activeFilters = computed(() => convertFilter());
+
+function addFilter(index: number, event: { key?: string; value?: string }): void {
+  let filters = convertFilter();
+  if (event.key) {
+    filters.push({
+      key: "Label.Name",
+      value: event.key,
+    });
+  }
+  if (event.value) {
+    filters.push({
+      key: "Label.Value",
+      value: event.value,
+    });
+  }
+
+  addFilterPopoverOpen.value[index] = false;
+
+  setFilters(filters);
+}
+
+function onDeleteFilter(index: number): void {
+  let filters = convertFilter();
+  filters.splice(index, 1);
+  setFilters(filters);
+}
+
+function findNamespaceLabelsByNamespace(namespaceName: string): NamespaceLabel[] {
+  return namespaceLabelsByNamespaceName.value[namespaceName] || [];
+}
 
 function updateSelectedVisualisation(index: number) {
   options.value.selectedVisualization = index;
@@ -352,11 +351,12 @@ const visualisationModes = ["Sunburst Filtered", "Sunburst Highlighted", "Hierar
 
 const queryParams = computed(() => {
   const searchParams = new URLSearchParams();
-  if (activeFilters.value) {
-    activeFilters.value.forEach((ac) => {
-      searchParams.append(ac.key, ac.value);
-    });
-  }
+
+  const filters = convertFilter();
+  filters.forEach((ac) => {
+    searchParams.append(ac.key, ac.value);
+  });
+
   return searchParams;
 });
 
@@ -409,7 +409,7 @@ const domainCount = computed(() => {
 });
 
 function onClearFilters() {
-  activeFilters.value = [];
+  setFilters([]);
 }
 
 const queryAsString = computed(() => {
