@@ -199,7 +199,7 @@
 <script setup lang="ts">
 import { useLocalStorage } from "@vueuse/core";
 import { storeToRefs } from "pinia";
-import { computed, Ref, ref, watch } from "vue";
+import { computed, Ref, ref } from "vue";
 import { useI18n } from "vue-i18n";
 import { LocationQueryValue, useRoute, useRouter } from "vue-router";
 import { useRouteQuery } from "@vueuse/router";
