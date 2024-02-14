@@ -21,7 +21,7 @@
 <script setup lang="ts">
 import ContextureAutocomplete from "~/components/primitives/autocomplete/ContextureAutocomplete.vue";
 import { useNamespaces } from "~/stores/namespaces";
-import { ref } from "vue";
+import { ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import Fuse, { IFuseOptions } from "fuse.js";
 
@@ -43,36 +43,40 @@ const fuseOptions: IFuseOptions<string> = {
 
 const { findNamespaceLabelValuesByLabelName, namespaceLabelValues } = useNamespaces();
 const { t } = useI18n();
-const suggestions = ref<string[]>(findNamespaceLabelValuesByLabelName(props.namespaceLabelName));
-const fuse = new Fuse(findNamespaceLabelValuesByLabelName(props.namespaceLabelName), fuseOptions);
+const suggestions = ref<string[]>(getSuggestions(""));
 const model = defineModel<string>();
 const inputText = ref("");
-
 const suggestionLimit = 10;
 
-const searchKeySuggestions = (query: string) => {
-  if (query == "") {
-    suggestions.value = findNamespaceLabelValuesByLabelName(props.namespaceLabelName);
-    model.value = undefined;
-    return;
-  }
-  inputText.value = query;
-  const namespaceLabelValuesByLabelName = findNamespaceLabelValuesByLabelName(props.namespaceLabelName);
-  fuse.setCollection(namespaceLabelValuesByLabelName);
-  const suggestionsForLabel = fuse.search(query);
+watch(props, () => {
+  searchKeySuggestions("");
+});
 
+function getSuggestionsForSelectedLabel(query: string) {
+  const fuse = new Fuse(findNamespaceLabelValuesByLabelName(props.namespaceLabelName), fuseOptions);
+  return fuse.search(query).map((result: { item: string }) => result.item);
+}
+
+function getSuggestionsForAllValues(query: string) {
+  const fuse = new Fuse(namespaceLabelValues, fuseOptions);
+  return fuse.search(query).map((result: { item: string }) => result.item);
+}
+
+function getSuggestions(query?: string) {
+  if (!query) {
+    return findNamespaceLabelValuesByLabelName(props.namespaceLabelName);
+  }
+
+  const suggestionsForLabel = getSuggestionsForSelectedLabel(query).sort();
   if (suggestionsForLabel.length >= suggestionLimit) {
-    suggestions.value = suggestionsForLabel.map((result: { item: string }) => result.item).sort();
+    return suggestionsForLabel;
   } else {
-    fuse.setCollection(namespaceLabelValues);
-    const suggestionsFromAllLabels = fuse.search(query);
-    const suggestionsForLabelValues = suggestionsForLabel.map((result: { item: string }) => result.item).sort();
-    const suggestionsFromAllLabelsValues = suggestionsFromAllLabels.map((result: { item: string }) => result.item);
-
-    suggestions.value = [...new Set(suggestionsForLabelValues.concat(suggestionsFromAllLabelsValues))].slice(
-      0,
-      suggestionLimit
-    );
+    const suggestionsForAllLabelsValues = getSuggestionsForAllValues(query);
+    return [...new Set(suggestionsForLabel.concat(suggestionsForAllLabelsValues))].slice(0, suggestionLimit);
   }
-};
+}
+
+function searchKeySuggestions(query: string) {
+  suggestions.value = getSuggestions(query);
+}
 </script>
