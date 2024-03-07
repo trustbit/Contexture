@@ -226,19 +226,19 @@ const schema = zod.object({
       return { message: t("bounded_context_canvas.collaborators.connection.required") };
     },
   }),
-  collaboratorRef: zod.union([zod.string().min(1), zod.object({})]),
+  collaboratorRef: zod.union([zod.string().min(1), zod.object({}).passthrough()]),
   description: zod.string(),
 });
 const validationSchema = toFormValidator(schema);
 
 interface CollaboratorFormValue {
-  collaborator: CollaboratorKeys | unknown;
+  collaborator: CollaboratorKeys;
   collaboratorRef: string | BoundedContext | Domain;
   description: string;
 }
 
 const initialValues: CollaboratorFormValue = {
-  collaborator: "",
+  collaborator: "boundedContext",
   collaboratorRef: "",
   description: "",
 };
@@ -248,9 +248,9 @@ const { values, handleSubmit, resetForm, setFieldValue } = useForm({
   initialValues: initialValues,
 });
 
-const onSubmit = handleSubmit((formValue: CollaboratorFormValue) => {
-  createCollaborator(formValue);
-  resetForm();
+const onSubmit = handleSubmit(async (formValue: CollaboratorFormValue) => {
+  await createCollaborator(formValue);
+  resetForm(initialValues);
 });
 
 function searchSuggestions(query: string): void {
