@@ -1,4 +1,4 @@
-import { UserManager, UserManagerSettings, WebStorageStateStore } from "oidc-client-ts";
+import { Log, UserManager, UserManagerSettings, WebStorageStateStore } from "oidc-client-ts";
 import { defineStore } from "pinia";
 import { Ref, computed, inject, onMounted, ref } from "vue";
 import { AfterFetchContext, createFetch } from "@vueuse/core";
@@ -74,6 +74,12 @@ export const useAuthStore = defineStore("auth", () => {
       };
       userManager = new UserManager(settings);
       enabled.value = true;
+
+      Log.setLogger(console);
+      userManager.events.addSilentRenewError(async (_error) => {
+        await userManager.removeUser();
+        await userManager.signinRedirect();
+      });
     }
   }
 
