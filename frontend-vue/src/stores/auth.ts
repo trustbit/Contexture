@@ -1,4 +1,4 @@
-import { Log, UserManager, UserManagerSettings, WebStorageStateStore } from "oidc-client-ts";
+import { UserManager, UserManagerSettings, WebStorageStateStore } from "oidc-client-ts";
 import { defineStore } from "pinia";
 import { Ref, computed, inject, onMounted, ref } from "vue";
 import { AfterFetchContext, createFetch } from "@vueuse/core";
