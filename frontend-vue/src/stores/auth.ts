@@ -75,8 +75,12 @@ export const useAuthStore = defineStore("auth", () => {
       userManager = new UserManager(settings);
       enabled.value = true;
 
-      Log.setLogger(console);
-      userManager.events.addSilentRenewError(async (_error) => {
+      userManager.events.addSilentRenewError(async () => {
+        await userManager.removeUser();
+        await userManager.signinRedirect();
+      });
+
+      userManager.events.addAccessTokenExpired(async () => {
         await userManager.removeUser();
         await userManager.signinRedirect();
       });
