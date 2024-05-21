@@ -73,18 +73,25 @@ export const useDomainsStore = defineStore("domains", () => {
   }
 
   async function updateDomain(domainId: DomainId, update: UpdateDomain): Promise<Awaited<UseFetchReturn<Domain>>[]> {
-    const response = await Promise.all([
-      useFetch<Domain>(`/api/domains/${domainId}/shortName`).post({
+    const oldValue = domainByDomainId.value[domainId];
+    const response = [];
+    if (oldValue.shortName !== update.key) {
+      response.push(await useFetch<Domain>(`/api/domains/${domainId}/shortName`).post({
         shortName: update.key,
-      }),
-      useFetch<Domain>(`/api/domains/${domainId}/rename`).post({
-        name: update.name,
-      }),
-      useFetch<Domain>(`/api/domains/${domainId}/vision`).post({
-        vision: update.vision,
-      }),
-    ]);
+      }));
+    }
 
+    if (oldValue.vision !== update.vision) {
+      response.push(await useFetch<Domain>(`/api/domains/${domainId}/vision`).post({
+        vision: update.vision,
+      }));
+    }
+
+    if (oldValue.name !== update?.name) {
+      response.push(await useFetch<Domain>(`/api/domains/${domainId}/rename`).post({
+        name: update.name,
+      }));
+    }
     if (response.find((r) => !r.response.value?.ok)) {
       return response;
     }
