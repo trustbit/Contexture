@@ -13,7 +13,7 @@
               <ContextureEditBoundedContextForm
                 :initial-value="activeBoundedContext"
                 :submit-error="submitError"
-                @submit="onSave"
+                :action="onSave"
               />
             </div>
 

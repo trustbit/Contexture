@@ -43,7 +43,7 @@
           label: t('bounded_context_canvas.domain_roles.actions.open.add'),
           size: 'sm',
         }"
-        @submit="onDomainRoleAdd"
+        :action="onDomainRoleAdd"
       />
     </ContextureCollapsable>
     <ContextureCollapsable

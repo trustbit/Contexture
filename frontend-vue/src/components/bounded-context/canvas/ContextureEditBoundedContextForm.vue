@@ -17,11 +17,13 @@
     />
 
     <div>
-      <ContexturePrimaryButton :label="t('common.save')" type="submit">
-        <template #left>
-          <Icon:material-symbols:check class="mr-1 h-6 w-6" />
-        </template>
-      </ContexturePrimaryButton>
+      <LoadingWrapper :is-loading="isLoading">
+        <ContexturePrimaryButton :label="t('common.save')" type="submit">
+          <template #left>
+            <Icon:material-symbols:check class="mr-1 h-6 w-6" />
+          </template>
+        </ContexturePrimaryButton>
+      </LoadingWrapper>
     </div>
   </Form>
 </template>
@@ -36,8 +38,10 @@ import ContexturePrimaryButton from "~/components/primitives/button/ContexturePr
 import ContextureChangeKey from "~/components/core/change-short-name/ContextureChangeShortName.vue";
 import ContextureInputText from "~/components/primitives/input/ContextureInputText.vue";
 import { BoundedContext } from "~/types/boundedContext";
+import { ActionProps, useActionWithLoading } from "~/components/primitives/button/util/useActionWithLoading";
+import LoadingWrapper from "~/components/primitives/button/util/LoadingWrapper.vue";
 
-interface Props {
+interface Props extends ActionProps {
   initialValue: BoundedContext;
 }
 
@@ -45,11 +49,12 @@ const props = defineProps<Props>();
 const emit = defineEmits(["submit"]);
 const { t } = useI18n();
 const editModel: Ref<BoundedContext> = toRef(props, "initialValue");
-
+const { isLoading, handleAction } = useActionWithLoading(props);
 const requiredString = toFieldValidator(zod.string().min(1, t("validation.required")));
 
-function submit(values: any) {
+async function submit(values: any) {
   emit("submit", values);
+  await handleAction(values);
 }
 </script>
 

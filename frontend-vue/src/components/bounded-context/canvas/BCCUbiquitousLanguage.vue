@@ -42,7 +42,7 @@
             label: t('bounded_context_canvas.ubiquitous_language.actions.open.add'),
             size: 'sm',
           }"
-          @submit="onUbiquitousLanguageAdd"
+          :action="onUbiquitousLanguageAdd"
         />
       </ContextureCollapsable>
     </div>
@@ -115,7 +115,7 @@ const ubiquitousLanguageSchema: DynamicFormSchema<UbiquitousLanguageItem> = {
 };
 
 async function onUbiquitousLanguageAdd(ubiquitousLanguageItem: UbiquitousLanguageItem) {
-  submitError.value = null;
+  submitError.value = undefined;
   const res = await store.addUbiquitousLanguageItem(activeBoundedContext.value.id, ubiquitousLanguageItem);
 
   if (res.error.value) {
@@ -141,7 +141,7 @@ async function onDeleteUbiquitousLanguage(ubiquitousLanguageKey: string) {
 }
 
 async function deleteUbiquitousLanguage(ubiquitousLanguageKey: string) {
-  submitError.value = null;
+  submitError.value = undefined;
   const res = await store.deleteUbiquitousLanguage(activeBoundedContext.value.id, ubiquitousLanguageKey);
 
   if (res.error.value) {
