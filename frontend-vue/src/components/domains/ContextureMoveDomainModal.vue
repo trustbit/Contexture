@@ -48,8 +48,7 @@
 </template>
 
 <script lang="ts" setup>
-import { Ref } from "vue";
-import { computed, ref } from "vue";
+import { computed, Ref, ref } from "vue";
 import { useI18n } from "vue-i18n";
 import ContextureAutocomplete from "~/components/primitives/autocomplete/ContextureAutocomplete.vue";
 import ContexturePrimaryButton from "~/components/primitives/button/ContexturePrimaryButton.vue";
@@ -100,7 +99,7 @@ const showAutocomplete = computed(() => {
 });
 
 async function onSubmit() {
-  submitError.value = null;
+  submitError.value = undefined;
   const res = await moveDomain(props.domain.id, selectedDomain.value?.id);
 
   if (res.error.value) {

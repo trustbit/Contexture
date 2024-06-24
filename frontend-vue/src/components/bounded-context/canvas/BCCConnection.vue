@@ -49,7 +49,7 @@
                 {{ t("bounded_context_canvas.collaborators.unknown_relationship") }}
               </p>
               <p
-                v-if="
+                v-else-if="
                   collaboration.relationshipType?.upstreamDownstream?.downstreamType ||
                   collaboration.relationshipType?.upstreamDownstream?.upstreamType
                 "
@@ -59,16 +59,16 @@
                   collaboration.relationshipType?.upstreamDownstream.upstreamType
                 }}
               </p>
-              <p v-if="collaboration.relationshipType?.upstreamDownstream?.role" class="text-xs">
+              <p v-else-if="collaboration.relationshipType?.upstreamDownstream?.role" class="text-xs">
                 {{ collaboration.relationshipType?.upstreamDownstream?.role }}
               </p>
               <span
-                v-if="collaboration.relationshipType?.upstreamDownstream"
+                v-else-if="collaboration.relationshipType?.upstreamDownstream"
                 class="border-l-2 border-black pl-1 text-xs font-bold"
                 >Upstream/Downstream</span
               >
               <span
-                v-if="collaboration.relationshipType?.symmetric"
+                v-else-if="collaboration.relationshipType?.symmetric"
                 class="border-l-2 border-black pl-1 text-xs font-bold"
                 >{{ t("bounded_context_canvas.collaborators.symmetric") }}</span
               >
@@ -141,15 +141,17 @@
             />
 
             <div>
-              <ContexturePrimaryButton
-                type="submit"
-                :label="t('bounded_context_canvas.collaborators.add_connection')"
-                size="sm"
-              >
-                <template #left>
-                  <Icon:material-symbols:add class="mr-2" />
-                </template>
-              </ContexturePrimaryButton>
+              <LoadingWrapper :is-loading="isSubmitting">
+                <ContexturePrimaryButton
+                  type="submit"
+                  :label="t('bounded_context_canvas.collaborators.add_connection')"
+                  size="sm"
+                >
+                  <template #left>
+                    <Icon:material-symbols:add class="mr-2" />
+                  </template>
+                </ContexturePrimaryButton>
+              </LoadingWrapper>
             </div>
           </form>
         </div>
@@ -199,6 +201,7 @@ import { useDomainsStore } from "~/stores/domains";
 import { BoundedContext } from "~/types/boundedContext";
 import { Collaboration, CollaborationId, CollaboratorKeys } from "~/types/collaboration";
 import { Domain } from "~/types/domain";
+import LoadingWrapper from "~/components/primitives/button/util/LoadingWrapper.vue";
 
 interface Props {
   collaborations: Collaboration[];
@@ -243,14 +246,14 @@ const initialValues: CollaboratorFormValue = {
   description: "",
 };
 
-const { values, handleSubmit, resetForm, setFieldValue } = useForm({
+const { values, isSubmitting, handleSubmit, resetForm, setFieldValue } = useForm<CollaboratorFormValue>({
   validationSchema: validationSchema,
   initialValues: initialValues,
 });
 
 const onSubmit = handleSubmit(async (formValue: CollaboratorFormValue) => {
   await createCollaborator(formValue);
-  resetForm(initialValues);
+  resetForm();
 });
 
 function searchSuggestions(query: string): void {

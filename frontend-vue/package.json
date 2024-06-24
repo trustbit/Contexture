@@ -20,11 +20,12 @@
     "@vueuse/core": "^10.7.2",
     "@vueuse/router": "^10.7.2",
     "d3": "^7.8.5",
-    "oidc-client-ts": "^2.4.0",
     "fuse.js": "^7.0.0",
+    "oidc-client-ts": "^2.4.0",
     "pinia": "^2.1.7",
     "vee-validate": "^4.12.4",
-    "vue": "^3.4.13",
+    "vite-plugin-pages": "^0.32.2",
+    "vue": "^3.4.29",
     "vue-i18n": "^9.9.0",
     "vue-router": "^4.2.5",
     "zod": "^3.22.4"
@@ -57,7 +58,7 @@
     "unplugin-vue-components": "^0.24.0",
     "vite": "^4.5.1",
     "vitest": "^0.29.1",
-    "vue-loader": "^16.8.3",
-    "vue-tsc": "^1.1.7"
+    "vue-loader": "^17.4.2",
+    "vue-tsc": "^1.8.27"
   }
 }

@@ -4,7 +4,7 @@
       <ContextureHelpfulErrorAlert v-bind="submitError" />
       <ContextureDynamicForm
         class="mt-4"
-        @submit="onAddNewDomain"
+        :action="onAddNewDomain"
         :schema="form"
         :button-props="{ label: t('domains.modal.create.form.submit') }"
         button-class="flex justify-center w-full"
@@ -81,7 +81,7 @@ const form: DynamicFormSchema<CreateDomain> = {
 const submitError = ref<HelpfulErrorProps>();
 
 async function onAddNewDomain(domain: CreateDomain) {
-  submitError.value = null;
+  submitError.value = undefined;
   const { error, data } = await createDomain(domain);
 
   if (error.value) {

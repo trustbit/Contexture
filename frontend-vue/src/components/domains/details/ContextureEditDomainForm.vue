@@ -1,5 +1,5 @@
 <template>
-  <Form class="flex w-9/12 flex-col gap-8" @submit="submit">
+  <Form class="flex w-9/12 flex-col gap-8" @submit="handleAction">
     <ContextureChangeKey
       :model-value="editModel.shortName"
       name="key"
@@ -28,11 +28,13 @@
     />
 
     <div>
-      <ContexturePrimaryButton :label="t('common.save')" type="submit">
-        <template #left>
-          <Icon:material-symbols:check class="mr-1 h-6 w-6" />
-        </template>
-      </ContexturePrimaryButton>
+      <LoadingWrapper :is-loading="isLoading">
+        <ContexturePrimaryButton :label="t('common.save')" type="submit">
+          <template #left>
+            <Icon:material-symbols:check class="mr-1 h-6 w-6" />
+          </template>
+        </ContexturePrimaryButton>
+      </LoadingWrapper>
     </div>
   </Form>
 </template>
@@ -48,21 +50,18 @@ import ContextureChangeKey from "~/components/core/change-short-name/ContextureC
 import ContextureInputText from "~/components/primitives/input/ContextureInputText.vue";
 import ContextureTextarea from "~/components/primitives/input/ContextureTextarea.vue";
 import { Domain } from "~/types/domain";
+import LoadingWrapper from "~/components/primitives/button/util/LoadingWrapper.vue";
+import { ActionProps, useActionWithLoading } from "~/components/primitives/button/util/useActionWithLoading";
 
-interface Props {
+interface Props extends ActionProps {
   domain: Domain;
 }
 
 const props = defineProps<Props>();
-const emit = defineEmits(["submit"]);
 const { t } = useI18n();
 const editModel: Ref<Domain> = toRef(props, "domain");
-
+const { isLoading, handleAction } = useActionWithLoading(props);
 const requiredString = toFieldValidator(zod.string().min(1, t("validation.required")));
-
-function submit(values: any) {
-  emit("submit", values);
-}
 </script>
 
 <style scoped></style>

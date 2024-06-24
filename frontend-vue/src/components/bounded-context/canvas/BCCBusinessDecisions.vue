@@ -42,7 +42,7 @@
             label: t('bounded_context_canvas.business_decisions.actions.open.add'),
             size: 'sm',
           }"
-          @submit="onBusinessDecisionAdd"
+          :action="onBusinessDecisionAdd"
         />
       </ContextureCollapsable>
     </div>
@@ -60,8 +60,9 @@ import ContextureBoundedContextCanvasElement from "~/components/bounded-context/
 import ContextureCollapsable from "~/components/primitives/collapsable/ContextureCollapsable.vue";
 import ContextureDynamicForm from "~/components/primitives/dynamic-form/ContextureDynamicForm.vue";
 import { DynamicFormSchema } from "~/components/primitives/dynamic-form/dynamicForm";
-import { HelpfulErrorProps } from "~/components/primitives/alert/ContextureHelpfulErrorAlert.vue";
-import ContextureHelpfulErrorAlert from "~/components/primitives/alert/ContextureHelpfulErrorAlert.vue";
+import ContextureHelpfulErrorAlert, {
+  HelpfulErrorProps,
+} from "~/components/primitives/alert/ContextureHelpfulErrorAlert.vue";
 import ContextureInputText from "~/components/primitives/input/ContextureInputText.vue";
 import { isUniqueIn } from "~/core/validation";
 import { useBoundedContextsStore } from "~/stores/boundedContexts";
@@ -115,7 +116,7 @@ const businessDecisionSchema: DynamicFormSchema<BusinessDecision> = {
 };
 
 async function onBusinessDecisionAdd(businessDecision: BusinessDecision) {
-  submitError.value = null;
+  submitError.value = undefined;
   const res = await store.addBusinessDecision(activeBoundedContext.value.id, businessDecision);
 
   if (res.error.value) {
@@ -141,7 +142,7 @@ async function onBusinessDecisionDelete(businessDecision: BusinessDecision) {
 }
 
 async function deleteBusinessDecision(businessDecision: BusinessDecision) {
-  submitError.value = null;
+  submitError.value = undefined;
   const res = await store.deleteBusinessDecision(activeBoundedContext.value.id, businessDecision);
 
   if (res.error.value) {

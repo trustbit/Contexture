@@ -36,8 +36,7 @@
 </template>
 
 <script lang="ts" setup>
-import { Ref } from "vue";
-import { ref } from "vue";
+import { Ref, ref } from "vue";
 import { useI18n } from "vue-i18n";
 import ContextureAutocomplete from "~/components/primitives/autocomplete/ContextureAutocomplete.vue";
 import ContexturePrimaryButton from "~/components/primitives/button/ContexturePrimaryButton.vue";
@@ -70,7 +69,7 @@ const suggestions: Ref<Domain[]> = ref<Domain[]>(allDomains);
 let submitError = ref<HelpfulErrorProps>();
 
 async function onSubmit() {
-  submitError.value = null;
+  submitError.value = undefined;
   const res = await moveBoundedContext(props.boundedContext.id, selectedDomain.value!.id);
 
   if (res.error.value) {

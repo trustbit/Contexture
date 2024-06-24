@@ -11,7 +11,7 @@
             />
           </div>
           <div class="flex justify-between gap-4">
-            <ContextureEditDomainForm :domain="domain" @submit="onSave" />
+            <ContextureEditDomainForm :domain="domain" :action="onSave" />
 
             <div>
               <ContextureRoundedButton @click="onEditCloseClick">

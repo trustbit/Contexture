@@ -83,7 +83,7 @@
         <div class="flex max-w-full flex-col gap-y-4 pt-4 sm:w-[400px]">
           <ContextureHelpfulErrorAlert v-if="submitError" v-bind="submitError" class="mb-4" />
 
-          <Form @submit="onAddNamespace">
+          <Form @submit="addNamespaceAction">
             <ContextureInputText
               name="namespace"
               class="ml-2 grow"
@@ -94,11 +94,13 @@
             ></ContextureInputText>
 
             <div class="mt-4">
-              <ContexturePrimaryButton type="submit" :label="t('bounded_context_namespace.dialog.add.button')">
-                <template #left>
-                  <Icon:materialSymbols:add class="mr-2" />
-                </template>
-              </ContexturePrimaryButton>
+              <LoadingWrapper :is-loading="isLoading">
+                <ContexturePrimaryButton type="submit" :label="t('bounded_context_namespace.dialog.add.button')">
+                  <template #left>
+                    <Icon:materialSymbols:add class="mr-2" />
+                  </template>
+                </ContexturePrimaryButton>
+              </LoadingWrapper>
             </div>
           </Form>
         </div>
@@ -112,7 +114,7 @@
         <div class="flex max-w-full flex-col gap-y-4 pt-4 sm:w-[600px]">
           <ContextureHelpfulErrorAlert v-if="submitError" v-bind="submitError" class="mb-4" />
 
-          <Form @submit="onAddNamespace" class="space-y-4">
+          <Form @submit="addNamespaceAction" class="space-y-4">
             <ContextureListbox
               name="name"
               key-prop="name"
@@ -139,11 +141,13 @@
             </div>
 
             <div class="mt-4">
-              <ContexturePrimaryButton type="submit" :label="t('bounded_context_namespace.dialog.add.button')">
-                <template #left>
-                  <Icon:materialSymbols:add class="mr-2" />
-                </template>
-              </ContexturePrimaryButton>
+              <LoadingWrapper :is-loading="isLoading">
+                <ContexturePrimaryButton type="submit" :label="t('bounded_context_namespace.dialog.add.button')">
+                  <template #left>
+                    <Icon:materialSymbols:add class="mr-2" />
+                  </template>
+                </ContexturePrimaryButton>
+              </LoadingWrapper>
             </div>
           </Form>
         </div>
@@ -183,6 +187,8 @@ import { useRouteParams } from "@vueuse/router";
 import { requiredObjectRule } from "~/core/validationRules";
 import { useAuthStore } from "~/stores/auth";
 import NamespaceValueAutocomplete from "~/components/bounded-context/namespace/NamespaceValueAutocomplete.vue";
+import { useActionWithLoading } from "~/components/primitives/button/util/useActionWithLoading";
+import LoadingWrapper from "~/components/primitives/button/util/LoadingWrapper.vue";
 
 const { loading, activeBoundedContext } = storeToRefs(useBoundedContextsStore());
 const { createNamespace, deleteNamespace, createNamespaceLabel, deleteNamespaceLabel } = useNamespaces();
@@ -228,7 +234,7 @@ async function onAddNamespace() {
     resetCreateNamespace();
   }
 }
-
+const { isLoading, handleAction: addNamespaceAction } = useActionWithLoading({ action: onAddNamespace });
 async function onDeleteNamespace(namespace: Namespace) {
   confirmationModal.open(
     t("bounded_context_namespace.delete.namespace.confirm.title", { namespaceName: namespace.name }),

@@ -3,7 +3,7 @@
     <ContextureHelpfulErrorAlert v-bind="submitError" />
     <div class="pt-8 sm:w-96">
       <ContextureDynamicForm
-        @submit="onAddNewSubdomain"
+        :action="onAddNewSubdomain"
         :schema="form"
         :button-props="{
           label: t('domains.modal.create_subdomain.form.submit'),
@@ -28,8 +28,7 @@ import ContextureHelpfulErrorAlert, {
 import ContextureInputText from "~/components/primitives/input/ContextureInputText.vue";
 import ContextureModal from "~/components/primitives/modal/ContextureModal.vue";
 import { useDomainsStore } from "~/stores/domains";
-import { Domain } from "~/types/domain";
-import { CreateDomain } from "~/types/domain";
+import { CreateDomain, Domain } from "~/types/domain";
 
 interface Props {
   isOpen: boolean;
@@ -84,9 +83,8 @@ const form: DynamicFormSchema<CreateDomain> = {
 const submitError = ref<HelpfulErrorProps>();
 
 async function onAddNewSubdomain(createDomain: CreateDomain) {
-  submitError.value = null;
+  submitError.value = undefined;
   const { error, data } = await createSubDomain(props.parentDomain.id, createDomain);
-
   if (error.value) {
     submitError.value = {
       friendlyMessage: t("domains.modal.create_subdomain.error.submit"),
