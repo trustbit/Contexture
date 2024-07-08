@@ -30,7 +30,7 @@ import ContextureModal from "~/components/primitives/modal/ContextureModal.vue";
 import { useBoundedContextsStore } from "~/stores/boundedContexts";
 import { Domain } from "~/types/domain";
 import { CreateBoundedContext } from "~/types/boundedContext";
-import ContextureChangeKey from "~/components/core/change-short-name/ContextureChangeShortName.vue";
+import { boundedContextShortNameValidationSchema } from "~/components/core/change-short-name/changeShortNameValidationSchema";
 
 interface Props {
   isOpen: boolean;
@@ -46,7 +46,6 @@ const emit = defineEmits<Emits>();
 const { t } = useI18n();
 const router = useRouter();
 const { createBoundedContext } = useBoundedContextsStore();
-
 const form: DynamicFormSchema<CreateBoundedContext> = {
   fields: [
     {
@@ -61,10 +60,12 @@ const form: DynamicFormSchema<CreateBoundedContext> = {
     },
     {
       name: "shortName",
-      component: ContextureChangeKey,
+      component: ContextureInputText,
       componentProps: {
         label: t("domains.modal.create_bounded_context.form.fields.short_name.label"),
         description: t("bounded_context_canvas.edit.form.description.key"),
+        required: true,
+        rules: toFieldValidator(boundedContextShortNameValidationSchema(props.parentDomain.boundedContexts)),
       },
     },
     {

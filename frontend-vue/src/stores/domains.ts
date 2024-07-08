@@ -76,21 +76,27 @@ export const useDomainsStore = defineStore("domains", () => {
     const oldValue = domainByDomainId.value[domainId];
     const response = [];
     if (oldValue.shortName !== update.key) {
-      response.push(await useFetch<Domain>(`/api/domains/${domainId}/shortName`).post({
-        shortName: update.key,
-      }));
+      response.push(
+        await useFetch<Domain>(`/api/domains/${domainId}/shortName`).post({
+          shortName: update.key,
+        })
+      );
     }
 
     if (oldValue.vision !== update.vision) {
-      response.push(await useFetch<Domain>(`/api/domains/${domainId}/vision`).post({
-        vision: update.vision,
-      }));
+      response.push(
+        await useFetch<Domain>(`/api/domains/${domainId}/vision`).post({
+          vision: update.vision,
+        })
+      );
     }
 
     if (oldValue.name !== update?.name) {
-      response.push(await useFetch<Domain>(`/api/domains/${domainId}/rename`).post({
-        name: update.name,
-      }));
+      response.push(
+        await useFetch<Domain>(`/api/domains/${domainId}/rename`).post({
+          name: update.name,
+        })
+      );
     }
     if (response.find((r) => !r.response.value?.ok)) {
       return response;

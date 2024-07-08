@@ -1,10 +1,11 @@
 <template>
   <Form class="flex w-9/12 flex-col gap-8" @submit="submit">
-    <ContextureChangeKey
+    <ContextureInputText
       :description="t('bounded_context_canvas.edit.form.description.key')"
       :model-value="editModel.shortName"
       name="key"
       :label="t('bounded_context_canvas.edit.form.label.key')"
+      :rules="boundedContextShortNameValidator"
     />
 
     <ContextureInputText
@@ -32,10 +33,12 @@ import { Form } from "vee-validate";
 import { Ref, toRef } from "vue";
 import { useI18n } from "vue-i18n";
 import * as zod from "zod";
+import { boundedContextShortNameValidationSchema } from "~/components/core/change-short-name/changeShortNameValidationSchema";
 import ContexturePrimaryButton from "~/components/primitives/button/ContexturePrimaryButton.vue";
-import ContextureChangeKey from "~/components/core/change-short-name/ContextureChangeShortName.vue";
 import ContextureInputText from "~/components/primitives/input/ContextureInputText.vue";
 import { BoundedContext } from "~/types/boundedContext";
+import { useBoundedContextsStore } from "~/stores/boundedContexts";
+import { storeToRefs } from "pinia";
 
 interface Props {
   initialValue: BoundedContext;
@@ -45,8 +48,15 @@ const props = defineProps<Props>();
 const emit = defineEmits(["submit"]);
 const { t } = useI18n();
 const editModel: Ref<BoundedContext> = toRef(props, "initialValue");
-
 const requiredString = toFieldValidator(zod.string().min(1, t("validation.required")));
+
+const store = useBoundedContextsStore();
+const { boundedContextsByDomainId } = storeToRefs(store);
+const boundedContextShortNameValidator = toFieldValidator(
+  boundedContextShortNameValidationSchema(
+    boundedContextsByDomainId.value[props.initialValue.parentDomainId].filter((bc) => bc.id !== props.initialValue.id)
+  )
+);
 
 function submit(values: any) {
   emit("submit", values);
