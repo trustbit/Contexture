@@ -15,6 +15,7 @@
         <Compile Include="EventStore.Tests.fs" />
         <Compile Include="PositionStorage.Tests.fs" />
         <Compile Include="Security.Tests.fs" />
+        <Compile Include="ReadModels.Tests.fs" />
         <Compile Include="Tests.fs" />
         <Compile Include="Specs\Scenario.fs" />
         <Compile Include="Specs\Fixtures.fs" />
