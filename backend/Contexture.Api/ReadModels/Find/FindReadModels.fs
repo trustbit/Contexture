@@ -2,6 +2,7 @@ namespace Contexture.Api.ReadModels.Find
 open Contexture.Api
 
 open Contexture.Api.Infrastructure
+open Contexture.Api.ReadModels
 module Utils =
     
     let appendToSet items (key, value) =
@@ -93,7 +94,7 @@ module Utils =
 
             newState
 
-        ReadModels.readModel updateState Map.empty
+        ReadModels.readModel updateState Map.empty Defaults.ReplyTimeout
 
 module Labels =
     open Contexture.Api.Aggregates.BoundedContext
@@ -227,7 +228,7 @@ module Labels =
 
             newState
 
-        ReadModels.readModel updateState NamespacesByLabel.Empty
+        ReadModels.readModel updateState NamespacesByLabel.Empty Defaults.ReplyTimeout
 
 module Domains =
     open Contexture.Api.Aggregates.Domain
@@ -303,7 +304,7 @@ module Domains =
 
             newState
 
-        ReadModels.readModel updateState DomainByShortNameAndNameModel.Empty
+        ReadModels.readModel updateState DomainByShortNameAndNameModel.Empty Defaults.ReplyTimeout
 
 module BoundedContexts =
     open Contexture.Api.Aggregates.BoundedContext
@@ -376,4 +377,4 @@ module BoundedContexts =
 
             newState
 
-        ReadModels.readModel updateState BoundedContextByShortNameAndNameModel.Empty
+        ReadModels.readModel updateState BoundedContextByShortNameAndNameModel.Empty Defaults.ReplyTimeout
