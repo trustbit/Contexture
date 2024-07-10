@@ -16,7 +16,7 @@
 
 <script setup lang="ts">
 import { toFieldValidator } from "@vee-validate/zod";
-import { ref } from "vue";
+import { computed, ref } from "vue";
 import { useI18n } from "vue-i18n";
 import { useRouter } from "vue-router";
 import * as zod from "zod";
@@ -46,40 +46,42 @@ const emit = defineEmits<Emits>();
 const { t } = useI18n();
 const router = useRouter();
 const { createBoundedContext } = useBoundedContextsStore();
-const form: DynamicFormSchema<CreateBoundedContext> = {
-  fields: [
-    {
-      name: "name",
-      component: ContextureInputText,
-      componentProps: {
-        label: t("domains.modal.create_bounded_context.form.fields.name.label"),
-        description: t("bounded_context_canvas.edit.form.description.name"),
-        required: true,
-        rules: toFieldValidator(zod.string().min(1)),
+const form = computed<DynamicFormSchema<CreateBoundedContext>>(() => {
+  return {
+    fields: [
+      {
+        name: "name",
+        component: ContextureInputText,
+        componentProps: {
+          label: t("domains.modal.create_bounded_context.form.fields.name.label"),
+          description: t("bounded_context_canvas.edit.form.description.name"),
+          required: true,
+          rules: toFieldValidator(zod.string().min(1)),
+        },
       },
-    },
-    {
-      name: "shortName",
-      component: ContextureInputText,
-      componentProps: {
-        label: t("domains.modal.create_bounded_context.form.fields.short_name.label"),
-        description: t("bounded_context_canvas.edit.form.description.key"),
-        required: true,
-        rules: toFieldValidator(boundedContextShortNameValidationSchema(props.parentDomain.boundedContexts)),
+      {
+        name: "shortName",
+        component: ContextureInputText,
+        componentProps: {
+          label: t("domains.modal.create_bounded_context.form.fields.short_name.label"),
+          description: t("bounded_context_canvas.edit.form.description.key"),
+          required: true,
+          rules: toFieldValidator(boundedContextShortNameValidationSchema(props.parentDomain.boundedContexts)),
+        },
       },
-    },
-    {
-      name: "description",
-      component: ContextureInputText,
-      componentProps: {
-        label: t("domains.modal.create_bounded_context.form.fields.description.label"),
-        description: t("bounded_context_canvas.description.description"),
-        required: true,
-        rules: toFieldValidator(zod.string().min(1)),
+      {
+        name: "description",
+        component: ContextureInputText,
+        componentProps: {
+          label: t("domains.modal.create_bounded_context.form.fields.description.label"),
+          description: t("bounded_context_canvas.description.description"),
+          required: true,
+          rules: toFieldValidator(zod.string().min(1)),
+        },
       },
-    },
-  ],
-};
+    ],
+  };
+});
 
 const submitError = ref<HelpfulErrorProps>();
 

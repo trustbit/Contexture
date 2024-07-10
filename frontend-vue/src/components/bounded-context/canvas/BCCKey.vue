@@ -30,7 +30,7 @@
 import { toFieldValidator } from "@vee-validate/zod";
 import { storeToRefs } from "pinia";
 import { Form } from "vee-validate";
-import { ref } from "vue";
+import { computed, ref } from "vue";
 import { useI18n } from "vue-i18n";
 import ContextureBoundedContextCanvasElement from "~/components/bounded-context/canvas/ContextureBoundedContextCanvasElement.vue";
 import { boundedContextShortNameValidationSchema } from "~/components/core/change-short-name/changeShortNameValidationSchema";
@@ -52,10 +52,12 @@ const { t } = useI18n();
 const key = ref(activeBoundedContext.value.shortName);
 const submitError = ref<HelpfulErrorProps | undefined>();
 const editMode = ref(false);
-const boundedContextShortNameValidator = toFieldValidator(
-  boundedContextShortNameValidationSchema(
-    boundedContextsByDomainId.value[activeBoundedContext.value.parentDomainId].filter(
-      (bc) => bc.id !== activeBoundedContext.value.id
+const boundedContextShortNameValidator = computed(() =>
+  toFieldValidator(
+    boundedContextShortNameValidationSchema(
+      boundedContextsByDomainId.value[activeBoundedContext.value.parentDomainId].filter(
+        (bc) => bc.id !== activeBoundedContext.value.id
+      )
     )
   )
 );
