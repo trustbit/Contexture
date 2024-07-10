@@ -30,7 +30,7 @@
 <script setup lang="ts">
 import { toFieldValidator } from "@vee-validate/zod";
 import { Form } from "vee-validate";
-import { Ref, toRef } from "vue";
+import { computed, Ref, toRef } from "vue";
 import { useI18n } from "vue-i18n";
 import * as zod from "zod";
 import { boundedContextShortNameValidationSchema } from "~/components/core/change-short-name/changeShortNameValidationSchema";
@@ -52,11 +52,11 @@ const requiredString = toFieldValidator(zod.string().min(1, t("validation.requir
 
 const store = useBoundedContextsStore();
 const { boundedContextsByDomainId } = storeToRefs(store);
-const boundedContextShortNameValidator = toFieldValidator(
+const boundedContextShortNameValidator = computed(()=> toFieldValidator(
   boundedContextShortNameValidationSchema(
     boundedContextsByDomainId.value[props.initialValue.parentDomainId].filter((bc) => bc.id !== props.initialValue.id)
   )
-);
+));
 
 function submit(values: any) {
   emit("submit", values);
