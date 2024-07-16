@@ -395,7 +395,11 @@ type Storage(persistence: IPersistence, clock: Clock, logger: INStoreLoggerFacto
             return
                 { new Subscription with
                     member _.Name = name
-                    member _.Status = status ()
+                    member _.Status =
+                        if pollingClient.IsActive then
+                            status ()
+                        else
+                            Stopped (Position.from pollingClient.Position)
                     member _.DisposeAsync() = ValueTask(pollingClient.Stop()) }
         }
 
