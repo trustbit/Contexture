@@ -390,16 +390,36 @@ type Storage(persistence: IPersistence, clock: Clock, logger: INStoreLoggerFacto
             let pollingClient =
                 PollingClient(persistence, positionValue, wrappedSubscription, logger)
 
-            pollingClient.Start()
+            let source = new CancellationTokenSource();
+            let cancellationToken = source.Token;
+            let poll = fun () -> (
+                task {
+                    while not cancellationToken.IsCancellationRequested do
+                        do! pollingClient.Poll().ConfigureAwait(false)
+                        if not cancellationToken.IsCancellationRequested then 
+                            do! Task.Delay(pollingClient.PollingIntervalMilliseconds, cancellationToken).ConfigureAwait(false)
+                    }
+                :> Task
+            )
+
+            Task
+                .Run(poll, cancellationToken)
+                .ContinueWith(fun t ->
+                    if t.IsFaulted then
+                        let innerException = t.Exception.Flatten().InnerException;
+                        let logger = logger.CreateLogger("PollingClient")
+                        logger.LogError($"Error during Poll, first exception: {innerException.Message}.\n{innerException}");
+                        wrappedSubscription.OnErrorAsync(pollingClient.Position ,t.Exception)
+                    else
+                        Task.CompletedTask
+                )
+                .ConfigureAwait(false)
+                |> ignore
 
             return
                 { new Subscription with
                     member _.Name = name
-                    member _.Status =
-                        if pollingClient.IsActive then
-                            status ()
-                        else
-                            Stopped (Position.from pollingClient.Position)
+                    member _.Status = status ()
                     member _.DisposeAsync() = ValueTask(pollingClient.Stop()) }
         }
 
