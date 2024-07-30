@@ -389,21 +389,18 @@ type Storage(persistence: IPersistence, clock: Clock, logger: INStoreLoggerFacto
 
             let pollingClient =
                 PollingClient(persistence, positionValue, wrappedSubscription, logger)
-
-            let source = new CancellationTokenSource();
-            let cancellationToken = source.Token;
+            
             let poll = fun () -> (
                 task {
-                    while not cancellationToken.IsCancellationRequested do
+                    while true do
                         do! pollingClient.Poll().ConfigureAwait(false)
-                        if not cancellationToken.IsCancellationRequested then 
-                            do! Task.Delay(pollingClient.PollingIntervalMilliseconds, cancellationToken).ConfigureAwait(false)
+                        do! Task.Delay(pollingClient.PollingIntervalMilliseconds).ConfigureAwait(false)
                     }
                 :> Task
             )
 
             Task
-                .Run(poll, cancellationToken)
+                .Run(poll)
                 .ContinueWith(fun t ->
                     if t.IsFaulted then
                         let innerException = t.Exception.Flatten().InnerException;
