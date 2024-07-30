@@ -23,42 +23,35 @@ module SystemRoutes =
     let errorHandler (ex : Exception) (logger : ILogger) =
         logger.LogError(ex, "An unhandled exception has occurred while executing the request.")
         clearResponse >=> setStatusCode 500 >=> text ex.Message
-
-    let status : HttpHandler =
-        fun (next: HttpFunc) (ctx: HttpContext) ->
-            let env = ctx.GetService<ContextureConfiguration>()
-            let payload =
-                {|
-                    Health = true
-                    GitHash = env.GitHash
-                |}
-            json payload next ctx
          
     // is there a better way to surface the subscriptions?
     let mutable subscriptions : Subscription list option = None
+
+    let toSubscriptionStatusPayload status = 
+        {| 
+            CaughtUp =
+                status.CaughtUp
+                |> List.map (fun (position, name) -> {| Name = name; Position = position |})
+            Failed =
+                status.Failed
+                |> List.map (fun (e, position, name) -> {| Name = name; Position = position; Error = e.Message |})
+            Processing =
+                status.Processing
+                |> List.map (fun (position, name) -> {| Name = name; Position = position |})
+            NotRunning =
+                status.NotRunning
+                |> List.map (fun ( name) -> {| Name = name |})
+            Stopped =
+                status.Stopped
+                |> List.map (fun (position, name) -> {| Name = name; Position = position |})
+        |}
             
     let readiness: HttpHandler =
         fun (next: HttpFunc) (ctx: HttpContext) ->
             match subscriptions with
             | Some subs ->
                 let status = Runtime.calculateStatistics subs
-                let payload =
-                    {| CaughtUp =
-                         status.CaughtUp
-                         |> List.map (fun (position, name) -> {| Name = name; Position = position |})
-                       Failed =
-                         status.Failed
-                         |> List.map (fun (e, position, name) -> {| Name = name; Position = position; Error = e.Message |})
-                       Processing =
-                         status.Processing
-                         |> List.map (fun (position, name) -> {| Name = name; Position = position |})
-                       NotRunning =
-                         status.NotRunning
-                         |> List.map (fun ( name) -> {| Name = name |})
-                       Stopped =
-                         status.Stopped
-                         |> List.map (fun (position, name) -> {| Name = name; Position = position |})
-                    |}
+                let payload = toSubscriptionStatusPayload status
                 // TODO: what if we are never able to catch up under (very) high load?
                 // Are we then really not ready to process or is this an OKish situation?
                 if Runtime.didAllSubscriptionsCatchup status.CaughtUp subs then
@@ -66,7 +59,30 @@ module SystemRoutes =
                 else
                     ServerErrors.serviceUnavailable (json payload) next ctx    
             | None ->
-                ServerErrors.serviceUnavailable (text "No subscriptions yet") next ctx            
+                ServerErrors.serviceUnavailable (text "No subscriptions yet") next ctx         
+    
+    let health: HttpHandler = fun (next: HttpFunc) (ctx: HttpContext) ->
+        match subscriptions with
+        | Some subs ->
+            let status = Runtime.calculateStatistics subs
+            let payload = toSubscriptionStatusPayload status
+            let allSubscriptionsHealthy = subs |> List.forall(fun sub ->
+                match sub.Status with
+                | CaughtUp _
+                | Processing _ -> 
+                    true
+                | NotRunning
+                | Failed _
+                | Stopped _ -> 
+                    false
+            )
+            if allSubscriptionsHealthy then
+                Successful.ok (json payload) next ctx
+            else 
+                ServerErrors.serviceUnavailable (json payload) next ctx         
+        | None ->
+            ServerErrors.serviceUnavailable (text "No subscriptions") next ctx         
+
 
 module Routes =
     open Microsoft.AspNetCore.Http
@@ -83,11 +99,11 @@ module Routes =
                 ])
             subRoute "/meta"
                 ( choose [
-                    route "/health" >=> GET >=> SystemRoutes.status
+                    route "/health" >=> GET >=> SystemRoutes.health
                     route "/readiness" >=> GET >=> SystemRoutes.readiness
                     route "/userPermissions" >=> GET >=> Security.userPermissions
                     route "/securityConfiguration" >=> GET >=> Security.securityConfiguration
-                    GET >=> SystemRoutes.status
+                    GET >=> SystemRoutes.health
                 ])
             hostFrontend
             RequestErrors.NOT_FOUND "Not found"
