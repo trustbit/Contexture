@@ -44,6 +44,7 @@
             </div>
           </div>
         </transition>
+        <StructurizerDiscloser />
       </div>
     </ContextureHeroHeader>
 
@@ -103,6 +104,7 @@ import ContextureHeroHeader from "~/components/core/header/ContextureHeroHeader.
 import ContextureHelpfulErrorAlert from "~/components/primitives/alert/ContextureHelpfulErrorAlert.vue";
 import ContextureRoundedButton from "~/components/primitives/button/ContextureRoundedButton.vue";
 import ContextureTooltip from "~/components/primitives/tooltip/ContextureTooltip.vue";
+import StructurizerDiscloser from "~/components/core/header/StructurizerDiscloser.vue";
 import { useAuthStore } from "~/stores/auth";
 import { useBoundedContextsStore } from "~/stores/boundedContexts";
 
