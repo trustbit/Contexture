@@ -5,6 +5,7 @@ import { useRouteParams } from "@vueuse/router";
 import { computed, ComputedRef, onMounted, ref } from "vue";
 import { Domain } from "~/types/domain";
 import { BoundedContext } from "~/types/boundedContext";
+import { useFetch } from "~/composables/useFetch";
 
 interface StructurizrConfigEntry {
   id: number;
@@ -17,22 +18,22 @@ type StructurizrConfig = Map<string, StructurizrConfigEntry>;
 export const useStructurizrUrlsStore = defineStore("structurizr-urls", () => {
   const structurizerConfig = ref<StructurizrConfig>(new Map<string, StructurizrConfigEntry>());
   const loadConfig = async () => {
-    const jsonFilePath = import.meta.env.VITE_CONTEXTURE_STRUCTURIZR_MAPPINGS_URL;
-    if (jsonFilePath === undefined) {
-      console.log("No JSON config path provided for Structurizr");
-      structurizerConfig.value = new Map<string, StructurizrConfigEntry>();
-      return;
-    }
-
+    const jsonFilePath = import.meta.env.VITE_CONTEXTURE_STRUCTURIZR_MAPPINGS_URL || `/structurizr-urls.json`;
     try {
-      const response = await fetch(jsonFilePath);
+      const {data, error} = await useFetch<StructurizrConfig>(jsonFilePath).get();
 
-      if (!response.ok) {
+      if(error.value){
         console.warn(`Failed to fetch JSON config from ${jsonFilePath}`);
         structurizerConfig.value = new Map<string, StructurizrConfigEntry>();
       }
-      const config = await response.json();
-      structurizerConfig.value = new Map<string, StructurizrConfigEntry>(Object.entries(config));
+      else {
+        if(data.value){
+          console.log(data.value);
+          structurizerConfig.value = new Map<string, StructurizrConfigEntry>(Object.entries(data.value));
+        }
+          
+      }
+
     } catch (error) {
       console.error(`Error loading JSON config: ${error}`);
       structurizerConfig.value = new Map<string, StructurizrConfigEntry>();
