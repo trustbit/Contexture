@@ -15,8 +15,9 @@ const router = useRouter();
 onMounted(() => {
   authStore
     .signinCallback()
-    .then(() => {
-      router.push("/");
+    .then((path) => {
+      if (path) router.push(path);
+      else router.push("/");
     })
     .catch((err) => {
       console.error(err);

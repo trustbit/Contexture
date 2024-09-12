@@ -16,7 +16,7 @@ const authStore = useAuthStore();
 const { enabled, user } = storeToRefs(authStore);
 
 function signIn() {
-  return authStore.signinRedirect();
+  return authStore.signinRedirect(window.location.pathname);
 }
 
 function signOut() {
