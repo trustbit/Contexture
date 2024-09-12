@@ -52,11 +52,13 @@ const requiredString = toFieldValidator(zod.string().min(1, t("validation.requir
 
 const store = useBoundedContextsStore();
 const { boundedContextsByDomainId } = storeToRefs(store);
-const boundedContextShortNameValidator = computed(()=> toFieldValidator(
-  boundedContextShortNameValidationSchema(
-    boundedContextsByDomainId.value[props.initialValue.parentDomainId].filter((bc) => bc.id !== props.initialValue.id)
+const boundedContextShortNameValidator = computed(() =>
+  toFieldValidator(
+    boundedContextShortNameValidationSchema(
+      boundedContextsByDomainId.value[props.initialValue.parentDomainId].filter((bc) => bc.id !== props.initialValue.id)
+    )
   )
-));
+);
 
 function submit(values: any) {
   emit("submit", values);

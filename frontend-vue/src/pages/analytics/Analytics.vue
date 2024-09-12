@@ -265,7 +265,7 @@ const uniqueNamespaceNames = computed(
       namespaces.value
         .map((n) => n.name)
         .filter((n) => n.toLowerCase().includes(namespaceSearchTerm.value.toLowerCase()))
-        .sort((a, b) => a.localeCompare(b))
+        .sortAlphabeticallyBy((n) => n)
     )
 );
 
@@ -333,7 +333,7 @@ function onDeleteFilter(index: number): void {
 }
 
 function findNamespaceLabelsByNamespace(namespaceName: string): NamespaceLabel[] {
-  return namespaceLabelsByNamespaceName.value[namespaceName] || [];
+  return namespaceLabelsByNamespaceName.value[namespaceName]?.sortAlphabeticallyBy((n) => n.name) || [];
 }
 
 function updateSelectedVisualisation(index: number) {
@@ -366,6 +366,18 @@ const { data, error, isFetching } = useFetch<BoundedContext[]>(url, {
   refetch: true,
 }).get();
 
+const domainIdToDomainName = computed<{ [domainId: string]: string }>(() => {
+  return (
+    allDomains.value?.reduce((acc: { [domainId: string]: string }, curr: Domain) => {
+      if (!acc[curr.id]) {
+        acc[curr.id] = "";
+      }
+      acc[curr.id] = curr.name;
+      return acc;
+    }, {}) || {}
+  );
+});
+
 const boundedContextDomain = computed<{
   [domainId: string]: BoundedContext[];
 }>(() => {
@@ -384,22 +396,13 @@ const boundedContextDomain = computed<{
 });
 
 const domainsWithBoundedContexts = computed(() => {
-  return Object.entries(boundedContextDomain.value).map(([domainId, contexts]) => ({
-    domainId,
-    contexts,
-  }));
-});
-
-const domainIdToDomainName = computed<{ [domainId: string]: string }>(() => {
-  return (
-    allDomains.value?.reduce((acc: { [domainId: string]: string }, curr: Domain) => {
-      if (!acc[curr.id]) {
-        acc[curr.id] = "";
-      }
-      acc[curr.id] = curr.name;
-      return acc;
-    }, {}) || {}
-  );
+  return Object.entries(boundedContextDomain.value)
+    .map(([domainId, contexts]) => ({
+      domainName: domainIdToDomainName.value[domainId],
+      domainId,
+      contexts: contexts.sortAlphabeticallyBy((c) => c.name),
+    }))
+    .sortAlphabeticallyBy((d) => d.domainName);
 });
 
 const addFilterPopoverOpen = ref<boolean[]>([]);

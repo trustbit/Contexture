@@ -191,12 +191,19 @@ const confirmationModal = useConfirmationModalStore();
 const { t } = useI18n();
 const { canModify } = useAuthStore();
 const selectableTemplates = computed(() =>
-  namespaceTemplates.value.filter((n) => !boundedContextNamespaces.value.map((n) => n.name).includes(n.name))
+  namespaceTemplates.value
+    .filter((n) => !boundedContextNamespaces.value.map((n) => n.name).includes(n.name))
+    .sortAlphabeticallyBy((n) => n.name)
 );
 const isCreateNamespaceOpen = ref(false);
 const isCreateNamespaceFromTemplateOpen = ref(false);
 const selectedTemplate = ref<NamespaceTemplate>();
-const boundedContextNamespaces = computed(() => activeBoundedContext.value?.namespaces || []);
+const boundedContextNamespaces = computed(
+  () =>
+    activeBoundedContext.value?.namespaces
+      .sortAlphabeticallyBy((n) => n.name)
+      .map((n) => ({ ...n, labels: n.labels.sortAlphabeticallyBy((l) => l.name) })) || []
+);
 const submitError = ref<HelpfulErrorProps>();
 const boundedContextId = useRouteParams("id");
 const namespaceNameRule = toFieldValidator(

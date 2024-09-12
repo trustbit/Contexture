@@ -13,7 +13,7 @@
       />
 
       <div v-else class="w-full">
-        <div class="text-sm text-gray-700" v-if="parentDomains.length === 0">{{ t("domains.empty") }}</div>
+        <div class="text-sm text-gray-700" v-if="sortedParentDomains.length === 0">{{ t("domains.empty") }}</div>
         <div v-else>
           <ContextureSearch v-model="searchQuery" :placeholder="t('domains.search.search-bounded_contexts')" />
 
@@ -23,7 +23,7 @@
           </div>
 
           <div class="mt-8 flex flex-col gap-y-4">
-            <template v-for="parentDomain of parentDomains" :key="parentDomain.id">
+            <template v-for="parentDomain of sortedParentDomains" :key="parentDomain.id">
               <div class="grid-cols-3 gap-4 bg-gray-100 p-2 sm:grid sm:p-6" v-if="showParentDomain(parentDomain.id)">
                 <!-- parent domains -->
                 <!-- first column -->
@@ -325,6 +325,7 @@ import { useBoundedContextsStore } from "~/stores/boundedContexts";
 import { useDomainsStore } from "~/stores/domains";
 import { refDebounced, useLocalStorage } from "@vueuse/core";
 import { BoundedContext } from "~/types/boundedContext";
+import { Domain } from "~/types/domain";
 import { DomainId } from "~/types/domain";
 
 interface DomainListViewSettings {
@@ -343,34 +344,57 @@ const options: Ref<DomainListViewSettings> = useLocalStorage<DomainListViewSetti
 const searchQuery = useRouteQuery<string>("query");
 const searchQueryDebounced = refDebounced(searchQuery, 500);
 
+const sortedParentDomains = computed(() => parentDomains.value.sortAlphabeticallyBy((d) => d.name));
+
 const filteredBoundedContexts = computed<{ [domainId: string]: BoundedContext[] }>(() => {
-  if (!searchQuery.value) {
-    return boundedContextsByDomainId.value;
-  }
-  if (searchQueryDebounced.value) {
-    return searchInBoundedContext(boundedContextsByDomainId.value, searchQueryDebounced.value as string);
-  } else {
-    return boundedContextsByDomainId.value;
-  }
+  const boundedContexts = (() => {
+    if (!searchQuery.value) {
+      return boundedContextsByDomainId.value;
+    }
+    if (searchQueryDebounced.value) {
+      return searchInBoundedContext(boundedContextsByDomainId.value, searchQueryDebounced.value as string);
+    } else {
+      return boundedContextsByDomainId.value;
+    }
+  })();
+
+  return Object.entries(boundedContexts).reduce((acc: { [domainId: string]: BoundedContext[] }, [k, v]) => {
+    acc[k] = v
+      .sortAlphabeticallyBy((b) => b.name)
+      .map((b) => ({
+        ...b,
+        namespaces: b.namespaces
+          .sortAlphabeticallyBy((n) => n.name)
+          .map((n) => ({ ...n, labels: n.labels.sortAlphabeticallyBy((l) => l.name) })),
+      }));
+    return acc;
+  }, {});
 });
 
 const filteredSubdomains = computed(() => {
-  if (!searchQuery.value) {
-    return subdomainsByDomainId.value;
-  }
-  if (searchQueryDebounced.value) {
-    return Object.keys(subdomainsByDomainId.value).reduce((acc: any, domainId: any) => {
-      const parentIds = parentDomains.value.map((p) => p.id);
-      if (parentIds.includes(domainId)) {
-        acc[domainId] = subdomainsByDomainId.value[domainId].filter(
-          (subdomain) => filteredBoundedContexts.value[subdomain.id]?.length > 0
-        );
-      }
-      return acc;
-    }, {});
-  } else {
-    return subdomainsByDomainId.value;
-  }
+  const subdomains = (() => {
+    if (!searchQuery.value) {
+      return subdomainsByDomainId.value;
+    }
+    if (searchQueryDebounced.value) {
+      return Object.keys(subdomainsByDomainId.value).reduce<{ [domainId: string]: Domain[] }>((acc, domainId: any) => {
+        const parentIds = parentDomains.value.map((p) => p.id);
+        if (parentIds.includes(domainId)) {
+          acc[domainId] = subdomainsByDomainId.value[domainId].filter(
+            (subdomain) => filteredBoundedContexts.value[subdomain.id]?.length > 0
+          );
+        }
+        return acc;
+      }, {});
+    } else {
+      return subdomainsByDomainId.value;
+    }
+  })();
+
+  return Object.entries(subdomains).reduce<{ [domainId: string]: Domain[] }>((acc, [k, v]) => {
+    acc[k] = v.sortAlphabeticallyBy((d) => d.name);
+    return acc;
+  }, {});
 });
 
 const searchInBoundedContext = (
