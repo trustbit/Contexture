@@ -80,6 +80,8 @@
         </TabGroup>
       </div>
     </div>
+
+    <ContextureNamespaceCollection></ContextureNamespaceCollection>
   </div>
 
   <div class="container mx-auto mt-5 px-2 pb-8 sm:px-0" v-else>
@@ -105,6 +107,7 @@ import ContextureRoundedButton from "~/components/primitives/button/ContextureRo
 import ContextureTooltip from "~/components/primitives/tooltip/ContextureTooltip.vue";
 import { useAuthStore } from "~/stores/auth";
 import { useBoundedContextsStore } from "~/stores/boundedContexts";
+import ContextureNamespaceCollection from "~/components/bounded-context/namespace/ContextureNamespaceCollection.vue";
 
 const store = useBoundedContextsStore();
 const { loading } = storeToRefs(store);
