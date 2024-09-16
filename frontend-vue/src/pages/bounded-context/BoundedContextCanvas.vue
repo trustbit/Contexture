@@ -81,6 +81,10 @@
         </TabGroup>
       </div>
     </div>
+
+    <div class="mx-auto mt-5 px-4 pb-8 lg:px-20">
+      <ContextureNamespaces></ContextureNamespaces>
+    </div>
   </div>
 
   <div class="container mx-auto mt-5 px-2 pb-8 sm:px-0" v-else>
@@ -107,6 +111,7 @@ import ContextureTooltip from "~/components/primitives/tooltip/ContextureTooltip
 import StructurizerDiscloser from "~/components/core/header/StructurizerDiscloser.vue";
 import { useAuthStore } from "~/stores/auth";
 import { useBoundedContextsStore } from "~/stores/boundedContexts";
+import ContextureNamespaces from "~/components/bounded-context/namespace/ContextureNamespaces.vue";
 
 const store = useBoundedContextsStore();
 const { loading } = storeToRefs(store);
