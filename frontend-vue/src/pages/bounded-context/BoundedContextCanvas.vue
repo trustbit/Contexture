@@ -81,7 +81,9 @@
       </div>
     </div>
 
-    <ContextureNamespaceCollection></ContextureNamespaceCollection>
+    <div class="mx-auto mt-5 px-4 pb-8 lg:px-20">
+      <ContextureNamespaceCollection></ContextureNamespaceCollection>
+    </div>
   </div>
 
   <div class="container mx-auto mt-5 px-2 pb-8 sm:px-0" v-else>
