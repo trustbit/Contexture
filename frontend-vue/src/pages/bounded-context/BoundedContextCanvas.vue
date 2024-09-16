@@ -82,7 +82,7 @@
     </div>
 
     <div class="mx-auto mt-5 px-4 pb-8 lg:px-20">
-      <ContextureNamespaceCollection></ContextureNamespaceCollection>
+      <ContextureNamespaces></ContextureNamespaces>
     </div>
   </div>
 
@@ -109,7 +109,7 @@ import ContextureRoundedButton from "~/components/primitives/button/ContextureRo
 import ContextureTooltip from "~/components/primitives/tooltip/ContextureTooltip.vue";
 import { useAuthStore } from "~/stores/auth";
 import { useBoundedContextsStore } from "~/stores/boundedContexts";
-import ContextureNamespaceCollection from "~/components/bounded-context/namespace/ContextureNamespaceCollection.vue";
+import ContextureNamespaces from "~/components/bounded-context/namespace/ContextureNamespaces.vue";
 
 const store = useBoundedContextsStore();
 const { loading } = storeToRefs(store);
