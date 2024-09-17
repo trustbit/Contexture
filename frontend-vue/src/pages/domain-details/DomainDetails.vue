@@ -43,7 +43,7 @@
               </ContextureTooltip>
             </div>
           </div>
-          <StructurizerDiscloser/>
+          <StructurizerDiscloser />
         </div>
       </transition>
     </div>
