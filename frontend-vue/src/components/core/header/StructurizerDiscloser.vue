@@ -59,7 +59,9 @@ interface IframeEvent {
 }
 
 const iframeWidth = computed(() => {
-  return container.value?.clientWidth > 0 ? container.value?.clientWidth : container.value?.parentElement?.clientWidth || 0;
+  return container.value?.clientWidth > 0
+    ? container.value?.clientWidth
+    : container.value?.parentElement?.clientWidth || 0;
 });
 const iframeHeight = ref<number>(0);
 window.addEventListener("message", (event: MessageEvent<IframeEvent>) => {

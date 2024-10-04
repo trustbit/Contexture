@@ -63,13 +63,16 @@
       {{ t("bounded_context_namespace.empty") }}
     </div>
 
-    <div v-for="namespace of boundedContextNamespaces" class="mt-4" :key="namespace.name">
+    <div class="grid grid-cols-3 gap-4">
       <ContextureNamespace
+        v-for="namespace of boundedContextNamespaces"
+        :key="namespace.name"
         :namespace="namespace"
         @save="(labels) => onSaveNamespaceLabels(namespace.id, labels)"
         @delete-label="(label) => onDeleteNamespaceLabel(namespace.id, label.id)"
         @delete-namespace="() => onDeleteNamespace(namespace)"
-      ></ContextureNamespace>
+      >
+      </ContextureNamespace>
     </div>
 
     <ContextureModal

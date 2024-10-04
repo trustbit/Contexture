@@ -83,7 +83,7 @@
     </div>
 
     <div class="mx-auto mt-5 px-4 pb-8 lg:px-20">
-      <ContextureNamespaces></ContextureNamespaces>
+      <ContextureNamespaces class="rounded bg-gray-100 p-4"></ContextureNamespaces>
     </div>
   </div>
 

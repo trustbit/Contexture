@@ -20,28 +20,25 @@ export const useStructurizrUrlsStore = defineStore("structurizr-urls", () => {
   const loadConfig = async () => {
     const jsonFilePath = import.meta.env.VITE_CONTEXTURE_STRUCTURIZR_MAPPINGS_URL || `/structurizr-urls.json`;
     try {
-      const {data, error} = await useFetch<StructurizrConfig>(jsonFilePath).get();
+      const { data, error } = await useFetch<StructurizrConfig>(jsonFilePath).get();
 
-      if(error.value){
+      if (error.value) {
         console.warn(`Failed to fetch JSON config from ${jsonFilePath}`);
         structurizerConfig.value = new Map<string, StructurizrConfigEntry>();
-      }
-      else {
-        if(data.value){
+      } else {
+        if (data.value) {
           console.log(data.value);
           structurizerConfig.value = new Map<string, StructurizrConfigEntry>(Object.entries(data.value));
         }
-          
       }
-
     } catch (error) {
       console.error(`Error loading JSON config: ${error}`);
       structurizerConfig.value = new Map<string, StructurizrConfigEntry>();
     }
   };
 
-  const { domainByDomainId, subdomainsByDomainId, parentDomains } = storeToRefs(useDomainsStore());
-  const { activeBoundedContext, boundedContextsByDomainId } = storeToRefs(useBoundedContextsStore());
+  const { domainByDomainId } = storeToRefs(useDomainsStore());
+  const { activeBoundedContext } = storeToRefs(useBoundedContextsStore());
   const currentDomainId = useRouteParams<string>("id");
   const domain: ComputedRef<Domain | undefined> = computed<Domain | undefined>(
     () => domainByDomainId.value[currentDomainId.value]
@@ -93,5 +90,4 @@ export const useStructurizrUrlsStore = defineStore("structurizr-urls", () => {
   });
   onMounted(loadConfig);
   return { structurizrUrl, structurizrKey, structurizrConfigExist };
-
 });
