@@ -13,10 +13,10 @@ describe("change short name validation rules", () => {
     expect(success).toBeFalsy();
   });
 
-  test("cannot exceed 16 characters", () => {
+  test("cannot exceed 50 characters", () => {
     const validation = shortNameValidationSchema("", []);
 
-    const { success } = validation.safeParse("a".repeat(17));
+    const { success } = validation.safeParse("a".repeat(51));
 
     expect(success).toBeFalsy();
   });

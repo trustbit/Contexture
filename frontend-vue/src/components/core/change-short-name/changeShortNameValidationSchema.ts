@@ -10,7 +10,7 @@ export const shortNameValidationSchema = (currentShortName: string | undefined, 
   zod
     .string()
     .min(1)
-    .max(16)
+    .max(50)
     .superRefine((arg: string, ctx: RefinementCtx) => {
       isUniqueIn<Domain>(arg, ctx, {
         in: domains.filter((d) => d.shortName !== currentShortName),
@@ -41,7 +41,7 @@ export const boundedContextShortNameValidationSchema = (boundedContexts: Bounded
   zod
     .string()
     .min(1)
-    .max(16)
+    .max(50)
     .refine((term: string) => !startsWithNumber(term), {
       message: "Must not start with a number",
     })
