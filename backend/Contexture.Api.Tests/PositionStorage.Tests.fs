@@ -81,10 +81,10 @@ type SqlServerPositionStorage(msSql: MsSqlFixture) =
     inherit PositionStorageBehavior()
 
     override this.EmptyStorage() =
-        SqlServer.PositionStorage(msSql.Container.ConnectionString)
+        SqlServer.PositionStorage(msSql.Container.GetConnectionString())
         
     override this.StorageWith items = task {
-        use client = new SqlConnection(msSql.Container.ConnectionString)
+        use client = new SqlConnection(msSql.Container.GetConnectionString())
         do! client.OpenAsync()
         
         // using string concatenation over parameters here is OK because it's just (unit) test code
@@ -98,15 +98,15 @@ type SqlServerPositionStorage(msSql: MsSqlFixture) =
         let! result = command.ExecuteNonQueryAsync()
         Assert.Equal(items |> List.length, result)
         
-        return SqlServer.PositionStorage(msSql.Container.ConnectionString) :> IStorePositions
+        return SqlServer.PositionStorage(msSql.Container.GetConnectionString()) :> IStorePositions
         }
 
     interface IAsyncLifetime with
         member this.DisposeAsync() =
-            SqlServer.PositionStorage.RemoveSchema(msSql.Container.ConnectionString)
+            SqlServer.PositionStorage.RemoveSchema(msSql.Container.GetConnectionString())
 
         member this.InitializeAsync() =
-            SqlServer.PositionStorage.CreateSchema(msSql.Container.ConnectionString)
+            SqlServer.PositionStorage.CreateSchema(msSql.Container.GetConnectionString())
 
     interface IClassFixture<MsSqlFixture> with
 
