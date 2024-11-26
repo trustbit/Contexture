@@ -12,6 +12,9 @@ open Xunit
 open Xunit.Sdk
 open Contexture.Api.Tests.EnvironmentSimulation
 open ValueObjects
+open Fixtures
+open Fixtures.Builders
+
 module Namespaces =
 
     [<Fact>]
@@ -22,8 +25,7 @@ module Namespaces =
             let domainId = environment |> PseudoRandom.guid
             let contextId = environment |> PseudoRandom.guid
 
-            let given =
-                Fixtures.Builders.givenADomainWithOneBoundedContext domainId contextId
+            let given = givenADomainWithOneBoundedContext domainId contextId
 
             use! testEnvironment = Prepare.withGiven environment given
 
@@ -61,6 +63,56 @@ module Namespaces =
                 )
             | e -> raise (XunitException $"Unexpected event: %O{e}")
         }
+
+    [<Fact>]
+    let ``can edit namespace label``() = task {
+        // arrange
+        let environment = FixedTimeEnvironment.FromSystemClock()
+        let domainId = environment |> PseudoRandom.guid
+        let contextId = environment |> PseudoRandom.guid
+        let namespaceId = environment |> PseudoRandom.guid
+        let labelId = environment |> PseudoRandom.guid
+        let labelDefinition = { 
+            LabelId = labelId
+            Name = "initial name"
+            Value = Some "initial value"
+            Template = None 
+        }
+
+        let given = 
+            givenADomainWithOneBoundedContext domainId contextId
+            |> Given.andOneEvent (
+                Namespace.definition contextId namespaceId
+                |> Namespace.appendLabel (labelDefinition)
+                |> Namespace.namespaceAdded
+            )
+
+        use! testEnvironment = Prepare.withGiven environment given
+
+        let updateLabelBody = """
+            {
+                "name": "updated name",
+                "value": "updated value"
+            }
+        """
+        let! response = When.postingJson $"api/boundedcontexts/{contextId}/namespaces/{namespaceId}/labels/{labelId}" updateLabelBody testEnvironment
+        let! result = response |> WhenResult.asJsonResponse<Projections.Namespace list>
+
+        let namespaceLabels = 
+            result.Result 
+            |> List.find(fun n -> n.Id = namespaceId)
+            |> _.Labels
+
+        let expectedLabel: Projections.Label = {
+            Id = labelId
+            Name = "updated name"
+            Value = "updated value"
+            Template = None
+        }
+
+        Then.Single namespaceLabels
+        |> fun label -> Then.Equal(expectedLabel, label)
+    }
 
 module BoundedContexts =
 
