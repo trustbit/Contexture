@@ -69,7 +69,7 @@
         :key="namespace.name"
         :namespace="namespace"
         @save="(labels) => onSaveNamespaceLabels(namespace.id, labels)"
-        @delete-label="(label) => onDeleteNamespaceLabel(namespace.id, label.id)"
+        @delete-label="(labelId) => onDeleteNamespaceLabel(namespace.id, labelId)"
         @delete-namespace="() => onDeleteNamespace(namespace)"
       >
       </ContextureNamespace>
@@ -175,7 +175,7 @@ import { useBoundedContextsStore } from "~/stores/boundedContexts";
 import useConfirmationModalStore from "~/stores/confirmationModal";
 import { useNamespaceTemplatesStore } from "~/stores/namespace-templates";
 import { useNamespaces } from "~/stores/namespaces";
-import { CreateNamespace, CreateNamespaceLabel, Namespace, NamespaceId, NamespaceLabelId } from "~/types/namespace";
+import { CreateNamespace, LabelChange, Namespace, NamespaceId, NamespaceLabelId } from "~/types/namespace";
 import { NamespaceTemplate, NamespaceTemplateItem } from "~/types/namespace-templates";
 import { useRouteParams } from "@vueuse/router";
 import { requiredObjectRule } from "~/core/validationRules";
@@ -183,7 +183,8 @@ import { useAuthStore } from "~/stores/auth";
 import NamespaceValueAutocomplete from "~/components/bounded-context/namespace/NamespaceValueAutocomplete.vue";
 
 const { loading, activeBoundedContext } = storeToRefs(useBoundedContextsStore());
-const { createNamespace, deleteNamespace, createNamespaceLabel, deleteNamespaceLabel } = useNamespaces();
+const { createNamespace, deleteNamespace, createNamespaceLabel, deleteNamespaceLabel, updateNamespaceLabel } =
+  useNamespaces();
 const { namespaceTemplates } = storeToRefs(useNamespaceTemplatesStore());
 const confirmationModal = useConfirmationModalStore();
 const { t } = useI18n();
@@ -253,9 +254,10 @@ async function onDeleteNamespace(namespace: Namespace) {
   );
 }
 
-async function onSaveNamespaceLabels(namespaceId: NamespaceId, namespaceLabels: CreateNamespaceLabel[]) {
+async function onSaveNamespaceLabels(namespaceId: NamespaceId, namespaceLabels: LabelChange[]) {
   for (const label of namespaceLabels) {
-    await createNamespaceLabel(activeBoundedContext.value!.id, namespaceId, label);
+    if (label.id) await updateNamespaceLabel(activeBoundedContext.value!.id, namespaceId, label);
+    else await createNamespaceLabel(activeBoundedContext.value!.id, namespaceId, label);
   }
 }
 
