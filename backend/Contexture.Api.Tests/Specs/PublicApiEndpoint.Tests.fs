@@ -101,7 +101,7 @@ module Namespaces =
         let namespaceLabels = 
             result.Result 
             |> List.find(fun n -> n.Id = namespaceId)
-            |> _.Labels
+            |> fun ns -> ns.Labels
 
         let expectedLabel: Projections.Label = {
             Id = labelId
