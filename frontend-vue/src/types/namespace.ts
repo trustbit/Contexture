@@ -28,3 +28,9 @@ export interface NamespaceLabel {
   value: string;
   template: string;
 }
+
+export interface LabelChange {
+  id?: string;
+  name: string;
+  value?: string;
+}

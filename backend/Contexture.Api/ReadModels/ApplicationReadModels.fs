@@ -194,6 +194,7 @@ module Namespace =
         | NamespaceRemoved e -> e.NamespaceId
         | LabelAdded l -> l.NamespaceId
         | LabelRemoved l -> l.NamespaceId
+        | LabelUpdated l -> l.NamespaceId
 
     let allNamespaces (state: NamespaceState) =
         state.NamespaceByNamespaceId
@@ -215,6 +216,7 @@ module Namespace =
             | NamespaceRemoved n -> state |> Map.remove n.NamespaceId
             | LabelAdded l -> state
             | LabelRemoved l -> state
+            | LabelUpdated _ -> state
 
         let byNamespace (state: NamespaceState) (namespaceId: NamespaceId) =
             state.BoundedContextIdByNamespaceId

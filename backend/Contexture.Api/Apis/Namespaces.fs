@@ -28,11 +28,11 @@ module Namespaces =
                     | Ok (updatedContext,version,position) ->
                         let! namespaceState = ctx.GetService<ReadModels.Namespace.AllNamespacesReadModel>().State(position)
                         // for namespaces we don't use redirects ATM
-                        let boundedContext =
+                        let namespaces =
                             updatedContext
                             |> ReadModels.Namespace.namespacesOf namespaceState
 
-                        return! json boundedContext next ctx
+                        return! json namespaces next ctx
                     | Error (DomainError error) ->
                         return! RequestErrors.BAD_REQUEST(sprintf "Domain Error %A" error) next ctx
                     | Error e -> return! ServerErrors.INTERNAL_ERROR e next ctx
@@ -46,6 +46,9 @@ module Namespaces =
 
         let removeLabel contextId (command: RemoveLabel) =
             updateAndReturnNamespaces (RemoveLabel(contextId, command))
+
+        let updateLabel contextId (command: UpdateLabel) =
+            updateAndReturnNamespaces (UpdateLabel(contextId, command))
 
         let newLabel contextId namespaceId (command: NewLabelDefinition) =
             updateAndReturnNamespaces (AddLabel(contextId, namespaceId, command))
@@ -143,6 +146,10 @@ module Namespaces =
                         boundedContextId
                         { Namespace = namespaceId
                           Label = labelId }
+                    POST >=> bindJson<{|Name:string; Value:string|}>(fun p ->
+                        {Label = labelId; Namespace = namespaceId; Name = p.Name; Value = p.Value}
+                        |> CommandEndpoints.updateLabel boundedContextId 
+                    )
                     RequestErrors.NOT_FOUND "Not found"
                 ]
         let routesForOneNamespace =

@@ -120,6 +120,36 @@ export const useNamespaces = defineStore("namespaces", () => {
     };
   }
 
+  async function updateNamespaceLabel(
+    boundedContextId: BoundedContextId,
+    namespaceId: NamespaceId,
+    label: NamespaceLabel
+  ) {
+    const { data, error } = await useFetch<Namespace[]>(
+      `/api/boundedContexts/${boundedContextId}/namespaces/${namespaceId}/labels/${label.id}`
+    ).post({
+      name: label.name,
+      value: label.value,
+    });
+
+    if (!error.value) {
+      activeBoundedContext.value!.namespaces = data.value || [];
+
+      const namespace = data.value?.find((n) => n.id === namespaceId);
+      if (namespace) {
+        const idx = namespaces.value.findIndex((n) => n.id == namespace.id);
+        const updatedNamespaces = [...namespaces.value];
+        updatedNamespaces[idx] = namespace;
+        namespaces.value = updatedNamespaces;
+      }
+    }
+
+    return {
+      data,
+      error,
+    };
+  }
+
   const namespaceLabelsByNamespaceName = computed<{
     [name: string]: NamespaceLabel[];
   }>(() => {
@@ -187,6 +217,7 @@ export const useNamespaces = defineStore("namespaces", () => {
     deleteNamespace,
     createNamespaceLabel,
     deleteNamespaceLabel,
+    updateNamespaceLabel,
     findNamespaceLabelValuesByLabelName,
     labelNames,
     namespaceLabelsByNamespaceName,
