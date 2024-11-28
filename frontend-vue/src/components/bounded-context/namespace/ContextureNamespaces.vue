@@ -63,7 +63,7 @@
       {{ t("bounded_context_namespace.empty") }}
     </div>
 
-    <div class="grid grid-cols-3 gap-4">
+    <div class="grid grid-cols-2 2xl:grid-cols-3 gap-4">
       <ContextureNamespace
         v-for="namespace of boundedContextNamespaces"
         :key="namespace.name"
