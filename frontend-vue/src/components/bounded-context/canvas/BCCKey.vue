@@ -63,7 +63,7 @@ const boundedContextShortNameValidator = computed(() =>
 );
 
 async function onUpdate() {
-  submitError.value = null;
+  submitError.value = undefined;
   const res = await store.updateKey(activeBoundedContext.value.id, key.value);
 
   if (res.error.value) {

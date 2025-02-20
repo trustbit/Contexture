@@ -59,7 +59,7 @@ const editMode = ref(false);
 const requiredString = toFieldValidator(zod.string().min(1, t("validation.required")));
 
 async function onUpdate() {
-  submitError.value = null;
+  submitError.value = undefined;
   const res = await store.updateDescription(activeBoundedContext.value.id, description.value);
 
   if (res.error.value) {
@@ -74,7 +74,7 @@ async function onUpdate() {
 }
 
 function onClose() {
-  submitError.value = null;
+  submitError.value = undefined;
   editMode.value = false;
   description.value = activeBoundedContext.value?.description;
 }

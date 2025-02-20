@@ -3,7 +3,7 @@
     <ContextureHelpfulErrorAlert v-bind="submitError" />
     <div class="pt-8 sm:w-96">
       <ContextureDynamicForm
-        @submit="onAddNewBoundedContext"
+        :action="onAddNewBoundedContext"
         :schema="form"
         :button-props="{
           label: t('domains.modal.create_bounded_context.form.submit'),
@@ -86,7 +86,7 @@ const form = computed<DynamicFormSchema<CreateBoundedContext>>(() => {
 const submitError = ref<HelpfulErrorProps>();
 
 async function onAddNewBoundedContext(createDomain: CreateBoundedContext) {
-  submitError.value = null;
+  submitError.value = undefined;
   const { error, data } = await createBoundedContext(props.parentDomain.id, createDomain);
 
   if (error.value) {

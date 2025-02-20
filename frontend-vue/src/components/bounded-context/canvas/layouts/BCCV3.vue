@@ -21,13 +21,13 @@
             <h3 class="text-base font-bold">
               {{ t("bounded_context_canvas.messages.consumed.title") }}
             </h3>
-            <BCCMessagesConsumed version="V3" />
+            <BCCMessagesConsumed :version="BoundedContextVersion.V3" />
           </div>
           <div class="flex w-1/2 flex-col gap-y-4 rounded p-4">
             <h3 class="text-base font-bold">
               {{ t("bounded_context_canvas.messages.produced.title") }}
             </h3>
-            <BCCMessagesProduced version="V3" />
+            <BCCMessagesProduced :version="BoundedContextVersion.V3" />
           </div>
         </div>
       </ContextureBoundedContextCanvasElement>
@@ -73,6 +73,7 @@ import BCCOutboundConnections from "~/components/bounded-context/canvas/BCCOutbo
 import BCCStrategicClassification from "~/components/bounded-context/canvas/BCCStrategicClassification.vue";
 import BCCUbiquitousLanguage from "~/components/bounded-context/canvas/BCCUbiquitousLanguage.vue";
 import ContextureBoundedContextCanvasElement from "~/components/bounded-context/canvas/ContextureBoundedContextCanvasElement.vue";
+import { BoundedContextVersion } from "~/components/bounded-context/canvas/layouts/version";
 
 const { t } = useI18n();
 </script>
