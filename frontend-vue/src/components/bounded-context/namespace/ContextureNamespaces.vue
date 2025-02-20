@@ -63,7 +63,7 @@
       {{ t("bounded_context_namespace.empty") }}
     </div>
 
-    <div class="grid grid-cols-2 2xl:grid-cols-3 gap-4">
+    <div class="grid grid-cols-2 gap-4 2xl:grid-cols-3">
       <ContextureNamespace
         v-for="namespace of boundedContextNamespaces"
         :key="namespace.name"
@@ -85,7 +85,6 @@
 
         <Form @submit="addNamespaceAction">
           <LoadingWrapper :is-loading="isLoading">
-
             <ContextureInputText
               name="namespace"
               class="ml-2 grow"
@@ -147,7 +146,7 @@
                   <Icon:materialSymbols:add class="mr-2" />
                 </template>
               </ContexturePrimaryButton>
-              </LoadingWrapper>
+            </LoadingWrapper>
           </div>
         </Form>
       </div>

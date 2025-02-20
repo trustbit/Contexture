@@ -65,7 +65,6 @@ const boundedContextShortNameValidator = computed(() =>
   )
 );
 
-function submit(values: any) {
 async function submit(values: any) {
   emit("submit", values);
   await handleAction(values);
