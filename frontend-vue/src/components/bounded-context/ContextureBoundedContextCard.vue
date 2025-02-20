@@ -6,7 +6,7 @@
         <span class="text-xs text-gray-600">{{ boundedContext.shortName }}</span>
       </div>
       <div class="flex flex-col gap-y-4 sm:w-9/12 sm:flex-col">
-        <div v-for="namespace of boundedContext.namespaces" :key="namespace.id">
+        <div v-for="namespace of namespaces" :key="namespace.id">
           <span class="text-xs font-bold text-gray-900">{{ namespace.name }}</span>
           <div class="mt-2 flex flex-wrap gap-2">
             <template v-for="label of namespace.labels" :key="label.id">
@@ -105,7 +105,7 @@
         </div>
 
         <div v-if="showNamespaces" class="divide-y divide-blue-100">
-          <div v-for="namespace of boundedContext.namespaces" :key="namespace.id" class="p-4">
+          <div v-for="namespace of namespaces" :key="namespace.id" class="p-4">
             <span class="text-xs font-bold text-gray-900">{{ namespace.name }}</span>
             <div class="mt-2 flex flex-wrap gap-2">
               <template v-for="label of namespace.labels" :key="label.id">
@@ -194,7 +194,7 @@
 </template>
 
 <script lang="ts" setup>
-import { ref } from "vue";
+import { computed, ref } from "vue";
 import { useI18n } from "vue-i18n";
 import { RouterLink } from "vue-router";
 import ContextureMoveBoundedContextModal from "~/components/bounded-context/ContextureMoveBoundedContextModal.vue";
@@ -223,6 +223,11 @@ const boundedContextStore = useBoundedContextsStore();
 const boundedContextToMove = ref<BoundedContext>();
 const moveBoundedContextDialogOpen = ref(false);
 const { canModify } = useAuthStore();
+const namespaces = computed(() =>
+  props.boundedContext.namespaces
+    .sortAlphabeticallyBy((n) => n.name)
+    .map((n) => ({ ...n, labels: n.labels.sortAlphabeticallyBy((l) => l.name) }))
+);
 
 function onDeleteClick(): void {
   confirmationModal.open(

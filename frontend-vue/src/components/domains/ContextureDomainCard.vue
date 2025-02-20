@@ -122,9 +122,13 @@ const confirmModal = useConfirmationModalStore();
 const domainsStore = useDomainsStore();
 const { boundedContextsByDomainId } = storeToRefs(useBoundedContextsStore());
 
-const subdomainNames = computed(() => props.domain.subdomains.map((subdomain) => subdomain.name));
+const subdomainNames = computed(() =>
+  props.domain.subdomains.map((subdomain) => subdomain.name).sortAlphabeticallyBy((name) => name)
+);
 const boundedContextNames = computed(() =>
-  (boundedContextsByDomainId.value[props.domain.id] || []).map((boundedContext) => boundedContext.name)
+  (boundedContextsByDomainId.value[props.domain.id] || [])
+    .map((boundedContext) => boundedContext.name)
+    .sortAlphabeticallyBy((name) => name)
 );
 const showBadges = computed(() => props.showSubdomains || props.showBoundedContexts);
 const hasSubdomainsOrBoundedContexts = computed(

@@ -6,6 +6,9 @@ open Contexture.Api.Aggregates.NamespaceTemplate.Projections
 open Contexture.Api.Infrastructure
 open Contexture.Api.Infrastructure.Projections
 
+module Defaults =
+    let ReplyTimeout = (System.TimeSpan.FromSeconds(10)).TotalMilliseconds |> int |> Some
+
 module Domain =
 
     open Contexture.Api.Aggregates.Domain
@@ -52,7 +55,7 @@ module Domain =
               // this is brute force ATM - but probably good enough for a while
               Subdomains = domains |> getDomains |> subdomainLookup }
 
-        ReadModels.readModel updateState AllDomainState.Initial
+        ReadModels.readModel updateState AllDomainState.Initial Defaults.ReplyTimeout
 
     let allDomains readModel = readModel.Domains |> getDomains
 
@@ -102,7 +105,7 @@ module BoundedContext =
                   |> allContexts
                   |> boundedContextsByDomainLookup }
 
-        ReadModels.readModel updateState BoundedContextState.Initial
+        ReadModels.readModel updateState BoundedContextState.Initial Defaults.ReplyTimeout
 
     let boundedContextLookup (state: BoundedContextState) =
         state.BoundedContexts
@@ -159,7 +162,7 @@ module Collaboration =
 
             collaborations
 
-        ReadModels.readModel updateState Map.empty
+        ReadModels.readModel updateState Map.empty Defaults.ReplyTimeout
 
 module Namespace =
     open Contexture.Api.Aggregates.Namespace
@@ -191,6 +194,7 @@ module Namespace =
         | NamespaceRemoved e -> e.NamespaceId
         | LabelAdded l -> l.NamespaceId
         | LabelRemoved l -> l.NamespaceId
+        | LabelUpdated l -> l.NamespaceId
 
     let allNamespaces (state: NamespaceState) =
         state.NamespaceByNamespaceId
@@ -212,6 +216,7 @@ module Namespace =
             | NamespaceRemoved n -> state |> Map.remove n.NamespaceId
             | LabelAdded l -> state
             | LabelRemoved l -> state
+            | LabelUpdated _ -> state
 
         let byNamespace (state: NamespaceState) (namespaceId: NamespaceId) =
             state.BoundedContextIdByNamespaceId
@@ -238,7 +243,7 @@ module Namespace =
                   NamespaceByBoundedContextId = byBoundedContextId
                   BoundedContextIdByNamespaceId = boundedContextByNamespaceId }
 
-        ReadModels.readModel updateState NamespaceState.Empty
+        ReadModels.readModel updateState NamespaceState.Empty Defaults.ReplyTimeout
 
 module Templates =
     open Contexture.Api.Aggregates.NamespaceTemplate
@@ -258,7 +263,7 @@ module Templates =
 
             templates
 
-        ReadModels.readModel updateState Map.empty
+        ReadModels.readModel updateState Map.empty Defaults.ReplyTimeout
 
     let allTemplates (state: TemplateState) = state |> Map.toList |> List.choose snd
 

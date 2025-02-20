@@ -3,6 +3,7 @@ module Contexture.Api.Aggregates.Namespace
 open System
 open Contexture.Api.Aggregates.Collaboration
 open BoundedContext.ValueObjects
+open FsToolkit.ErrorHandling
 
 module ValueObjects =
     type NamespaceTemplateId = Guid
@@ -22,6 +23,7 @@ type Command =
     | RemoveNamespace of BoundedContextId * NamespaceId
     | RemoveLabel of BoundedContextId * RemoveLabel
     | AddLabel of BoundedContextId * NamespaceId * NewLabelDefinition
+    | UpdateLabel of BoundedContextId * UpdateLabel
 
 and NamespaceDefinition =
     { Name: string
@@ -33,6 +35,12 @@ and NewLabelDefinition = { Name: string; Value: string; Template: TemplateLabelI
 and RemoveLabel =
     { Namespace: NamespaceId
       Label: LabelId }
+and UpdateLabel = {
+    Label: LabelId
+    Namespace: NamespaceId
+    Name: string
+    Value: string
+}
 
 type Event =
     | NamespaceImported of NamespaceImported
@@ -40,6 +48,7 @@ type Event =
     | NamespaceRemoved of NamespaceRemoved
     | LabelRemoved of LabelRemoved
     | LabelAdded of LabelAdded
+    | LabelUpdated of LabelUpdated
 
 and NamespaceImported =
     { NamespaceId: NamespaceId
@@ -76,25 +85,36 @@ and LabelAdded =
       Name: string
       Value: string option }
 
-type State =
-    | Namespaces of Map<NamespaceId, string>
-    static member Initial = Namespaces Map.empty
+and LabelUpdated = 
+    { LabelId: LabelId
+      NamespaceId: NamespaceId
+      Name: string
+      Value: string option }
 
-    static member evolve (Namespaces namespaces) (event: Event) =
+type State = {
+    Namespaces : Map<NamespaceId, string>
+    Labels : Set<LabelId>
+}
+with
+    static member Initial = {
+        Namespaces = Map.empty
+        Labels = Set.empty
+    }
+
+    static member evolve state (event: Event) =
         match event with
         | NamespaceRemoved e ->
-            namespaces
-            |> Map.remove e.NamespaceId
-            |> Namespaces
+            {state with Namespaces = state.Namespaces |> Map.remove e.NamespaceId }
         | NamespaceAdded e ->
-            namespaces
-            |> Map.add e.NamespaceId e.Name
-            |> Namespaces
+            {state with Namespaces = state.Namespaces |> Map.add e.NamespaceId e.Name}
         | NamespaceImported e ->
-            namespaces
-            |> Map.add e.NamespaceId e.Name
-            |> Namespaces
-        | _ -> Namespaces namespaces
+            {state with Namespaces = state.Namespaces |> Map.add e.NamespaceId e.Name }
+        | LabelAdded e ->
+            {state with Labels = state.Labels |> Set.add e.LabelId }
+        | LabelRemoved e ->
+            {state with Labels = state.Labels |> Set.remove e.LabelId }
+        | _ -> state
+    
 
 module LabelDefinition =
     let create name (value: string) template: LabelDefinition option =
@@ -107,8 +127,8 @@ module LabelDefinition =
                   Value = if not (isNull value) then value.Trim() |> Some else None
                   Template = template }
 
-let addNewNamespace boundedContextId name templateId (labels: NewLabelDefinition list) (Namespaces namespaces) =
-    if namespaces
+let addNewNamespace boundedContextId name templateId (labels: NewLabelDefinition list) state =
+    if state.Namespaces
        |> Map.exists (fun _ existingName -> String.Equals (existingName, name,StringComparison.OrdinalIgnoreCase)) then
         Error NamespaceNameNotUnique
     else
@@ -137,12 +157,25 @@ let addLabel namespaceId labelName value =
               LabelId = label.LabelId }
     | None -> Error EmptyName
 
+let updateLabel (cmd: UpdateLabel) =
+    LabelDefinition.create cmd.Name cmd.Value None
+    |> Result.requireSome EmptyName
+    |> Result.map(fun label ->
+        LabelUpdated { 
+            Name = label.Name
+            Value = label.Value
+            LabelId = cmd.Label
+            NamespaceId = cmd.Namespace
+        }
+    )
+
 let identify =
     function
     | NewNamespace (boundedContextId, _) -> boundedContextId
     | RemoveNamespace (boundedContextId, _) -> boundedContextId
     | AddLabel (boundedContextId, _, _) -> boundedContextId
     | RemoveLabel (boundedContextId, _) -> boundedContextId
+    | UpdateLabel (boundedContextId, _) -> boundedContextId
 
 let name identity = identity
 
@@ -162,6 +195,7 @@ let decide (command: Command) (state: State) =
         <| LabelRemoved
             { NamespaceId = labelCommand.Namespace
               LabelId = labelCommand.Label }
+    | UpdateLabel (_, labelCommand) -> updateLabel labelCommand
     |> Result.map List.singleton
 
 module Projections =
@@ -218,6 +252,17 @@ module Projections =
                           n.Labels
                           |> List.filter (fun l -> l.Id <> c.LabelId) }
             )
+        | LabelUpdated c ->
+            namespaceOption
+            |> Option.map(fun n ->
+                {n with Labels = n.Labels |> List.map(fun label ->
+                    if label.Id = c.LabelId then
+                        {label with Name = c.Name; Value = c.Value |> Option.defaultValue null}
+                    else 
+                        label
+                    )
+                }
+            )
 
     let asNamespaces namespaces event =
         match event with
@@ -257,6 +302,19 @@ module Projections =
                           Labels =
                               n.Labels
                               |> List.filter (fun l -> l.Id <> c.LabelId) }
+                else
+                    n)
+        | LabelUpdated c ->
+            namespaces
+            |> List.map(fun n ->
+                if n.Id = c.NamespaceId then
+                    {n with Labels = n.Labels |> List.map(fun label ->
+                        if label.Id = c.LabelId then
+                            {label with Name = c.Name; Value = c.Value |> Option.defaultValue null}
+                        else 
+                            label
+                        )
+                    }
                 else
                     n)
             

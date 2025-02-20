@@ -71,8 +71,6 @@ module SearchPhraseResult =
 
     let fromManyResults results =
         results
-        |> Seq.map Set.ofSeq
-        |> Set.unionMany
         |> fromResults
 
     let combineResultsWithAnd (searchResults: SearchPhraseResult<_> seq) =

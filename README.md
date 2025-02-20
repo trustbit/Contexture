@@ -89,11 +89,12 @@ Your data will be stored in the `/data/db.json` file on the volume `/data`.
 
 ### Liveness & Readiness Probes
 
-Contexture provides HTTP based [Liveness & Readiness Probes](https://kubernetes.io/docs/tasks/configure-pod-container/configure-liveness-readiness-startup-probes/) to determine if the container is health & operational
+Contexture provides HTTP based [Liveness & Readiness Probes](https://kubernetes.io/docs/tasks/configure-pod-container/configure-liveness-readiness-startup-probes/) to determine if the container is healthy & operational
 
 #### Liveness
 
 A `GET` request to `$BASE_URL/meta/health` will return `200 OK` if the application is healthy and currently processing requests.
+It will return a `503 ServiceUnavailable` in case information about subscriptions can not be obtained or any of the subscriptions have Failed.
 
 #### Readiness
 

@@ -1,10 +1,18 @@
 version: '3'
 services:
   contexture-database:
-    image: mcr.microsoft.com/mssql/server:2019-latest
+    image: mcr.microsoft.com/mssql/server:2022-latest
     ports:
       - "1433:1433"
     environment:
       ACCEPT_EULA: Y
       MSSQL_SA_PASSWORD: development(!)Password
+
+  contexture:
+    depends_on: [contexture-database]
+    image: softwarepark/contexture:latest
+    environment:
+      - SqlBased__ConnectionString=Server=contexture-contexture-database-1;User Id=sa;Password=development(!)Password
+    ports:
+      - "3000:3000"
   

@@ -389,8 +389,29 @@ type Storage(persistence: IPersistence, clock: Clock, logger: INStoreLoggerFacto
 
             let pollingClient =
                 PollingClient(persistence, positionValue, wrappedSubscription, logger)
+            
+            let poll = fun () -> (
+                task {
+                    while true do
+                        do! pollingClient.Poll().ConfigureAwait(false)
+                        do! Task.Delay(pollingClient.PollingIntervalMilliseconds).ConfigureAwait(false)
+                    }
+                :> Task
+            )
 
-            pollingClient.Start()
+            Task
+                .Run(poll)
+                .ContinueWith(fun t ->
+                    if t.IsFaulted then
+                        let innerException = t.Exception.Flatten().InnerException;
+                        let logger = logger.CreateLogger("PollingClient")
+                        logger.LogError($"Error during Poll, first exception: {innerException.Message}.\n{innerException}");
+                        wrappedSubscription.OnErrorAsync(pollingClient.Position ,t.Exception)
+                    else
+                        Task.CompletedTask
+                )
+                .ConfigureAwait(false)
+                |> ignore
 
             return
                 { new Subscription with

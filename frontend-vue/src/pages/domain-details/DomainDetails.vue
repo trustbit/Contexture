@@ -43,6 +43,7 @@
               </ContextureTooltip>
             </div>
           </div>
+          <StructurizerDiscloser />
         </div>
       </transition>
     </div>
@@ -220,6 +221,7 @@ import ContextureEntityNotFound from "~/components/core/ContextureEntityNotFound
 import ContextureEditDomainForm from "~/components/domains/details/ContextureEditDomainForm.vue";
 import ContextureHeroHeader from "~/components/core/header/ContextureHeroHeader.vue";
 import ContextureTooltip from "~/components/primitives/tooltip/ContextureTooltip.vue";
+import StructurizerDiscloser from "~/components/core/header/StructurizerDiscloser.vue";
 import { useBoundedContextsStore } from "~/stores/boundedContexts";
 import { useDomainsStore } from "~/stores/domains";
 import { Domain, UpdateDomain } from "~/types/domain";

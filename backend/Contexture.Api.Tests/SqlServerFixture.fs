@@ -1,27 +1,20 @@
 namespace Contexture.Api.Tests
 
-#nowarn "44" // ContainerBuilder<MsSqlTestcontainer>() is deprecated but does not provide a clear guidance yet
-
 open System
 open System.Threading
-open DotNet.Testcontainers.Builders
-open DotNet.Testcontainers.Configurations
-open DotNet.Testcontainers.Containers
+open Testcontainers.MsSql
 open Xunit
 
 type MsSqlFixture() =
     static let mutable counter = ref 0
-    let container =
+    let container =   
         let containerConfiguration =
-            ContainerBuilder<MsSqlTestcontainer>()
-                .WithDatabase(new MsSqlTestcontainerConfiguration(Password = "localdevpassword#123"))
-                .WithImage("mcr.microsoft.com/mssql/server:2019-latest")
+            MsSqlBuilder()
                 .WithName($"MS-SQL-Integration-Tests-{Interlocked.Increment counter}")
                 .WithCleanUp(false)
                 .WithAutoRemove(true)
 
-        let instance = containerConfiguration.Build()
-        instance
+        containerConfiguration.Build()
 
     member _.Container = container
 

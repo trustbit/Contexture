@@ -68,6 +68,7 @@ type Msg<'Event, 'Result> =
 let readModel
     (updateState: 'State -> EventEnvelope<'Event> list -> 'State)
     (initState: 'State)
+    (replyTimeout: int option)
     : ReadModel<'Event, 'State> =
     let agent =
         let eventSubscriber (inbox: Agent<Msg<_, _>>) =
@@ -96,14 +97,15 @@ let readModel
 
         Agent<Msg<_, _>>.Start (eventSubscriber)
 
+    let replyTimeoutMiliseconds = replyTimeout |> Option.defaultValue -1
     { new ReadModel<'Event, 'State> with
         member _.EventHandler position eventEnvelopes =
-            agent.PostAndAsyncReply(fun reply -> Notify(position, eventEnvelopes, reply))
+            agent.PostAndAsyncReply((fun reply -> Notify(position, eventEnvelopes, reply)), replyTimeoutMiliseconds)
 
         member _.State position =
             match position with
             | Some position ->
-                agent.PostAndAsyncReply (fun reply -> StateAfter(position,reply)) |> Async.StartAsTask
+                agent.PostAndAsyncReply ((fun reply -> StateAfter(position,reply)), replyTimeoutMiliseconds) |> Async.StartAsTask
             | None ->
-                agent.PostAndAsyncReply State |> Async.StartAsTask
+                agent.PostAndAsyncReply (State, replyTimeoutMiliseconds) |> Async.StartAsTask
     }

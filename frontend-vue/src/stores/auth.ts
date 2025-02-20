@@ -97,13 +97,14 @@ export const useAuthStore = defineStore("auth", () => {
       };
   }
 
-  function signinRedirect() {
-    return userManager.signinRedirect();
+  function signinRedirect(path?: string | undefined) {
+    return userManager.signinRedirect({ url_state: path });
   }
 
   async function signinCallback() {
-    await userManager.signinCallback();
+    const usr = await userManager.signinCallback();
     await fetchUserInfo();
+    return usr?.url_state;
   }
 
   async function signinSilent() {
@@ -123,7 +124,6 @@ export const useAuthStore = defineStore("auth", () => {
 
   async function fetchUserInfo() {
     const user = await userManager.getUser();
-
     const { data } = await useFetch<{ permissions: string[] }>("/meta/userPermissions", {
       headers: {
         Authorization: `Bearer ${user?.access_token}`,

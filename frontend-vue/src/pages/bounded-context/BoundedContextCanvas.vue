@@ -44,6 +44,7 @@
             </div>
           </div>
         </transition>
+        <StructurizerDiscloser />
       </div>
     </ContextureHeroHeader>
 
@@ -80,6 +81,10 @@
         </TabGroup>
       </div>
     </div>
+
+    <div class="mx-auto mt-5 px-4 pb-8 lg:px-20">
+      <ContextureNamespaces class="rounded bg-gray-100 p-4"></ContextureNamespaces>
+    </div>
   </div>
 
   <div class="container mx-auto mt-5 px-2 pb-8 sm:px-0" v-else>
@@ -103,8 +108,10 @@ import ContextureHeroHeader from "~/components/core/header/ContextureHeroHeader.
 import ContextureHelpfulErrorAlert from "~/components/primitives/alert/ContextureHelpfulErrorAlert.vue";
 import ContextureRoundedButton from "~/components/primitives/button/ContextureRoundedButton.vue";
 import ContextureTooltip from "~/components/primitives/tooltip/ContextureTooltip.vue";
+import StructurizerDiscloser from "~/components/core/header/StructurizerDiscloser.vue";
 import { useAuthStore } from "~/stores/auth";
 import { useBoundedContextsStore } from "~/stores/boundedContexts";
+import ContextureNamespaces from "~/components/bounded-context/namespace/ContextureNamespaces.vue";
 
 const store = useBoundedContextsStore();
 const { loading } = storeToRefs(store);

@@ -55,7 +55,7 @@ module SearchFor =
                 [ nameof dummy.Name
                   nameof dummy.Value ]
 
-        let findRelevantLabels (namespacesByLabel: Labels.NamespacesByLabel) (item: LabelQuery) =
+        let findRelevantLabels (namespacesByLabel: Labels.State) (item: LabelQuery) =
             let byNameResults =
                 item.Name
                 |> SearchArgument.fromInputs
@@ -70,7 +70,7 @@ module SearchFor =
             SearchResult.combineResults [ byNameResults
                                           byLabelResults ]
 
-        let find (state: Labels.NamespacesByLabel) (byLabel: LabelQuery option) =
+        let find (state: Labels.State) (byLabel: LabelQuery option) =
             byLabel
             |> Option.map (findRelevantLabels state)
             |> SearchResult.fromOption

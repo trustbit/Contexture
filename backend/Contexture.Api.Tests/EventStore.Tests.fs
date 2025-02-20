@@ -264,7 +264,7 @@ type MsSqlBackedEventStore(msSql: MsSqlFixture) =
             let config =
                 MsSqlPersistenceOptions(
                     loggerFactory,
-                    ConnectionString = msSql.Container.ConnectionString,
+                    ConnectionString = msSql.Container.GetConnectionString(),
                     StreamsTableName = $"streams_{Interlocked.Increment(counter)}_{this.GetType().Name}",
                     Serializer = NStoreBased.JsonMsSqlSerializer.Default
                 )
