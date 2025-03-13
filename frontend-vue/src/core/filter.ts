@@ -21,8 +21,7 @@ export function filter(obj: any, query: string, key?: string | undefined): boole
       if (nestedResults.length) {
         return true;
       }
-    }
-    else if (typeof propValue === "object") {
+    } else if (typeof propValue === "object") {
       return filter(propValue, query);
     } else if (typeof propValue === "string") {
       if (propValue.toLowerCase().includes(query?.toLowerCase())) {
