@@ -6,24 +6,26 @@
  * @param key An optional property key to limit the search to
  * @returns Returns a boolean indicating if the query was found in any of the object's properties.
  */
-export function filter(obj: any, query: string, key?: string | undefined) {
+export function filter(obj: any, query: string, key?: string | undefined): boolean {
   for (const prop in obj) {
     if (key && prop !== key) {
       continue;
     }
-    if (Array.isArray(obj[prop])) {
-      if (obj[prop].includes(query)) {
+    const propValue = obj[prop];
+    if (!propValue) return false;
+    if (Array.isArray(propValue)) {
+      if (propValue.includes(query)) {
         return true;
       }
-      const nestedResults = filterInArray(obj[prop] as any[], query);
+      const nestedResults = filterInArray(propValue as any[], query);
       if (nestedResults.length) {
         return true;
       }
-    } else {
-      if (typeof obj[prop] === "string") {
-        if (obj[prop].toLowerCase().includes(query?.toLowerCase())) {
-          return true;
-        }
+    } else if (typeof propValue === "object") {
+      return filter(propValue, query);
+    } else if (typeof propValue === "string") {
+      if (propValue.toLowerCase().includes(query?.toLowerCase())) {
+        return true;
       }
     }
   }
