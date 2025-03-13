@@ -37,4 +37,21 @@ describe("filter", () => {
 
     expect(actualFound).toBeFalsy();
   });
+
+  it("should search in nested object array", () => {
+    const nestedObject = {
+      a: [
+        {
+          b: [
+            {
+              c: "hit",
+            },
+          ],
+        },
+      ],
+    };
+
+    const result = filter(nestedObject, "hit");
+    expect(result).toBeTruthy();
+  });
 });
