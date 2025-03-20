@@ -22,7 +22,9 @@ export function filter(obj: any, query: string, key?: string | undefined): boole
         return true;
       }
     } else if (typeof propValue === "object") {
-      return filter(propValue, query);
+      if (filter(propValue, query)) {
+        return true;
+      }
     } else if (typeof propValue === "string") {
       if (propValue.toLowerCase().includes(query?.toLowerCase())) {
         return true;

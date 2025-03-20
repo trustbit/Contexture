@@ -24,7 +24,7 @@
 
           <div class="mt-8 flex flex-col gap-y-4">
             <template v-for="parentDomain of sortedParentDomains" :key="parentDomain.id">
-              <div class="grid-cols-3 gap-4 bg-gray-100 p-2 sm:grid sm:p-6" v-if="showParentDomain(parentDomain.id)">
+              <div class="grid-cols-3 gap-4 bg-gray-100 p-2 sm:grid sm:p-6" v-if="showParentDomain(parentDomain)">
                 <!-- parent domains -->
                 <!-- first column -->
                 <RouterLink
@@ -325,8 +325,7 @@ import { useBoundedContextsStore } from "~/stores/boundedContexts";
 import { useDomainsStore } from "~/stores/domains";
 import { refDebounced, useLocalStorage } from "@vueuse/core";
 import { BoundedContext } from "~/types/boundedContext";
-import { Domain } from "~/types/domain";
-import { DomainId } from "~/types/domain";
+import { Domain, DomainId } from "~/types/domain";
 
 interface DomainListViewSettings {
   showDescription: boolean;
@@ -419,9 +418,13 @@ const searchInBoundedContext = (
   }, {});
 };
 
-const showParentDomain = (parentDomainId: DomainId) => {
-  return searchQuery.value
-    ? filteredSubdomains.value[parentDomainId]?.length > 0 || filteredBoundedContexts.value[parentDomainId]?.length > 0
-    : filteredSubdomains;
+const showParentDomain = (parentDomain: Domain) => {
+  if (!searchQuery.value) return filteredSubdomains;
+  const parentDomainId: DomainId = parentDomain.id;
+  return (
+    filteredSubdomains.value[parentDomainId]?.length > 0 ||
+    filteredBoundedContexts.value[parentDomainId]?.length > 0 ||
+    filter({ ...parentDomain, boundedContexts: [], subdomains: [] }, searchQuery.value)
+  );
 };
 </script>
