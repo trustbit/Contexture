@@ -337,6 +337,7 @@ module EventLog =
             }
             [ 
                 prependEvent b.BoundedContextId eventToAppend
+                updateBoundedContext {Id = b.BoundedContextId; Name = b.Name; ShortName = None; DomainId = b.DomainId}
             ]
         | BoundedContext.BoundedContextRenamed b -> 
             let bc = getBoundedContext state b.BoundedContextId id
@@ -473,7 +474,9 @@ module EventLog =
                 EventData = {| Name = d.Name |} |> asEventData 
             }
             [
+                prependEvent d.ParentDomainId eventToAppend
                 prependEvent d.DomainId eventToAppend
+                updateDomain { Id = d.DomainId; Name = d.Name; ShortName = None }
             ]
         | Domain.DomainRenamed d -> 
             let domain = getDomain state d.DomainId id
@@ -523,15 +526,21 @@ module EventLog =
 
 
     let projectEvent (state: EventLogState) (event: EventEnvelope<AllEvents>) =
-        let modifications =
-            match event.Event with
-            | BoundedContexts boundedContextEvent -> projectBoundedContextEvent state boundedContextEvent event.Metadata
-            | Domains domainEvent -> projectDomainEvent state domainEvent event.Metadata
-            | Namespaces _namespaceEvent -> []
-            | NamespaceTemplates _templateEvent -> []
-            | Collaboration _collaborationEvent -> []
+        try
+            let modifications =
+                match event.Event with
+                | BoundedContexts boundedContextEvent -> projectBoundedContextEvent state boundedContextEvent event.Metadata
+                | Domains domainEvent -> projectDomainEvent state domainEvent event.Metadata
+                | Namespaces _namespaceEvent -> []
+                | NamespaceTemplates _templateEvent -> []
+                | Collaboration _collaborationEvent -> []
 
-        modifications |> List.fold (fun acc modify -> modify acc) state
+            modifications |> List.fold (fun acc modify -> modify acc) state
+        with
+        | ex -> 
+            printfn $"{ex}"
+            state
+
 
     let eventLogReadModel () : EventLogReadModel =
         let updateState state eventEnvelopes =
