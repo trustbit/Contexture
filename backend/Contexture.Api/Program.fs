@@ -95,6 +95,7 @@ module Routes =
                        Apis.BoundedContexts.routes
                        Apis.Collaborations.routes
                        Apis.Namespaces.routes
+                       Apis.EventLog.routes
                        AllRoutes.routes
                 ])
             subRoute "/meta"
@@ -191,6 +192,17 @@ module ServiceConfiguration =
                 $"ReadModel of {formatAsString(typeof<'E>)} for {formatAsString(typeof<'S>)}"
                 readModel.EventHandler
         services.AddSingleton<ReadModels.ReadModelInitialization> initializeReadModel
+
+    let registerEventLogReadModel (services: IServiceCollection) =
+        let readModel = ReadModels.EventLog.eventLogReadModel()
+        services.AddSingleton<ReadModels.EventLog.EventLogReadModel> readModel |> ignore
+        services.AddSingleton<ReadModels.ReadModelInitialization> (fun s ->
+            ReadModels.ReadModelInitialization.initializeFromAll 
+                (s.GetRequiredService<EventStore>())
+                AllEvents.AllEvents.fromEnvelope
+                $"ReadModel of {formatAsString(typeof<AllEvents.AllEvents>)} for {formatAsString(typeof<ReadModels.EventLog.EventLogState>)}"
+                readModel.EventHandler
+        )
         
     let registerReaction<'R, 'E, 'S when 'R :> Reactions.Reaction<'S,'E> and 'R : not struct> (reaction: IServiceProvider -> 'R) (services: IServiceCollection) =
         let initializeReaction (s: IServiceProvider) =
@@ -214,6 +226,7 @@ module ServiceConfiguration =
         |> registerReadModel (ReadModels.Find.Domains.readModel())
         |> registerReadModel (ReadModels.Find.Labels.readModel())
         |> registerReadModel (ReadModels.Find.Namespaces.readModel())
+        |> registerEventLogReadModel
         
     let configureReactions (services: IServiceCollection) =
         services

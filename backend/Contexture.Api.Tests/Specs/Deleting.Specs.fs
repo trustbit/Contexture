@@ -3,7 +3,7 @@ module Contexture.Api.Tests.Specs.Deleting
 open Contexture.Api.Aggregates
 open Contexture.Api.Aggregates.Collaboration.ValueObjects
 open Contexture.Api.Infrastructure
-open Contexture.Api.Reactions
+open Contexture.Api.AllEvents
 open Contexture.Api.Tests
 open Contexture.Api.Tests.EnvironmentSimulation
 open Xunit

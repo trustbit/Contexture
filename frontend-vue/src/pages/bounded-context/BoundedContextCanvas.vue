@@ -48,43 +48,39 @@
       </div>
     </ContextureHeroHeader>
 
-    <div class="mx-auto mt-5 px-4 pb-8 text-gray-900 lg:px-20">
-      <div class="mt-8">
-        <TabGroup :default-index="1">
-          <div class="flex items-center justify-between">
-            <div>
-              <ContextureBreadcrumbs />
-            </div>
-            <div>
-              <TabList
-                class="flex divide-x divide-blue-500 overflow-hidden rounded-2xl border border-blue-500 text-xs text-blue-500 sm:mr-10 sm:w-fit"
-              >
-                <Tab
-                  v-for="version in BoundedContextVersion"
-                  class="inline-flex flex-grow items-center justify-center px-3 py-1.5 hover:bg-blue-100 ui-selected:bg-blue-500 ui-selected:text-white"
-                  :key="version"
-                  >{{ version }}
-                </Tab>
-              </TabList>
-            </div>
-          </div>
-          <TabPanels>
-            <div class="mt-8 overflow-x-auto">
-              <TabPanel>
-                <BCCV3 />
-              </TabPanel>
-              <TabPanel>
-                <BCCV4 />
-              </TabPanel>
-            </div>
-          </TabPanels>
-        </TabGroup>
+    <div class="mx-auto mt-5 flex flex-col gap-4 px-4 pb-8 text-gray-900 lg:px-20">
+      <div class="flex flex-row items-center justify-between">
+        <ContextureBreadcrumbs />
+        <ContextureSecondaryButton :label="t('event_log.show')" size="sm" @click="openEventLogModal">
+        </ContextureSecondaryButton>
       </div>
-    </div>
-
-    <div class="mx-auto mt-5 px-4 pb-8 lg:px-20">
+      <TabGroup :default-index="1">
+        <div class="flex justify-end">
+          <TabList
+            class="flex divide-x divide-blue-500 overflow-hidden rounded-2xl border border-blue-500 text-xs text-blue-500 sm:w-fit"
+          >
+            <Tab
+              v-for="version in BoundedContextVersion"
+              class="inline-flex flex-grow items-center justify-center px-3 py-1.5 hover:bg-blue-100 ui-selected:bg-blue-500 ui-selected:text-white"
+              :key="version"
+              >{{ version }}
+            </Tab>
+          </TabList>
+        </div>
+        <TabPanels>
+          <div class="overflow-x-auto">
+            <TabPanel>
+              <BCCV3 />
+            </TabPanel>
+            <TabPanel>
+              <BCCV4 />
+            </TabPanel>
+          </div>
+        </TabPanels>
+      </TabGroup>
       <ContextureNamespaces class="rounded bg-gray-100 p-4"></ContextureNamespaces>
     </div>
+    <EventLogModal :isOpen="isEventLogModalOpen" :entityId="activeBoundedContext.id" @cancel="closeEventLogModal" />
   </div>
 
   <div class="container mx-auto mt-5 px-2 pb-8 sm:px-0" v-else>
@@ -107,11 +103,13 @@ import ContextureEntityNotFound from "~/components/core/ContextureEntityNotFound
 import ContextureHeroHeader from "~/components/core/header/ContextureHeroHeader.vue";
 import ContextureHelpfulErrorAlert from "~/components/primitives/alert/ContextureHelpfulErrorAlert.vue";
 import ContextureRoundedButton from "~/components/primitives/button/ContextureRoundedButton.vue";
+import ContextureSecondaryButton from "~/components/primitives/button/ContextureSecondaryButton.vue";
 import ContextureTooltip from "~/components/primitives/tooltip/ContextureTooltip.vue";
 import StructurizerDiscloser from "~/components/core/header/StructurizerDiscloser.vue";
 import { useAuthStore } from "~/stores/auth";
 import { useBoundedContextsStore } from "~/stores/boundedContexts";
 import ContextureNamespaces from "~/components/bounded-context/namespace/ContextureNamespaces.vue";
+import EventLogModal from "~/components/event-log/EventLogModal.vue";
 
 const store = useBoundedContextsStore();
 const { loading } = storeToRefs(store);
@@ -142,4 +140,14 @@ async function onSave(values: { name: string; key?: string }) {
     editMode.value = false;
   }
 }
+
+const isEventLogModalOpen = ref(false);
+
+const openEventLogModal = () => {
+  isEventLogModalOpen.value = true;
+};
+
+const closeEventLogModal = () => {
+  isEventLogModalOpen.value = false;
+};
 </script>

@@ -53,8 +53,13 @@
     <div class="mt-4 flex justify-center sm:mt-10" v-if="loading">{{ t("domains.details.loading") }}</div>
 
     <div class="mt-6" v-else-if="domain">
-      <div class="mt-8">
+      <div class="flex flex-row items-center justify-between">
         <ContextureBreadcrumbs />
+        <ContextureSecondaryButton
+          :label="t('event_log.show')"
+          @click="openEventLogModal"
+          size="sm"
+        ></ContextureSecondaryButton>
       </div>
       <div class="mt-6">
         <TabGroup @change="onTabChange" :selected-index="selectedTab">
@@ -198,6 +203,11 @@
       :parent-domain="domain"
       @close="onCreateBoundedContextClose"
     />
+    <EventLogModal
+      :is-open="isEventLogModalOpen"
+      :entityId="currentDomainId"
+      @cancel="closeEventLogModal"
+    ></EventLogModal>
   </div>
 </template>
 
@@ -222,10 +232,12 @@ import ContextureEditDomainForm from "~/components/domains/details/ContextureEdi
 import ContextureHeroHeader from "~/components/core/header/ContextureHeroHeader.vue";
 import ContextureTooltip from "~/components/primitives/tooltip/ContextureTooltip.vue";
 import StructurizerDiscloser from "~/components/core/header/StructurizerDiscloser.vue";
+import EventLogModal from "~/components/event-log/EventLogModal.vue";
 import { useBoundedContextsStore } from "~/stores/boundedContexts";
 import { useDomainsStore } from "~/stores/domains";
 import { Domain, UpdateDomain } from "~/types/domain";
 import { useAuthStore } from "~/stores/auth";
+import ContextureSecondaryButton from "~/components/primitives/button/ContextureSecondaryButton.vue";
 
 const { t } = useI18n();
 const domainStore = useDomainsStore();
@@ -326,4 +338,14 @@ watchEffect(() => {
     onTabChange(viewOptions.indexOf(viewOptions[1])); // Set the second tab as active
   }
 });
+
+const isEventLogModalOpen = ref(false);
+
+const openEventLogModal = () => {
+  isEventLogModalOpen.value = true;
+};
+
+const closeEventLogModal = () => {
+  isEventLogModalOpen.value = false;
+};
 </script>
