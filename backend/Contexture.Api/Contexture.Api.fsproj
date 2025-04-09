@@ -33,6 +33,7 @@
     <Compile Include="Infrastructure\Projections.fs" />
     <Compile Include="Infrastructure\ReadModels.fs" />
     <Compile Include="Infrastructure\Security.fs" />
+    <Compile Include="AllEvents.fs" />
     <Compile Include="CommandHandlers.fs" />
     <Compile Include="Reactions.fs" />
     <Compile Include="ReadModels\ApplicationReadModels.fs" />
@@ -43,6 +44,7 @@
     <Compile Include="Apis\Namespaces.fs" />
     <Compile Include="Apis\BoundedContexts.fs" />
     <Compile Include="Apis\Collaborations.fs" />
+    <Compile Include="Apis\EventLog.fs" />
     <Compile Include="Views\Views.fs" />
     <Compile Include="Views\Namespaces.fs" />
     <Compile Include="Views\Search.fs" />

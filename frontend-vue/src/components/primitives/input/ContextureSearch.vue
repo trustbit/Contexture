@@ -16,7 +16,7 @@
       @input="onInput"
     />
     <div v-if="modelValue" class="absolute inset-y-0 right-0 flex cursor-pointer items-center pr-3" @click="clear">
-      <Icon:materialSymbols:close class="h-5 w-5 text-blue-500 hover:text-blue-400 bg-white" />
+      <Icon:materialSymbols:close class="h-5 w-5 bg-white text-blue-500 hover:text-blue-400" />
     </div>
   </div>
 </template>

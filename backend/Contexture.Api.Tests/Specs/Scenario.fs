@@ -7,7 +7,7 @@ open System.Threading.Tasks
 open Contexture.Api.Infrastructure
 open Contexture.Api.Infrastructure.Storage
 open Contexture.Api.Infrastructure.Subscriptions
-open Contexture.Api.Reactions
+open Contexture.Api.AllEvents
 open Contexture.Api.Tests.TestHost
 open FsToolkit.ErrorHandling
 open Microsoft.Extensions.Logging.Abstractions
