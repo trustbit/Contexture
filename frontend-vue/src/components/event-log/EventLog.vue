@@ -2,9 +2,9 @@
   <ol class="mt-3 divide-y divide-gray-200 dark:divide-gray-700">
     <li v-for="(event, index) in paginatedEvents" :key="index">
       <div class="flex flex-col p-3">
-        <div class="flex justify-between gap-6 text-base font-normal">
+        <div class="flex items-center justify-between gap-6 text-base font-normal">
           <span class="font-medium text-blue-500">{{ translateEventTypeName(event.eventType) }}</span>
-          <span class="font-medium text-blue-500">{{ formatTimestamp(event.timestamp) }}</span>
+          <FormattedDate :date="event.timestamp"></FormattedDate>
         </div>
         <template v-if="event.eventType === 'BoundedContextImported'">
           <PropertyValue :name="t('event_log.boundedcontext.name')" :value="event.eventData.name"></PropertyValue>
@@ -60,17 +60,11 @@ import { useI18n } from "vue-i18n";
 import { EventLogEntry } from "~/types/event-log";
 import ValueDiff from "./ValueDiff.vue";
 import PropertyValue from "./PropertyValue.vue";
+import FormattedDate from "./FormattedDate.vue";
+
 const { events } = defineProps<{ events: EventLogEntry[] }>();
-
 const { t } = useI18n();
-
 const translateEventTypeName = (eventType: string) => t(`event_log.eventype.${eventType.toLowerCase()}`);
-
-const formatTimestamp = (timestamp: string) => {
-  const date = new Date(timestamp);
-  return date.toUTCString();
-};
-
 const itemsPerPage = 5;
 const currentPage = ref(1);
 

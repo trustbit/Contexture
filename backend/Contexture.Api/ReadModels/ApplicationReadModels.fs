@@ -455,7 +455,7 @@ module EventLog =
             }
             [
                 prependEvent d.DomainId eventToAppend
-                updateDomain { Id = d.DomainId; Name = d.Name; ShortName = None }
+                updateDomain { Id = d.DomainId; Name = d.Name; ShortName = d.ShortName }
             ]
         | Domain.DomainCreated d -> 
             let eventToAppend = { 
